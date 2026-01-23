@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSession } from '@/contexts/SessionContext';
-import { createSession } from '@/lib/supabase-helpers';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -14,22 +15,46 @@ interface CreateSessionProps {
 
 export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
   const { setCurrentSession, setIsAdmin } = useSession();
+  const { user } = useAuth();
   const [verseReference, setVerseReference] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = async () => {
+    if (!user) {
+      toast.error('請先登入');
+      return;
+    }
+    
     setIsCreating(true);
     
-    const session = await createSession(verseReference);
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({ 
+        verse_reference: verseReference, 
+        status: 'waiting',
+        owner_id: user.id 
+      })
+      .select()
+      .single();
     
-    if (session) {
-      setCurrentSession(session);
-      setIsAdmin(true);
-      toast.success('查經聚會已建立！Session created!');
-      onCreated();
-    } else {
+    if (error) {
+      console.error('Error creating session:', error);
       toast.error('建立失敗，請重試');
+      setIsCreating(false);
+      return;
     }
+
+    setCurrentSession({
+      id: data.id,
+      bibleVerse: '',
+      verseReference: data.verse_reference,
+      status: data.status as 'waiting' | 'grouping' | 'studying' | 'completed',
+      createdAt: new Date(data.created_at),
+      groups: [],
+    });
+    setIsAdmin(true);
+    toast.success('查經聚會已建立！Session created!');
+    onCreated();
     
     setIsCreating(false);
   };
