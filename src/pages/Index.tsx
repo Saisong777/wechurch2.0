@@ -1,11 +1,21 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen, Settings, Users, Sparkles } from 'lucide-react';
 
 const Index = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  
+  // If session ID is in URL, redirect to user page with that session
+  useEffect(() => {
+    const sessionId = searchParams.get('session');
+    if (sessionId) {
+      navigate(`/user?session=${sessionId}`);
+    }
+  }, [searchParams, navigate]);
   return (
     <div className="min-h-screen bg-background">
       <Header />

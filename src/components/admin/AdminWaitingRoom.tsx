@@ -10,6 +10,7 @@ import { fetchParticipants, assignGroupsToParticipants } from '@/lib/supabase-he
 import { Users, UserCheck, Settings, Shuffle, Scale, Copy } from 'lucide-react';
 import { GroupingSettings } from '@/types/bible-study';
 import { toast } from 'sonner';
+import { SessionQRCode } from './SessionQRCode';
 
 interface AdminWaitingRoomProps {
   onGroupingComplete: () => void;
@@ -73,29 +74,39 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in">
-      {/* Session Info */}
-      <Card variant="highlight">
-        <CardContent className="py-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">今日經文</p>
-              <p className="font-serif text-xl font-bold text-foreground">
-                {currentSession?.verseReference}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={handleCopySessionId}>
-                <Copy className="w-4 h-4 mr-2" />
-                複製 Session ID
-              </Button>
-              <div className="flex items-center gap-2 text-accent">
-                <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
-                <span className="font-medium text-sm">等待中</span>
+      {/* Session Info + QR Code */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <Card variant="highlight" className="md:col-span-2">
+          <CardContent className="py-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">今日經文</p>
+                <p className="font-serif text-xl font-bold text-foreground">
+                  {currentSession?.verseReference}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <Button variant="outline" size="sm" onClick={handleCopySessionId}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  複製 ID
+                </Button>
+                <div className="flex items-center gap-2 text-accent">
+                  <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
+                  <span className="font-medium text-sm">等待中</span>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        
+        {/* QR Code */}
+        {currentSession?.id && (
+          <SessionQRCode 
+            sessionId={currentSession.id} 
+            verseReference={currentSession.verseReference}
+          />
+        )}
+      </div>
 
       {/* Participants */}
       <Card>
