@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,16 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Load saved info from localStorage
+  useEffect(() => {
+    const savedName = localStorage.getItem('bible_study_guest_name');
+    const savedEmail = localStorage.getItem('bible_study_guest_email');
+    const savedGender = localStorage.getItem('bible_study_guest_gender');
+    if (savedName) setName(savedName);
+    if (savedEmail) setEmail(savedEmail);
+    if (savedGender === 'male' || savedGender === 'female') setGender(savedGender);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -29,6 +39,11 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
     }
     
     setIsLoading(true);
+
+    // Save to localStorage for next time
+    localStorage.setItem('bible_study_guest_name', name);
+    localStorage.setItem('bible_study_guest_email', email);
+    localStorage.setItem('bible_study_guest_gender', gender);
 
     const user = await joinSession(currentSession.id, name, email, gender);
 
