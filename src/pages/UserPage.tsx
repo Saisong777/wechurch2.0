@@ -1,53 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
-import { ParticipantAuth } from '@/components/auth/ParticipantAuth';
 import { JoinForm } from '@/components/user/JoinForm';
 import { WaitingRoom } from '@/components/user/WaitingRoom';
 import { GroupReveal } from '@/components/user/GroupReveal';
 import { StudyForm } from '@/components/user/StudyForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
 import { useSession } from '@/contexts/SessionContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { BookOpen, ArrowRight, Loader2 } from 'lucide-react';
+import { BookOpen, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { joinSession } from '@/lib/supabase-helpers';
 
-type UserStep = 'landing' | 'enter-session' | 'auth' | 'join' | 'waiting' | 'group-reveal' | 'study' | 'review';
+type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'study' | 'review';
 
 export const UserPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
-  const { currentUser, currentSession, setCurrentSession, setCurrentUser, addUser } = useSession();
+  const { currentUser, currentSession, setCurrentSession } = useSession();
   const [step, setStep] = useState<UserStep>('landing');
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
-  const [guestInfo, setGuestInfo] = useState<{ name: string; email: string; gender: 'male' | 'female' } | null>(null);
 
   // Handle session ID from QR code URL
   useEffect(() => {
     const sessionFromUrl = searchParams.get('session');
     if (sessionFromUrl && !currentSession) {
       setSessionId(sessionFromUrl);
-      setPendingSessionId(sessionFromUrl);
-      // Load the session first, then check auth
       loadSessionAndCheckAuth(sessionFromUrl);
     }
   }, [searchParams]);
-
-  // When user becomes authenticated and we have a pending session
-  useEffect(() => {
-    if (user && pendingSessionId && step === 'auth') {
-      loadSession(pendingSessionId);
-      setPendingSessionId(null);
-    }
-  }, [user, pendingSessionId, step]);
 
   const loadSessionAndCheckAuth = async (id: string) => {
     setIsLoading(true);
@@ -76,37 +60,8 @@ export const UserPage: React.FC = () => {
 
     setIsLoading(false);
     
-    // Always go to auth page - user can choose to login or join as guest
-    setStep('auth');
-  };
-
-  const loadSession = async (id: string) => {
-    setIsLoading(true);
-    
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('id', id.trim())
-      .maybeSingle();
-
-    if (sessionError || !sessionData) {
-      toast.error('找不到此 Session，請確認 ID 是否正確');
-      setIsLoading(false);
-      setStep('enter-session');
-      return;
-    }
-
-    setCurrentSession({
-      id: sessionData.id,
-      bibleVerse: '',
-      verseReference: sessionData.verse_reference,
-      status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-      createdAt: new Date(sessionData.created_at),
-      groups: [],
-    });
-
+    // QR code scanning goes directly to join form
     setStep('join');
-    setIsLoading(false);
   };
 
   // Watch for user group number changes (real-time grouping)
@@ -121,7 +76,6 @@ export const UserPage: React.FC = () => {
       toast.error('請輸入 Session ID');
       return;
     }
-    setPendingSessionId(sessionId);
     await loadSessionAndCheckAuth(sessionId);
   };
 
@@ -204,41 +158,6 @@ export const UserPage: React.FC = () => {
                 </Button>
               </CardContent>
             </Card>
-          </div>
-        );
-
-      case 'auth':
-        return (
-          <div className="px-4 py-8 animate-fade-in">
-            <ParticipantAuth 
-              onSuccess={() => setStep('join')} 
-              onGuestJoin={async (name, email, gender) => {
-                // Guest join - directly join the session
-                if (!currentSession?.id) {
-                  toast.error('Session 資訊遺失，請重新掃描 QR Code');
-                  return;
-                }
-                
-                setIsLoading(true);
-                try {
-                  const newUser = await joinSession(currentSession.id, name, email, gender);
-                  if (newUser) {
-                    setCurrentUser(newUser);
-                    addUser(newUser);
-                    toast.success('成功加入查經！');
-                    setStep('waiting');
-                  } else {
-                    toast.error('加入失敗，請重試');
-                  }
-                } catch (error) {
-                  console.error('Guest join error:', error);
-                  toast.error('加入失敗，請重試');
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
-              verseReference={currentSession?.verseReference}
-            />
           </div>
         );
 
