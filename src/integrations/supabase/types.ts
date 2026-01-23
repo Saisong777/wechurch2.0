@@ -87,12 +87,40 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           created_at: string
           group_size: number | null
           grouping_method: string | null
           id: string
+          owner_id: string | null
           status: string
           verse_reference: string
         }
@@ -101,6 +129,7 @@ export type Database = {
           group_size?: number | null
           grouping_method?: string | null
           id?: string
+          owner_id?: string | null
           status?: string
           verse_reference: string
         }
@@ -109,6 +138,7 @@ export type Database = {
           group_size?: number | null
           grouping_method?: string | null
           id?: string
+          owner_id?: string | null
           status?: string
           verse_reference?: string
         }
