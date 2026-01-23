@@ -22,11 +22,12 @@ type UserStep = 'landing' | 'enter-session' | 'auth' | 'join' | 'waiting' | 'gro
 export const UserPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const { currentUser, currentSession, setCurrentSession, setCurrentUser } = useSession();
+  const { currentUser, currentSession, setCurrentSession, setCurrentUser, addUser } = useSession();
   const [step, setStep] = useState<UserStep>('landing');
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [guestInfo, setGuestInfo] = useState<{ name: string; email: string; gender: 'male' | 'female' } | null>(null);
 
   // Handle session ID from QR code URL
   useEffect(() => {
@@ -214,6 +215,21 @@ export const UserPage: React.FC = () => {
           <div className="px-4 py-8 animate-fade-in">
             <ParticipantAuth 
               onSuccess={() => setStep('join')} 
+              onGuestJoin={async (name, email, gender) => {
+                // Guest join - directly join the session
+                if (!currentSession?.id) return;
+                const newUser = await import('@/lib/supabase-helpers').then(m => 
+                  m.joinSession(currentSession.id, name, email, gender)
+                );
+                if (newUser) {
+                  setCurrentUser(newUser);
+                  addUser(newUser);
+                  toast.success('成功加入查經！');
+                  setStep('waiting');
+                } else {
+                  toast.error('加入失敗，請重試');
+                }
+              }}
               verseReference={currentSession?.verseReference}
             />
           </div>
