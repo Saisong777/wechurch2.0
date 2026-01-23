@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useSession } from '@/contexts/SessionContext';
-import { BookOpen, Plus, Calendar, Users, ChevronRight } from 'lucide-react';
+import { BookOpen, Plus, Calendar, Users, ChevronRight, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface PastSession {
   id: string;
@@ -32,29 +43,61 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
     const loadSessions = async () => {
       if (!user) return;
 
-      const { data, error } = await supabase
+      // First get sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
-        .select(`
-          id,
-          verse_reference,
-          status,
-          created_at,
-          participants:participants(count)
-        `)
+        .select('id, verse_reference, status, created_at')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setSessions(data.map(s => ({
-          ...s,
-          participant_count: (s.participants as any)?.[0]?.count || 0,
-        })));
+      if (sessionsError || !sessionsData) {
+        setIsLoading(false);
+        return;
       }
+
+      // Then get participant counts for each session
+      const sessionsWithCounts = await Promise.all(
+        sessionsData.map(async (session) => {
+          const { count } = await supabase
+            .from('participants')
+            .select('*', { count: 'exact', head: true })
+            .eq('session_id', session.id);
+          
+          return {
+            ...session,
+            participant_count: count || 0,
+          };
+        })
+      );
+
+      setSessions(sessionsWithCounts);
       setIsLoading(false);
     };
 
     loadSessions();
   }, [user]);
+
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    
+    try {
+      // Delete related data first (due to foreign key constraints)
+      await supabase.from('ai_reports').delete().eq('session_id', sessionId);
+      await supabase.from('submissions').delete().eq('session_id', sessionId);
+      await supabase.from('participants').delete().eq('session_id', sessionId);
+      
+      // Delete the session
+      const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
+      
+      if (error) throw error;
+      
+      setSessions(sessions.filter(s => s.id !== sessionId));
+      toast.success('聚會已刪除');
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      toast.error('刪除失敗，請重試');
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -136,7 +179,38 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                       </span>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>確定刪除此聚會？</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            刪除後將無法恢復，包括所有參與者資料和筆記都會被刪除。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>取消</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={(e) => handleDeleteSession(session.id, e)}
+                          >
+                            刪除
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
