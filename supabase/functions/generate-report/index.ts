@@ -1,11 +1,21 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schema
+const RequestSchema = z.object({
+  sessionId: z.string().uuid("Invalid session ID format"),
+  reportType: z.enum(["group", "overall"], {
+    errorMap: () => ({ message: 'reportType must be "group" or "overall"' }),
+  }),
+  groupNumber: z.number().int().positive().optional(),
+});
 
 const SYSTEM_PROMPT = `## Role
 
@@ -56,7 +66,29 @@ serve(async (req) => {
   }
 
   try {
-    const { sessionId, reportType, groupNumber } = await req.json();
+    // Parse and validate input
+    const body = await req.json();
+    const validationResult = RequestSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid input", 
+          details: validationResult.error.errors.map(e => e.message) 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { sessionId, reportType, groupNumber } = validationResult.data;
+    
+    // Additional validation: groupNumber required for group reports
+    if (reportType === "group" && groupNumber === undefined) {
+      return new Response(
+        JSON.stringify({ error: "groupNumber is required for group reports" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
