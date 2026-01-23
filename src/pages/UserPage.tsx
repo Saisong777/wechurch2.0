@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { JoinForm } from '@/components/user/JoinForm';
 import { WaitingRoom } from '@/components/user/WaitingRoom';
@@ -17,35 +18,35 @@ import { toast } from 'sonner';
 type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'study' | 'review';
 
 export const UserPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const { currentUser, currentSession, setCurrentSession, setCurrentUser } = useSession();
   const [step, setStep] = useState<UserStep>('landing');
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Watch for user group number changes (real-time grouping)
+  // Handle session ID from QR code URL
   useEffect(() => {
-    if (currentUser?.groupNumber && step === 'waiting') {
-      setStep('group-reveal');
+    const sessionFromUrl = searchParams.get('session');
+    if (sessionFromUrl && !currentSession) {
+      setSessionId(sessionFromUrl);
+      // Auto-load the session
+      loadSession(sessionFromUrl);
     }
-  }, [currentUser?.groupNumber, step]);
+  }, [searchParams]);
 
-  const handleEnterSession = async () => {
-    if (!sessionId.trim()) {
-      toast.error('請輸入 Session ID');
-      return;
-    }
-
+  const loadSession = async (id: string) => {
     setIsLoading(true);
     
     const { data, error } = await supabase
       .from('sessions')
       .select('*')
-      .eq('id', sessionId.trim())
+      .eq('id', id.trim())
       .maybeSingle();
 
     if (error || !data) {
       toast.error('找不到此 Session，請確認 ID 是否正確');
       setIsLoading(false);
+      setStep('enter-session');
       return;
     }
 
@@ -60,6 +61,21 @@ export const UserPage: React.FC = () => {
 
     setStep('join');
     setIsLoading(false);
+  };
+
+  // Watch for user group number changes (real-time grouping)
+  useEffect(() => {
+    if (currentUser?.groupNumber && step === 'waiting') {
+      setStep('group-reveal');
+    }
+  }, [currentUser?.groupNumber, step]);
+
+  const handleEnterSession = async () => {
+    if (!sessionId.trim()) {
+      toast.error('請輸入 Session ID');
+      return;
+    }
+    await loadSession(sessionId);
   };
 
   const renderStep = () => {
