@@ -14,7 +14,175 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_reports: {
+        Row: {
+          content: string
+          created_at: string
+          group_number: number | null
+          id: string
+          report_type: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          group_number?: number | null
+          id?: string
+          report_type: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          group_number?: number | null
+          id?: string
+          report_type?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_reports_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participants: {
+        Row: {
+          email: string
+          gender: string
+          group_number: number | null
+          id: string
+          joined_at: string
+          name: string
+          session_id: string
+        }
+        Insert: {
+          email: string
+          gender: string
+          group_number?: number | null
+          id?: string
+          joined_at?: string
+          name: string
+          session_id: string
+        }
+        Update: {
+          email?: string
+          gender?: string
+          group_number?: number | null
+          id?: string
+          joined_at?: string
+          name?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          created_at: string
+          group_size: number | null
+          grouping_method: string | null
+          id: string
+          status: string
+          verse_reference: string
+        }
+        Insert: {
+          created_at?: string
+          group_size?: number | null
+          grouping_method?: string | null
+          id?: string
+          status?: string
+          verse_reference: string
+        }
+        Update: {
+          created_at?: string
+          group_size?: number | null
+          grouping_method?: string | null
+          id?: string
+          status?: string
+          verse_reference?: string
+        }
+        Relationships: []
+      }
+      submissions: {
+        Row: {
+          application_in_life: string | null
+          bible_verse: string
+          email: string
+          facts_discovered: string | null
+          group_number: number
+          id: string
+          inspiration_from_god: string | null
+          moving_verse: string | null
+          name: string
+          others: string | null
+          participant_id: string
+          session_id: string
+          submitted_at: string
+          theme: string | null
+          traditional_exegesis: string | null
+        }
+        Insert: {
+          application_in_life?: string | null
+          bible_verse: string
+          email: string
+          facts_discovered?: string | null
+          group_number: number
+          id?: string
+          inspiration_from_god?: string | null
+          moving_verse?: string | null
+          name: string
+          others?: string | null
+          participant_id: string
+          session_id: string
+          submitted_at?: string
+          theme?: string | null
+          traditional_exegesis?: string | null
+        }
+        Update: {
+          application_in_life?: string | null
+          bible_verse?: string
+          email?: string
+          facts_discovered?: string | null
+          group_number?: number
+          id?: string
+          inspiration_from_god?: string | null
+          moving_verse?: string | null
+          name?: string
+          others?: string | null
+          participant_id?: string
+          session_id?: string
+          submitted_at?: string
+          theme?: string | null
+          traditional_exegesis?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -4,34 +4,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSession } from '@/contexts/SessionContext';
-import { Session } from '@/types/bible-study';
+import { createSession } from '@/lib/supabase-helpers';
 import { BookOpen, Play } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CreateSessionProps {
   onCreated: () => void;
 }
 
 export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
-  const { setCurrentSession } = useSession();
+  const { setCurrentSession, setIsAdmin } = useSession();
   const [verseReference, setVerseReference] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = async () => {
     setIsCreating(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const session: Session = {
-      id: `session-${Date.now()}`,
-      bibleVerse: '',
-      verseReference,
-      status: 'waiting',
-      createdAt: new Date(),
-      groups: [],
-    };
-
-    setCurrentSession(session);
+    
+    const session = await createSession(verseReference);
+    
+    if (session) {
+      setCurrentSession(session);
+      setIsAdmin(true);
+      toast.success('查經聚會已建立！Session created!');
+      onCreated();
+    } else {
+      toast.error('建立失敗，請重試');
+    }
+    
     setIsCreating(false);
-    onCreated();
   };
 
   return (

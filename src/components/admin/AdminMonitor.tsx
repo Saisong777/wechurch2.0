@@ -1,33 +1,118 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download } from 'lucide-react';
+import { useRealtime } from '@/hooks/useRealtime';
+import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV } from '@/lib/supabase-helpers';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export const AdminMonitor: React.FC = () => {
-  const { currentSession, users, submissions } = useSession();
+  const { currentSession, users, submissions, setSubmissions, addSubmission } = useSession();
+  const [isGeneratingGroup, setIsGeneratingGroup] = useState(false);
+  const [isGeneratingOverall, setIsGeneratingOverall] = useState(false);
+  const [reportContent, setReportContent] = useState<string | null>(null);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+
+  // Real-time submission updates
+  useRealtime({
+    sessionId: currentSession?.id || null,
+    onSubmissionAdded: (submission) => {
+      addSubmission(submission);
+      toast.success(`${submission.name} 已提交筆記！`);
+    },
+  });
+
+  // Load existing submissions on mount
+  useEffect(() => {
+    const loadSubmissions = async () => {
+      if (currentSession?.id) {
+        const subs = await fetchSubmissions(currentSession.id);
+        setSubmissions(subs);
+      }
+    };
+    loadSubmissions();
+  }, [currentSession?.id, setSubmissions]);
 
   const groups = currentSession?.groups || [];
   const submittedCount = submissions.length;
   const totalCount = users.length;
 
-  const handleGenerateGroupSummary = () => {
-    toast.info('AI 正在生成小組摘要... AI generating group summaries...');
-    setTimeout(() => {
-      toast.success('小組摘要已生成！Group summaries generated!');
-    }, 2000);
+  const handleGenerateGroupSummary = async () => {
+    if (!currentSession?.id || groups.length === 0) return;
+    
+    setIsGeneratingGroup(true);
+    let allReports = '';
+    
+    for (const group of groups) {
+      toast.info(`正在生成第 ${group.number} 組摘要...`);
+      const result = await generateAIReport(currentSession.id, 'group', group.number);
+      
+      if (result.success && result.report) {
+        allReports += `\n\n${'='.repeat(50)}\n第 ${group.number} 組報告\n${'='.repeat(50)}\n\n${result.report}`;
+      } else {
+        toast.error(`第 ${group.number} 組生成失敗: ${result.error}`);
+      }
+    }
+    
+    if (allReports) {
+      setReportContent(allReports);
+      setShowReportDialog(true);
+      toast.success('所有小組摘要已生成！');
+    }
+    
+    setIsGeneratingGroup(false);
   };
 
-  const handleGenerateOverallInsight = () => {
-    toast.info('AI 正在生成整體洞察... AI generating overall insight...');
-    setTimeout(() => {
-      toast.success('整體洞察已生成！Overall insight generated!');
-    }, 2000);
+  const handleGenerateOverallInsight = async () => {
+    if (!currentSession?.id) return;
+    
+    setIsGeneratingOverall(true);
+    toast.info('正在生成整體洞察報告...');
+    
+    const result = await generateAIReport(currentSession.id, 'overall');
+    
+    if (result.success && result.report) {
+      setReportContent(result.report);
+      setShowReportDialog(true);
+      toast.success('整體洞察報告已生成！');
+    } else {
+      toast.error(`生成失敗: ${result.error}`);
+    }
+    
+    setIsGeneratingOverall(false);
   };
 
   const handleExportCSV = () => {
-    toast.success('正在導出 CSV... Exporting CSV...');
+    if (submissions.length === 0) {
+      toast.error('目前沒有提交資料可導出');
+      return;
+    }
+    
+    const csv = exportSubmissionsAsCSV(submissions);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bible-study-${currentSession?.verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast.success('CSV 已導出！');
+  };
+
+  const handleCopyReport = () => {
+    if (reportContent) {
+      navigator.clipboard.writeText(reportContent);
+      toast.success('報告已複製到剪貼簿！');
+    }
   };
 
   return (
@@ -124,8 +209,13 @@ export const AdminMonitor: React.FC = () => {
               size="lg"
               className="w-full"
               onClick={handleGenerateGroupSummary}
+              disabled={isGeneratingGroup || submissions.length === 0}
             >
-              <FileText className="w-5 h-5" />
+              {isGeneratingGroup ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <FileText className="w-5 h-5" />
+              )}
               生成小組摘要
             </Button>
             <Button
@@ -133,8 +223,13 @@ export const AdminMonitor: React.FC = () => {
               size="lg"
               className="w-full"
               onClick={handleGenerateOverallInsight}
+              disabled={isGeneratingOverall || submissions.length === 0}
             >
-              <Sparkles className="w-5 h-5" />
+              {isGeneratingOverall ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Sparkles className="w-5 h-5" />
+              )}
               生成整體洞察
             </Button>
             <Button
@@ -142,6 +237,7 @@ export const AdminMonitor: React.FC = () => {
               size="lg"
               className="w-full"
               onClick={handleExportCSV}
+              disabled={submissions.length === 0}
             >
               <Download className="w-5 h-5" />
               導出 CSV
@@ -149,6 +245,31 @@ export const AdminMonitor: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Report Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-secondary" />
+              AI 分析報告
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="prose prose-sm max-w-none whitespace-pre-wrap">
+              {reportContent}
+            </div>
+          </ScrollArea>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleCopyReport}>
+              複製報告
+            </Button>
+            <Button variant="gold" onClick={() => setShowReportDialog(false)}>
+              關閉
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,34 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { useSession } from '@/contexts/SessionContext';
-import { Users, UserCheck, Settings, Shuffle, Scale } from 'lucide-react';
+import { useRealtime } from '@/hooks/useRealtime';
+import { fetchParticipants, assignGroupsToParticipants } from '@/lib/supabase-helpers';
+import { Users, UserCheck, Settings, Shuffle, Scale, Copy } from 'lucide-react';
 import { GroupingSettings } from '@/types/bible-study';
+import { toast } from 'sonner';
 
 interface AdminWaitingRoomProps {
   onGroupingComplete: () => void;
 }
 
 export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingComplete }) => {
-  const { users, currentSession, assignGroups } = useSession();
+  const { users, setUsers, currentSession, setCurrentSession, addUser } = useSession();
   const [showSettings, setShowSettings] = useState(false);
   const [groupSize, setGroupSize] = useState(4);
   const [method, setMethod] = useState<'random' | 'gender-balanced'>('random');
   const [isGrouping, setIsGrouping] = useState(false);
 
+  // Real-time updates
+  useRealtime({
+    sessionId: currentSession?.id || null,
+    onParticipantJoined: (user) => {
+      addUser(user);
+      toast.success(`${user.name} 已加入！`);
+    },
+  });
+
+  // Load existing participants on mount
+  useEffect(() => {
+    const loadParticipants = async () => {
+      if (currentSession?.id) {
+        const participants = await fetchParticipants(currentSession.id);
+        setUsers(participants);
+      }
+    };
+    loadParticipants();
+  }, [currentSession?.id, setUsers]);
+
   const maleCount = users.filter(u => u.gender === 'male').length;
   const femaleCount = users.filter(u => u.gender === 'female').length;
 
+  const handleCopySessionId = () => {
+    if (currentSession?.id) {
+      navigator.clipboard.writeText(currentSession.id);
+      toast.success('Session ID 已複製！');
+    }
+  };
+
   const handleStartGrouping = async () => {
+    if (!currentSession?.id) return;
+    
     setIsGrouping(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const settings: GroupingSettings = { groupSize, method };
-    assignGroups(settings);
+    const groups = await assignGroupsToParticipants(currentSession.id, users, settings);
     
+    setCurrentSession({ ...currentSession, groups, status: 'studying' });
+    setUsers(users.map(u => {
+      const group = groups.find(g => g.members.some(m => m.id === u.id));
+      return group ? { ...u, groupNumber: group.number } : u;
+    }));
+    
+    toast.success(`已分為 ${groups.length} 組！`);
     setIsGrouping(false);
     onGroupingComplete();
   };
@@ -45,9 +83,15 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                 {currentSession?.verseReference}
               </p>
             </div>
-            <div className="flex items-center gap-2 text-primary">
-              <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
-              <span className="font-medium">等待參加者加入中</span>
+            <div className="flex items-center gap-4">
+              <Button variant="outline" size="sm" onClick={handleCopySessionId}>
+                <Copy className="w-4 h-4 mr-2" />
+                複製 Session ID
+              </Button>
+              <div className="flex items-center gap-2 text-accent">
+                <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
+                <span className="font-medium text-sm">等待中</span>
+              </div>
             </div>
           </div>
         </CardContent>

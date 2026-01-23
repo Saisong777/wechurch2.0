@@ -12,11 +12,14 @@ interface SessionContextType {
   
   // Users in session
   users: User[];
+  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   addUser: (user: User) => void;
+  updateUser: (user: User) => void;
   removeUser: (userId: string) => void;
   
   // Submissions
   submissions: StudySubmission[];
+  setSubmissions: React.Dispatch<React.SetStateAction<StudySubmission[]>>;
   addSubmission: (submission: StudySubmission) => void;
   
   // Grouping
@@ -43,12 +46,19 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const updateUser = useCallback((user: User) => {
+    setUsers(prev => prev.map(u => u.id === user.id ? user : u));
+  }, []);
+
   const removeUser = useCallback((userId: string) => {
     setUsers(prev => prev.filter(u => u.id !== userId));
   }, []);
 
   const addSubmission = useCallback((submission: StudySubmission) => {
-    setSubmissions(prev => [...prev, submission]);
+    setSubmissions(prev => {
+      if (prev.find(s => s.id === submission.id)) return prev;
+      return [...prev, submission];
+    });
   }, []);
 
   const assignGroups = useCallback((settings: GroupingSettings) => {
@@ -100,9 +110,12 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         currentSession,
         setCurrentSession,
         users,
+        setUsers,
         addUser,
+        updateUser,
         removeUser,
         submissions,
+        setSubmissions,
         addSubmission,
         assignGroups,
         isAdmin,

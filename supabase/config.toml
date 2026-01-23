@@ -1,1 +1,4 @@
 project_id = "evyfzgrkvpwyvwmiajtx"
+
+[functions.generate-report]
+verify_jwt = false

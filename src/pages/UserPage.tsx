@@ -7,20 +7,60 @@ import { StudyForm } from '@/components/user/StudyForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { BookOpen } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { BookOpen, ArrowRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-type UserStep = 'landing' | 'join' | 'waiting' | 'group-reveal' | 'study' | 'review';
+type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'study' | 'review';
 
 export const UserPage: React.FC = () => {
-  const { currentUser, currentSession } = useSession();
+  const { currentUser, currentSession, setCurrentSession, setCurrentUser } = useSession();
   const [step, setStep] = useState<UserStep>('landing');
+  const [sessionId, setSessionId] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Watch for session status changes (simulating real-time)
+  // Watch for user group number changes (real-time grouping)
   useEffect(() => {
-    if (currentSession?.status === 'studying' && step === 'waiting') {
+    if (currentUser?.groupNumber && step === 'waiting') {
       setStep('group-reveal');
     }
-  }, [currentSession?.status, step]);
+  }, [currentUser?.groupNumber, step]);
+
+  const handleEnterSession = async () => {
+    if (!sessionId.trim()) {
+      toast.error('請輸入 Session ID');
+      return;
+    }
+
+    setIsLoading(true);
+    
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', sessionId.trim())
+      .maybeSingle();
+
+    if (error || !data) {
+      toast.error('找不到此 Session，請確認 ID 是否正確');
+      setIsLoading(false);
+      return;
+    }
+
+    setCurrentSession({
+      id: data.id,
+      bibleVerse: '',
+      verseReference: data.verse_reference,
+      status: data.status as 'waiting' | 'grouping' | 'studying' | 'completed',
+      createdAt: new Date(data.created_at),
+      groups: [],
+    });
+
+    setStep('join');
+    setIsLoading(false);
+  };
 
   const renderStep = () => {
     switch (step) {
@@ -47,11 +87,60 @@ export const UserPage: React.FC = () => {
             <Button
               variant="gold"
               size="xl"
-              onClick={() => setStep('join')}
+              onClick={() => setStep('enter-session')}
               className="min-w-64"
             >
               加入查經 Join Bible Study
             </Button>
+          </div>
+        );
+
+      case 'enter-session':
+        return (
+          <div className="w-full max-w-md mx-auto px-4 py-8 animate-fade-in">
+            <Card variant="highlight" className="border-2">
+              <CardHeader className="text-center">
+                <div className="mx-auto w-16 h-16 rounded-full gradient-gold flex items-center justify-center mb-4 glow-gold">
+                  <BookOpen className="w-8 h-8 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-2xl">輸入聚會代碼</CardTitle>
+                <CardDescription className="text-base">
+                  Enter Session ID from your host
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="sessionId" className="text-base">
+                    Session ID
+                  </Label>
+                  <Input
+                    id="sessionId"
+                    value={sessionId}
+                    onChange={(e) => setSessionId(e.target.value)}
+                    placeholder="輸入主持人提供的 Session ID"
+                    className="h-12 text-base font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    請向主持人索取聚會代碼
+                  </p>
+                </div>
+
+                <Button
+                  variant="gold"
+                  size="xl"
+                  className="w-full"
+                  onClick={handleEnterSession}
+                  disabled={isLoading || !sessionId.trim()}
+                >
+                  {isLoading ? '驗證中...' : (
+                    <>
+                      繼續 Continue
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         );
 
@@ -65,7 +154,7 @@ export const UserPage: React.FC = () => {
       case 'waiting':
         return (
           <div className="px-4 py-8">
-            <WaitingRoom />
+            <WaitingRoom onGroupingStarted={() => setStep('group-reveal')} />
           </div>
         );
 
