@@ -50,7 +50,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/user?session=${currentSession?.id || ''}`,
+          redirectTo: `${window.location.origin}/user?session_id=${currentSession?.id || ''}`,
         },
       });
       if (error) {
@@ -83,6 +83,8 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
     if (user) {
       setCurrentUser(user);
       addUser(user);
+      // Clear pending session from localStorage after successful join
+      localStorage.removeItem('pending_session_id');
       toast.success('成功加入查經！');
       onJoined();
     } else {
