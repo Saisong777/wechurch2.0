@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { BookOpen, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { joinSession } from '@/lib/supabase-helpers';
 
 type UserStep = 'landing' | 'enter-session' | 'auth' | 'join' | 'waiting' | 'group-reveal' | 'study' | 'review';
 
@@ -75,12 +76,8 @@ export const UserPage: React.FC = () => {
 
     setIsLoading(false);
     
-    // If user is already logged in, go to join; otherwise go to auth
-    if (user) {
-      setStep('join');
-    } else {
-      setStep('auth');
-    }
+    // Always go to auth page - user can choose to login or join as guest
+    setStep('auth');
   };
 
   const loadSession = async (id: string) => {
@@ -217,17 +214,27 @@ export const UserPage: React.FC = () => {
               onSuccess={() => setStep('join')} 
               onGuestJoin={async (name, email, gender) => {
                 // Guest join - directly join the session
-                if (!currentSession?.id) return;
-                const newUser = await import('@/lib/supabase-helpers').then(m => 
-                  m.joinSession(currentSession.id, name, email, gender)
-                );
-                if (newUser) {
-                  setCurrentUser(newUser);
-                  addUser(newUser);
-                  toast.success('成功加入查經！');
-                  setStep('waiting');
-                } else {
+                if (!currentSession?.id) {
+                  toast.error('Session 資訊遺失，請重新掃描 QR Code');
+                  return;
+                }
+                
+                setIsLoading(true);
+                try {
+                  const newUser = await joinSession(currentSession.id, name, email, gender);
+                  if (newUser) {
+                    setCurrentUser(newUser);
+                    addUser(newUser);
+                    toast.success('成功加入查經！');
+                    setStep('waiting');
+                  } else {
+                    toast.error('加入失敗，請重試');
+                  }
+                } catch (error) {
+                  console.error('Guest join error:', error);
                   toast.error('加入失敗，請重試');
+                } finally {
+                  setIsLoading(false);
                 }
               }}
               verseReference={currentSession?.verseReference}

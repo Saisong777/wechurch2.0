@@ -16,7 +16,7 @@ interface ParticipantAuthProps {
 }
 
 export const ParticipantAuth: React.FC<ParticipantAuthProps> = ({ onSuccess, onGuestJoin, verseReference }) => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup' | 'guest'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +26,9 @@ export const ParticipantAuth: React.FC<ParticipantAuthProps> = ({ onSuccess, onG
   const [guestGender, setGuestGender] = useState<'male' | 'female'>('male');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // If user is already logged in, show a simpler UI
+  const isLoggedIn = !!user;
 
   // Load saved guest info from localStorage
   useEffect(() => {
@@ -104,6 +107,52 @@ export const ParticipantAuth: React.FC<ParticipantAuthProps> = ({ onSuccess, onG
 
     onGuestJoin(guestName, guestEmail, guestGender);
   };
+
+  // If user is already logged in, show options to continue or join as guest
+  if (isLoggedIn && mode !== 'guest') {
+    return (
+      <Card className="w-full max-w-md mx-auto border-2">
+        <CardHeader className="text-center space-y-4">
+          <div className="mx-auto w-16 h-16 rounded-full gradient-gold flex items-center justify-center glow-gold">
+            <BookOpen className="w-8 h-8 text-secondary-foreground" />
+          </div>
+          <div>
+            <CardTitle className="text-2xl font-serif">歡迎回來！</CardTitle>
+            <CardDescription className="text-base mt-2">
+              Welcome back, {user?.email}
+            </CardDescription>
+            {verseReference && (
+              <p className="text-sm text-primary font-medium mt-2">
+                📖 {verseReference}
+              </p>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            variant="gold"
+            size="lg"
+            className="w-full h-12"
+            onClick={onSuccess}
+          >
+            <User className="w-5 h-5 mr-2" />
+            以此帳號繼續 Continue with this account
+          </Button>
+          
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full h-12"
+            onClick={() => setMode('guest')}
+          >
+            <UserX className="w-5 h-5 mr-2" />
+            訪客快速加入 Join as Guest
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Guest mode UI
   if (mode === 'guest') {
