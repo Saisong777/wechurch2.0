@@ -24,12 +24,21 @@ export const UserPage: React.FC = () => {
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Handle session ID from QR code URL
+  // Handle session ID from QR code URL (support both 'session' and 'session_id' params)
   useEffect(() => {
-    const sessionFromUrl = searchParams.get('session');
+    const sessionFromUrl = searchParams.get('session_id') || searchParams.get('session');
     if (sessionFromUrl && !currentSession) {
       setSessionId(sessionFromUrl);
+      // Store in localStorage for persistence across auth redirects
+      localStorage.setItem('pending_session_id', sessionFromUrl);
       loadSessionAndCheckAuth(sessionFromUrl);
+    } else if (!sessionFromUrl && !currentSession) {
+      // Check localStorage for pending session after OAuth redirect
+      const pendingSession = localStorage.getItem('pending_session_id');
+      if (pendingSession) {
+        setSessionId(pendingSession);
+        loadSessionAndCheckAuth(pendingSession);
+      }
     }
   }, [searchParams]);
 

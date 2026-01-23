@@ -13,8 +13,9 @@ interface SessionQRCodeProps {
 export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, verseReference }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Build the join URL
-  const joinUrl = `${window.location.origin}/?session=${sessionId}`;
+  // Build the join URL using the public app URL
+  const publicBaseUrl = 'https://id-preview--535fde94-f0d2-40e6-b67e-11919e99216e.lovable.app';
+  const joinUrl = `${publicBaseUrl}/user?session_id=${sessionId}`;
 
   const handleDownload = () => {
     const svg = document.getElementById('session-qr-code');
