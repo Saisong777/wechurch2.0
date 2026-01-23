@@ -82,7 +82,7 @@ export const AdminPage: React.FC = () => {
       }
     }
   };
-        setStep('monitor');
+
   const handleSignOut = async () => {
     await signOut();
     setStep('auth');
