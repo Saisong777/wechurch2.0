@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useSession } from '@/contexts/SessionContext';
-import { StudySubmission } from '@/types/bible-study';
+import { submitStudyNotes } from '@/lib/supabase-helpers';
 import { BookOpen, Send, Sparkles, Heart, Lightbulb, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,18 +33,21 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentUser || !currentSession) {
+      toast.error('Session 資訊遺失');
+      return;
+    }
+    
     setIsSubmitting(true);
 
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const submission: StudySubmission = {
-      id: `submission-${Date.now()}`,
-      sessionId: currentSession?.id || '',
-      userId: currentUser?.id || '',
-      groupNumber: currentUser?.groupNumber || 0,
-      name: currentUser?.name || '',
-      email: currentUser?.email || '',
-      bibleVerse: currentSession?.verseReference || '',
+    const submission = await submitStudyNotes({
+      sessionId: currentSession.id,
+      userId: currentUser.id,
+      groupNumber: currentUser.groupNumber || 0,
+      name: currentUser.name,
+      email: currentUser.email,
+      bibleVerse: currentSession.verseReference,
       theme: formData.theme || '',
       movingVerse: formData.movingVerse || '',
       factsDiscovered: formData.factsDiscovered || '',
@@ -53,13 +55,17 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
       inspirationFromGod: formData.inspirationFromGod || '',
       applicationInLife: formData.applicationInLife || '',
       others: formData.others || '',
-      submittedAt: new Date(),
-    };
+    });
 
-    addSubmission(submission);
+    if (submission) {
+      addSubmission(submission);
+      toast.success('提交成功！Submission successful!');
+      onSubmitted();
+    } else {
+      toast.error('提交失敗，請重試');
+    }
+    
     setIsSubmitting(false);
-    toast.success('提交成功！Submission successful!');
-    onSubmitted();
   };
 
   return (
@@ -102,25 +108,14 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
                   <Icon className="w-4 h-4 text-secondary" />
                   {label}
                 </Label>
-                {id === 'others' ? (
-                  <Textarea
-                    id={id}
-                    value={formData[id] || ''}
-                    onChange={(e) => handleChange(id, e.target.value)}
-                    placeholder={placeholder}
-                    rows={3}
-                    className="resize-none"
-                  />
-                ) : (
-                  <Textarea
-                    id={id}
-                    value={formData[id] || ''}
-                    onChange={(e) => handleChange(id, e.target.value)}
-                    placeholder={placeholder}
-                    rows={2}
-                    className="resize-none"
-                  />
-                )}
+                <Textarea
+                  id={id}
+                  value={formData[id] || ''}
+                  onChange={(e) => handleChange(id, e.target.value)}
+                  placeholder={placeholder}
+                  rows={id === 'others' ? 3 : 2}
+                  className="resize-none"
+                />
               </div>
             ))}
 

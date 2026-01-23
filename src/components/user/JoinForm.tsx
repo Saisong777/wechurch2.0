@@ -5,15 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useSession } from '@/contexts/SessionContext';
-import { User } from '@/types/bible-study';
+import { joinSession } from '@/lib/supabase-helpers';
 import { Users, Mail, User as UserIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface JoinFormProps {
   onJoined: () => void;
 }
 
 export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
-  const { setCurrentUser, addUser } = useSession();
+  const { currentSession, setCurrentUser, addUser } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
@@ -21,23 +22,26 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentSession?.id) {
+      toast.error('請先輸入有效的 Session ID');
+      return;
+    }
+    
     setIsLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const user = await joinSession(currentSession.id, name, email, gender);
 
-    const user: User = {
-      id: `user-${Date.now()}`,
-      name,
-      email,
-      gender,
-      joinedAt: new Date(),
-    };
-
-    setCurrentUser(user);
-    addUser(user);
+    if (user) {
+      setCurrentUser(user);
+      addUser(user);
+      toast.success('成功加入查經！');
+      onJoined();
+    } else {
+      toast.error('加入失敗，請重試');
+    }
+    
     setIsLoading(false);
-    onJoined();
   };
 
   return (

@@ -1,10 +1,32 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
+import { useRealtime } from '@/hooks/useRealtime';
 import { Clock, Users } from 'lucide-react';
 
-export const WaitingRoom: React.FC = () => {
-  const { currentUser, users, currentSession } = useSession();
+interface WaitingRoomProps {
+  onGroupingStarted: () => void;
+}
+
+export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) => {
+  const { currentUser, users, currentSession, setCurrentSession, updateUser } = useSession();
+
+  // Listen for session status updates and participant group assignments
+  useRealtime({
+    sessionId: currentSession?.id || null,
+    onSessionUpdated: (sessionUpdate) => {
+      if (sessionUpdate.status === 'studying' && currentSession) {
+        setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
+      }
+    },
+    onParticipantUpdated: (user) => {
+      updateUser(user);
+      // If this is the current user and they got a group number, trigger the transition
+      if (user.id === currentUser?.id && user.groupNumber) {
+        onGroupingStarted();
+      }
+    },
+  });
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6 animate-fade-in">
@@ -36,7 +58,7 @@ export const WaitingRoom: React.FC = () => {
             <span className="text-lg font-bold text-primary">{users.length} 人</span>
           </div>
 
-          {currentSession?.bibleVerse && (
+          {currentSession?.verseReference && (
             <div className="mt-4 p-4 rounded-lg bg-muted/50">
               <p className="text-sm text-muted-foreground mb-1">今日經文</p>
               <p className="font-serif text-lg font-medium text-foreground">
