@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchParticipants, assignGroupsToParticipants } from '@/lib/supabase-helpers';
@@ -221,49 +221,45 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
         </CardHeader>
         {showSettings && (
           <CardContent className="space-y-6">
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label className="text-base">每組最少人數 Min Size: {minSize} 人</Label>
-                <Slider
-                  value={[minSize]}
-                  onValueChange={(value) => {
-                    setMinSize(value[0]);
-                    if (value[0] > maxSize) setMaxSize(value[0]);
-                  }}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="minSize">每組最少人數 Min</Label>
+                <Input
+                  id="minSize"
+                  type="number"
                   min={2}
-                  max={6}
-                  step={1}
-                  className="w-full"
+                  max={10}
+                  value={minSize}
+                  onChange={(e) => {
+                    const val = Math.max(2, Math.min(10, parseInt(e.target.value) || 2));
+                    setMinSize(val);
+                    if (val > maxSize) setMaxSize(val);
+                  }}
+                  className="text-center text-lg font-medium"
                 />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>2人</span>
-                  <span>6人</span>
-                </div>
               </div>
               
-              <div className="space-y-3">
-                <Label className="text-base">每組最多人數 Max Size: {maxSize} 人</Label>
-                <Slider
-                  value={[maxSize]}
-                  onValueChange={(value) => {
-                    setMaxSize(value[0]);
-                    if (value[0] < minSize) setMinSize(value[0]);
-                  }}
+              <div className="space-y-2">
+                <Label htmlFor="maxSize">每組最多人數 Max</Label>
+                <Input
+                  id="maxSize"
+                  type="number"
                   min={2}
-                  max={8}
-                  step={1}
-                  className="w-full"
+                  max={12}
+                  value={maxSize}
+                  onChange={(e) => {
+                    const val = Math.max(2, Math.min(12, parseInt(e.target.value) || 2));
+                    setMaxSize(val);
+                    if (val < minSize) setMinSize(val);
+                  }}
+                  className="text-center text-lg font-medium"
                 />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>2人</span>
-                  <span>8人</span>
-                </div>
               </div>
-              
-              <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                💡 優先以 {minSize} 人分組，不足時才擴展到 {maxSize} 人
-              </p>
             </div>
+            
+            <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              💡 優先以 {minSize} 人分組，不足時才擴展到 {maxSize} 人
+            </p>
 
             <div className="space-y-3">
               <Label className="text-base">分組方式 Grouping Method</Label>
