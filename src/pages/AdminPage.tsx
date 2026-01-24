@@ -1,35 +1,51 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { SessionHistory } from '@/components/admin/SessionHistory';
 import { CreateSession } from '@/components/admin/CreateSession';
 import { AdminWaitingRoom } from '@/components/admin/AdminWaitingRoom';
 import { AdminMonitor } from '@/components/admin/AdminMonitor';
+import { MemberManagement } from '@/components/admin/MemberManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Settings, LogOut, ChevronLeft, Loader2, Users, BookOpen, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchParticipants, fetchSubmissions } from '@/lib/supabase-helpers';
+import { toast } from 'sonner';
 
-type AdminStep = 'auth' | 'history' | 'create' | 'waiting' | 'monitor';
+type AdminStep = 'auth' | 'dashboard' | 'create' | 'waiting' | 'monitor';
 
 export const AdminPage: React.FC = () => {
-  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
   const { currentSession, setCurrentSession, setUsers, setSubmissions, setIsAdmin } = useSession();
   const [step, setStep] = useState<AdminStep>('auth');
+  const [activeTab, setActiveTab] = useState<'sessions' | 'members'>('sessions');
 
-  // Set step based on auth state
+  const loading = authLoading || roleLoading;
+
+  // Authorization check
   useEffect(() => {
     if (!loading) {
-      if (user) {
-        setStep('history');
-      } else {
+      if (!user) {
         setStep('auth');
+      } else if (!canCreateSession) {
+        // User is logged in but doesn't have permission
+        toast.error('您沒有權限存取管理後台', {
+          description: 'Unauthorized access. Only leaders and admins can access this page.',
+        });
+        navigate('/');
+      } else {
+        setStep('dashboard');
       }
     }
-  }, [user, loading]);
+  }, [user, loading, canCreateSession, navigate]);
 
   const handleSelectSession = async (sessionId: string) => {
     // Load session data
@@ -88,11 +104,11 @@ export const AdminPage: React.FC = () => {
     setStep('auth');
   };
 
-  const handleBackToHistory = () => {
+  const handleBackToDashboard = () => {
     setCurrentSession(null);
     setUsers([]);
     setSubmissions([]);
-    setStep('history');
+    setStep('dashboard');
   };
 
   const renderStep = () => {
@@ -100,16 +116,37 @@ export const AdminPage: React.FC = () => {
       case 'auth':
         return (
           <div className="px-4 py-8">
-            <AuthForm onSuccess={() => setStep('history')} />
+            <AuthForm onSuccess={() => setStep('dashboard')} />
           </div>
         );
-      case 'history':
+      case 'dashboard':
         return (
           <div className="px-4 py-8">
-            <SessionHistory 
-              onCreateNew={() => setStep('create')} 
-              onSelectSession={handleSelectSession}
-            />
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'sessions' | 'members')}>
+              <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-6">
+                <TabsTrigger value="sessions" className="gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  聚會管理
+                </TabsTrigger>
+                {isAdmin && (
+                  <TabsTrigger value="members" className="gap-2">
+                    <Users className="w-4 h-4" />
+                    會員管理
+                  </TabsTrigger>
+                )}
+              </TabsList>
+              <TabsContent value="sessions">
+                <SessionHistory 
+                  onCreateNew={() => setStep('create')} 
+                  onSelectSession={handleSelectSession}
+                />
+              </TabsContent>
+              {isAdmin && (
+                <TabsContent value="members">
+                  <MemberManagement />
+                </TabsContent>
+              )}
+            </Tabs>
           </div>
         );
       case 'create':
@@ -148,12 +185,12 @@ export const AdminPage: React.FC = () => {
       <div className="gradient-navy text-primary-foreground py-3 px-4">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {step !== 'auth' && step !== 'history' ? (
+            {step !== 'auth' && step !== 'dashboard' ? (
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="text-primary-foreground hover:bg-white/10"
-                onClick={handleBackToHistory}
+                onClick={handleBackToDashboard}
               >
                 <ChevronLeft className="w-4 h-4" />
                 返回
@@ -171,6 +208,11 @@ export const AdminPage: React.FC = () => {
           <div className="flex items-center gap-2">
             {user && (
               <>
+                {role && (
+                  <span className="text-xs bg-white/20 px-2 py-1 rounded hidden sm:inline">
+                    {role === 'admin' ? '管理員' : role === 'leader' ? '小組長' : '儲備'}
+                  </span>
+                )}
                 <span className="text-sm opacity-80 hidden sm:inline">
                   {user.email}
                 </span>
