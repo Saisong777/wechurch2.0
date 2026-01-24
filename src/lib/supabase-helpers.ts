@@ -73,6 +73,29 @@ export const joinSession = async (
   gender: "male" | "female",
   location: string = "On-site"
 ): Promise<User | null> => {
+  // First check if user already exists in this session
+  const { data: existing } = await supabase
+    .from("participants")
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existing) {
+    // User already joined - return their existing record
+    return {
+      id: existing.id,
+      name: existing.name,
+      email: existing.email,
+      gender: existing.gender as "male" | "female",
+      groupNumber: existing.group_number || undefined,
+      joinedAt: new Date(existing.joined_at),
+      location: existing.location,
+      readyConfirmed: existing.ready_confirmed,
+    };
+  }
+
+  // New user - insert
   const { data, error } = await supabase
     .from("participants")
     .insert({
