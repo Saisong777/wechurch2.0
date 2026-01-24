@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { JoinForm } from '@/components/user/JoinForm';
@@ -20,31 +20,178 @@ import { toast } from 'sonner';
 
 type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'study' | 'review';
 
+// localStorage keys for session persistence
+const STORAGE_KEYS = {
+  SESSION_ID: 'pending_session_id',
+  PARTICIPANT_ID: 'bible_study_participant_id',
+  USER_STEP: 'bible_study_user_step',
+};
+
 export const UserPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { currentUser, currentSession, setCurrentSession } = useSession();
+  const { currentUser, currentSession, setCurrentSession, setCurrentUser } = useSession();
   const [step, setStep] = useState<UserStep>('landing');
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(true);
 
-  // Handle session ID from QR code URL (support both 'session' and 'session_id' params)
-  useEffect(() => {
-    const sessionFromUrl = searchParams.get('session_id') || searchParams.get('session');
-    if (sessionFromUrl && !currentSession) {
-      setSessionId(sessionFromUrl);
-      // Store in localStorage for persistence across auth redirects
-      localStorage.setItem('pending_session_id', sessionFromUrl);
-      loadSessionAndCheckAuth(sessionFromUrl);
-    } else if (!sessionFromUrl && !currentSession) {
-      // Check localStorage for pending session after OAuth redirect
-      const pendingSession = localStorage.getItem('pending_session_id');
-      if (pendingSession) {
-        setSessionId(pendingSession);
-        loadSessionAndCheckAuth(pendingSession);
-      }
+  // Restore user session on page load/refresh
+  const restoreUserSession = useCallback(async () => {
+    const storedSessionId = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
+    const storedParticipantId = localStorage.getItem(STORAGE_KEYS.PARTICIPANT_ID);
+    const storedStep = localStorage.getItem(STORAGE_KEYS.USER_STEP) as UserStep | null;
+    const storedEmail = localStorage.getItem('bible_study_guest_email');
+
+    // If no session or participant info stored, nothing to restore
+    if (!storedSessionId || !storedParticipantId || !storedEmail) {
+      setIsRestoring(false);
+      return false;
     }
-  }, [searchParams]);
+
+    try {
+      // Fetch the session first
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('sessions_public')
+        .select('*')
+        .eq('id', storedSessionId)
+        .maybeSingle();
+
+      if (sessionError || !sessionData) {
+        console.log('[UserPage] Session not found or expired, clearing stored data');
+        localStorage.removeItem(STORAGE_KEYS.PARTICIPANT_ID);
+        localStorage.removeItem(STORAGE_KEYS.USER_STEP);
+        setIsRestoring(false);
+        return false;
+      }
+
+      // Try to get the participant data using the RPC function
+      const { data: participantData } = await supabase.rpc('get_participant_for_reentry', {
+        p_session_id: storedSessionId,
+        p_email: storedEmail,
+      });
+
+      if (!participantData || participantData.length === 0) {
+        console.log('[UserPage] Participant not found, clearing stored data');
+        localStorage.removeItem(STORAGE_KEYS.PARTICIPANT_ID);
+        localStorage.removeItem(STORAGE_KEYS.USER_STEP);
+        setIsRestoring(false);
+        return false;
+      }
+
+      const participant = participantData[0];
+
+      // Restore session state
+      setCurrentSession({
+        id: sessionData.id,
+        bibleVerse: '',
+        verseReference: sessionData.verse_reference,
+        status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
+        createdAt: new Date(sessionData.created_at),
+        groups: [],
+      });
+
+      // Restore user state
+      setCurrentUser({
+        id: participant.id,
+        name: participant.name,
+        email: storedEmail,
+        gender: participant.gender as 'male' | 'female',
+        groupNumber: participant.group_number || undefined,
+        joinedAt: new Date(participant.joined_at),
+        location: participant.location,
+        readyConfirmed: participant.ready_confirmed,
+      });
+
+      // Determine the correct step based on session status and user state
+      let restoredStep: UserStep = 'waiting';
+      
+      if (sessionData.status === 'studying') {
+        restoredStep = 'study';
+      } else if (sessionData.status === 'grouping') {
+        if (participant.ready_confirmed) {
+          restoredStep = 'study'; // All confirmed, waiting for others
+        } else if (participant.group_number) {
+          restoredStep = 'verification';
+        } else {
+          restoredStep = 'waiting';
+        }
+      } else if (sessionData.status === 'waiting') {
+        if (participant.group_number) {
+          restoredStep = 'group-reveal';
+        } else {
+          restoredStep = 'waiting';
+        }
+      }
+
+      // If stored step is 'review', keep it (user already submitted)
+      if (storedStep === 'review') {
+        restoredStep = 'review';
+      }
+
+      setStep(restoredStep);
+      setSessionId(storedSessionId);
+      
+      console.log('[UserPage] Session restored successfully:', {
+        sessionId: storedSessionId,
+        participantId: participant.id,
+        step: restoredStep,
+        sessionStatus: sessionData.status,
+      });
+      
+      toast.success('已恢復您的查經進度 Session restored!');
+      setIsRestoring(false);
+      return true;
+    } catch (error) {
+      console.error('[UserPage] Error restoring session:', error);
+      setIsRestoring(false);
+      return false;
+    }
+  }, [setCurrentSession, setCurrentUser]);
+
+  // Initial session restoration on mount
+  useEffect(() => {
+    const initializeSession = async () => {
+      const sessionFromUrl = searchParams.get('session_id') || searchParams.get('session');
+      
+      // If URL has a session ID, use that (new session join)
+      if (sessionFromUrl) {
+        setSessionId(sessionFromUrl);
+        localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionFromUrl);
+        await loadSessionAndCheckAuth(sessionFromUrl);
+        setIsRestoring(false);
+      } else if (!currentSession) {
+        // Try to restore existing session
+        const restored = await restoreUserSession();
+        if (!restored) {
+          // Check for pending session from OAuth redirect
+          const pendingSession = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
+          if (pendingSession) {
+            setSessionId(pendingSession);
+            await loadSessionAndCheckAuth(pendingSession);
+          }
+        }
+      } else {
+        setIsRestoring(false);
+      }
+    };
+
+    initializeSession();
+  }, [searchParams, restoreUserSession]);
+
+  // Persist step changes to localStorage
+  useEffect(() => {
+    if (step !== 'landing' && step !== 'enter-session') {
+      localStorage.setItem(STORAGE_KEYS.USER_STEP, step);
+    }
+  }, [step]);
+
+  // Persist participant ID when user joins
+  useEffect(() => {
+    if (currentUser?.id) {
+      localStorage.setItem(STORAGE_KEYS.PARTICIPANT_ID, currentUser.id);
+    }
+  }, [currentUser?.id]);
 
   const loadSessionAndCheckAuth = async (id: string) => {
     setIsLoading(true);
@@ -249,6 +396,21 @@ export const UserPage: React.FC = () => {
         return null;
     }
   };
+
+  // Show loading while restoring session
+  if (isRestoring) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full gradient-gold flex items-center justify-center animate-pulse">
+            <BookOpen className="w-8 h-8 text-secondary-foreground" />
+          </div>
+          <p className="text-muted-foreground">正在載入您的查經進度...</p>
+          <p className="text-sm text-muted-foreground">Loading your session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

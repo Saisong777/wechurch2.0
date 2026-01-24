@@ -154,3 +154,28 @@ export const clearAllGroupAssignments = async (sessionId: string): Promise<{
 
   return { success: true, count: data?.length || 0 };
 };
+
+/**
+ * Re-group only: Clear group assignments and reset ready status, but keep participants.
+ * Same as clearAllGroupAssignments but intended for "re-group with new settings" workflow.
+ */
+export const regroupParticipants = async (sessionId: string): Promise<{
+  success: boolean;
+  count?: number;
+  error?: string;
+}> => {
+  // This is essentially the same as clearAllGroupAssignments
+  // but semantically represents the "re-group" action
+  const { data, error } = await supabase
+    .from("participants")
+    .update({ group_number: null, ready_confirmed: false })
+    .eq("session_id", sessionId)
+    .select("id");
+
+  if (error) {
+    console.error("Regroup participants error:", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, count: data?.length || 0 };
+};
