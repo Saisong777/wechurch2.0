@@ -199,7 +199,7 @@ const applyGenderBalancing = (users: User[]): User[] => {
   return balanced;
 };
 
-// Multi-site grouping algorithm with max 6 per group
+// Multi-site grouping algorithm with max 6 per group (OPTIMIZED with batch updates)
 export const assignGroupsToParticipants = async (
   sessionId: string,
   participants: User[],
@@ -220,9 +220,12 @@ export const assignGroupsToParticipants = async (
 
   const groups: Group[] = [];
   let groupNumber = 1;
+  
+  // Collect all updates for batch processing
+  const groupAssignments: { participantId: string; groupNumber: number }[] = [];
 
-  // Step 2: Process each location bucket independently
-  for (const [location, users] of locationBuckets) {
+  // Step 2: Process each location bucket independently (in-memory, no DB calls yet)
+  for (const [, users] of locationBuckets) {
     let usersToGroup = [...users];
     
     // Apply grouping method
@@ -236,10 +239,7 @@ export const assignGroupsToParticipants = async (
     if (usersToGroup.length <= MAX_GROUP_SIZE) {
       // Single group for this location
       for (const member of usersToGroup) {
-        await supabase
-          .from("participants")
-          .update({ group_number: groupNumber, ready_confirmed: false })
-          .eq("id", member.id);
+        groupAssignments.push({ participantId: member.id, groupNumber });
         member.groupNumber = groupNumber;
       }
       groups.push({
@@ -250,23 +250,18 @@ export const assignGroupsToParticipants = async (
       groupNumber++;
     } else {
       // Split into multiple subgroups
-      // Calculate optimal subgroup count to balance sizes
       const subgroupCount = Math.ceil(usersToGroup.length / MAX_GROUP_SIZE);
       const baseSize = Math.floor(usersToGroup.length / subgroupCount);
       const remainder = usersToGroup.length % subgroupCount;
       
       let currentIndex = 0;
       for (let subIdx = 0; subIdx < subgroupCount; subIdx++) {
-        // Distribute remainder across first groups
         const thisGroupSize = baseSize + (subIdx < remainder ? 1 : 0);
         const groupMembers = usersToGroup.slice(currentIndex, currentIndex + thisGroupSize);
         currentIndex += thisGroupSize;
         
         for (const member of groupMembers) {
-          await supabase
-            .from("participants")
-            .update({ group_number: groupNumber, ready_confirmed: false })
-            .eq("id", member.id);
+          groupAssignments.push({ participantId: member.id, groupNumber });
           member.groupNumber = groupNumber;
         }
         
@@ -280,7 +275,27 @@ export const assignGroupsToParticipants = async (
     }
   }
 
+  // Step 4: Batch update all participants by group number (one query per group)
+  const groupedAssignments = new Map<number, string[]>();
+  for (const { participantId, groupNumber: gn } of groupAssignments) {
+    if (!groupedAssignments.has(gn)) {
+      groupedAssignments.set(gn, []);
+    }
+    groupedAssignments.get(gn)!.push(participantId);
+  }
+
+  // Execute batch updates in parallel (one request per group, not per participant)
+  const updatePromises = Array.from(groupedAssignments.entries()).map(([gn, ids]) =>
+    supabase
+      .from("participants")
+      .update({ group_number: gn, ready_confirmed: false })
+      .in("id", ids)
+  );
+  
+  await Promise.all(updatePromises);
+
   // Update session status to 'grouping' (verification phase)
+  await updateSessionStatus(sessionId, "grouping");
   await updateSessionStatus(sessionId, "grouping");
 
   return groups;
