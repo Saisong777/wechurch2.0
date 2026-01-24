@@ -235,12 +235,12 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
             </div>
 
             {/* Remote Location Toggle */}
-            <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
-              <div className="flex items-center justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-muted-foreground" />
                   <Label htmlFor="remote-toggle" className="text-base cursor-pointer">
-                    線上/遠端加入？
+                    Joining from a Remote Location?
                   </Label>
                 </div>
                 <Switch
@@ -249,14 +249,12 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                   onCheckedChange={setIsRemote}
                 />
               </div>
-              <p className="text-sm text-muted-foreground">
-                Joining from a remote location?
-              </p>
               
               {isRemote && (
-                <div className="space-y-2 pt-2 animate-fade-in">
-                  <Label htmlFor="location" className="text-sm">
-                    地點名稱 Location Name *
+                <div className="space-y-2 animate-fade-in">
+                  <Label htmlFor="location" className="text-base flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    地點名稱 Location Name
                   </Label>
                   <Input
                     id="location"
@@ -264,7 +262,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                     onChange={(e) => setLocationName(e.target.value)}
                     placeholder="例如：桃園教會、台中小組"
                     required={isRemote}
-                    className="h-10"
+                    className="h-12 text-base"
                   />
                 </div>
               )}
