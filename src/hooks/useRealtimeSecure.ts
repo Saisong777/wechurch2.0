@@ -109,37 +109,20 @@ export const useRealtimeSecure = ({
 
     // Set up polling for participant changes (since direct realtime exposes emails)
     // Poll every 3 seconds for participant updates
-    let lastParticipantCount = 0;
     let lastParticipantIds = new Set<string>();
+    // Track last known state to detect actual changes
+    let lastParticipantState = new Map<string, { groupNumber?: number; readyConfirmed: boolean }>();
     
     const pollInterval = setInterval(async () => {
       const participants = await pollParticipants();
       if (!participants) return;
       
-      // Check for new participants
-      if (participants.length > lastParticipantCount) {
-        const currentIds = new Set(participants.map(p => p.id));
-        for (const p of participants) {
-          if (!lastParticipantIds.has(p.id!) && onParticipantJoined) {
-            onParticipantJoined({
-              id: p.id!,
-              name: p.name!,
-              email: "", // Email excluded by view
-              gender: p.gender as "male" | "female",
-              groupNumber: p.group_number || undefined,
-              joinedAt: new Date(p.joined_at!),
-              location: p.location || "On-site",
-              readyConfirmed: p.ready_confirmed || false,
-            });
-          }
-        }
-        lastParticipantIds = currentIds;
-      }
+      const currentIds = new Set(participants.map(p => p.id));
       
-      // Check for updates (group assignments, ready status)
+      // Check for new participants
       for (const p of participants) {
-        if (onParticipantUpdated && (p.group_number || p.ready_confirmed)) {
-          onParticipantUpdated({
+        if (!lastParticipantIds.has(p.id!) && onParticipantJoined) {
+          onParticipantJoined({
             id: p.id!,
             name: p.name!,
             email: "", // Email excluded by view
@@ -152,7 +135,37 @@ export const useRealtimeSecure = ({
         }
       }
       
-      lastParticipantCount = participants.length;
+      // Check for updates (group assignments, ready status) - compare against last known state
+      for (const p of participants) {
+        const lastState = lastParticipantState.get(p.id!);
+        const currentGroupNumber = p.group_number || undefined;
+        const currentReadyConfirmed = p.ready_confirmed || false;
+        
+        // Only fire update if state actually changed
+        const groupChanged = lastState?.groupNumber !== currentGroupNumber;
+        const readyChanged = lastState?.readyConfirmed !== currentReadyConfirmed;
+        
+        if (onParticipantUpdated && (groupChanged || readyChanged)) {
+          onParticipantUpdated({
+            id: p.id!,
+            name: p.name!,
+            email: "", // Email excluded by view
+            gender: p.gender as "male" | "female",
+            groupNumber: currentGroupNumber,
+            joinedAt: new Date(p.joined_at!),
+            location: p.location || "On-site",
+            readyConfirmed: currentReadyConfirmed,
+          });
+        }
+        
+        // Update tracked state
+        lastParticipantState.set(p.id!, {
+          groupNumber: currentGroupNumber,
+          readyConfirmed: currentReadyConfirmed,
+        });
+      }
+      
+      lastParticipantIds = currentIds;
     }, 3000);
 
     // Subscribe to session and submission changes via realtime
