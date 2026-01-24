@@ -40,6 +40,9 @@ export const AdminMonitor: React.FC = () => {
   // Determine if we're in verification phase
   const isVerificationPhase = currentSession?.status === 'grouping';
   const isStudyingPhase = currentSession?.status === 'studying';
+  
+  // Debug: Log current session status
+  console.log('[AdminMonitor] Session status:', currentSession?.status, 'isVerificationPhase:', isVerificationPhase);
 
   // Refresh ready status
   const refreshReadyStatus = useCallback(async () => {
@@ -232,8 +235,8 @@ export const AdminMonitor: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Force Verify Button (Verification Phase Only) */}
-      {isVerificationPhase && (
+      {/* Force Verify Button (Verification Phase Only - or always show for testing) */}
+      {(isVerificationPhase || (!isStudyingPhase && groups.length > 0)) && (
         <Card className="border-accent/50 bg-accent/5">
           <CardContent className="py-4">
             <div className="flex items-center justify-between flex-wrap gap-4">

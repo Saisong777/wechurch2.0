@@ -33,6 +33,10 @@ export const updateSessionStatus = async (sessionId: string, status: string): Pr
     .update({ status })
     .eq("id", sessionId);
 
+  if (error) {
+    console.error("[updateSessionStatus] Failed to update session status:", error.message);
+  }
+  
   return !error;
 };
 
