@@ -308,45 +308,61 @@ export const AdminMonitor: React.FC = () => {
           return a.localeCompare(b);
         });
         
+        // Color themes for different locations
+        const locationThemes = [
+          { bg: 'bg-primary/5', border: 'border-primary/30', header: 'bg-primary/10', icon: 'text-primary' },
+          { bg: 'bg-secondary/5', border: 'border-secondary/30', header: 'bg-secondary/10', icon: 'text-secondary' },
+          { bg: 'bg-accent/5', border: 'border-accent/30', header: 'bg-accent/10', icon: 'text-accent' },
+          { bg: 'bg-emerald-500/5', border: 'border-emerald-500/30', header: 'bg-emerald-500/10', icon: 'text-emerald-600' },
+          { bg: 'bg-purple-500/5', border: 'border-purple-500/30', header: 'bg-purple-500/10', icon: 'text-purple-600' },
+          { bg: 'bg-orange-500/5', border: 'border-orange-500/30', header: 'bg-orange-500/10', icon: 'text-orange-600' },
+        ];
+        
         return sortedLocations.map((location, locIndex) => {
           const locationGroups = locationGroupsMap.get(location) || [];
           const locationUserCount = locationGroups.reduce((acc, g) => {
             return acc + ('totalMembers' in g ? g.totalMembers : (g as any).members?.length || 0);
           }, 0);
           
+          const theme = locationThemes[locIndex % locationThemes.length];
+          
           return (
             <div key={location} className="space-y-4">
               {/* Location Header */}
-              <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-3 p-3 rounded-lg ${theme.header}`}>
                 <div className="flex items-center gap-2 text-lg font-semibold">
-                  <MapPin className="w-5 h-5 text-secondary" />
+                  <MapPin className={`w-5 h-5 ${theme.icon}`} />
                   {location === 'On-site' ? '📍 現場' : `📍 ${location}`}
                   <span className="text-muted-foreground font-normal">
-                    ({locationUserCount} 人)
+                    ({locationUserCount} 人，{locationGroups.length} 組)
                   </span>
                 </div>
               </div>
               
-              {/* Groups Grid */}
+              {/* Groups Grid - Local numbering starts from 1 for each location */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {locationGroups.map((group) => {
+                {locationGroups.map((group, localIndex) => {
                   const isGroupReady = 'allReady' in group ? group.allReady : false;
                   const members = 'members' in group ? group.members : (group as any).members || [];
-                  const groupNumber = 'groupNumber' in group ? group.groupNumber : (group as any).number;
+                  const globalGroupNumber = 'groupNumber' in group ? group.groupNumber : (group as any).number;
+                  const localGroupNumber = localIndex + 1; // Start from 1 for each location
                   const readyCount = 'readyCount' in group ? group.readyCount : 0;
                   const totalMembers = 'totalMembers' in group ? group.totalMembers : members.length;
                   
                   // For study phase, check submissions
-                  const groupSubmissions = submissions.filter(s => s.groupNumber === groupNumber);
+                  const groupSubmissions = submissions.filter(s => s.groupNumber === globalGroupNumber);
                   const allSubmitted = !isVerificationPhase && groupSubmissions.length === members.length;
 
                   return (
-                    <Card key={groupNumber} className={isGroupReady || allSubmitted ? 'border-accent' : ''}>
+                    <Card 
+                      key={globalGroupNumber} 
+                      className={`${theme.bg} ${theme.border} border-2 ${isGroupReady || allSubmitted ? 'ring-2 ring-accent' : ''}`}
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-lg flex items-center gap-2">
-                            <Users className="w-5 h-5 text-secondary" />
-                            第 {groupNumber} 組
+                            <Users className={`w-5 h-5 ${theme.icon}`} />
+                            第 {localGroupNumber} 組
                           </CardTitle>
                           {isVerificationPhase ? (
                             isGroupReady ? (
@@ -393,7 +409,7 @@ export const AdminMonitor: React.FC = () => {
                             return (
                               <div
                                 key={member.id}
-                                className="flex items-center justify-between py-2 border-b last:border-0"
+                                className="flex items-center justify-between py-2 border-b last:border-0 border-muted/50"
                               >
                                 <div className="flex items-center gap-2">
                                   <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground text-sm font-bold">
@@ -418,7 +434,7 @@ export const AdminMonitor: React.FC = () => {
               
               {/* Separator between locations */}
               {locIndex < sortedLocations.length - 1 && (
-                <div className="border-t border-dashed border-muted-foreground/30 my-6" />
+                <div className="border-t-2 border-dashed border-muted-foreground/20 my-8" />
               )}
             </div>
           );
