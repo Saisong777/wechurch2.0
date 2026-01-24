@@ -6,12 +6,14 @@ import { WaitingRoom } from '@/components/user/WaitingRoom';
 import { GroupReveal } from '@/components/user/GroupReveal';
 import { StudyForm } from '@/components/user/StudyForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
+import { QRCodeScanner } from '@/components/user/QRCodeScanner';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { BookOpen, ArrowRight } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { BookOpen, ArrowRight, QrCode } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -23,6 +25,7 @@ export const UserPage: React.FC = () => {
   const [step, setStep] = useState<UserStep>('landing');
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Handle session ID from QR code URL (support both 'session' and 'session_id' params)
   useEffect(() => {
@@ -86,6 +89,12 @@ export const UserPage: React.FC = () => {
       return;
     }
     await loadSessionAndCheckAuth(sessionId);
+  };
+
+  const handleQRScan = async (scannedId: string) => {
+    setSessionId(scannedId);
+    toast.success('QR Code 掃描成功！');
+    await loadSessionAndCheckAuth(scannedId);
   };
 
   const renderStep = () => {
@@ -165,8 +174,35 @@ export const UserPage: React.FC = () => {
                     </>
                   )}
                 </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                      或者 OR
+                    </span>
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="xl"
+                  className="w-full"
+                  onClick={() => setShowScanner(true)}
+                >
+                  <QrCode className="w-5 h-5 mr-2" />
+                  掃描 QR Code
+                </Button>
               </CardContent>
             </Card>
+            
+            <QRCodeScanner 
+              open={showScanner} 
+              onClose={() => setShowScanner(false)} 
+              onScan={handleQRScan}
+            />
           </div>
         );
 
