@@ -112,12 +112,15 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
 
           {/* Manual Refresh Button for Mobile Users */}
           <div className="mt-6 pt-4 border-t text-center">
+            <p className="text-xs text-muted-foreground mb-2">
+              📱 手機用戶若畫面沒更新，請點擊下方按鈕
+            </p>
             <Button 
-              variant="ghost" 
-              size="sm"
+              variant="outline" 
+              size="default"
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className="text-muted-foreground hover:text-foreground"
+              className="w-full text-foreground border-primary/50 hover:bg-primary/10"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? '更新中...' : '狀態沒更新？點此刷新'}
