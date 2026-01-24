@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
-import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, updateSessionStatus, fetchParticipants } from '@/lib/supabase-helpers';
+import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers } from '@/lib/supabase-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle } from 'lucide-react';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -39,13 +41,29 @@ export const AdminMonitor: React.FC = () => {
   const [isClearingGroups, setIsClearingGroups] = useState(false);
   const [isRegrouping, setIsRegrouping] = useState(false);
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
+  const [allowLatecomers, setAllowLatecomers] = useState(currentSession?.allowLatecomers || false);
 
   // Determine if we're in verification phase
   const isVerificationPhase = currentSession?.status === 'grouping';
   const isStudyingPhase = currentSession?.status === 'studying';
   
-  // Debug: Log current session status
-  console.log('[AdminMonitor] Session status:', currentSession?.status, 'isVerificationPhase:', isVerificationPhase);
+  // Sync allowLatecomers with session
+  useEffect(() => {
+    setAllowLatecomers(currentSession?.allowLatecomers || false);
+  }, [currentSession?.allowLatecomers]);
+
+  const handleToggleLatecomers = async (checked: boolean) => {
+    if (!currentSession?.id) return;
+    setAllowLatecomers(checked);
+    const success = await updateSessionAllowLatecomers(currentSession.id, checked);
+    if (success) {
+      setCurrentSession({ ...currentSession, allowLatecomers: checked });
+      toast.success(checked ? '已開啟遲到者加入功能' : '已關閉遲到者加入功能');
+    } else {
+      setAllowLatecomers(!checked); // Revert on failure
+      toast.error('更新失敗');
+    }
+  };
 
   // Refresh ready status
   const refreshReadyStatus = useCallback(async () => {
@@ -299,6 +317,30 @@ export const AdminMonitor: React.FC = () => {
               <p className="text-xs text-muted-foreground text-center">
                 {readyPercentage.toFixed(0)}% 的參與者已確認
               </p>
+            </div>
+          )}
+
+          {/* Allow Latecomers Toggle */}
+          {(isVerificationPhase || isStudyingPhase) && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="allow-latecomers" className="text-sm cursor-pointer">
+                    允許遲到者加入 Allow Latecomers
+                  </Label>
+                </div>
+                <Switch
+                  id="allow-latecomers"
+                  checked={allowLatecomers}
+                  onCheckedChange={handleToggleLatecomers}
+                />
+              </div>
+              {allowLatecomers && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  ✅ 遲到者可以加入，將自動分配到人數最少的小組
+                </p>
+              )}
             </div>
           )}
         </CardContent>

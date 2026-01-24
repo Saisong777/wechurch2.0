@@ -136,6 +136,7 @@ export type Database = {
       }
       sessions: {
         Row: {
+          allow_latecomers: boolean
           created_at: string
           group_size: number | null
           grouping_method: string | null
@@ -145,6 +146,7 @@ export type Database = {
           verse_reference: string
         }
         Insert: {
+          allow_latecomers?: boolean
           created_at?: string
           group_size?: number | null
           grouping_method?: string | null
@@ -154,6 +156,7 @@ export type Database = {
           verse_reference: string
         }
         Update: {
+          allow_latecomers?: boolean
           created_at?: string
           group_size?: number | null
           grouping_method?: string | null
@@ -302,6 +305,7 @@ export type Database = {
       }
       sessions_public: {
         Row: {
+          allow_latecomers: boolean | null
           created_at: string | null
           group_size: number | null
           grouping_method: string | null
@@ -310,6 +314,7 @@ export type Database = {
           verse_reference: string | null
         }
         Insert: {
+          allow_latecomers?: boolean | null
           created_at?: string | null
           group_size?: number | null
           grouping_method?: string | null
@@ -318,6 +323,7 @@ export type Database = {
           verse_reference?: string | null
         }
         Update: {
+          allow_latecomers?: boolean | null
           created_at?: string | null
           group_size?: number | null
           grouping_method?: string | null
