@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtimeSecure } from '@/hooks/useRealtimeSecure';
+import { ConnectionStatus } from '@/components/ui/connection-status';
 import { Clock, Users, MapPin, RefreshCw } from 'lucide-react';
 
 interface WaitingRoomProps {
@@ -15,7 +16,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
 
   // Listen for session status updates and participant group assignments
   // Using secure realtime hook with aggressive mobile sync features
-  const { forceRefresh } = useRealtimeSecure({
+  const { forceRefresh, connectionState, lastSyncTime } = useRealtimeSecure({
     sessionId: currentSession?.id || null,
     currentUserId: currentUser?.id || null,
     onSessionUpdated: (sessionUpdate) => {
@@ -60,6 +61,14 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6 animate-fade-in">
+      {/* Connection Status Indicator */}
+      <div className="flex justify-center">
+        <ConnectionStatus 
+          state={connectionState} 
+          lastSyncTime={lastSyncTime || undefined} 
+        />
+      </div>
+
       <Card variant="highlight" className="text-center">
         <CardContent className="py-12">
           <div className="relative inline-block mb-6">
