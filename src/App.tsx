@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import { UserPage } from "./pages/UserPage";
 import { AdminPage } from "./pages/AdminPage";
+import CRMPage from "./pages/CRMPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/user" element={<UserPage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/crm" element={<CRMPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
