@@ -250,6 +250,58 @@ const calculateOptimalGroupSizes = (total: number, minSize: number, maxSize: num
 };
 
 /**
+ * Helper function to process a gender group (males or females only)
+ */
+const processGenderGroup = (
+  usersToGroup: User[],
+  minSize: number,
+  maxSize: number,
+  startGroupNumber: number,
+  groups: Group[],
+  groupAssignments: { participantId: string; groupNumber: number }[]
+): number => {
+  let groupNumber = startGroupNumber;
+  const totalUsers = usersToGroup.length;
+  
+  if (totalUsers <= maxSize) {
+    // Single group
+    for (const member of usersToGroup) {
+      groupAssignments.push({ participantId: member.id, groupNumber });
+      member.groupNumber = groupNumber;
+    }
+    groups.push({
+      id: `group-${groupNumber}`,
+      number: groupNumber,
+      members: usersToGroup,
+    });
+    return groupNumber + 1;
+  }
+  
+  // Multiple groups needed
+  const groupSizes = calculateOptimalGroupSizes(totalUsers, minSize, maxSize);
+  
+  let currentIndex = 0;
+  for (const size of groupSizes) {
+    const groupMembers = usersToGroup.slice(currentIndex, currentIndex + size);
+    currentIndex += size;
+    
+    for (const member of groupMembers) {
+      groupAssignments.push({ participantId: member.id, groupNumber });
+      member.groupNumber = groupNumber;
+    }
+    
+    groups.push({
+      id: `group-${groupNumber}`,
+      number: groupNumber,
+      members: groupMembers,
+    });
+    groupNumber++;
+  }
+  
+  return groupNumber;
+};
+
+/**
  * Optimized grouping algorithm: prioritize minSize, expand to maxSize only when needed
  * 
  * Logic:
@@ -282,52 +334,67 @@ export const assignGroupsToParticipants = async (
 
   // Step 2: Process each location bucket independently (in-memory, no DB calls yet)
   for (const [, users] of locationBuckets) {
-    let usersToGroup = [...users];
-    
-    // Apply grouping method
-    if (method === "gender-balanced") {
-      usersToGroup = applyGenderBalancing(usersToGroup);
+    // Gender-separated mode: split into male and female groups first
+    if (method === "gender-separated") {
+      const males = shuffleArray(users.filter(u => u.gender === "male"));
+      const females = shuffleArray(users.filter(u => u.gender === "female"));
+      
+      // Process males
+      if (males.length > 0) {
+        groupNumber = processGenderGroup(males, minSize, maxSize, groupNumber, groups, groupAssignments);
+      }
+      
+      // Process females
+      if (females.length > 0) {
+        groupNumber = processGenderGroup(females, minSize, maxSize, groupNumber, groups, groupAssignments);
+      }
     } else {
-      usersToGroup = shuffleArray(usersToGroup);
-    }
-
-    const totalUsers = usersToGroup.length;
-    
-    // Edge case: fewer users than minSize - put them all in one group
-    if (totalUsers <= maxSize) {
-      for (const member of usersToGroup) {
-        groupAssignments.push({ participantId: member.id, groupNumber });
-        member.groupNumber = groupNumber;
-      }
-      groups.push({
-        id: `group-${groupNumber}`,
-        number: groupNumber,
-        members: usersToGroup,
-      });
-      groupNumber++;
-      continue;
-    }
-
-    // Calculate optimal distribution: prioritize minSize, expand only when needed
-    // Formula: find the number of groups where each group is between minSize and maxSize
-    const groupSizes = calculateOptimalGroupSizes(totalUsers, minSize, maxSize);
-    
-    let currentIndex = 0;
-    for (const size of groupSizes) {
-      const groupMembers = usersToGroup.slice(currentIndex, currentIndex + size);
-      currentIndex += size;
+      // Random or gender-balanced
+      let usersToGroup = [...users];
       
-      for (const member of groupMembers) {
-        groupAssignments.push({ participantId: member.id, groupNumber });
-        member.groupNumber = groupNumber;
+      if (method === "gender-balanced") {
+        usersToGroup = applyGenderBalancing(usersToGroup);
+      } else {
+        usersToGroup = shuffleArray(usersToGroup);
       }
+
+      const totalUsers = usersToGroup.length;
       
-      groups.push({
-        id: `group-${groupNumber}`,
-        number: groupNumber,
-        members: groupMembers,
-      });
-      groupNumber++;
+      // Edge case: fewer users than maxSize - put them all in one group
+      if (totalUsers <= maxSize) {
+        for (const member of usersToGroup) {
+          groupAssignments.push({ participantId: member.id, groupNumber });
+          member.groupNumber = groupNumber;
+        }
+        groups.push({
+          id: `group-${groupNumber}`,
+          number: groupNumber,
+          members: usersToGroup,
+        });
+        groupNumber++;
+        continue;
+      }
+
+      // Calculate optimal distribution: prioritize minSize, expand only when needed
+      const groupSizes = calculateOptimalGroupSizes(totalUsers, minSize, maxSize);
+      
+      let currentIndex = 0;
+      for (const size of groupSizes) {
+        const groupMembers = usersToGroup.slice(currentIndex, currentIndex + size);
+        currentIndex += size;
+        
+        for (const member of groupMembers) {
+          groupAssignments.push({ participantId: member.id, groupNumber });
+          member.groupNumber = groupNumber;
+        }
+        
+        groups.push({
+          id: `group-${groupNumber}`,
+          number: groupNumber,
+          members: groupMembers,
+        });
+        groupNumber++;
+      }
     }
   }
 

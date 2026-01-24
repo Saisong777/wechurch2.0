@@ -285,103 +285,145 @@ export const AdminMonitor: React.FC = () => {
         </Card>
       )}
 
-      {/* Groups Overview with Ready Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {(isVerificationPhase ? groupReadyStatus : groups).map((group) => {
-          const isGroupReady = 'allReady' in group ? group.allReady : false;
-          const members = 'members' in group ? group.members : (group as any).members || [];
-          const groupNumber = 'groupNumber' in group ? group.groupNumber : (group as any).number;
-          const location = 'location' in group ? group.location : 'On-site';
-          const readyCount = 'readyCount' in group ? group.readyCount : 0;
-          const totalMembers = 'totalMembers' in group ? group.totalMembers : members.length;
+      {/* Groups Overview by Location */}
+      {(() => {
+        // Organize groups by location
+        const groupsData = isVerificationPhase ? groupReadyStatus : groups;
+        
+        // Group by location
+        const locationGroupsMap = new Map<string, typeof groupsData>();
+        for (const group of groupsData) {
+          const location = 'location' in group ? group.location : 
+            (group as any).members?.[0]?.location || 'On-site';
+          if (!locationGroupsMap.has(location)) {
+            locationGroupsMap.set(location, []);
+          }
+          locationGroupsMap.get(location)!.push(group as any);
+        }
+        
+        // Sort: On-site first, then others alphabetically
+        const sortedLocations = Array.from(locationGroupsMap.keys()).sort((a, b) => {
+          if (a === 'On-site') return -1;
+          if (b === 'On-site') return 1;
+          return a.localeCompare(b);
+        });
+        
+        return sortedLocations.map((location, locIndex) => {
+          const locationGroups = locationGroupsMap.get(location) || [];
+          const locationUserCount = locationGroups.reduce((acc, g) => {
+            return acc + ('totalMembers' in g ? g.totalMembers : (g as any).members?.length || 0);
+          }, 0);
           
-          // For study phase, check submissions
-          const groupSubmissions = submissions.filter(s => s.groupNumber === groupNumber);
-          const allSubmitted = !isVerificationPhase && groupSubmissions.length === members.length;
-
           return (
-            <Card key={groupNumber} className={isGroupReady || allSubmitted ? 'border-accent' : ''}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Users className="w-5 h-5 text-secondary" />
-                      第 {groupNumber} 組
-                    </CardTitle>
-                    {location !== 'On-site' && (
-                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3 h-3" />
-                        {location}
-                      </div>
-                    )}
-                  </div>
-                  {isVerificationPhase ? (
-                    isGroupReady ? (
-                      <span className="flex items-center gap-1 text-sm text-accent">
-                        <CheckCircle className="w-4 h-4" />
-                        已就緒
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        {readyCount}/{totalMembers} 確認
-                      </span>
-                    )
-                  ) : (
-                    allSubmitted ? (
-                      <span className="flex items-center gap-1 text-sm text-accent">
-                        <CheckCircle className="w-4 h-4" />
-                        已完成
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        {groupSubmissions.length}/{members.length}
-                      </span>
-                    )
-                  )}
+            <div key={location} className="space-y-4">
+              {/* Location Header */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-lg font-semibold">
+                  <MapPin className="w-5 h-5 text-secondary" />
+                  {location === 'On-site' ? '📍 現場' : `📍 ${location}`}
+                  <span className="text-muted-foreground font-normal">
+                    ({locationUserCount} 人)
+                  </span>
                 </div>
-                
-                {/* Ready progress bar for verification phase */}
-                {isVerificationPhase && (
-                  <Progress 
-                    value={(readyCount / totalMembers) * 100} 
-                    className="h-1.5 mt-2" 
-                  />
-                )}
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {members.map((member: any) => {
-                    const memberReady = 'readyConfirmed' in member ? member.readyConfirmed : false;
-                    const hasSubmitted = !isVerificationPhase && submissions.some(s => s.userId === member.id);
-                    const isComplete = isVerificationPhase ? memberReady : hasSubmitted;
-                    
-                    return (
-                      <div
-                        key={member.id}
-                        className="flex items-center justify-between py-2 border-b last:border-0"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground text-sm font-bold">
-                            {member.name.charAt(0)}
-                          </div>
-                          <span className="text-sm font-medium">{member.name}</span>
+              </div>
+              
+              {/* Groups Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {locationGroups.map((group) => {
+                  const isGroupReady = 'allReady' in group ? group.allReady : false;
+                  const members = 'members' in group ? group.members : (group as any).members || [];
+                  const groupNumber = 'groupNumber' in group ? group.groupNumber : (group as any).number;
+                  const readyCount = 'readyCount' in group ? group.readyCount : 0;
+                  const totalMembers = 'totalMembers' in group ? group.totalMembers : members.length;
+                  
+                  // For study phase, check submissions
+                  const groupSubmissions = submissions.filter(s => s.groupNumber === groupNumber);
+                  const allSubmitted = !isVerificationPhase && groupSubmissions.length === members.length;
+
+                  return (
+                    <Card key={groupNumber} className={isGroupReady || allSubmitted ? 'border-accent' : ''}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <Users className="w-5 h-5 text-secondary" />
+                            第 {groupNumber} 組
+                          </CardTitle>
+                          {isVerificationPhase ? (
+                            isGroupReady ? (
+                              <span className="flex items-center gap-1 text-sm text-accent">
+                                <CheckCircle className="w-4 h-4" />
+                                已就緒
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Clock className="w-4 h-4" />
+                                {readyCount}/{totalMembers} 確認
+                              </span>
+                            )
+                          ) : (
+                            allSubmitted ? (
+                              <span className="flex items-center gap-1 text-sm text-accent">
+                                <CheckCircle className="w-4 h-4" />
+                                已完成
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Clock className="w-4 h-4" />
+                                {groupSubmissions.length}/{members.length}
+                              </span>
+                            )
+                          )}
                         </div>
-                        {isComplete ? (
-                          <CheckCircle className="w-5 h-5 text-accent" />
-                        ) : (
-                          <Clock className="w-5 h-5 text-muted-foreground" />
+                        
+                        {/* Ready progress bar for verification phase */}
+                        {isVerificationPhase && (
+                          <Progress 
+                            value={(readyCount / totalMembers) * 100} 
+                            className="h-1.5 mt-2" 
+                          />
                         )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {members.map((member: any) => {
+                            const memberReady = 'readyConfirmed' in member ? member.readyConfirmed : false;
+                            const hasSubmitted = !isVerificationPhase && submissions.some(s => s.userId === member.id);
+                            const isComplete = isVerificationPhase ? memberReady : hasSubmitted;
+                            
+                            return (
+                              <div
+                                key={member.id}
+                                className="flex items-center justify-between py-2 border-b last:border-0"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground text-sm font-bold">
+                                    {member.name.charAt(0)}
+                                  </div>
+                                  <span className="text-sm font-medium">{member.name}</span>
+                                </div>
+                                {isComplete ? (
+                                  <CheckCircle className="w-5 h-5 text-accent" />
+                                ) : (
+                                  <Clock className="w-5 h-5 text-muted-foreground" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              
+              {/* Separator between locations */}
+              {locIndex < sortedLocations.length - 1 && (
+                <div className="border-t border-dashed border-muted-foreground/30 my-6" />
+              )}
+            </div>
           );
-        })}
-      </div>
+        });
+      })()}
 
       {/* AI Analysis Actions (Show only in study phase) */}
       {isStudyingPhase && (
