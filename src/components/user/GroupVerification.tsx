@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSession } from '@/contexts/SessionContext';
-import { fetchGroupMembers, updateParticipantReady } from '@/lib/supabase-helpers';
+import { fetchGroupMembers } from '@/lib/supabase-helpers';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/bible-study';
 import { Users, CheckCircle, Loader2, MapPin, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -191,8 +191,17 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   };
 
   const handleReady = async () => {
-    if (!currentUser?.id || !currentSession?.id || !currentUser?.email) {
+    if (!currentUser?.id || !currentSession?.id) {
       toast.error('缺少必要資訊，請重新整理頁面');
+      return;
+    }
+
+    // Get email from localStorage (since participant_names view returns NULL for privacy)
+    const userEmail = localStorage.getItem('user_email');
+    if (!userEmail) {
+      toast.error('Session 已過期，請重新加入', {
+        description: 'Session expired, please rejoin the study.',
+      });
       return;
     }
 
@@ -207,21 +216,28 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
 
     setIsSubmitting(true);
 
-    // Use secure RPC with email verification
-    const success = await updateParticipantReady(
-      currentUser.id,
-      true,
-      currentSession.id,
-      currentUser.email
-    );
+    // Use secure RPC with email verification from localStorage
+    const { data, error } = await supabase.rpc('set_participant_ready', {
+      p_session_id: currentSession.id,
+      p_participant_id: currentUser.id,
+      p_email: userEmail,
+      p_ready: true,
+    });
 
-    if (success) {
+    if (error) {
+      console.error('[GroupVerification] RPC error:', error);
+      toast.error('確認失敗，請重試', {
+        description: error.message,
+      });
+    } else if (data === true) {
       setHasConfirmed(true);
       setCurrentUser({ ...currentUser, readyConfirmed: true });
       toast.success('已確認準備完成！等待其他組員...');
       await fetchMembers(); // Refresh to check if all ready
     } else {
-      toast.error('確認失敗，請重試。可能聚會狀態已變更。');
+      toast.error('驗證失敗：可能聚會狀態已變更或身份不符', {
+        description: 'Verification failed. Session may have ended or identity mismatch.',
+      });
     }
 
     setIsSubmitting(false);

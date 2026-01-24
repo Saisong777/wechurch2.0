@@ -117,6 +117,8 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
       localStorage.removeItem('pending_session_id');
       // Save participant ID for session restoration
       localStorage.setItem('bible_study_participant_id', joinedUser.id);
+      // Save email for RPC verification (critical for set_participant_ready)
+      localStorage.setItem('user_email', email);
       toast.success('成功加入查經！');
       onJoined(isLatecomer && !!joinedUser.groupNumber);
     } else {
