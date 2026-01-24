@@ -1,6 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User, StudySubmission, GroupingSettings, Group } from "@/types/bible-study";
 
+// Generic error message for client-side display
+const GENERIC_ERROR = "An error occurred. Please try again.";
+
 // Session functions
 export const createSession = async (verseReference: string): Promise<Session | null> => {
   const { data, error } = await supabase
@@ -10,7 +13,7 @@ export const createSession = async (verseReference: string): Promise<Session | n
     .single();
 
   if (error) {
-    console.error("Error creating session:", error);
+    // Error logged server-side by Supabase - return null to client
     return null;
   }
 
@@ -24,15 +27,13 @@ export const createSession = async (verseReference: string): Promise<Session | n
   };
 };
 
-export const updateSessionStatus = async (sessionId: string, status: string) => {
+export const updateSessionStatus = async (sessionId: string, status: string): Promise<boolean> => {
   const { error } = await supabase
     .from("sessions")
     .update({ status })
     .eq("id", sessionId);
 
-  if (error) {
-    console.error("Error updating session:", error);
-  }
+  return !error;
 };
 
 // Fetch public session info (without owner_id) for participants
@@ -50,12 +51,9 @@ export const fetchSessionPublic = async (sessionId: string): Promise<{
     .eq("id", sessionId)
     .maybeSingle();
 
-  if (error) {
-    console.error("Error fetching session:", error);
+  if (error || !data) {
     return null;
   }
-
-  if (!data) return null;
 
   return {
     id: data.id,
@@ -86,7 +84,6 @@ export const joinSession = async (
     .single();
 
   if (error) {
-    console.error("Error joining session:", error);
     return null;
   }
 
@@ -109,7 +106,6 @@ export const fetchParticipantsSecure = async (sessionId: string): Promise<User[]
     .order("joined_at", { ascending: true });
 
   if (error) {
-    console.error("Error fetching participants:", error);
     return [];
   }
 
@@ -132,7 +128,6 @@ export const fetchParticipants = async (sessionId: string): Promise<User[]> => {
     .order("joined_at", { ascending: true });
 
   if (error) {
-    console.error("Error fetching participants:", error);
     return [];
   }
 
@@ -227,7 +222,6 @@ export const submitStudyNotes = async (
     .single();
 
   if (error) {
-    console.error("Error submitting notes:", error);
     return null;
   }
 
@@ -259,7 +253,6 @@ export const fetchSubmissions = async (sessionId: string): Promise<StudySubmissi
     .order("submitted_at", { ascending: true });
 
   if (error) {
-    console.error("Error fetching submissions:", error);
     return [];
   }
 
@@ -291,7 +284,6 @@ export const fetchSubmissionsPublic = async (sessionId: string): Promise<StudySu
     .order("submitted_at", { ascending: true });
 
   if (error) {
-    console.error("Error fetching public submissions:", error);
     return [];
   }
 
@@ -325,8 +317,7 @@ export const generateAIReport = async (
   });
 
   if (error) {
-    console.error("Error generating report:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: GENERIC_ERROR };
   }
 
   if (data.error) {
