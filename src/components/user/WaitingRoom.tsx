@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtimeSecure } from '@/hooks/useRealtimeSecure';
-import { Clock, Users } from 'lucide-react';
+import { Clock, Users, MapPin } from 'lucide-react';
 
 interface WaitingRoomProps {
   onGroupingStarted: () => void;
@@ -16,7 +16,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
   useRealtimeSecure({
     sessionId: currentSession?.id || null,
     onSessionUpdated: (sessionUpdate) => {
-      if (sessionUpdate.status === 'studying' && currentSession) {
+      if ((sessionUpdate.status === 'studying' || sessionUpdate.status === 'grouping') && currentSession) {
         setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
       }
     },
@@ -28,6 +28,8 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
       }
     },
   });
+
+  const isRemote = currentUser?.location && currentUser.location !== 'On-site';
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6 animate-fade-in">
@@ -73,6 +75,12 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
             <p className="font-medium text-foreground mt-1">
               {currentUser?.name} ({currentUser?.gender === 'male' ? '男' : '女'})
             </p>
+            {isRemote && (
+              <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
+                <MapPin className="w-4 h-4" />
+                <span>{currentUser?.location}</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

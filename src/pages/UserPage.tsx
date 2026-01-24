@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { JoinForm } from '@/components/user/JoinForm';
 import { WaitingRoom } from '@/components/user/WaitingRoom';
 import { GroupReveal } from '@/components/user/GroupReveal';
+import { GroupVerification } from '@/components/user/GroupVerification';
 import { StudyForm } from '@/components/user/StudyForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
 import { QRCodeScanner } from '@/components/user/QRCodeScanner';
@@ -17,7 +18,7 @@ import { BookOpen, ArrowRight, QrCode } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'study' | 'review';
+type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'study' | 'review';
 
 export const UserPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -221,7 +222,14 @@ export const UserPage: React.FC = () => {
         );
 
       case 'group-reveal':
-        return <GroupReveal onContinue={() => setStep('study')} />;
+        return <GroupReveal onContinue={() => setStep('verification')} />;
+
+      case 'verification':
+        return (
+          <div className="px-4 py-8">
+            <GroupVerification onAllReady={() => setStep('study')} />
+          </div>
+        );
 
       case 'study':
         return (

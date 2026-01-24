@@ -45,6 +45,16 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
 
   const maleCount = users.filter(u => u.gender === 'male').length;
   const femaleCount = users.filter(u => u.gender === 'female').length;
+  
+  // Group users by location for display
+  const locationGroups = users.reduce((acc, user) => {
+    const loc = user.location || 'On-site';
+    if (!acc[loc]) acc[loc] = [];
+    acc[loc].push(user);
+    return acc;
+  }, {} as Record<string, typeof users>);
+  
+  const locationCount = Object.keys(locationGroups).length;
 
   const handleCopySessionId = () => {
     if (currentSession?.id) {
@@ -116,13 +126,18 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
               <Users className="w-5 h-5 text-secondary" />
               已加入成員 Participants
             </CardTitle>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
               <span className="flex items-center gap-1">
                 👨 <strong>{maleCount}</strong> 男
               </span>
               <span className="flex items-center gap-1">
                 👩 <strong>{femaleCount}</strong> 女
               </span>
+              {locationCount > 1 && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  📍 <strong>{locationCount}</strong> 地點
+                </span>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -134,21 +149,36 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
               <p className="text-sm mt-1">Waiting for participants to join...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {users.map((user, index) => (
-                <div
-                  key={user.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 animate-slide-in-right"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground font-bold">
-                    {user.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {user.gender === 'male' ? '男' : '女'}
-                    </p>
+            <div className="space-y-6">
+              {Object.entries(locationGroups).map(([location, locationUsers]) => (
+                <div key={location}>
+                  {locationCount > 1 && (
+                    <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                      <span className="font-medium">
+                        {location === 'On-site' ? '📍 現場' : `📍 ${location}`}
+                      </span>
+                      <span>({locationUsers.length} 人)</span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {locationUsers.map((user, index) => (
+                      <div
+                        key={user.id}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 animate-slide-in-right"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                      >
+                        <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground font-bold">
+                          {user.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{user.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {user.gender === 'male' ? '男' : '女'}
+                            {locationCount === 1 && user.location !== 'On-site' && ` • ${user.location}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}

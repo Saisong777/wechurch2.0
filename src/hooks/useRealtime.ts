@@ -37,6 +37,8 @@ export const useRealtime = ({
       gender: string;
       group_number: number | null;
       joined_at: string;
+      location: string;
+      ready_confirmed: boolean;
     }>) => {
       if (payload.eventType === "INSERT" && onParticipantJoined) {
         const p = payload.new;
@@ -47,6 +49,8 @@ export const useRealtime = ({
           gender: p.gender as "male" | "female",
           groupNumber: p.group_number || undefined,
           joinedAt: new Date(p.joined_at),
+          location: p.location,
+          readyConfirmed: p.ready_confirmed,
         });
       } else if (payload.eventType === "UPDATE" && onParticipantUpdated) {
         const p = payload.new;
@@ -57,6 +61,8 @@ export const useRealtime = ({
           gender: p.gender as "male" | "female",
           groupNumber: p.group_number || undefined,
           joinedAt: new Date(p.joined_at),
+          location: p.location,
+          readyConfirmed: p.ready_confirmed,
         });
       }
     },

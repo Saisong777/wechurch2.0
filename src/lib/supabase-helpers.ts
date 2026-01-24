@@ -70,7 +70,8 @@ export const joinSession = async (
   sessionId: string,
   name: string,
   email: string,
-  gender: "male" | "female"
+  gender: "male" | "female",
+  location: string = "On-site"
 ): Promise<User | null> => {
   const { data, error } = await supabase
     .from("participants")
@@ -79,6 +80,7 @@ export const joinSession = async (
       name,
       email,
       gender,
+      location,
     })
     .select()
     .single();
@@ -94,6 +96,8 @@ export const joinSession = async (
     gender: data.gender as "male" | "female",
     groupNumber: data.group_number || undefined,
     joinedAt: new Date(data.joined_at),
+    location: data.location,
+    readyConfirmed: data.ready_confirmed,
   };
 };
 
@@ -109,13 +113,15 @@ export const fetchParticipantsSecure = async (sessionId: string): Promise<User[]
     return [];
   }
 
-  return data.map((p: { id: string; name: string; email: string | null; gender: string; group_number: number | null; joined_at: string }) => ({
+  return data.map((p: { id: string; name: string; email: string | null; gender: string; group_number: number | null; joined_at: string; location: string; ready_confirmed: boolean }) => ({
     id: p.id,
     name: p.name,
     email: p.email || "", // Email is null in the view for privacy
     gender: p.gender as "male" | "female",
     groupNumber: p.group_number || undefined,
     joinedAt: new Date(p.joined_at),
+    location: p.location,
+    readyConfirmed: p.ready_confirmed,
   }));
 };
 
@@ -138,63 +144,160 @@ export const fetchParticipants = async (sessionId: string): Promise<User[]> => {
     gender: p.gender as "male" | "female",
     groupNumber: p.group_number || undefined,
     joinedAt: new Date(p.joined_at),
+    location: p.location,
+    readyConfirmed: p.ready_confirmed,
   }));
 };
 
+// Helper function to shuffle an array
+const shuffleArray = <T>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
+// Helper function to apply gender balancing
+const applyGenderBalancing = (users: User[]): User[] => {
+  const males = users.filter((u) => u.gender === "male");
+  const females = users.filter((u) => u.gender === "female");
+  const balanced: User[] = [];
+  const maxLen = Math.max(males.length, females.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i < males.length) balanced.push(males[i]);
+    if (i < females.length) balanced.push(females[i]);
+  }
+  return balanced;
+};
+
+// Multi-site grouping algorithm with max 6 per group
 export const assignGroupsToParticipants = async (
   sessionId: string,
   participants: User[],
   settings: GroupingSettings
 ): Promise<Group[]> => {
-  const { groupSize, method } = settings;
-  let usersToGroup = [...participants];
-
-  // Shuffle or balance
-  if (method === "gender-balanced") {
-    const males = usersToGroup.filter((u) => u.gender === "male");
-    const females = usersToGroup.filter((u) => u.gender === "female");
-    usersToGroup = [];
-    const maxLen = Math.max(males.length, females.length);
-    for (let i = 0; i < maxLen; i++) {
-      if (i < males.length) usersToGroup.push(males[i]);
-      if (i < females.length) usersToGroup.push(females[i]);
+  const { method } = settings;
+  const MAX_GROUP_SIZE = 6;
+  
+  // Step 1: Bucket participants by location
+  const locationBuckets = new Map<string, User[]>();
+  for (const p of participants) {
+    const loc = p.location || "On-site";
+    if (!locationBuckets.has(loc)) {
+      locationBuckets.set(loc, []);
     }
-  } else {
-    // Random shuffle
-    for (let i = usersToGroup.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [usersToGroup[i], usersToGroup[j]] = [usersToGroup[j], usersToGroup[i]];
-    }
+    locationBuckets.get(loc)!.push(p);
   }
 
   const groups: Group[] = [];
   let groupNumber = 1;
 
-  for (let i = 0; i < usersToGroup.length; i += groupSize) {
-    const groupMembers = usersToGroup.slice(i, i + groupSize);
+  // Step 2: Process each location bucket independently
+  for (const [location, users] of locationBuckets) {
+    let usersToGroup = [...users];
     
-    // Update each participant's group number in DB
-    for (const member of groupMembers) {
-      await supabase
-        .from("participants")
-        .update({ group_number: groupNumber })
-        .eq("id", member.id);
-      
-      member.groupNumber = groupNumber;
+    // Apply grouping method
+    if (method === "gender-balanced") {
+      usersToGroup = applyGenderBalancing(usersToGroup);
+    } else {
+      usersToGroup = shuffleArray(usersToGroup);
     }
 
-    groups.push({
-      id: `group-${groupNumber}`,
-      number: groupNumber,
-      members: groupMembers,
-    });
-    groupNumber++;
+    // Step 3: Split into subgroups with max 6 members
+    if (usersToGroup.length <= MAX_GROUP_SIZE) {
+      // Single group for this location
+      for (const member of usersToGroup) {
+        await supabase
+          .from("participants")
+          .update({ group_number: groupNumber, ready_confirmed: false })
+          .eq("id", member.id);
+        member.groupNumber = groupNumber;
+      }
+      groups.push({
+        id: `group-${groupNumber}`,
+        number: groupNumber,
+        members: usersToGroup,
+      });
+      groupNumber++;
+    } else {
+      // Split into multiple subgroups
+      // Calculate optimal subgroup count to balance sizes
+      const subgroupCount = Math.ceil(usersToGroup.length / MAX_GROUP_SIZE);
+      const baseSize = Math.floor(usersToGroup.length / subgroupCount);
+      const remainder = usersToGroup.length % subgroupCount;
+      
+      let currentIndex = 0;
+      for (let subIdx = 0; subIdx < subgroupCount; subIdx++) {
+        // Distribute remainder across first groups
+        const thisGroupSize = baseSize + (subIdx < remainder ? 1 : 0);
+        const groupMembers = usersToGroup.slice(currentIndex, currentIndex + thisGroupSize);
+        currentIndex += thisGroupSize;
+        
+        for (const member of groupMembers) {
+          await supabase
+            .from("participants")
+            .update({ group_number: groupNumber, ready_confirmed: false })
+            .eq("id", member.id);
+          member.groupNumber = groupNumber;
+        }
+        
+        groups.push({
+          id: `group-${groupNumber}`,
+          number: groupNumber,
+          members: groupMembers,
+        });
+        groupNumber++;
+      }
+    }
   }
 
-  // Update session status
-  await updateSessionStatus(sessionId, "studying");
+  // Update session status to 'grouping' (verification phase)
+  await updateSessionStatus(sessionId, "grouping");
 
   return groups;
+};
+
+// Update participant's ready confirmation status
+export const updateParticipantReady = async (
+  participantId: string,
+  ready: boolean
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from("participants")
+    .update({ ready_confirmed: ready })
+    .eq("id", participantId);
+  
+  return !error;
+};
+
+// Fetch group members for verification
+export const fetchGroupMembers = async (
+  sessionId: string,
+  groupNumber: number
+): Promise<User[]> => {
+  const { data, error } = await supabase
+    .from("participant_names")
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("group_number", groupNumber)
+    .order("joined_at", { ascending: true });
+
+  if (error) {
+    return [];
+  }
+
+  return data.map((p: { id: string; name: string; email: string | null; gender: string; group_number: number | null; joined_at: string; location: string; ready_confirmed: boolean }) => ({
+    id: p.id,
+    name: p.name,
+    email: p.email || "",
+    gender: p.gender as "male" | "female",
+    groupNumber: p.group_number || undefined,
+    joinedAt: new Date(p.joined_at),
+    location: p.location,
+    readyConfirmed: p.ready_confirmed,
+  }));
 };
 
 // Submission functions
