@@ -201,6 +201,13 @@ export type Database = {
             foreignKeyName: "submissions_participant_id_fkey"
             columns: ["participant_id"]
             isOneToOne: false
+            referencedRelation: "participant_names"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
             referencedRelation: "participants"
             referencedColumns: ["id"]
           },
@@ -215,10 +222,58 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      participant_names: {
+        Row: {
+          email: string | null
+          gender: string | null
+          group_number: number | null
+          id: string | null
+          joined_at: string | null
+          name: string | null
+          session_id: string | null
+        }
+        Insert: {
+          email?: never
+          gender?: string | null
+          group_number?: number | null
+          id?: string | null
+          joined_at?: string | null
+          name?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          email?: never
+          gender?: string | null
+          group_number?: number | null
+          id?: string | null
+          joined_at?: string | null
+          name?: string | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      check_participant_rate_limit: {
+        Args: { p_email: string; p_session_id: string }
+        Returns: boolean
+      }
+      is_verified_participant: {
+        Args: {
+          p_email: string
+          p_participant_id: string
+          p_session_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
