@@ -5,10 +5,13 @@ import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 /**
  * Secure realtime hook for PARTICIPANTS (non-admin users).
- * This hook strips sensitive data (like email) from realtime events
- * to prevent data exposure through browser dev tools.
  * 
- * For admin users who need access to participant emails, use useRealtimeAdmin instead.
+ * This hook uses a combination of approaches:
+ * - For participants: Uses the participant_names view (emails excluded at DB level)
+ * - For sessions: Uses direct postgres_changes (no sensitive data)
+ * - For submissions: Uses submissions_public view (emails excluded at DB level)
+ * 
+ * Emails are never exposed to participant clients at any point.
  */
 
 interface UseRealtimeSecureOptions {
@@ -26,42 +29,20 @@ export const useRealtimeSecure = ({
   onSessionUpdated,
   onSubmissionAdded,
 }: UseRealtimeSecureOptions) => {
-  const handleParticipantChange = useCallback(
-    (payload: RealtimePostgresChangesPayload<{
-      id: string;
-      session_id: string;
-      name: string;
-      email: string; // Present in payload but we strip it
-      gender: string;
-      group_number: number | null;
-      joined_at: string;
-    }>) => {
-      if (payload.eventType === "INSERT" && onParticipantJoined) {
-        const p = payload.new;
-        // Strip email from participant data for privacy
-        onParticipantJoined({
-          id: p.id,
-          name: p.name,
-          email: "", // Email is stripped for privacy - participants shouldn't see each other's emails
-          gender: p.gender as "male" | "female",
-          groupNumber: p.group_number || undefined,
-          joinedAt: new Date(p.joined_at),
-        });
-      } else if (payload.eventType === "UPDATE" && onParticipantUpdated) {
-        const p = payload.new;
-        // Strip email from participant data for privacy
-        onParticipantUpdated({
-          id: p.id,
-          name: p.name,
-          email: "", // Email is stripped for privacy - participants shouldn't see each other's emails
-          gender: p.gender as "male" | "female",
-          groupNumber: p.group_number || undefined,
-          joinedAt: new Date(p.joined_at),
-        });
-      }
-    },
-    [onParticipantJoined, onParticipantUpdated]
-  );
+  
+  // Poll for participant changes using the secure view
+  // This is more secure than realtime as it goes through RLS with the view
+  const pollParticipants = useCallback(async () => {
+    if (!sessionId) return;
+    
+    const { data } = await supabase
+      .from("participant_names")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("joined_at", { ascending: true });
+    
+    return data;
+  }, [sessionId]);
 
   const handleSessionChange = useCallback(
     (payload: RealtimePostgresChangesPayload<{
@@ -107,7 +88,7 @@ export const useRealtimeSecure = ({
           userId: s.participant_id,
           groupNumber: s.group_number,
           name: s.name,
-          email: "", // Email is not exposed through realtime for privacy
+          email: "", // Email never exposed to participants
           bibleVerse: s.bible_verse,
           theme: s.theme || "",
           movingVerse: s.moving_verse || "",
@@ -126,18 +107,54 @@ export const useRealtimeSecure = ({
   useEffect(() => {
     if (!sessionId) return;
 
+    // Set up polling for participant changes (since direct realtime exposes emails)
+    // Poll every 3 seconds for participant updates
+    let lastParticipantCount = 0;
+    let lastParticipantIds = new Set<string>();
+    
+    const pollInterval = setInterval(async () => {
+      const participants = await pollParticipants();
+      if (!participants) return;
+      
+      // Check for new participants
+      if (participants.length > lastParticipantCount) {
+        const currentIds = new Set(participants.map(p => p.id));
+        for (const p of participants) {
+          if (!lastParticipantIds.has(p.id!) && onParticipantJoined) {
+            onParticipantJoined({
+              id: p.id!,
+              name: p.name!,
+              email: "", // Email excluded by view
+              gender: p.gender as "male" | "female",
+              groupNumber: p.group_number || undefined,
+              joinedAt: new Date(p.joined_at!),
+            });
+          }
+        }
+        lastParticipantIds = currentIds;
+      }
+      
+      // Check for updates (group assignments)
+      for (const p of participants) {
+        if (onParticipantUpdated && p.group_number) {
+          onParticipantUpdated({
+            id: p.id!,
+            name: p.name!,
+            email: "", // Email excluded by view
+            gender: p.gender as "male" | "female",
+            groupNumber: p.group_number || undefined,
+            joinedAt: new Date(p.joined_at!),
+          });
+        }
+      }
+      
+      lastParticipantCount = participants.length;
+    }, 3000);
+
+    // Subscribe to session and submission changes via realtime
+    // These don't expose sensitive data
     const channel = supabase
       .channel(`session-secure-${sessionId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "participants",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        handleParticipantChange
-      )
       .on(
         "postgres_changes",
         {
@@ -161,7 +178,8 @@ export const useRealtimeSecure = ({
       .subscribe();
 
     return () => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
-  }, [sessionId, handleParticipantChange, handleSessionChange, handleSubmissionChange]);
+  }, [sessionId, pollParticipants, handleSessionChange, handleSubmissionChange, onParticipantJoined, onParticipantUpdated]);
 };
