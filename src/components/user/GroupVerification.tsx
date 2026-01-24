@@ -141,15 +141,43 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     load();
   }, [fetchMembers]);
 
-  // Poll for member status updates every 2 seconds
+  // Real-time subscription for instant sync + fallback polling
   useEffect(() => {
     if (!currentSession?.id || !globalGroupNumber) return;
 
+    // Subscribe to participant_names view for real-time updates
+    const channel = supabase
+      .channel(`group-verification-${currentSession.id}-${globalGroupNumber}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'participants',
+          filter: `session_id=eq.${currentSession.id}`,
+        },
+        async (payload) => {
+          console.log('[GroupVerification] Realtime update received:', payload);
+          // Immediately refetch members when any participant changes
+          await fetchMembers();
+        }
+      )
+      .subscribe((status) => {
+        console.log('[GroupVerification] Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          toast.success('已連線即時同步', { id: 'realtime-connected', duration: 2000 });
+        }
+      });
+
+    // Fallback polling every 5 seconds (reduced from 2s since we have realtime now)
     const pollInterval = setInterval(async () => {
       await fetchMembers();
-    }, 2000);
+    }, 5000);
 
-    return () => clearInterval(pollInterval);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
+    };
   }, [currentSession?.id, globalGroupNumber, fetchMembers]);
 
   const handleCheckMember = (memberId: string, checked: boolean) => {
