@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { QrCode, Maximize2, Download } from 'lucide-react';
+import { getSessionJoinUrl } from '@/lib/url-helpers';
 
 interface SessionQRCodeProps {
   sessionId: string;
@@ -13,9 +14,8 @@ interface SessionQRCodeProps {
 export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, verseReference }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Build the join URL using the public app URL
-  const publicBaseUrl = 'https://id-preview--535fde94-f0d2-40e6-b67e-11919e99216e.lovable.app';
-  const joinUrl = `${publicBaseUrl}/user?session_id=${sessionId}`;
+  // Build the join URL dynamically
+  const joinUrl = getSessionJoinUrl(sessionId);
 
   const handleDownload = () => {
     const svg = document.getElementById('session-qr-code');

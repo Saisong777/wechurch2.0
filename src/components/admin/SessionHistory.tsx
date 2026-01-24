@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { getSessionJoinUrl } from '@/lib/url-helpers';
 
 interface PastSession {
   id: string;
@@ -43,10 +44,6 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<PastSession | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
-
-  // Build the join URL using the public app URL
-  const publicBaseUrl = 'https://id-preview--535fde94-f0d2-40e6-b67e-11919e99216e.lovable.app';
-  const getJoinUrl = (sessionId: string) => `${publicBaseUrl}/user?session_id=${sessionId}`;
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -293,7 +290,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               >
                 <QRCodeSVG
                   id="session-history-qr"
-                  value={getJoinUrl(selectedSession.id)}
+                  value={getSessionJoinUrl(selectedSession.id)}
                   size={isExpanded ? 350 : 200}
                   level="H"
                   includeMargin
