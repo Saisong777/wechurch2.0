@@ -199,14 +199,70 @@ const applyGenderBalancing = (users: User[]): User[] => {
   return balanced;
 };
 
-// Multi-site grouping algorithm with max 6 per group (OPTIMIZED with batch updates)
+/**
+ * Calculate optimal group sizes: prioritize minSize, expand to maxSize only when needed
+ * 
+ * Example: 13 people with min=4, max=6
+ * - 13 / 4 = 3 groups with remainder 1
+ * - Distribute remainder: 3 groups of 4, plus 1 extra = [5, 4, 4] (13 total)
+ */
+const calculateOptimalGroupSizes = (total: number, minSize: number, maxSize: number): number[] => {
+  // Calculate how many groups at minSize, and what's left over
+  const groupsAtMin = Math.floor(total / minSize);
+  const remainder = total % minSize;
+  
+  if (remainder === 0) {
+    // Perfect fit at minSize
+    return Array(groupsAtMin).fill(minSize);
+  }
+  
+  // We have a remainder. Options:
+  // 1. Distribute remainder across existing groups (if they can absorb it)
+  // 2. Create one more smaller group (if it meets minSize)
+  
+  const canAbsorb = groupsAtMin * (maxSize - minSize) >= remainder;
+  
+  if (canAbsorb && groupsAtMin > 0) {
+    // Distribute remainder across groups, starting from the first
+    const sizes = Array(groupsAtMin).fill(minSize);
+    for (let i = 0; i < remainder; i++) {
+      sizes[i % groupsAtMin]++;
+    }
+    return sizes;
+  } else if (remainder >= minSize) {
+    // Remainder is large enough to be its own group
+    return [...Array(groupsAtMin).fill(minSize), remainder];
+  } else if (groupsAtMin > 0) {
+    // Remainder too small - redistribute all users evenly
+    const newTotal = total;
+    const newGroupCount = groupsAtMin;
+    const baseSize = Math.floor(newTotal / newGroupCount);
+    const extra = newTotal % newGroupCount;
+    const sizes: number[] = [];
+    for (let i = 0; i < newGroupCount; i++) {
+      sizes.push(baseSize + (i < extra ? 1 : 0));
+    }
+    return sizes;
+  } else {
+    // Edge case: total < minSize, just return one group
+    return [total];
+  }
+};
+
+/**
+ * Optimized grouping algorithm: prioritize minSize, expand to maxSize only when needed
+ * 
+ * Logic:
+ * 1. Calculate how many groups we can form at minSize
+ * 2. If there's a remainder, distribute it across groups (up to maxSize)
+ * 3. If remainder is too small to form a valid group, merge into existing groups
+ */
 export const assignGroupsToParticipants = async (
   sessionId: string,
   participants: User[],
   settings: GroupingSettings
 ): Promise<Group[]> => {
-  const { method } = settings;
-  const MAX_GROUP_SIZE = 6;
+  const { method, minSize, maxSize } = settings;
   
   // Step 1: Bucket participants by location
   const locationBuckets = new Map<string, User[]>();
@@ -235,9 +291,10 @@ export const assignGroupsToParticipants = async (
       usersToGroup = shuffleArray(usersToGroup);
     }
 
-    // Step 3: Split into subgroups with max 6 members
-    if (usersToGroup.length <= MAX_GROUP_SIZE) {
-      // Single group for this location
+    const totalUsers = usersToGroup.length;
+    
+    // Edge case: fewer users than minSize - put them all in one group
+    if (totalUsers <= maxSize) {
       for (const member of usersToGroup) {
         groupAssignments.push({ participantId: member.id, groupNumber });
         member.groupNumber = groupNumber;
@@ -248,30 +305,29 @@ export const assignGroupsToParticipants = async (
         members: usersToGroup,
       });
       groupNumber++;
-    } else {
-      // Split into multiple subgroups
-      const subgroupCount = Math.ceil(usersToGroup.length / MAX_GROUP_SIZE);
-      const baseSize = Math.floor(usersToGroup.length / subgroupCount);
-      const remainder = usersToGroup.length % subgroupCount;
+      continue;
+    }
+
+    // Calculate optimal distribution: prioritize minSize, expand only when needed
+    // Formula: find the number of groups where each group is between minSize and maxSize
+    const groupSizes = calculateOptimalGroupSizes(totalUsers, minSize, maxSize);
+    
+    let currentIndex = 0;
+    for (const size of groupSizes) {
+      const groupMembers = usersToGroup.slice(currentIndex, currentIndex + size);
+      currentIndex += size;
       
-      let currentIndex = 0;
-      for (let subIdx = 0; subIdx < subgroupCount; subIdx++) {
-        const thisGroupSize = baseSize + (subIdx < remainder ? 1 : 0);
-        const groupMembers = usersToGroup.slice(currentIndex, currentIndex + thisGroupSize);
-        currentIndex += thisGroupSize;
-        
-        for (const member of groupMembers) {
-          groupAssignments.push({ participantId: member.id, groupNumber });
-          member.groupNumber = groupNumber;
-        }
-        
-        groups.push({
-          id: `group-${groupNumber}`,
-          number: groupNumber,
-          members: groupMembers,
-        });
-        groupNumber++;
+      for (const member of groupMembers) {
+        groupAssignments.push({ participantId: member.id, groupNumber });
+        member.groupNumber = groupNumber;
       }
+      
+      groups.push({
+        id: `group-${groupNumber}`,
+        number: groupNumber,
+        members: groupMembers,
+      });
+      groupNumber++;
     }
   }
 
@@ -295,7 +351,6 @@ export const assignGroupsToParticipants = async (
   await Promise.all(updatePromises);
 
   // Update session status to 'grouping' (verification phase)
-  await updateSessionStatus(sessionId, "grouping");
   await updateSessionStatus(sessionId, "grouping");
 
   return groups;

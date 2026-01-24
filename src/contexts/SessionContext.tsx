@@ -84,9 +84,54 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return balanced;
   };
 
+  /**
+   * Calculate optimal group sizes: prioritize minSize, expand to maxSize only when needed
+   */
+  const calculateOptimalGroupSizes = (total: number, minSize: number, maxSize: number): number[] => {
+    // Calculate how many groups at minSize, and what's left over
+    const groupsAtMin = Math.floor(total / minSize);
+    const remainder = total % minSize;
+    
+    if (remainder === 0) {
+      // Perfect fit at minSize
+      return Array(groupsAtMin).fill(minSize);
+    }
+    
+    // We have a remainder. Options:
+    // 1. Distribute remainder across existing groups (if they can absorb it)
+    // 2. Create one more smaller group (if it meets minSize)
+    
+    const canAbsorb = groupsAtMin * (maxSize - minSize) >= remainder;
+    
+    if (canAbsorb && groupsAtMin > 0) {
+      // Distribute remainder across groups, starting from the first
+      const sizes = Array(groupsAtMin).fill(minSize);
+      for (let i = 0; i < remainder; i++) {
+        sizes[i % groupsAtMin]++;
+      }
+      return sizes;
+    } else if (remainder >= minSize) {
+      // Remainder is large enough to be its own group
+      return [...Array(groupsAtMin).fill(minSize), remainder];
+    } else if (groupsAtMin > 0) {
+      // Remainder too small - reduce one group and redistribute
+      const newTotal = total;
+      const newGroupCount = groupsAtMin; // Keep same count, just redistribute
+      const baseSize = Math.floor(newTotal / newGroupCount);
+      const extra = newTotal % newGroupCount;
+      const sizes: number[] = [];
+      for (let i = 0; i < newGroupCount; i++) {
+        sizes.push(baseSize + (i < extra ? 1 : 0));
+      }
+      return sizes;
+    } else {
+      // Edge case: total < minSize, just return one group
+      return [total];
+    }
+  };
+
   const assignGroups = useCallback((settings: GroupingSettings) => {
-    const { method } = settings;
-    const MAX_GROUP_SIZE = 6;
+    const { method, minSize, maxSize } = settings;
     
     // Step 1: Bucket participants by location (STRICT ISOLATION)
     const locationBuckets = new Map<string, User[]>();
@@ -113,9 +158,10 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         usersToGroup = shuffleArray(usersToGroup);
       }
 
-      // Step 3: Split into subgroups with max 6 members
-      if (usersToGroup.length <= MAX_GROUP_SIZE) {
-        // Single group for this location
+      const totalUsers = usersToGroup.length;
+      
+      // Edge case: fewer users than maxSize - put them all in one group
+      if (totalUsers <= maxSize) {
         usersToGroup.forEach(member => {
           member.groupNumber = groupNumber;
           updatedUsers.push(member);
@@ -126,30 +172,28 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           members: usersToGroup,
         });
         groupNumber++;
-      } else {
-        // Split into multiple subgroups - balance sizes
-        const subgroupCount = Math.ceil(usersToGroup.length / MAX_GROUP_SIZE);
-        const baseSize = Math.floor(usersToGroup.length / subgroupCount);
-        const remainder = usersToGroup.length % subgroupCount;
+        continue;
+      }
+
+      // Calculate optimal distribution: prioritize minSize, expand only when needed
+      const groupSizes = calculateOptimalGroupSizes(totalUsers, minSize, maxSize);
+      
+      let currentIndex = 0;
+      for (const size of groupSizes) {
+        const groupMembers = usersToGroup.slice(currentIndex, currentIndex + size);
+        currentIndex += size;
         
-        let currentIndex = 0;
-        for (let subIdx = 0; subIdx < subgroupCount; subIdx++) {
-          const thisGroupSize = baseSize + (subIdx < remainder ? 1 : 0);
-          const groupMembers = usersToGroup.slice(currentIndex, currentIndex + thisGroupSize);
-          currentIndex += thisGroupSize;
-          
-          groupMembers.forEach(member => {
-            member.groupNumber = groupNumber;
-            updatedUsers.push(member);
-          });
-          
-          groups.push({
-            id: `group-${groupNumber}`,
-            number: groupNumber,
-            members: groupMembers,
-          });
-          groupNumber++;
-        }
+        groupMembers.forEach(member => {
+          member.groupNumber = groupNumber;
+          updatedUsers.push(member);
+        });
+        
+        groups.push({
+          id: `group-${groupNumber}`,
+          number: groupNumber,
+          members: groupMembers,
+        });
+        groupNumber++;
       }
     }
     
