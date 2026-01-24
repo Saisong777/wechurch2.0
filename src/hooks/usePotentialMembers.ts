@@ -100,6 +100,82 @@ export const usePotentialMembers = (options: UsePotentialMembersOptions = {}) =>
     },
   });
 
+  const bulkUpdateStatus = useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: PotentialMember['status'] }) => {
+      const { error } = await supabase
+        .from('potential_members')
+        .update({ status, updated_at: new Date().toISOString() })
+        .in('id', ids);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, { ids }) => {
+      queryClient.invalidateQueries({ queryKey: ['potential-members'] });
+      queryClient.invalidateQueries({ queryKey: ['potential-members-stats'] });
+      toast.success(`已更新 ${ids.length} 筆會員狀態`);
+    },
+    onError: (error) => {
+      toast.error('批量更新失敗: ' + error.message);
+    },
+  });
+
+  const bulkUpdateSubscription = useMutation({
+    mutationFn: async ({ ids, subscribed }: { ids: string[]; subscribed: boolean }) => {
+      const { error } = await supabase
+        .from('potential_members')
+        .update({ subscribed, updated_at: new Date().toISOString() })
+        .in('id', ids);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, { ids, subscribed }) => {
+      queryClient.invalidateQueries({ queryKey: ['potential-members'] });
+      queryClient.invalidateQueries({ queryKey: ['potential-members-stats'] });
+      toast.success(`已${subscribed ? '啟用' : '取消'} ${ids.length} 筆會員訂閱`);
+    },
+    onError: (error) => {
+      toast.error('批量更新失敗: ' + error.message);
+    },
+  });
+
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('potential_members')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['potential-members'] });
+      queryClient.invalidateQueries({ queryKey: ['potential-members-stats'] });
+      toast.success(`已刪除 ${ids.length} 筆會員資料`);
+    },
+    onError: (error) => {
+      toast.error('批量刪除失敗: ' + error.message);
+    },
+  });
+
+  const deleteMember = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('potential_members')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['potential-members'] });
+      queryClient.invalidateQueries({ queryKey: ['potential-members-stats'] });
+      toast.success('會員資料已刪除');
+    },
+    onError: (error) => {
+      toast.error('刪除失敗: ' + error.message);
+    },
+  });
+
   const linkUserManually = useMutation({
     mutationFn: async ({ memberId, userId }: { memberId: string; userId: string }) => {
       const { error } = await supabase
@@ -129,6 +205,10 @@ export const usePotentialMembers = (options: UsePotentialMembersOptions = {}) =>
     stats: stats.data,
     statsLoading: stats.isLoading,
     updateMember,
+    bulkUpdateStatus,
+    bulkUpdateSubscription,
+    bulkDelete,
+    deleteMember,
     linkUserManually,
     forceRefetch,
   };
