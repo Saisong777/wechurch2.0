@@ -16,6 +16,22 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
   const [isRefreshing, setIsRefreshing] = useState(false);
   const prevConnectionStateRef = useRef<ConnectionState | null>(null);
 
+  // NOTE: participant_names view intentionally returns email as empty/null for privacy.
+  // We must NEVER overwrite currentUser.email with an empty value, because email is
+  // still required for later submission verification.
+  const mergeIntoCurrentUser = (incoming: any) => {
+    if (!currentUser) {
+      setCurrentUser(incoming);
+      return;
+    }
+
+    setCurrentUser({
+      ...currentUser,
+      ...incoming,
+      email: currentUser.email, // preserve
+    });
+  };
+
   // Listen for session status updates and participant group assignments
   // Using secure realtime hook with aggressive mobile sync features
   const { forceRefresh, connectionState, lastSyncTime } = useRealtimeSecure({
@@ -28,6 +44,11 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
     },
     onParticipantUpdated: (user) => {
       updateUser(user);
+      // Critical: also update currentUser so downstream pages (GroupReveal/Verification)
+      // can see the assigned groupNumber.
+      if (user.id === currentUser?.id) {
+        mergeIntoCurrentUser(user);
+      }
       // If this is the current user and they got a group number, trigger the transition
       if (user.id === currentUser?.id && user.groupNumber) {
         onGroupingStarted();
@@ -36,7 +57,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
     // Handle force-refetched user data when session status changes
     onCurrentUserRefetched: (user) => {
       console.log('[WaitingRoom] User refetched:', user.name, 'groupNumber:', user.groupNumber);
-      setCurrentUser(user);
+      mergeIntoCurrentUser(user);
       updateUser(user);
       // If the user now has a group number, trigger the transition immediately
       if (user.groupNumber) {
