@@ -35,6 +35,38 @@ export const updateSessionStatus = async (sessionId: string, status: string) => 
   }
 };
 
+// Fetch public session info (without owner_id) for participants
+export const fetchSessionPublic = async (sessionId: string): Promise<{
+  id: string;
+  verseReference: string;
+  status: string;
+  groupSize: number;
+  groupingMethod: string;
+  createdAt: Date;
+} | null> => {
+  const { data, error } = await supabase
+    .from("sessions_public")
+    .select("*")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching session:", error);
+    return null;
+  }
+
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    verseReference: data.verse_reference,
+    status: data.status,
+    groupSize: data.group_size || 4,
+    groupingMethod: data.grouping_method || "random",
+    createdAt: new Date(data.created_at),
+  };
+};
+
 // Participant functions
 export const joinSession = async (
   sessionId: string,
