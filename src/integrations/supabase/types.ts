@@ -47,6 +47,13 @@ export type Database = {
             referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ai_reports_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       participants: {
@@ -83,6 +90,13 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
             referencedColumns: ["id"]
           },
         ]
@@ -218,6 +232,13 @@ export type Database = {
             referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "submissions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -258,7 +279,41 @@ export type Database = {
             referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      sessions_public: {
+        Row: {
+          created_at: string | null
+          group_size: number | null
+          grouping_method: string | null
+          id: string | null
+          status: string | null
+          verse_reference: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          group_size?: number | null
+          grouping_method?: string | null
+          id?: string | null
+          status?: string | null
+          verse_reference?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          group_size?: number | null
+          grouping_method?: string | null
+          id?: string | null
+          status?: string | null
+          verse_reference?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
