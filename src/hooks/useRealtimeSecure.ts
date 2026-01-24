@@ -4,16 +4,14 @@ import { User, Session, StudySubmission } from "@/types/bible-study";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 /**
- * Realtime hook for ADMIN users who need full access to participant data including emails.
+ * Secure realtime hook for PARTICIPANTS (non-admin users).
+ * This hook strips sensitive data (like email) from realtime events
+ * to prevent data exposure through browser dev tools.
  * 
- * SECURITY NOTE: This hook exposes participant emails through realtime events.
- * Only use this hook in authenticated admin contexts (AdminWaitingRoom, AdminMonitor).
- * 
- * For participant-facing components (WaitingRoom, etc.), use useRealtimeSecure instead,
- * which strips sensitive data from realtime events.
+ * For admin users who need access to participant emails, use useRealtimeAdmin instead.
  */
 
-interface UseRealtimeOptions {
+interface UseRealtimeSecureOptions {
   sessionId: string | null;
   onParticipantJoined?: (user: User) => void;
   onParticipantUpdated?: (user: User) => void;
@@ -21,39 +19,41 @@ interface UseRealtimeOptions {
   onSubmissionAdded?: (submission: StudySubmission) => void;
 }
 
-export const useRealtime = ({
+export const useRealtimeSecure = ({
   sessionId,
   onParticipantJoined,
   onParticipantUpdated,
   onSessionUpdated,
   onSubmissionAdded,
-}: UseRealtimeOptions) => {
+}: UseRealtimeSecureOptions) => {
   const handleParticipantChange = useCallback(
     (payload: RealtimePostgresChangesPayload<{
       id: string;
       session_id: string;
       name: string;
-      email: string;
+      email: string; // Present in payload but we strip it
       gender: string;
       group_number: number | null;
       joined_at: string;
     }>) => {
       if (payload.eventType === "INSERT" && onParticipantJoined) {
         const p = payload.new;
+        // Strip email from participant data for privacy
         onParticipantJoined({
           id: p.id,
           name: p.name,
-          email: p.email,
+          email: "", // Email is stripped for privacy - participants shouldn't see each other's emails
           gender: p.gender as "male" | "female",
           groupNumber: p.group_number || undefined,
           joinedAt: new Date(p.joined_at),
         });
       } else if (payload.eventType === "UPDATE" && onParticipantUpdated) {
         const p = payload.new;
+        // Strip email from participant data for privacy
         onParticipantUpdated({
           id: p.id,
           name: p.name,
-          email: p.email,
+          email: "", // Email is stripped for privacy - participants shouldn't see each other's emails
           gender: p.gender as "male" | "female",
           groupNumber: p.group_number || undefined,
           joinedAt: new Date(p.joined_at),
@@ -127,7 +127,7 @@ export const useRealtime = ({
     if (!sessionId) return;
 
     const channel = supabase
-      .channel(`session-${sessionId}`)
+      .channel(`session-secure-${sessionId}`)
       .on(
         "postgres_changes",
         {
