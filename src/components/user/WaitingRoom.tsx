@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
-import { useRealtimeSecure } from '@/hooks/useRealtimeSecure';
+import { useRealtimeSecure, ConnectionState } from '@/hooks/useRealtimeSecure';
 import { ConnectionStatus } from '@/components/ui/connection-status';
 import { Clock, Users, MapPin, RefreshCw } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface WaitingRoomProps {
   onGroupingStarted: () => void;
@@ -13,6 +14,7 @@ interface WaitingRoomProps {
 export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) => {
   const { currentUser, users, currentSession, setCurrentSession, updateUser, setCurrentUser } = useSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const prevConnectionStateRef = useRef<ConnectionState | null>(null);
 
   // Listen for session status updates and participant group assignments
   // Using secure realtime hook with aggressive mobile sync features
@@ -47,6 +49,40 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
       onGroupingStarted();
     },
   });
+
+  // Toast notifications for connection state changes
+  useEffect(() => {
+    const prevState = prevConnectionStateRef.current;
+    
+    // Skip initial render
+    if (prevState === null) {
+      prevConnectionStateRef.current = connectionState;
+      return;
+    }
+    
+    // Only show toast when state actually changes
+    if (prevState !== connectionState) {
+      if (connectionState === 'disconnected') {
+        toast({
+          title: '⚠️ 連線已中斷',
+          description: '請檢查網路連線，或點擊「手動刷新」按鈕更新狀態',
+          variant: 'destructive',
+        });
+      } else if (connectionState === 'connected' && (prevState === 'disconnected' || prevState === 'reconnecting')) {
+        toast({
+          title: '✅ 已重新連線',
+          description: '即時同步已恢復正常',
+        });
+      } else if (connectionState === 'reconnecting') {
+        toast({
+          title: '🔄 重新連線中...',
+          description: '正在嘗試恢復連線',
+        });
+      }
+      
+      prevConnectionStateRef.current = connectionState;
+    }
+  }, [connectionState]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
