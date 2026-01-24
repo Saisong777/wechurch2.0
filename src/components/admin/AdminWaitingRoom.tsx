@@ -69,18 +69,31 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
     
     setIsGrouping(true);
     
-    const settings: GroupingSettings = { groupSize, method };
-    const groups = await assignGroupsToParticipants(currentSession.id, users, settings);
-    
-    setCurrentSession({ ...currentSession, groups, status: 'studying' });
-    setUsers(users.map(u => {
-      const group = groups.find(g => g.members.some(m => m.id === u.id));
-      return group ? { ...u, groupNumber: group.number } : u;
-    }));
-    
-    toast.success(`已分為 ${groups.length} 組！`);
-    setIsGrouping(false);
-    onGroupingComplete();
+    try {
+      const settings: GroupingSettings = { groupSize, method };
+      const groups = await assignGroupsToParticipants(currentSession.id, users, settings);
+      
+      // Update local state with groups and set status to 'grouping' (verification phase)
+      const updatedUsers = users.map(u => {
+        const group = groups.find(g => g.members.some(m => m.id === u.id));
+        return group ? { ...u, groupNumber: group.number, readyConfirmed: false } : u;
+      });
+      
+      setCurrentSession({ ...currentSession, groups, status: 'grouping' });
+      setUsers(updatedUsers);
+      
+      toast.success(`分組完成！已分為 ${groups.length} 組，進入驗證階段。`, {
+        description: 'Grouping complete! Entering verification phase.',
+        duration: 5000,
+      });
+      
+      setIsGrouping(false);
+      onGroupingComplete();
+    } catch (error) {
+      console.error('Grouping error:', error);
+      toast.error('分組失敗，請重試');
+      setIsGrouping(false);
+    }
   };
 
   return (

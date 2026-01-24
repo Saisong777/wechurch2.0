@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
-import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV } from '@/lib/supabase-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2 } from 'lucide-react';
+import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, updateSessionStatus, fetchParticipants } from '@/lib/supabase-helpers';
+import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus } from '@/lib/admin-helpers';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -12,14 +13,51 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 export const AdminMonitor: React.FC = () => {
-  const { currentSession, users, submissions, setSubmissions, addSubmission } = useSession();
+  const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
   const [isGeneratingGroup, setIsGeneratingGroup] = useState(false);
   const [isGeneratingOverall, setIsGeneratingOverall] = useState(false);
   const [reportContent, setReportContent] = useState<string | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [isForceVerifying, setIsForceVerifying] = useState(false);
+  const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
+
+  // Determine if we're in verification phase
+  const isVerificationPhase = currentSession?.status === 'grouping';
+  const isStudyingPhase = currentSession?.status === 'studying';
+
+  // Refresh ready status
+  const refreshReadyStatus = useCallback(async () => {
+    if (!currentSession?.id) return;
+    const participants = await fetchParticipantsWithReadyStatus(currentSession.id);
+    const status = calculateGroupReadyStatus(participants);
+    setGroupReadyStatus(status);
+    
+    // Check if all groups are ready - auto-transition to studying
+    const allReady = status.length > 0 && status.every(g => g.allReady);
+    if (allReady && isVerificationPhase) {
+      await updateSessionStatus(currentSession.id, 'studying');
+      setCurrentSession({ ...currentSession, status: 'studying' });
+      toast.success('所有組員已確認，開始查經！', {
+        description: 'All members verified! Study phase started.',
+      });
+    }
+  }, [currentSession, setCurrentSession, isVerificationPhase]);
 
   // Real-time submission updates
   useRealtime({
@@ -28,22 +66,57 @@ export const AdminMonitor: React.FC = () => {
       addSubmission(submission);
       toast.success(`${submission.name} 已提交筆記！`);
     },
+    onParticipantUpdated: () => {
+      // Refresh ready status when any participant updates
+      refreshReadyStatus();
+    },
   });
 
-  // Load existing submissions on mount
+  // Load existing data on mount
   useEffect(() => {
-    const loadSubmissions = async () => {
+    const loadData = async () => {
       if (currentSession?.id) {
         const subs = await fetchSubmissions(currentSession.id);
         setSubmissions(subs);
+        await refreshReadyStatus();
+        
+        // Also refresh user list
+        const participants = await fetchParticipants(currentSession.id);
+        setUsers(participants);
       }
     };
-    loadSubmissions();
-  }, [currentSession?.id, setSubmissions]);
+    loadData();
+  }, [currentSession?.id, setSubmissions, setUsers, refreshReadyStatus]);
+
+  // Poll for ready status during verification phase
+  useEffect(() => {
+    if (!isVerificationPhase || !currentSession?.id) return;
+    
+    const interval = setInterval(refreshReadyStatus, 3000);
+    return () => clearInterval(interval);
+  }, [isVerificationPhase, currentSession?.id, refreshReadyStatus]);
 
   const groups = currentSession?.groups || [];
   const submittedCount = submissions.length;
   const totalCount = users.length;
+
+  const handleForceVerifyAll = async () => {
+    if (!currentSession?.id) return;
+    
+    setIsForceVerifying(true);
+    const result = await forceVerifyAllParticipants(currentSession.id);
+    
+    if (result.success) {
+      toast.success(`已強制確認 ${result.count} 位參與者！`, {
+        description: 'All participants marked as ready.',
+      });
+      await refreshReadyStatus();
+    } else {
+      toast.error(`操作失敗: ${result.error}`);
+    }
+    
+    setIsForceVerifying(false);
+  };
 
   const handleGenerateGroupSummary = async () => {
     if (!currentSession?.id || groups.length === 0) return;
@@ -115,6 +188,11 @@ export const AdminMonitor: React.FC = () => {
     }
   };
 
+  // Calculate overall ready progress
+  const totalReadyCount = groupReadyStatus.reduce((acc, g) => acc + g.readyCount, 0);
+  const totalMemberCount = groupReadyStatus.reduce((acc, g) => acc + g.totalMembers, 0);
+  const readyPercentage = totalMemberCount > 0 ? (totalReadyCount / totalMemberCount) * 100 : 0;
+
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in">
       {/* Session Header */}
@@ -128,46 +206,154 @@ export const AdminMonitor: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <Badge variant={isVerificationPhase ? 'secondary' : isStudyingPhase ? 'default' : 'outline'}>
+                {isVerificationPhase ? '驗證階段 Verification' : isStudyingPhase ? '查經中 Studying' : currentSession?.status}
+              </Badge>
               <div className="text-center">
-                <p className="text-2xl font-bold text-primary">{submittedCount}/{totalCount}</p>
-                <p className="text-sm text-muted-foreground">已提交</p>
+                <p className="text-2xl font-bold text-primary">
+                  {isVerificationPhase ? `${totalReadyCount}/${totalMemberCount}` : `${submittedCount}/${totalCount}`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {isVerificationPhase ? '已確認 Ready' : '已提交 Submitted'}
+                </p>
               </div>
             </div>
           </div>
+          
+          {/* Progress bar for verification phase */}
+          {isVerificationPhase && (
+            <div className="mt-4 space-y-2">
+              <Progress value={readyPercentage} className="h-2" />
+              <p className="text-xs text-muted-foreground text-center">
+                {readyPercentage.toFixed(0)}% 的參與者已確認
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Groups Overview */}
+      {/* Force Verify Button (Verification Phase Only) */}
+      {isVerificationPhase && (
+        <Card className="border-accent/50 bg-accent/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-accent" />
+                <div>
+                  <p className="font-medium text-foreground">測試模式工具</p>
+                  <p className="text-sm text-muted-foreground">
+                    模擬使用者無法點擊確認，使用此按鈕強制通過驗證
+                  </p>
+                </div>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="border-accent text-accent hover:bg-accent/10"
+                    disabled={isForceVerifying}
+                  >
+                    {isForceVerifying ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Zap className="w-4 h-4 mr-2" />
+                    )}
+                    強制全員確認
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>確定要強制確認所有參與者嗎？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      此操作會將所有 {totalMemberCount} 位參與者標記為「已確認」，並自動進入查經階段。
+                      此功能僅供測試使用。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleForceVerifyAll}>
+                      確定執行
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Groups Overview with Ready Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {groups.map((group) => {
-          const groupSubmissions = submissions.filter(s => s.groupNumber === group.number);
-          const allSubmitted = groupSubmissions.length === group.members.length;
+        {(isVerificationPhase ? groupReadyStatus : groups).map((group) => {
+          const isGroupReady = 'allReady' in group ? group.allReady : false;
+          const members = 'members' in group ? group.members : (group as any).members || [];
+          const groupNumber = 'groupNumber' in group ? group.groupNumber : (group as any).number;
+          const location = 'location' in group ? group.location : 'On-site';
+          const readyCount = 'readyCount' in group ? group.readyCount : 0;
+          const totalMembers = 'totalMembers' in group ? group.totalMembers : members.length;
+          
+          // For study phase, check submissions
+          const groupSubmissions = submissions.filter(s => s.groupNumber === groupNumber);
+          const allSubmitted = !isVerificationPhase && groupSubmissions.length === members.length;
 
           return (
-            <Card key={group.id} className={allSubmitted ? 'border-accent' : ''}>
+            <Card key={groupNumber} className={isGroupReady || allSubmitted ? 'border-accent' : ''}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="w-5 h-5 text-secondary" />
-                    第 {group.number} 組
-                  </CardTitle>
-                  {allSubmitted ? (
-                    <span className="flex items-center gap-1 text-sm text-accent">
-                      <CheckCircle className="w-4 h-4" />
-                      已完成
-                    </span>
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="w-5 h-5 text-secondary" />
+                      第 {groupNumber} 組
+                    </CardTitle>
+                    {location !== 'On-site' && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                        <MapPin className="w-3 h-3" />
+                        {location}
+                      </div>
+                    )}
+                  </div>
+                  {isVerificationPhase ? (
+                    isGroupReady ? (
+                      <span className="flex items-center gap-1 text-sm text-accent">
+                        <CheckCircle className="w-4 h-4" />
+                        已就緒
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        {readyCount}/{totalMembers} 確認
+                      </span>
+                    )
                   ) : (
-                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="w-4 h-4" />
-                      {groupSubmissions.length}/{group.members.length}
-                    </span>
+                    allSubmitted ? (
+                      <span className="flex items-center gap-1 text-sm text-accent">
+                        <CheckCircle className="w-4 h-4" />
+                        已完成
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        {groupSubmissions.length}/{members.length}
+                      </span>
+                    )
                   )}
                 </div>
+                
+                {/* Ready progress bar for verification phase */}
+                {isVerificationPhase && (
+                  <Progress 
+                    value={(readyCount / totalMembers) * 100} 
+                    className="h-1.5 mt-2" 
+                  />
+                )}
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {group.members.map((member) => {
-                    const hasSubmitted = submissions.some(s => s.userId === member.id);
+                  {members.map((member: any) => {
+                    const memberReady = 'readyConfirmed' in member ? member.readyConfirmed : false;
+                    const hasSubmitted = !isVerificationPhase && submissions.some(s => s.userId === member.id);
+                    const isComplete = isVerificationPhase ? memberReady : hasSubmitted;
+                    
                     return (
                       <div
                         key={member.id}
@@ -179,7 +365,7 @@ export const AdminMonitor: React.FC = () => {
                           </div>
                           <span className="text-sm font-medium">{member.name}</span>
                         </div>
-                        {hasSubmitted ? (
+                        {isComplete ? (
                           <CheckCircle className="w-5 h-5 text-accent" />
                         ) : (
                           <Clock className="w-5 h-5 text-muted-foreground" />
@@ -194,57 +380,59 @@ export const AdminMonitor: React.FC = () => {
         })}
       </div>
 
-      {/* AI Analysis Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-secondary" />
-            AI 分析 Analysis
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button
-              variant="navy"
-              size="lg"
-              className="w-full"
-              onClick={handleGenerateGroupSummary}
-              disabled={isGeneratingGroup || submissions.length === 0}
-            >
-              {isGeneratingGroup ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <FileText className="w-5 h-5" />
-              )}
-              生成小組摘要
-            </Button>
-            <Button
-              variant="gold"
-              size="lg"
-              className="w-full"
-              onClick={handleGenerateOverallInsight}
-              disabled={isGeneratingOverall || submissions.length === 0}
-            >
-              {isGeneratingOverall ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Sparkles className="w-5 h-5" />
-              )}
-              生成整體洞察
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full"
-              onClick={handleExportCSV}
-              disabled={submissions.length === 0}
-            >
-              <Download className="w-5 h-5" />
-              導出 CSV
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* AI Analysis Actions (Show only in study phase) */}
+      {isStudyingPhase && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-secondary" />
+              AI 分析 Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Button
+                variant="navy"
+                size="lg"
+                className="w-full"
+                onClick={handleGenerateGroupSummary}
+                disabled={isGeneratingGroup || submissions.length === 0}
+              >
+                {isGeneratingGroup ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <FileText className="w-5 h-5" />
+                )}
+                生成小組摘要
+              </Button>
+              <Button
+                variant="gold"
+                size="lg"
+                className="w-full"
+                onClick={handleGenerateOverallInsight}
+                disabled={isGeneratingOverall || submissions.length === 0}
+              >
+                {isGeneratingOverall ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-5 h-5" />
+                )}
+                生成整體洞察
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={handleExportCSV}
+                disabled={submissions.length === 0}
+              >
+                <Download className="w-5 h-5" />
+                導出 CSV
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Report Dialog */}
       <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
