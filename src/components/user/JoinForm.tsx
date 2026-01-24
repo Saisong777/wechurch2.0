@@ -8,13 +8,13 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { joinSession } from '@/lib/supabase-helpers';
+import { joinSession, findSmallestGroup, assignLatecomerToGroup } from '@/lib/supabase-helpers';
 import { supabase } from '@/integrations/supabase/client';
 import { Users, Mail, User as UserIcon, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface JoinFormProps {
-  onJoined: () => void;
+  onJoined: (isLatecomer?: boolean) => void;
 }
 
 export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
@@ -93,12 +93,32 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
     const joinedUser = await joinSession(currentSession.id, name, email, gender, location);
 
     if (joinedUser) {
+      // Check if this is a latecomer joining during grouping/studying phase
+      // If so, auto-assign them to the smallest group
+      const sessionStatus = currentSession.status;
+      const isLatecomer = ['grouping', 'verification', 'studying'].includes(sessionStatus) && !joinedUser.groupNumber;
+
+      if (isLatecomer) {
+        const smallestGroup = await findSmallestGroup(currentSession.id);
+        if (smallestGroup) {
+          const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup);
+          if (assigned) {
+            joinedUser.groupNumber = smallestGroup;
+            toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`, {
+              description: 'You have been assigned to the smallest group.',
+            });
+          }
+        }
+      }
+
       setCurrentUser(joinedUser);
       addUser(joinedUser);
       // Clear pending session from localStorage after successful join
       localStorage.removeItem('pending_session_id');
+      // Save participant ID for session restoration
+      localStorage.setItem('bible_study_participant_id', joinedUser.id);
       toast.success('成功加入查經！');
-      onJoined();
+      onJoined(isLatecomer && !!joinedUser.groupNumber);
     } else {
       toast.error('加入失敗，請重試');
     }

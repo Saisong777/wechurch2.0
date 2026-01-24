@@ -48,6 +48,7 @@ export const fetchSessionPublic = async (sessionId: string): Promise<{
   groupSize: number;
   groupingMethod: string;
   createdAt: Date;
+  allowLatecomers: boolean;
 } | null> => {
   const { data, error } = await supabase
     .from("sessions_public")
@@ -66,7 +67,70 @@ export const fetchSessionPublic = async (sessionId: string): Promise<{
     groupSize: data.group_size || 4,
     groupingMethod: data.grouping_method || "random",
     createdAt: new Date(data.created_at),
+    allowLatecomers: data.allow_latecomers || false,
   };
+};
+
+// Update session's allow_latecomers setting
+export const updateSessionAllowLatecomers = async (
+  sessionId: string,
+  allowLatecomers: boolean
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ allow_latecomers: allowLatecomers })
+    .eq("id", sessionId);
+
+  if (error) {
+    console.error("[updateSessionAllowLatecomers] Failed:", error.message);
+  }
+
+  return !error;
+};
+
+// Find the group number with the fewest members
+export const findSmallestGroup = async (sessionId: string): Promise<number | null> => {
+  const { data, error } = await supabase
+    .from("participants")
+    .select("group_number")
+    .eq("session_id", sessionId)
+    .not("group_number", "is", null);
+
+  if (error || !data || data.length === 0) {
+    return null;
+  }
+
+  // Count members per group
+  const groupCounts = new Map<number, number>();
+  for (const p of data) {
+    const gn = p.group_number as number;
+    groupCounts.set(gn, (groupCounts.get(gn) || 0) + 1);
+  }
+
+  // Find the group with the minimum count
+  let minGroup = 1;
+  let minCount = Infinity;
+  for (const [gn, count] of groupCounts) {
+    if (count < minCount) {
+      minCount = count;
+      minGroup = gn;
+    }
+  }
+
+  return minGroup;
+};
+
+// Assign a latecomer to the smallest group
+export const assignLatecomerToGroup = async (
+  participantId: string,
+  groupNumber: number
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from("participants")
+    .update({ group_number: groupNumber, ready_confirmed: false })
+    .eq("id", participantId);
+
+  return !error;
 };
 
 // Participant functions

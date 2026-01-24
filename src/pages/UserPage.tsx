@@ -89,6 +89,7 @@ export const UserPage: React.FC = () => {
         status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
         createdAt: new Date(sessionData.created_at),
         groups: [],
+        allowLatecomers: sessionData.allow_latecomers || false,
       });
 
       // Restore user state
@@ -357,7 +358,14 @@ export const UserPage: React.FC = () => {
       case 'join':
         return (
           <div className="px-4 py-8">
-            <JoinForm onJoined={() => setStep('waiting')} />
+            <JoinForm onJoined={(isLatecomer) => {
+              if (isLatecomer) {
+                // Latecomers with assigned group go directly to verification
+                setStep('verification');
+              } else {
+                setStep('waiting');
+              }
+            }} />
           </div>
         );
 

@@ -16,6 +16,7 @@ export interface Session {
   status: 'waiting' | 'grouping' | 'verification' | 'studying' | 'completed';
   createdAt: Date;
   groups: Group[];
+  allowLatecomers?: boolean;
 }
 
 export interface Group {
