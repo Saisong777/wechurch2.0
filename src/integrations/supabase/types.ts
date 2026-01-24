@@ -315,6 +315,86 @@ export type Database = {
         }
         Relationships: []
       }
+      submissions_public: {
+        Row: {
+          application_in_life: string | null
+          bible_verse: string | null
+          facts_discovered: string | null
+          group_number: number | null
+          id: string | null
+          inspiration_from_god: string | null
+          moving_verse: string | null
+          name: string | null
+          others: string | null
+          participant_id: string | null
+          session_id: string | null
+          submitted_at: string | null
+          theme: string | null
+          traditional_exegesis: string | null
+        }
+        Insert: {
+          application_in_life?: string | null
+          bible_verse?: string | null
+          facts_discovered?: string | null
+          group_number?: number | null
+          id?: string | null
+          inspiration_from_god?: string | null
+          moving_verse?: string | null
+          name?: string | null
+          others?: string | null
+          participant_id?: string | null
+          session_id?: string | null
+          submitted_at?: string | null
+          theme?: string | null
+          traditional_exegesis?: string | null
+        }
+        Update: {
+          application_in_life?: string | null
+          bible_verse?: string | null
+          facts_discovered?: string | null
+          group_number?: number | null
+          id?: string | null
+          inspiration_from_god?: string | null
+          moving_verse?: string | null
+          name?: string | null
+          others?: string | null
+          participant_id?: string | null
+          session_id?: string | null
+          submitted_at?: string | null
+          theme?: string | null
+          traditional_exegesis?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "participant_names"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       check_participant_rate_limit: {
