@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, updateSessionStatus, fetchParticipants } from '@/lib/supabase-helpers';
-import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw } from 'lucide-react';
+import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants } from '@/lib/admin-helpers';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -37,6 +37,7 @@ export const AdminMonitor: React.FC = () => {
   const [isForceVerifying, setIsForceVerifying] = useState(false);
   const [isResettingReady, setIsResettingReady] = useState(false);
   const [isClearingGroups, setIsClearingGroups] = useState(false);
+  const [isRegrouping, setIsRegrouping] = useState(false);
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
 
   // Determine if we're in verification phase
@@ -163,6 +164,30 @@ export const AdminMonitor: React.FC = () => {
     }
 
     setIsClearingGroups(false);
+  };
+
+  const handleRegroupOnly = async () => {
+    if (!currentSession?.id) return;
+
+    setIsRegrouping(true);
+    const result = await regroupParticipants(currentSession.id);
+
+    if (result.success) {
+      toast.success(`已重置 ${result.count} 位參與者的分組！`, {
+        description: 'Group assignments cleared. You can now re-group with new settings.',
+      });
+      // Reset session status to waiting so admin can re-group
+      await updateSessionStatus(currentSession.id, 'waiting');
+      setCurrentSession({ ...currentSession, status: 'waiting', groups: [] });
+      // Refresh participants list
+      const participants = await fetchParticipants(currentSession.id);
+      setUsers(participants);
+      setGroupReadyStatus([]);
+    } else {
+      toast.error(`操作失敗: ${result.error}`);
+    }
+
+    setIsRegrouping(false);
   };
 
   const handleGenerateGroupSummary = async () => {
@@ -355,6 +380,40 @@ export const AdminMonitor: React.FC = () => {
                     <AlertDialogCancel>取消</AlertDialogCancel>
                     <AlertDialogAction onClick={handleResetAllReady} className="bg-orange-600 hover:bg-orange-700">
                       確定重置
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Re-group Only (keep participants) */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="border-blue-500 text-blue-600 hover:bg-blue-500/10"
+                    disabled={isRegrouping}
+                  >
+                    {isRegrouping ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Shuffle className="w-4 h-4 mr-2" />
+                    )}
+                    僅重新分組
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>確定要重新分組嗎？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      此操作會清除所有 {totalMemberCount} 位參與者的小組分配，但<strong>保留所有參與者</strong>。
+                      <br /><br />
+                      您可以使用新的分組設定重新分配小組，或讓新加入的人一起參與分組。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRegroupOnly} className="bg-blue-600 hover:bg-blue-700">
+                      確定重新分組
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
