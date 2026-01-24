@@ -191,7 +191,10 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   };
 
   const handleReady = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || !currentSession?.id || !currentUser?.email) {
+      toast.error('缺少必要資訊，請重新整理頁面');
+      return;
+    }
 
     // Validate that all members are checked
     const otherMembers = groupMembers.filter(m => m.id !== currentUser.id);
@@ -204,7 +207,13 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
 
     setIsSubmitting(true);
 
-    const success = await updateParticipantReady(currentUser.id, true);
+    // Use secure RPC with email verification
+    const success = await updateParticipantReady(
+      currentUser.id,
+      true,
+      currentSession.id,
+      currentUser.email
+    );
 
     if (success) {
       setHasConfirmed(true);
@@ -212,7 +221,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       toast.success('已確認準備完成！等待其他組員...');
       await fetchMembers(); // Refresh to check if all ready
     } else {
-      toast.error('確認失敗，請重試');
+      toast.error('確認失敗，請重試。可能聚會狀態已變更。');
     }
 
     setIsSubmitting(false);

@@ -487,11 +487,31 @@ export const assignGroupsToParticipants = async (
   return groups;
 };
 
-// Update participant's ready confirmation status
+// Update participant's ready confirmation status using secure RPC
 export const updateParticipantReady = async (
   participantId: string,
-  ready: boolean
+  ready: boolean,
+  sessionId?: string,
+  email?: string
 ): Promise<boolean> => {
+  // If session and email provided, use the secure RPC function
+  if (sessionId && email) {
+    const { data, error } = await supabase.rpc("set_participant_ready", {
+      p_session_id: sessionId,
+      p_participant_id: participantId,
+      p_email: email,
+      p_ready: ready,
+    });
+
+    if (error) {
+      console.error("[updateParticipantReady] RPC error:", error);
+      return false;
+    }
+
+    return data === true;
+  }
+
+  // Fallback to direct update (for admin use)
   const { error } = await supabase
     .from("participants")
     .update({ ready_confirmed: ready })
