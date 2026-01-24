@@ -413,6 +413,18 @@ export type Database = {
         Args: { p_email: string; p_session_id: string }
         Returns: boolean
       }
+      get_participant_for_reentry: {
+        Args: { p_email: string; p_session_id: string }
+        Returns: {
+          gender: string
+          group_number: number
+          id: string
+          joined_at: string
+          location: string
+          name: string
+          ready_confirmed: boolean
+        }[]
+      }
       is_verified_participant: {
         Args: {
           p_email: string
