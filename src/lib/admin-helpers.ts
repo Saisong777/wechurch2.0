@@ -108,3 +108,49 @@ export const calculateGroupReadyStatus = (
 
   return Array.from(groupMap.values()).sort((a, b) => a.groupNumber - b.groupNumber);
 };
+
+/**
+ * Reset all participants' ready_confirmed status to false.
+ * Useful when a group needs to re-verify.
+ */
+export const resetAllReadyStatus = async (sessionId: string): Promise<{
+  success: boolean;
+  count?: number;
+  error?: string;
+}> => {
+  const { data, error } = await supabase
+    .from("participants")
+    .update({ ready_confirmed: false })
+    .eq("session_id", sessionId)
+    .select("id");
+
+  if (error) {
+    console.error("Reset ready status error:", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, count: data?.length || 0 };
+};
+
+/**
+ * Clear all group assignments (set group_number to null) and reset ready status.
+ * Allows admin to re-run grouping from scratch.
+ */
+export const clearAllGroupAssignments = async (sessionId: string): Promise<{
+  success: boolean;
+  count?: number;
+  error?: string;
+}> => {
+  const { data, error } = await supabase
+    .from("participants")
+    .update({ group_number: null, ready_confirmed: false })
+    .eq("session_id", sessionId)
+    .select("id");
+
+  if (error) {
+    console.error("Clear group assignments error:", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, count: data?.length || 0 };
+};

@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, updateSessionStatus, fetchParticipants } from '@/lib/supabase-helpers';
-import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin } from 'lucide-react';
+import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments } from '@/lib/admin-helpers';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -35,6 +35,8 @@ export const AdminMonitor: React.FC = () => {
   const [reportContent, setReportContent] = useState<string | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isForceVerifying, setIsForceVerifying] = useState(false);
+  const [isResettingReady, setIsResettingReady] = useState(false);
+  const [isClearingGroups, setIsClearingGroups] = useState(false);
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
 
   // Determine if we're in verification phase
@@ -119,6 +121,48 @@ export const AdminMonitor: React.FC = () => {
     }
     
     setIsForceVerifying(false);
+  };
+
+  const handleResetAllReady = async () => {
+    if (!currentSession?.id) return;
+
+    setIsResettingReady(true);
+    const result = await resetAllReadyStatus(currentSession.id);
+
+    if (result.success) {
+      toast.success(`已重置 ${result.count} 位參與者的確認狀態！`, {
+        description: 'All ready statuses reset to false.',
+      });
+      await refreshReadyStatus();
+    } else {
+      toast.error(`操作失敗: ${result.error}`);
+    }
+
+    setIsResettingReady(false);
+  };
+
+  const handleClearAllGroups = async () => {
+    if (!currentSession?.id) return;
+
+    setIsClearingGroups(true);
+    const result = await clearAllGroupAssignments(currentSession.id);
+
+    if (result.success) {
+      toast.success(`已清除 ${result.count} 位參與者的小組分配！`, {
+        description: 'All group assignments cleared. You can now re-group.',
+      });
+      // Reset session status to waiting so admin can re-group
+      await updateSessionStatus(currentSession.id, 'waiting');
+      setCurrentSession({ ...currentSession, status: 'waiting', groups: [] });
+      // Refresh participants list
+      const participants = await fetchParticipants(currentSession.id);
+      setUsers(participants);
+      setGroupReadyStatus([]);
+    } else {
+      toast.error(`操作失敗: ${result.error}`);
+    }
+
+    setIsClearingGroups(false);
   };
 
   const handleGenerateGroupSummary = async () => {
@@ -235,20 +279,24 @@ export const AdminMonitor: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Force Verify Button (Verification Phase Only - or always show for testing) */}
+      {/* Admin Rescue Tools */}
       {(isVerificationPhase || (!isStudyingPhase && groups.length > 0)) && (
         <Card className="border-accent/50 bg-accent/5">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-accent" />
-                <div>
-                  <p className="font-medium text-foreground">測試模式工具</p>
-                  <p className="text-sm text-muted-foreground">
-                    模擬使用者無法點擊確認，使用此按鈕強制通過驗證
-                  </p>
-                </div>
+          <CardContent className="py-4 space-y-4">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-accent" />
+              <div>
+                <p className="font-medium text-foreground">管理員救援工具 Admin Rescue Tools</p>
+                <p className="text-sm text-muted-foreground">
+                  現場出狀況時可快速救援，請謹慎使用
+                </p>
               </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3">
+              {/* Force Verify All */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
@@ -269,13 +317,78 @@ export const AdminMonitor: React.FC = () => {
                     <AlertDialogTitle>確定要強制確認所有參與者嗎？</AlertDialogTitle>
                     <AlertDialogDescription>
                       此操作會將所有 {totalMemberCount} 位參與者標記為「已確認」，並自動進入查經階段。
-                      此功能僅供測試使用。
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>取消</AlertDialogCancel>
                     <AlertDialogAction onClick={handleForceVerifyAll}>
                       確定執行
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Reset All Ready Status */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="border-orange-500 text-orange-600 hover:bg-orange-500/10"
+                    disabled={isResettingReady}
+                  >
+                    {isResettingReady ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                    )}
+                    重置確認狀態
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>確定要重置所有參與者的確認狀態嗎？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      此操作會將所有 {totalMemberCount} 位參與者的「已確認」狀態重置為「未確認」，讓他們需要重新進行組員確認。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleResetAllReady} className="bg-orange-600 hover:bg-orange-700">
+                      確定重置
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Clear All Groups & Re-group */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="border-destructive text-destructive hover:bg-destructive/10"
+                    disabled={isClearingGroups}
+                  >
+                    {isClearingGroups ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    清除分組重新來過
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>⚠️ 確定要清除所有分組嗎？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      此操作會清除所有 {totalMemberCount} 位參與者的小組分配，並將 Session 狀態重置為「等待中」，讓您可以重新分組。
+                      <br /><br />
+                      <strong className="text-destructive">注意：此操作無法復原！</strong>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearAllGroups} className="bg-destructive hover:bg-destructive/90">
+                      確定清除
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
