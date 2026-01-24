@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useState } from 'react';
 import { X, ChevronDown, UserCheck, Bell, BellOff, Trash2, Clock, UserX } from 'lucide-react';
-import type { PotentialMember } from '@/hooks/usePotentialMembers';
+import type { PotentialMember } from '@/hooks/useUnifiedMembers';
 
 interface CRMBulkActionsProps {
   selectedCount: number;
