@@ -128,15 +128,17 @@ export const useRealtimeSecure = ({
               gender: p.gender as "male" | "female",
               groupNumber: p.group_number || undefined,
               joinedAt: new Date(p.joined_at!),
+              location: p.location || "On-site",
+              readyConfirmed: p.ready_confirmed || false,
             });
           }
         }
         lastParticipantIds = currentIds;
       }
       
-      // Check for updates (group assignments)
+      // Check for updates (group assignments, ready status)
       for (const p of participants) {
-        if (onParticipantUpdated && p.group_number) {
+        if (onParticipantUpdated && (p.group_number || p.ready_confirmed)) {
           onParticipantUpdated({
             id: p.id!,
             name: p.name!,
@@ -144,6 +146,8 @@ export const useRealtimeSecure = ({
             gender: p.gender as "male" | "female",
             groupNumber: p.group_number || undefined,
             joinedAt: new Date(p.joined_at!),
+            location: p.location || "On-site",
+            readyConfirmed: p.ready_confirmed || false,
           });
         }
       }

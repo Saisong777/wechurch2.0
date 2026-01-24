@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { joinSession } from '@/lib/supabase-helpers';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Mail, User as UserIcon, Loader2 } from 'lucide-react';
+import { Users, Mail, User as UserIcon, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface JoinFormProps {
@@ -22,6 +23,8 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
+  const [isRemote, setIsRemote] = useState(false);
+  const [locationName, setLocationName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -38,9 +41,14 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
       const savedName = localStorage.getItem('bible_study_guest_name');
       const savedEmail = localStorage.getItem('bible_study_guest_email');
       const savedGender = localStorage.getItem('bible_study_guest_gender');
+      const savedLocation = localStorage.getItem('bible_study_guest_location');
       if (savedName) setName(savedName);
       if (savedEmail) setEmail(savedEmail);
       if (savedGender === 'male' || savedGender === 'female') setGender(savedGender);
+      if (savedLocation && savedLocation !== 'On-site') {
+        setIsRemote(true);
+        setLocationName(savedLocation);
+      }
     }
   }, [user]);
 
@@ -73,16 +81,20 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
     
     setIsLoading(true);
 
+    // Determine location value
+    const location = isRemote && locationName.trim() ? locationName.trim() : 'On-site';
+
     // Save to localStorage for next time
     localStorage.setItem('bible_study_guest_name', name);
     localStorage.setItem('bible_study_guest_email', email);
     localStorage.setItem('bible_study_guest_gender', gender);
+    localStorage.setItem('bible_study_guest_location', location);
 
-    const user = await joinSession(currentSession.id, name, email, gender);
+    const joinedUser = await joinSession(currentSession.id, name, email, gender, location);
 
-    if (user) {
-      setCurrentUser(user);
-      addUser(user);
+    if (joinedUser) {
+      setCurrentUser(joinedUser);
+      addUser(joinedUser);
       // Clear pending session from localStorage after successful join
       localStorage.removeItem('pending_session_id');
       toast.success('成功加入查經！');
@@ -222,12 +234,48 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
               </RadioGroup>
             </div>
 
+            {/* Remote Location Toggle */}
+            <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="remote-toggle" className="text-base cursor-pointer">
+                    線上/遠端加入？
+                  </Label>
+                </div>
+                <Switch
+                  id="remote-toggle"
+                  checked={isRemote}
+                  onCheckedChange={setIsRemote}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Joining from a remote location?
+              </p>
+              
+              {isRemote && (
+                <div className="space-y-2 pt-2 animate-fade-in">
+                  <Label htmlFor="location" className="text-sm">
+                    地點名稱 Location Name *
+                  </Label>
+                  <Input
+                    id="location"
+                    value={locationName}
+                    onChange={(e) => setLocationName(e.target.value)}
+                    placeholder="例如：桃園教會、台中小組"
+                    required={isRemote}
+                    className="h-10"
+                  />
+                </div>
+              )}
+            </div>
+
             <Button
               type="submit"
               variant="gold"
               size="xl"
               className="w-full"
-              disabled={isLoading || !name || !email}
+              disabled={isLoading || !name || !email || (isRemote && !locationName.trim())}
             >
               {isLoading ? '加入中...' : '加入查經 Join Now'}
             </Button>

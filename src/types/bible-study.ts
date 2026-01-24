@@ -5,6 +5,8 @@ export interface User {
   gender: 'male' | 'female';
   groupNumber?: number;
   joinedAt: Date;
+  location: string;
+  readyConfirmed: boolean;
 }
 
 export interface Session {
