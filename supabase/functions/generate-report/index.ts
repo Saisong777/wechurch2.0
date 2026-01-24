@@ -66,11 +66,11 @@ serve(async (req) => {
   }
 
   try {
-    // Verify authentication - extract JWT from Authorization header
+    // Verify authentication using getClaims() for secure JWT validation
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
-        JSON.stringify({ error: "Missing or invalid authorization header" }),
+        JSON.stringify({ error: "Authentication required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -81,16 +81,24 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
-    // Create client with user's token to verify auth
+    // Create client with user's token for auth validation
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
     
-    // Verify the user is authenticated
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    if (authError || !user) {
+    // Securely validate JWT using getClaims()
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
       return new Response(
-        JSON.stringify({ error: "Invalid or expired authentication token" }),
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const userId = claimsData.claims.sub as string;
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -135,9 +143,9 @@ serve(async (req) => {
       );
     }
     
-    if (session.owner_id !== user.id) {
+    if (session.owner_id !== userId) {
       return new Response(
-        JSON.stringify({ error: "You are not authorized to generate reports for this session" }),
+        JSON.stringify({ error: "Access denied" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -225,9 +233,9 @@ ${JSON.stringify(formattedData, null, 2)}
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      // Log error server-side without exposing details
+      await response.text(); // Consume response body
+      throw new Error("Failed to generate report. Please try again.");
     }
 
     const aiResponse = await response.json();
@@ -246,7 +254,7 @@ ${JSON.stringify(formattedData, null, 2)}
       .single();
 
     if (saveError) {
-      console.error("Failed to save report:", saveError);
+      // Report generated but not saved - continue with response
     }
 
     return new Response(
@@ -259,8 +267,8 @@ ${JSON.stringify(formattedData, null, 2)}
     );
 
   } catch (error: unknown) {
-    console.error("Error in generate-report:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    // Return generic error message to client - no details exposed
+    const errorMessage = error instanceof Error ? error.message : "An error occurred. Please try again.";
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

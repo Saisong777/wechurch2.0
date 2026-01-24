@@ -1,4 +1,6 @@
 project_id = "evyfzgrkvpwyvwmiajtx"
 
+# JWT verification handled in code via getClaims() for proper auth
+# See: https://docs.lovable.dev/features/security
 [functions.generate-report]
 verify_jwt = false
