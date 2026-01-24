@@ -9,12 +9,14 @@ interface WaitingRoomProps {
 }
 
 export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) => {
-  const { currentUser, users, currentSession, setCurrentSession, updateUser } = useSession();
+  const { currentUser, users, currentSession, setCurrentSession, updateUser, setCurrentUser } = useSession();
 
   // Listen for session status updates and participant group assignments
   // Using secure realtime hook that strips email data for privacy
+  // Key: Pass currentUserId to enable force-refetch when session status changes
   useRealtimeSecure({
     sessionId: currentSession?.id || null,
+    currentUserId: currentUser?.id || null,
     onSessionUpdated: (sessionUpdate) => {
       if ((sessionUpdate.status === 'studying' || sessionUpdate.status === 'grouping') && currentSession) {
         setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
@@ -24,6 +26,16 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
       updateUser(user);
       // If this is the current user and they got a group number, trigger the transition
       if (user.id === currentUser?.id && user.groupNumber) {
+        onGroupingStarted();
+      }
+    },
+    // NEW: Handle force-refetched user data when session status changes
+    onCurrentUserRefetched: (user) => {
+      console.log('[WaitingRoom] User refetched:', user.name, 'groupNumber:', user.groupNumber);
+      setCurrentUser(user);
+      updateUser(user);
+      // If the user now has a group number, trigger the transition immediately
+      if (user.groupNumber) {
         onGroupingStarted();
       }
     },

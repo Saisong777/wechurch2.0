@@ -11,24 +11,61 @@ import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
  * - For sessions: Uses direct postgres_changes (no sensitive data)
  * - For submissions: Uses submissions_public view (emails excluded at DB level)
  * 
+ * Key feature: Session status changes trigger immediate user data refetch
+ * to ensure group assignments are picked up even when Realtime doesn't
+ * properly propagate view updates.
+ * 
  * Emails are never exposed to participant clients at any point.
  */
 
 interface UseRealtimeSecureOptions {
   sessionId: string | null;
+  currentUserId?: string | null; // Added to enable force refetch for current user
   onParticipantJoined?: (user: User) => void;
   onParticipantUpdated?: (user: User) => void;
   onSessionUpdated?: (session: Partial<Session>) => void;
   onSubmissionAdded?: (submission: StudySubmission) => void;
+  onCurrentUserRefetched?: (user: User) => void; // Called when current user data is force-refetched
 }
 
 export const useRealtimeSecure = ({
   sessionId,
+  currentUserId,
   onParticipantJoined,
   onParticipantUpdated,
   onSessionUpdated,
   onSubmissionAdded,
+  onCurrentUserRefetched,
 }: UseRealtimeSecureOptions) => {
+  
+  // Refetch current user data from the secure view
+  // Used when session status changes to ensure group assignments are picked up
+  const refetchCurrentUser = useCallback(async () => {
+    if (!sessionId || !currentUserId) return null;
+    
+    const { data } = await supabase
+      .from("participant_names")
+      .select("*")
+      .eq("session_id", sessionId)
+      .eq("id", currentUserId)
+      .single();
+    
+    if (data && onCurrentUserRefetched) {
+      const user: User = {
+        id: data.id!,
+        name: data.name!,
+        email: "", // Email excluded by view
+        gender: data.gender as "male" | "female",
+        groupNumber: data.group_number || undefined,
+        joinedAt: new Date(data.joined_at!),
+        location: data.location || "On-site",
+        readyConfirmed: data.ready_confirmed || false,
+      };
+      onCurrentUserRefetched(user);
+      return user;
+    }
+    return null;
+  }, [sessionId, currentUserId, onCurrentUserRefetched]);
   
   // Poll for participant changes using the secure view
   // This is more secure than realtime as it goes through RLS with the view
@@ -44,23 +81,36 @@ export const useRealtimeSecure = ({
     return data;
   }, [sessionId]);
 
+  // Track last known session status to detect transitions
   const handleSessionChange = useCallback(
-    (payload: RealtimePostgresChangesPayload<{
+    async (payload: RealtimePostgresChangesPayload<{
       id: string;
       verse_reference: string;
       status: string;
       created_at: string;
     }>) => {
-      if (payload.eventType === "UPDATE" && onSessionUpdated) {
+      if (payload.eventType === "UPDATE") {
         const s = payload.new;
-        onSessionUpdated({
-          id: s.id,
-          verseReference: s.verse_reference,
-          status: s.status as Session["status"],
-        });
+        const newStatus = s.status as Session["status"];
+        
+        // Notify about session update
+        if (onSessionUpdated) {
+          onSessionUpdated({
+            id: s.id,
+            verseReference: s.verse_reference,
+            status: newStatus,
+          });
+        }
+        
+        // CRITICAL: When session transitions away from 'waiting',
+        // immediately force-refetch current user to get their group assignment
+        if (newStatus !== 'waiting') {
+          console.log(`[Realtime] Session status changed to ${newStatus}, force-refetching current user...`);
+          await refetchCurrentUser();
+        }
       }
     },
-    [onSessionUpdated]
+    [onSessionUpdated, refetchCurrentUser]
   );
 
   const handleSubmissionChange = useCallback(
@@ -108,12 +158,12 @@ export const useRealtimeSecure = ({
     if (!sessionId) return;
 
     // Set up polling for participant changes (since direct realtime exposes emails)
-    // Poll every 3 seconds for participant updates
+    // Default poll interval: 3 seconds, reduced to 2 seconds during active phases
     let lastParticipantIds = new Set<string>();
     // Track last known state to detect actual changes
     let lastParticipantState = new Map<string, { groupNumber?: number; readyConfirmed: boolean }>();
     
-    const pollInterval = setInterval(async () => {
+    const doPoll = async () => {
       const participants = await pollParticipants();
       if (!participants) return;
       
@@ -166,7 +216,10 @@ export const useRealtimeSecure = ({
       }
       
       lastParticipantIds = currentIds;
-    }, 3000);
+    };
+    
+    // Poll every 2 seconds (faster than before to catch group assignments quickly)
+    const pollInterval = setInterval(doPoll, 2000);
 
     // Subscribe to session and submission changes via realtime
     // These don't expose sensitive data
@@ -180,7 +233,16 @@ export const useRealtimeSecure = ({
           table: "sessions",
           filter: `id=eq.${sessionId}`,
         },
-        handleSessionChange
+        (payload) => {
+          handleSessionChange(payload as RealtimePostgresChangesPayload<{
+            id: string;
+            verse_reference: string;
+            status: string;
+            created_at: string;
+          }>);
+          // Also trigger an immediate poll when session status changes
+          doPoll();
+        }
       )
       .on(
         "postgres_changes",
