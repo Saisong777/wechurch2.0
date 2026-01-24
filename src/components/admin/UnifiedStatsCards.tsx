@@ -1,16 +1,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserCheck, Clock, BarChart3 } from 'lucide-react';
+import { Users, UserCheck, Clock, BarChart3, Shield, Crown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-interface CRMStatsCardsProps {
-  total: number;
-  converted: number;
-  pending: number;
+interface UnifiedStatsCardsProps {
+  registeredCount: number;
+  adminCount: number;
+  leaderCount: number;
+  potentialTotal: number;
+  linkedCount: number;
+  pendingCount: number;
   avgAttendance: number;
   loading?: boolean;
 }
 
-export const CRMStatsCards = ({ total, converted, pending, avgAttendance, loading }: CRMStatsCardsProps) => {
+export const UnifiedStatsCards = ({
+  registeredCount,
+  adminCount,
+  leaderCount,
+  potentialTotal,
+  linkedCount,
+  pendingCount,
+  avgAttendance,
+  loading,
+}: UnifiedStatsCardsProps) => {
   if (loading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -30,26 +42,26 @@ export const CRMStatsCards = ({ total, converted, pending, avgAttendance, loadin
 
   const stats = [
     {
-      title: '潛在會員',
-      value: total,
-      icon: Users,
-      description: '總參與人數',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-    },
-    {
-      title: '已轉換會員',
-      value: converted,
+      title: '已註冊會員',
+      value: registeredCount,
       icon: UserCheck,
-      description: '已註冊帳號',
+      description: `管理員 ${adminCount} ・ 小組長 ${leaderCount}`,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
     },
     {
+      title: '潛在會員',
+      value: potentialTotal,
+      icon: Users,
+      description: `已連結 ${linkedCount} ・ 待跟進 ${pendingCount}`,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+    },
+    {
       title: '待跟進',
-      value: pending,
+      value: pendingCount,
       icon: Clock,
-      description: '尚未註冊',
+      description: '尚未註冊帳號',
       color: 'text-amber-600',
       bgColor: 'bg-amber-50',
     },

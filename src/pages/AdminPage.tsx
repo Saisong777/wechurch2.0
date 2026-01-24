@@ -6,14 +6,12 @@ import { SessionHistory } from '@/components/admin/SessionHistory';
 import { CreateSession } from '@/components/admin/CreateSession';
 import { AdminWaitingRoom } from '@/components/admin/AdminWaitingRoom';
 import { AdminMonitor } from '@/components/admin/AdminMonitor';
-import { MemberManagement } from '@/components/admin/MemberManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, LogOut, ChevronLeft, Loader2, Users, BookOpen, ShieldAlert, UserPlus } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Users, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchParticipants, fetchSubmissions } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
@@ -26,7 +24,6 @@ export const AdminPage: React.FC = () => {
   const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
   const { currentSession, setCurrentSession, setUsers, setSubmissions, setIsAdmin } = useSession();
   const [step, setStep] = useState<AdminStep>('auth');
-  const [activeTab, setActiveTab] = useState<'sessions' | 'members'>('sessions');
 
   const loading = authLoading || roleLoading;
 
@@ -122,42 +119,25 @@ export const AdminPage: React.FC = () => {
       case 'dashboard':
         return (
           <div className="px-4 py-8">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'sessions' | 'members')}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <TabsList className="grid w-full max-w-md grid-cols-2">
-                  <TabsTrigger value="sessions" className="gap-2">
-                    <BookOpen className="w-4 h-4" />
-                    聚會管理
-                  </TabsTrigger>
-                  {isAdmin && (
-                    <TabsTrigger value="members" className="gap-2">
-                      <Users className="w-4 h-4" />
-                      會員管理
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => navigate('/admin/crm')}
-                  className="gap-2"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  潛在會員 CRM
-                </Button>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-semibold">聚會管理</h2>
               </div>
-              <TabsContent value="sessions">
-                <SessionHistory 
-                  onCreateNew={() => setStep('create')} 
-                  onSelectSession={handleSelectSession}
-                />
-              </TabsContent>
-              {isAdmin && (
-                <TabsContent value="members">
-                  <MemberManagement />
-                </TabsContent>
-              )}
-            </Tabs>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => navigate('/admin/crm')}
+                className="gap-2"
+              >
+                <Users className="w-4 h-4" />
+                會員管理系統
+              </Button>
+            </div>
+            <SessionHistory 
+              onCreateNew={() => setStep('create')} 
+              onSelectSession={handleSelectSession}
+            />
           </div>
         );
       case 'create':
