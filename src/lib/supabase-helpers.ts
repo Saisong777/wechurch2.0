@@ -68,6 +68,30 @@ export const joinSession = async (
   };
 };
 
+// Fetch participants using the secure view (hides emails from non-owners)
+export const fetchParticipantsSecure = async (sessionId: string): Promise<User[]> => {
+  const { data, error } = await supabase
+    .from("participant_names")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("joined_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching participants:", error);
+    return [];
+  }
+
+  return data.map((p: { id: string; name: string; email: string | null; gender: string; group_number: number | null; joined_at: string }) => ({
+    id: p.id,
+    name: p.name,
+    email: p.email || "", // Email is null in the view for privacy
+    gender: p.gender as "male" | "female",
+    groupNumber: p.group_number || undefined,
+    joinedAt: new Date(p.joined_at),
+  }));
+};
+
+// Fetch participants with full data (for session owners only)
 export const fetchParticipants = async (sessionId: string): Promise<User[]> => {
   const { data, error } = await supabase
     .from("participants")
