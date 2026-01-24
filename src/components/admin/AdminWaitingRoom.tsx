@@ -11,6 +11,7 @@ import { Users, UserCheck, Settings, Shuffle, Scale, Copy } from 'lucide-react';
 import { GroupingSettings } from '@/types/bible-study';
 import { toast } from 'sonner';
 import { SessionQRCode } from './SessionQRCode';
+import { StressTestSimulator } from './StressTestSimulator';
 
 interface AdminWaitingRoomProps {
   onGroupingComplete: () => void;
@@ -255,13 +256,22 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                     <p className="text-sm text-muted-foreground">Gender-balanced</p>
                   </div>
                 </Label>
-              </RadioGroup>
+            </RadioGroup>
             </div>
           </CardContent>
         )}
       </Card>
 
-      {/* Start Grouping Button */}
+      {/* Stress Test Simulator */}
+      <StressTestSimulator 
+        onParticipantsGenerated={async () => {
+          // Refresh participants after generation
+          if (currentSession?.id) {
+            const participants = await fetchParticipants(currentSession.id);
+            setUsers(participants);
+          }
+        }}
+      />
       <Button
         variant="gold"
         size="xl"
