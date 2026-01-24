@@ -3,11 +3,17 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { BookOpen, Settings, Users, Sparkles } from 'lucide-react';
+import { BookOpen, Settings, Users, Sparkles, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const Index = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { canCreateSession, loading: roleLoading } = useUserRole();
+  
+  const loading = authLoading || (user && roleLoading);
   
   // If session ID is in URL, redirect to user page with that session
   useEffect(() => {
@@ -16,6 +22,7 @@ const Index = () => {
       navigate(`/user?session=${sessionId}`);
     }
   }, [searchParams, navigate]);
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -43,7 +50,7 @@ const Index = () => {
           </div>
 
           {/* Entry Points */}
-          <div className="grid md:grid-cols-2 gap-6 mb-16">
+          <div className={`grid gap-6 mb-16 ${loading || canCreateSession ? 'md:grid-cols-2' : ''}`}>
             <Card variant="highlight" className="group hover:scale-[1.02] transition-transform cursor-pointer">
               <Link to="/user">
                 <CardContent className="py-12 text-center">
@@ -63,24 +70,33 @@ const Index = () => {
               </Link>
             </Card>
 
-            <Card variant="default" className="group hover:scale-[1.02] transition-transform cursor-pointer">
-              <Link to="/admin">
-                <CardContent className="py-12 text-center">
-                  <div className="mx-auto w-20 h-20 rounded-full gradient-navy flex items-center justify-center mb-6">
-                    <Settings className="w-10 h-10 text-secondary" />
-                  </div>
-                  <h2 className="font-serif text-2xl font-bold text-foreground mb-2">
-                    主持人入口
-                  </h2>
-                  <p className="text-muted-foreground mb-6">
-                    Host / Admin Entry
-                  </p>
-                  <Button variant="navy" size="lg">
-                    管理聚會 Manage Session
-                  </Button>
+            {/* Show Admin card only if loading or user can create sessions */}
+            {loading ? (
+              <Card variant="default" className="group">
+                <CardContent className="py-12 text-center flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                 </CardContent>
-              </Link>
-            </Card>
+              </Card>
+            ) : canCreateSession ? (
+              <Card variant="default" className="group hover:scale-[1.02] transition-transform cursor-pointer">
+                <Link to="/admin">
+                  <CardContent className="py-12 text-center">
+                    <div className="mx-auto w-20 h-20 rounded-full gradient-navy flex items-center justify-center mb-6">
+                      <Settings className="w-10 h-10 text-secondary" />
+                    </div>
+                    <h2 className="font-serif text-2xl font-bold text-foreground mb-2">
+                      主持人入口
+                    </h2>
+                    <p className="text-muted-foreground mb-6">
+                      Host / Admin Entry
+                    </p>
+                    <Button variant="navy" size="lg">
+                      管理聚會 Manage Session
+                    </Button>
+                  </CardContent>
+                </Link>
+              </Card>
+            ) : null}
           </div>
 
           {/* Features Preview */}

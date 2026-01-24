@@ -253,6 +253,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       participant_names: {
@@ -418,6 +442,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_create_session: { Args: { _user_id: string }; Returns: boolean }
       check_participant_rate_limit: {
         Args: { p_email: string; p_session_id: string }
         Returns: boolean
@@ -434,6 +459,18 @@ export type Database = {
           ready_confirmed: boolean
         }[]
       }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_verified_participant: {
         Args: {
           p_email: string
@@ -453,7 +490,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "member" | "leader" | "future_leader" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -580,6 +617,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["member", "leader", "future_leader", "admin"],
+    },
   },
 } as const
