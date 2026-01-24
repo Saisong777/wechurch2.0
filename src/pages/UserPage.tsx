@@ -49,7 +49,7 @@ export const UserPage: React.FC = () => {
     setIsLoading(true);
     
     const { data: sessionData, error: sessionError } = await supabase
-      .from('sessions')
+      .from('sessions_public')
       .select('*')
       .eq('id', id.trim())
       .maybeSingle();
