@@ -79,7 +79,6 @@ export const useRealtime = ({
       participant_id: string;
       group_number: number;
       name: string;
-      email: string;
       bible_verse: string;
       theme: string | null;
       moving_verse: string | null;
@@ -98,7 +97,7 @@ export const useRealtime = ({
           userId: s.participant_id,
           groupNumber: s.group_number,
           name: s.name,
-          email: s.email,
+          email: "", // Email is not exposed through realtime for privacy
           bibleVerse: s.bible_verse,
           theme: s.theme || "",
           movingVerse: s.moving_verse || "",
