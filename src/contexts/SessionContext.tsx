@@ -61,45 +61,100 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
-  const assignGroups = useCallback((settings: GroupingSettings) => {
-    const { groupSize, method } = settings;
-    let usersToGroup = [...users];
-    
-    if (method === 'gender-balanced') {
-      const males = usersToGroup.filter(u => u.gender === 'male');
-      const females = usersToGroup.filter(u => u.gender === 'female');
-      usersToGroup = [];
-      const maxLen = Math.max(males.length, females.length);
-      for (let i = 0; i < maxLen; i++) {
-        if (i < males.length) usersToGroup.push(males[i]);
-        if (i < females.length) usersToGroup.push(females[i]);
-      }
-    } else {
-      // Random shuffle
-      for (let i = usersToGroup.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [usersToGroup[i], usersToGroup[j]] = [usersToGroup[j], usersToGroup[i]];
-      }
+  // Helper: Shuffle array
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
+    return shuffled;
+  };
+
+  // Helper: Gender balancing
+  const applyGenderBalancing = (usersArr: User[]): User[] => {
+    const males = usersArr.filter(u => u.gender === 'male');
+    const females = usersArr.filter(u => u.gender === 'female');
+    const balanced: User[] = [];
+    const maxLen = Math.max(males.length, females.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < males.length) balanced.push(males[i]);
+      if (i < females.length) balanced.push(females[i]);
+    }
+    return balanced;
+  };
+
+  const assignGroups = useCallback((settings: GroupingSettings) => {
+    const { method } = settings;
+    const MAX_GROUP_SIZE = 6;
     
+    // Step 1: Bucket participants by location (STRICT ISOLATION)
+    const locationBuckets = new Map<string, User[]>();
+    for (const user of users) {
+      const loc = user.location || 'On-site';
+      if (!locationBuckets.has(loc)) {
+        locationBuckets.set(loc, []);
+      }
+      locationBuckets.get(loc)!.push(user);
+    }
+
     const groups: Group[] = [];
     let groupNumber = 1;
-    
-    for (let i = 0; i < usersToGroup.length; i += groupSize) {
-      const groupMembers = usersToGroup.slice(i, i + groupSize);
-      groupMembers.forEach(member => {
-        member.groupNumber = groupNumber;
-      });
-      groups.push({
-        id: `group-${groupNumber}`,
-        number: groupNumber,
-        members: groupMembers,
-      });
-      groupNumber++;
+    const updatedUsers: User[] = [];
+
+    // Step 2: Process each location bucket independently (NO MIXING)
+    for (const [, bucketUsers] of locationBuckets) {
+      let usersToGroup = [...bucketUsers];
+      
+      // Apply grouping method
+      if (method === 'gender-balanced') {
+        usersToGroup = applyGenderBalancing(usersToGroup);
+      } else {
+        usersToGroup = shuffleArray(usersToGroup);
+      }
+
+      // Step 3: Split into subgroups with max 6 members
+      if (usersToGroup.length <= MAX_GROUP_SIZE) {
+        // Single group for this location
+        usersToGroup.forEach(member => {
+          member.groupNumber = groupNumber;
+          updatedUsers.push(member);
+        });
+        groups.push({
+          id: `group-${groupNumber}`,
+          number: groupNumber,
+          members: usersToGroup,
+        });
+        groupNumber++;
+      } else {
+        // Split into multiple subgroups - balance sizes
+        const subgroupCount = Math.ceil(usersToGroup.length / MAX_GROUP_SIZE);
+        const baseSize = Math.floor(usersToGroup.length / subgroupCount);
+        const remainder = usersToGroup.length % subgroupCount;
+        
+        let currentIndex = 0;
+        for (let subIdx = 0; subIdx < subgroupCount; subIdx++) {
+          const thisGroupSize = baseSize + (subIdx < remainder ? 1 : 0);
+          const groupMembers = usersToGroup.slice(currentIndex, currentIndex + thisGroupSize);
+          currentIndex += thisGroupSize;
+          
+          groupMembers.forEach(member => {
+            member.groupNumber = groupNumber;
+            updatedUsers.push(member);
+          });
+          
+          groups.push({
+            id: `group-${groupNumber}`,
+            number: groupNumber,
+            members: groupMembers,
+          });
+          groupNumber++;
+        }
+      }
     }
     
-    setUsers([...usersToGroup]);
-    setCurrentSession(prev => prev ? { ...prev, groups, status: 'studying' } : null);
+    setUsers(updatedUsers);
+    setCurrentSession(prev => prev ? { ...prev, groups, status: 'grouping' } : null);
   }, [users]);
 
   return (

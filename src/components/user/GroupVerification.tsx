@@ -129,22 +129,26 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
                 </span>
               </div>
             </div>
-            <p className="mt-4 text-muted-foreground">Group #{groupNumber}</p>
+            <p className="mt-4 text-muted-foreground">小組 #{groupNumber}</p>
           </>
         ) : (
           <>
-            <p className="text-muted-foreground text-lg mb-4">您的小組</p>
+            <p className="text-muted-foreground text-lg mb-4 flex items-center justify-center gap-2">
+              <Users className="w-5 h-5" />
+              您的小組
+            </p>
             <div className="relative inline-block">
               <div className="absolute inset-0 bg-secondary/40 rounded-full blur-3xl animate-pulse-soft" />
-              <div className="relative w-36 h-36 md:w-48 md:h-48 rounded-full gradient-gold flex items-center justify-center glow-gold">
-                <span className="font-serif text-7xl md:text-8xl font-bold text-secondary-foreground">
+              <div className="relative w-44 h-44 md:w-56 md:h-56 rounded-full gradient-gold flex items-center justify-center glow-gold shadow-2xl">
+                <span className="font-serif text-8xl md:text-9xl font-bold text-secondary-foreground drop-shadow-lg">
                   {groupNumber}
                 </span>
               </div>
             </div>
-            <p className="mt-4 font-serif text-2xl font-bold text-foreground">
+            <p className="mt-6 font-serif text-3xl font-bold text-foreground">
               第 {groupNumber} 組
             </p>
+            <p className="mt-2 text-sm text-muted-foreground">現場 On-site</p>
           </>
         )}
       </div>
