@@ -1,7 +1,9 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session, StudySubmission } from "@/types/bible-study";
-import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { RealtimePostgresChangesPayload, RealtimeChannel } from "@supabase/supabase-js";
+
+export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
 /**
  * Secure realtime hook for PARTICIPANTS (non-admin users).
@@ -15,6 +17,7 @@ import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
  * - Fail-safe polling every 3 seconds (queries DB directly)
  * - Visibility change detection for instant refetch when user returns
  * - Manual refresh capability exposed via callback
+ * - Connection state tracking for UI feedback
  * 
  * Emails are never exposed to participant clients at any point.
  */
@@ -32,6 +35,8 @@ interface UseRealtimeSecureOptions {
 
 interface UseRealtimeSecureReturn {
   forceRefresh: () => Promise<void>;
+  connectionState: ConnectionState;
+  lastSyncTime: Date | null;
 }
 
 export const useRealtimeSecure = ({
@@ -44,6 +49,11 @@ export const useRealtimeSecure = ({
   onCurrentUserRefetched,
   onGroupingDetected,
 }: UseRealtimeSecureOptions): UseRealtimeSecureReturn => {
+  
+  // Connection state tracking
+  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
   
   // Track last known state to detect actual changes
   const lastParticipantStateRef = useRef(new Map<string, { groupNumber?: number; readyConfirmed: boolean }>());
@@ -228,13 +238,20 @@ export const useRealtimeSecure = ({
   );
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      setConnectionState('disconnected');
+      return;
+    }
 
+    setConnectionState('connecting');
     const lastParticipantState = lastParticipantStateRef.current;
     
     const doPoll = async () => {
       const participants = await pollParticipants();
       if (!participants) return;
+      
+      // Update last sync time on successful poll
+      setLastSyncTime(new Date());
       
       const currentIds = new Set(participants.map(p => p.id));
       
@@ -300,7 +317,10 @@ export const useRealtimeSecure = ({
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         console.log('[Realtime] Tab/app became visible, running immediate status check...');
-        fullStatusCheck();
+        setConnectionState('reconnecting');
+        fullStatusCheck().then(() => {
+          setConnectionState('connected');
+        });
         doPoll();
       }
     };
@@ -326,6 +346,7 @@ export const useRealtimeSecure = ({
           filter: `id=eq.${sessionId}`,
         },
         (payload) => {
+          setLastSyncTime(new Date());
           handleSessionChange(payload as RealtimePostgresChangesPayload<{
             id: string;
             verse_reference: string;
@@ -343,20 +364,55 @@ export const useRealtimeSecure = ({
           table: "submissions",
           filter: `session_id=eq.${sessionId}`,
         },
-        handleSubmissionChange
+        (payload) => {
+          setLastSyncTime(new Date());
+          handleSubmissionChange(payload as RealtimePostgresChangesPayload<{
+            id: string;
+            session_id: string;
+            participant_id: string;
+            group_number: number;
+            name: string;
+            bible_verse: string;
+            theme: string | null;
+            moving_verse: string | null;
+            facts_discovered: string | null;
+            traditional_exegesis: string | null;
+            inspiration_from_god: string | null;
+            application_in_life: string | null;
+            others: string | null;
+            submitted_at: string;
+          }>);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Realtime] Channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          setConnectionState('connected');
+          setLastSyncTime(new Date());
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setConnectionState('disconnected');
+        } else if (status === 'TIMED_OUT') {
+          setConnectionState('reconnecting');
+        }
+      });
+    
+    channelRef.current = channel;
 
     return () => {
       clearInterval(heartbeatInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      setConnectionState('disconnected');
     };
   }, [sessionId, pollParticipants, handleSessionChange, handleSubmissionChange, onParticipantJoined, onParticipantUpdated, fullStatusCheck]);
   
-  // Expose force refresh for manual refresh button
+  // Expose force refresh for manual refresh button and connection state
   return {
     forceRefresh: fullStatusCheck,
+    connectionState,
+    lastSyncTime,
   };
 };
