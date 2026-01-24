@@ -250,6 +250,7 @@ export const submitStudyNotes = async (
   };
 };
 
+// Fetch all submissions for session owners (with email access)
 export const fetchSubmissions = async (sessionId: string): Promise<StudySubmission[]> => {
   const { data, error } = await supabase
     .from("submissions")
@@ -269,6 +270,38 @@ export const fetchSubmissions = async (sessionId: string): Promise<StudySubmissi
     groupNumber: s.group_number,
     name: s.name,
     email: s.email,
+    bibleVerse: s.bible_verse,
+    theme: s.theme || "",
+    movingVerse: s.moving_verse || "",
+    factsDiscovered: s.facts_discovered || "",
+    traditionalExegesis: s.traditional_exegesis || "",
+    inspirationFromGod: s.inspiration_from_god || "",
+    applicationInLife: s.application_in_life || "",
+    others: s.others || "",
+    submittedAt: new Date(s.submitted_at),
+  }));
+};
+
+// Fetch submissions for participants (without email - uses public view)
+export const fetchSubmissionsPublic = async (sessionId: string): Promise<StudySubmission[]> => {
+  const { data, error } = await supabase
+    .from("submissions_public")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("submitted_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching public submissions:", error);
+    return [];
+  }
+
+  return data.map((s) => ({
+    id: s.id,
+    sessionId: s.session_id,
+    userId: s.participant_id,
+    groupNumber: s.group_number,
+    name: s.name,
+    email: "", // Email is hidden from participants
     bibleVerse: s.bible_verse,
     theme: s.theme || "",
     movingVerse: s.moving_verse || "",
