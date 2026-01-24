@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, Play, Download, CheckCircle, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
+import { getSessionJoinUrl } from '@/lib/url-helpers';
 
 interface CreateSessionProps {
   onCreated: () => void;
@@ -24,9 +25,8 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
   const [createdSessionId, setCreatedSessionId] = useState('');
   const [createdVerseRef, setCreatedVerseRef] = useState('');
 
-  // Build the join URL using the public app URL
-  const publicBaseUrl = 'https://id-preview--535fde94-f0d2-40e6-b67e-11919e99216e.lovable.app';
-  const joinUrl = createdSessionId ? `${publicBaseUrl}/user?session_id=${createdSessionId}` : '';
+  // Build the join URL dynamically
+  const joinUrl = createdSessionId ? getSessionJoinUrl(createdSessionId) : '';
 
   const handleCreate = async () => {
     if (!user) {
