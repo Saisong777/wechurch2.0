@@ -67,6 +67,7 @@ export type Database = {
           name: string
           ready_confirmed: boolean
           session_id: string
+          updated_at: string | null
         }
         Insert: {
           email: string
@@ -78,6 +79,7 @@ export type Database = {
           name: string
           ready_confirmed?: boolean
           session_id: string
+          updated_at?: string | null
         }
         Update: {
           email?: string
@@ -89,6 +91,7 @@ export type Database = {
           name?: string
           ready_confirmed?: boolean
           session_id?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -435,6 +438,15 @@ export type Database = {
         Args: {
           p_email: string
           p_participant_id: string
+          p_session_id: string
+        }
+        Returns: boolean
+      }
+      set_participant_ready: {
+        Args: {
+          p_email: string
+          p_participant_id: string
+          p_ready: boolean
           p_session_id: string
         }
         Returns: boolean
