@@ -20,7 +20,8 @@ interface AdminWaitingRoomProps {
 export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingComplete }) => {
   const { users, setUsers, currentSession, setCurrentSession, addUser } = useSession();
   const [showSettings, setShowSettings] = useState(false);
-  const [groupSize, setGroupSize] = useState(4);
+  const [minSize, setMinSize] = useState(4);
+  const [maxSize, setMaxSize] = useState(6);
   const [method, setMethod] = useState<'random' | 'gender-balanced'>('random');
   const [isGrouping, setIsGrouping] = useState(false);
 
@@ -70,7 +71,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
     setIsGrouping(true);
     
     try {
-      const settings: GroupingSettings = { groupSize, method };
+      const settings: GroupingSettings = { minSize, maxSize, method };
       const groups = await assignGroupsToParticipants(currentSession.id, users, settings);
       
       // Update local state with groups and set status to 'grouping' (verification phase)
@@ -220,20 +221,48 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
         </CardHeader>
         {showSettings && (
           <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <Label className="text-base">每組人數 Group Size: {groupSize} 人</Label>
-              <Slider
-                value={[groupSize]}
-                onValueChange={(value) => setGroupSize(value[0])}
-                min={3}
-                max={7}
-                step={1}
-                className="w-full"
-              />
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>3人</span>
-                <span>7人</span>
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <Label className="text-base">每組最少人數 Min Size: {minSize} 人</Label>
+                <Slider
+                  value={[minSize]}
+                  onValueChange={(value) => {
+                    setMinSize(value[0]);
+                    if (value[0] > maxSize) setMaxSize(value[0]);
+                  }}
+                  min={2}
+                  max={6}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>2人</span>
+                  <span>6人</span>
+                </div>
               </div>
+              
+              <div className="space-y-3">
+                <Label className="text-base">每組最多人數 Max Size: {maxSize} 人</Label>
+                <Slider
+                  value={[maxSize]}
+                  onValueChange={(value) => {
+                    setMaxSize(value[0]);
+                    if (value[0] < minSize) setMinSize(value[0]);
+                  }}
+                  min={2}
+                  max={8}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>2人</span>
+                  <span>8人</span>
+                </div>
+              </div>
+              
+              <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                💡 優先以 {minSize} 人分組，不足時才擴展到 {maxSize} 人
+              </p>
             </div>
 
             <div className="space-y-3">

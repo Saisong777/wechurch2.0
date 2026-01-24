@@ -43,6 +43,7 @@ export interface StudySubmission {
 }
 
 export interface GroupingSettings {
-  groupSize: number;
+  minSize: number;
+  maxSize: number;
   method: 'random' | 'gender-balanced';
 }
