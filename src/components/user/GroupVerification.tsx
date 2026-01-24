@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSession } from '@/contexts/SessionContext';
 import { fetchGroupMembers, updateParticipantReady } from '@/lib/supabase-helpers';
+import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/bible-study';
-import { Users, CheckCircle, Loader2, MapPin } from 'lucide-react';
+import { Users, CheckCircle, Loader2, MapPin, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface GroupVerificationProps {
@@ -19,6 +21,8 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasConfirmed, setHasConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [errorState, setErrorState] = useState<'none' | 'no-group' | 'no-members' | 'fetch-error'>('none');
 
   const globalGroupNumber = currentUser?.groupNumber;
   const location = currentUser?.location || 'On-site';
@@ -43,22 +47,91 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     return localIndex >= 0 ? localIndex + 1 : 1;
   }, [currentSession?.groups, globalGroupNumber, location]);
 
+  // Force re-sync current user data from DB
+  const resyncCurrentUser = useCallback(async () => {
+    if (!currentSession?.id || !currentUser?.id) return null;
+
+    setIsSyncing(true);
+    setErrorState('none');
+
+    try {
+      const { data, error } = await supabase
+        .from('participant_names')
+        .select('*')
+        .eq('session_id', currentSession.id)
+        .eq('id', currentUser.id)
+        .single();
+
+      if (error || !data) {
+        console.error('[GroupVerification] Failed to resync user:', error);
+        setErrorState('fetch-error');
+        return null;
+      }
+
+      const refreshedUser: User = {
+        ...currentUser,
+        groupNumber: data.group_number || undefined,
+        readyConfirmed: data.ready_confirmed || false,
+        location: data.location || 'On-site',
+      };
+
+      setCurrentUser(refreshedUser);
+      return refreshedUser;
+    } catch (err) {
+      console.error('[GroupVerification] Resync error:', err);
+      setErrorState('fetch-error');
+      return null;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [currentSession?.id, currentUser, setCurrentUser]);
+
   // Fetch group members and poll for updates
   const fetchMembers = useCallback(async () => {
-    if (!currentSession?.id || !globalGroupNumber) return;
-    
-    const members = await fetchGroupMembers(currentSession.id, globalGroupNumber);
-    setGroupMembers(members);
-    
-    // Check if all members are ready - auto redirect
-    const allReady = members.length > 0 && members.every(m => m.readyConfirmed);
-    if (allReady) {
-      toast.success('所有組員都已準備好！開始查經！');
-      onAllReady();
+    if (!currentSession?.id) {
+      setErrorState('fetch-error');
+      return;
     }
-    
-    return members;
+
+    // Check if we have a group number
+    if (!globalGroupNumber) {
+      setErrorState('no-group');
+      return;
+    }
+
+    try {
+      const members = await fetchGroupMembers(currentSession.id, globalGroupNumber);
+
+      if (members.length === 0) {
+        setErrorState('no-members');
+      } else {
+        setErrorState('none');
+        setGroupMembers(members);
+
+        // Check if all members are ready - auto redirect
+        const allReady = members.every(m => m.readyConfirmed);
+        if (allReady) {
+          toast.success('所有組員都已準備好！開始查經！');
+          onAllReady();
+        }
+      }
+    } catch (err) {
+      console.error('[GroupVerification] Fetch members error:', err);
+      setErrorState('fetch-error');
+    }
   }, [currentSession?.id, globalGroupNumber, onAllReady]);
+
+  // Handle manual resync button
+  const handleResync = async () => {
+    const refreshedUser = await resyncCurrentUser();
+    if (refreshedUser?.groupNumber) {
+      await fetchMembers();
+      toast.success('同步成功！');
+    } else if (!refreshedUser?.groupNumber) {
+      toast.error('尚未分配到小組，請稍候或聯繫主持人');
+    }
+  };
+
   // Initial load
   useEffect(() => {
     const load = async () => {
@@ -71,7 +144,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   // Poll for member status updates every 2 seconds
   useEffect(() => {
     if (!currentSession?.id || !globalGroupNumber) return;
-    
+
     const pollInterval = setInterval(async () => {
       await fetchMembers();
     }, 2000);
@@ -91,20 +164,20 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
 
   const handleReady = async () => {
     if (!currentUser?.id) return;
-    
+
     // Validate that all members are checked
     const otherMembers = groupMembers.filter(m => m.id !== currentUser.id);
     const allChecked = otherMembers.every(m => checkedMembers.has(m.id));
-    
+
     if (!allChecked) {
       toast.error('請確認所有組員都在場');
       return;
     }
 
     setIsSubmitting(true);
-    
+
     const success = await updateParticipantReady(currentUser.id, true);
-    
+
     if (success) {
       setHasConfirmed(true);
       setCurrentUser({ ...currentUser, readyConfirmed: true });
@@ -113,7 +186,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     } else {
       toast.error('確認失敗，請重試');
     }
-    
+
     setIsSubmitting(false);
   };
 
@@ -121,10 +194,93 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   const totalCount = groupMembers.length;
   const otherMembers = groupMembers.filter(m => m.id !== currentUser?.id);
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-secondary" />
+      </div>
+    );
+  }
+
+  // Error states with recovery UI
+  if (errorState !== 'none') {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-8 space-y-6">
+            <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
+              <AlertTriangle className="h-5 w-5" />
+              <AlertTitle className="ml-2">
+                {errorState === 'no-group' && '尚未分配小組'}
+                {errorState === 'no-members' && '找不到組員資料'}
+                {errorState === 'fetch-error' && '資料載入失敗'}
+              </AlertTitle>
+              <AlertDescription className="ml-7 mt-2">
+                {errorState === 'no-group' && (
+                  <>
+                    您的帳號尚未被分配到任何小組。
+                    <br />
+                    <span className="text-muted-foreground text-sm">
+                      可能原因：主持人尚未開始分組，或同步延遲。
+                    </span>
+                  </>
+                )}
+                {errorState === 'no-members' && (
+                  <>
+                    無法載入您的小組成員名單。
+                    <br />
+                    <span className="text-muted-foreground text-sm">
+                      可能原因：網路問題或資料庫同步延遲。
+                    </span>
+                  </>
+                )}
+                {errorState === 'fetch-error' && (
+                  <>
+                    無法連接到伺服器取得資料。
+                    <br />
+                    <span className="text-muted-foreground text-sm">
+                      請檢查網路連線後重試。
+                    </span>
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+
+            <div className="text-center space-y-4">
+              <p className="text-sm text-muted-foreground">
+                目前狀態：
+                {currentUser?.groupNumber
+                  ? `已分配至第 ${currentUser.groupNumber} 組`
+                  : '尚未分配小組'}
+              </p>
+
+              <Button
+                variant="gold"
+                size="lg"
+                className="w-full"
+                onClick={handleResync}
+                disabled={isSyncing}
+              >
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    同步中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    重新同步 Resync
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-muted-foreground">
+                若問題持續，請聯繫主持人協助
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
