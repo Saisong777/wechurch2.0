@@ -7,11 +7,22 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ArrowLeft, Users } from 'lucide-react';
 import { CRMStatsCards } from '@/components/admin/CRMStatsCards';
 import { CRMMemberCard } from '@/components/admin/CRMMemberCard';
 import { CRMMemberTable } from '@/components/admin/CRMMemberTable';
 import { CRMFilters } from '@/components/admin/CRMFilters';
+import { CRMBulkActions } from '@/components/admin/CRMBulkActions';
 import { LinkUserDialog } from '@/components/admin/LinkUserDialog';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,13 +30,16 @@ import { supabase } from '@/integrations/supabase/client';
 const CRMPage = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { isLeader, loading: roleLoading } = useUserRole();
+  const { isLeader, isAdmin, loading: roleLoading } = useUserRole();
   const isMobile = useIsMobile();
   
   const [status, setStatus] = useState<'all' | 'pending' | 'member' | 'declined'>('all');
   const [subscribed, setSubscribed] = useState<'all' | boolean>('all');
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
   const { 
     data, 
@@ -34,6 +48,10 @@ const CRMPage = () => {
     stats, 
     statsLoading, 
     updateMember,
+    bulkUpdateStatus,
+    bulkUpdateSubscription,
+    bulkDelete,
+    deleteMember,
     linkUserManually,
     forceRefetch,
   } = usePotentialMembers({ status, subscribed });
@@ -60,6 +78,55 @@ const CRMPage = () => {
     fetchActiveSession();
   });
 
+  // Selection handlers
+  const handleToggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleToggleSelectAll = () => {
+    if (!data?.members) return;
+    const allIds = data.members.map(m => m.id);
+    const allSelected = allIds.every(id => selectedIds.has(id));
+    
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allIds));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  // Bulk action handlers
+  const handleBulkUpdateStatus = (newStatus: PotentialMember['status']) => {
+    bulkUpdateStatus.mutate(
+      { ids: Array.from(selectedIds), status: newStatus },
+      { onSuccess: () => setSelectedIds(new Set()) }
+    );
+  };
+
+  const handleBulkUpdateSubscription = (newSubscribed: boolean) => {
+    bulkUpdateSubscription.mutate(
+      { ids: Array.from(selectedIds), subscribed: newSubscribed },
+      { onSuccess: () => setSelectedIds(new Set()) }
+    );
+  };
+
+  const handleBulkDelete = () => {
+    bulkDelete.mutate(Array.from(selectedIds), {
+      onSuccess: () => setSelectedIds(new Set()),
+    });
+  };
+
+  // Single member handlers
   const handleUpdateStatus = (id: string, newStatus: PotentialMember['status']) => {
     updateMember.mutate({ id, updates: { status: newStatus } });
   };
@@ -77,11 +144,26 @@ const CRMPage = () => {
     linkUserManually.mutate({ memberId, userId });
   };
 
+  const handleDeleteClick = (id: string) => {
+    setMemberToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (memberToDelete) {
+      deleteMember.mutate(memberToDelete);
+      setMemberToDelete(null);
+    }
+    setDeleteDialogOpen(false);
+  };
+
   const handleSimulate = () => {
     if (activeSessionId) {
       simulateParticipant.mutate(activeSessionId);
     }
   };
+
+  const isUpdating = bulkUpdateStatus.isPending || bulkUpdateSubscription.isPending || bulkDelete.isPending;
 
   // Loading state
   if (authLoading || roleLoading) {
@@ -165,6 +247,18 @@ const CRMPage = () => {
               isSimulating={simulateParticipant.isPending}
             />
 
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && (
+              <CRMBulkActions
+                selectedCount={selectedIds.size}
+                onClearSelection={handleClearSelection}
+                onBulkUpdateStatus={handleBulkUpdateStatus}
+                onBulkUpdateSubscription={handleBulkUpdateSubscription}
+                onBulkDelete={handleBulkDelete}
+                isUpdating={isUpdating}
+              />
+            )}
+
             {/* Member List */}
             {isLoading ? (
               <div className="space-y-3">
@@ -184,18 +278,25 @@ const CRMPage = () => {
                   <CRMMemberCard
                     key={member.id}
                     member={member}
+                    isSelected={selectedIds.has(member.id)}
+                    onToggleSelect={handleToggleSelect}
                     onUpdateStatus={handleUpdateStatus}
                     onToggleSubscription={handleToggleSubscription}
                     onLinkUser={handleLinkUser}
+                    onDelete={handleDeleteClick}
                   />
                 ))}
               </div>
             ) : (
               <CRMMemberTable
                 members={data?.members ?? []}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                onToggleSelectAll={handleToggleSelectAll}
                 onUpdateStatus={handleUpdateStatus}
                 onToggleSubscription={handleToggleSubscription}
                 onLinkUser={handleLinkUser}
+                onDelete={handleDeleteClick}
               />
             )}
 
@@ -216,6 +317,27 @@ const CRMPage = () => {
         memberId={selectedMemberId}
         onLink={handleLinkConfirm}
       />
+
+      {/* Single Delete Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定刪除？</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作將永久刪除該會員資料，無法復原。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              確定刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

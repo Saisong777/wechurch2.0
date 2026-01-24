@@ -1,6 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -8,23 +9,29 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Mail, Bell, BellOff, UserCheck, Link2 } from 'lucide-react';
+import { MoreVertical, Mail, Bell, BellOff, UserCheck, Link2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import type { PotentialMember } from '@/hooks/usePotentialMembers';
 
 interface CRMMemberCardProps {
   member: PotentialMember;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
   onUpdateStatus: (id: string, status: PotentialMember['status']) => void;
   onToggleSubscription: (id: string, subscribed: boolean) => void;
   onLinkUser: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export const CRMMemberCard = ({ 
-  member, 
+  member,
+  isSelected,
+  onToggleSelect, 
   onUpdateStatus, 
   onToggleSubscription,
   onLinkUser,
+  onDelete,
 }: CRMMemberCardProps) => {
   const statusConfig = {
     pending: { label: '待跟進', variant: 'secondary' as const },
@@ -35,9 +42,15 @@ export const CRMMemberCard = ({
   const status = statusConfig[member.status];
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className={`hover:shadow-md transition-shadow ${isSelected ? 'ring-2 ring-primary bg-muted/50' : ''}`}>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect(member.id)}
+            className="mt-1"
+            aria-label={`Select ${member.name}`}
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-medium truncate">{member.name}</h3>
@@ -107,6 +120,14 @@ export const CRMMemberCard = ({
                   </DropdownMenuItem>
                 </>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => onDelete(member.id)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                刪除
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

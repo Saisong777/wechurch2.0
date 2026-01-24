@@ -73,14 +73,14 @@ export const LinkUserDialog = ({ open, onOpenChange, memberId, onLink }: LinkUse
               className="mt-2"
             />
           </div>
-          <DialogFooter>
+          <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               取消
             </Button>
             <Button type="submit" disabled={loading || !email.trim()}>
               {loading ? '搜尋中...' : '連結'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
