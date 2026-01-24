@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchParticipants, assignGroupsToParticipants } from '@/lib/supabase-helpers';
-import { Users, UserCheck, Settings, Shuffle, Scale, Copy } from 'lucide-react';
+import { Users, UserCheck, Settings, Shuffle, Scale, Copy, UserX } from 'lucide-react';
 import { GroupingSettings } from '@/types/bible-study';
 import { toast } from 'sonner';
 import { SessionQRCode } from './SessionQRCode';
@@ -22,7 +22,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
   const [showSettings, setShowSettings] = useState(false);
   const [minSize, setMinSize] = useState(4);
   const [maxSize, setMaxSize] = useState(6);
-  const [method, setMethod] = useState<'random' | 'gender-balanced'>('random');
+  const [method, setMethod] = useState<'random' | 'gender-balanced' | 'gender-separated'>('random');
   const [isGrouping, setIsGrouping] = useState(false);
 
   // Real-time updates
@@ -265,8 +265,8 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
               <Label className="text-base">分組方式 Grouping Method</Label>
               <RadioGroup
                 value={method}
-                onValueChange={(value) => setMethod(value as 'random' | 'gender-balanced')}
-                className="grid grid-cols-2 gap-4"
+                onValueChange={(value) => setMethod(value as 'random' | 'gender-balanced' | 'gender-separated')}
+                className="grid grid-cols-1 md:grid-cols-3 gap-3"
               >
                 <Label
                   htmlFor="random"
@@ -291,10 +291,23 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                   <Scale className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <p className="font-medium">性別平衡</p>
-                    <p className="text-sm text-muted-foreground">Gender-balanced</p>
+                    <p className="text-sm text-muted-foreground">Balanced</p>
                   </div>
                 </Label>
-            </RadioGroup>
+                <Label
+                  htmlFor="gender-separated"
+                  className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    method === 'gender-separated' ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
+                >
+                  <RadioGroupItem value="gender-separated" id="gender-separated" />
+                  <UserX className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">男女分組</p>
+                    <p className="text-sm text-muted-foreground">Separated</p>
+                  </div>
+                </Label>
+              </RadioGroup>
             </div>
           </CardContent>
         )}
