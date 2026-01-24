@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session, StudySubmission } from "@/types/bible-study";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
@@ -11,21 +11,27 @@ import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
  * - For sessions: Uses direct postgres_changes (no sensitive data)
  * - For submissions: Uses submissions_public view (emails excluded at DB level)
  * 
- * Key feature: Session status changes trigger immediate user data refetch
- * to ensure group assignments are picked up even when Realtime doesn't
- * properly propagate view updates.
+ * Mobile-optimized features:
+ * - Fail-safe polling every 3 seconds (queries DB directly)
+ * - Visibility change detection for instant refetch when user returns
+ * - Manual refresh capability exposed via callback
  * 
  * Emails are never exposed to participant clients at any point.
  */
 
 interface UseRealtimeSecureOptions {
   sessionId: string | null;
-  currentUserId?: string | null; // Added to enable force refetch for current user
+  currentUserId?: string | null;
   onParticipantJoined?: (user: User) => void;
   onParticipantUpdated?: (user: User) => void;
   onSessionUpdated?: (session: Partial<Session>) => void;
   onSubmissionAdded?: (submission: StudySubmission) => void;
-  onCurrentUserRefetched?: (user: User) => void; // Called when current user data is force-refetched
+  onCurrentUserRefetched?: (user: User) => void;
+  onGroupingDetected?: () => void; // Called when grouping is detected (session in verification + user has group)
+}
+
+interface UseRealtimeSecureReturn {
+  forceRefresh: () => Promise<void>;
 }
 
 export const useRealtimeSecure = ({
@@ -36,12 +42,18 @@ export const useRealtimeSecure = ({
   onSessionUpdated,
   onSubmissionAdded,
   onCurrentUserRefetched,
-}: UseRealtimeSecureOptions) => {
+  onGroupingDetected,
+}: UseRealtimeSecureOptions): UseRealtimeSecureReturn => {
+  
+  // Track last known state to detect actual changes
+  const lastParticipantStateRef = useRef(new Map<string, { groupNumber?: number; readyConfirmed: boolean }>());
+  const lastParticipantIdsRef = useRef(new Set<string>());
   
   // Refetch current user data from the secure view
-  // Used when session status changes to ensure group assignments are picked up
   const refetchCurrentUser = useCallback(async () => {
     if (!sessionId || !currentUserId) return null;
+    
+    console.log('[Realtime] Force-refetching current user data...');
     
     const { data } = await supabase
       .from("participant_names")
@@ -54,7 +66,7 @@ export const useRealtimeSecure = ({
       const user: User = {
         id: data.id!,
         name: data.name!,
-        email: "", // Email excluded by view
+        email: "",
         gender: data.gender as "male" | "female",
         groupNumber: data.group_number || undefined,
         joinedAt: new Date(data.joined_at!),
@@ -67,8 +79,71 @@ export const useRealtimeSecure = ({
     return null;
   }, [sessionId, currentUserId, onCurrentUserRefetched]);
   
+  // Full status check - queries session AND current user from DB directly
+  // This is the "heartbeat" that catches missed events
+  const fullStatusCheck = useCallback(async () => {
+    if (!sessionId || !currentUserId) return;
+    
+    console.log('[Realtime] Full status check (heartbeat)...');
+    
+    // Query both session and current user in parallel
+    const [sessionResult, userResult] = await Promise.all([
+      supabase
+        .from("sessions_public")
+        .select("*")
+        .eq("id", sessionId)
+        .single(),
+      supabase
+        .from("participant_names")
+        .select("*")
+        .eq("session_id", sessionId)
+        .eq("id", currentUserId)
+        .single(),
+    ]);
+    
+    const session = sessionResult.data;
+    const userData = userResult.data;
+    
+    if (session && onSessionUpdated) {
+      onSessionUpdated({
+        id: session.id!,
+        verseReference: session.verse_reference!,
+        status: session.status as Session["status"],
+      });
+    }
+    
+    // Check if grouping is complete: session in verification/studying AND user has group
+    if (session && userData) {
+      const isGrouped = (session.status === 'verification' || session.status === 'studying') 
+        && userData.group_number != null;
+      
+      if (isGrouped) {
+        console.log('[Realtime] Grouping detected! Session:', session.status, 'Group:', userData.group_number);
+        
+        // Update user state
+        if (onCurrentUserRefetched) {
+          const user: User = {
+            id: userData.id!,
+            name: userData.name!,
+            email: "",
+            gender: userData.gender as "male" | "female",
+            groupNumber: userData.group_number || undefined,
+            joinedAt: new Date(userData.joined_at!),
+            location: userData.location || "On-site",
+            readyConfirmed: userData.ready_confirmed || false,
+          };
+          onCurrentUserRefetched(user);
+        }
+        
+        // Trigger grouping detection callback
+        if (onGroupingDetected) {
+          onGroupingDetected();
+        }
+      }
+    }
+  }, [sessionId, currentUserId, onSessionUpdated, onCurrentUserRefetched, onGroupingDetected]);
+  
   // Poll for participant changes using the secure view
-  // This is more secure than realtime as it goes through RLS with the view
   const pollParticipants = useCallback(async () => {
     if (!sessionId) return;
     
@@ -93,7 +168,6 @@ export const useRealtimeSecure = ({
         const s = payload.new;
         const newStatus = s.status as Session["status"];
         
-        // Notify about session update
         if (onSessionUpdated) {
           onSessionUpdated({
             id: s.id,
@@ -102,15 +176,14 @@ export const useRealtimeSecure = ({
           });
         }
         
-        // CRITICAL: When session transitions away from 'waiting',
-        // immediately force-refetch current user to get their group assignment
+        // When session transitions away from 'waiting', do full status check
         if (newStatus !== 'waiting') {
-          console.log(`[Realtime] Session status changed to ${newStatus}, force-refetching current user...`);
-          await refetchCurrentUser();
+          console.log(`[Realtime] Session status changed to ${newStatus}, running full status check...`);
+          await fullStatusCheck();
         }
       }
     },
-    [onSessionUpdated, refetchCurrentUser]
+    [onSessionUpdated, fullStatusCheck]
   );
 
   const handleSubmissionChange = useCallback(
@@ -138,7 +211,7 @@ export const useRealtimeSecure = ({
           userId: s.participant_id,
           groupNumber: s.group_number,
           name: s.name,
-          email: "", // Email never exposed to participants
+          email: "",
           bibleVerse: s.bible_verse,
           theme: s.theme || "",
           movingVerse: s.moving_verse || "",
@@ -157,11 +230,7 @@ export const useRealtimeSecure = ({
   useEffect(() => {
     if (!sessionId) return;
 
-    // Set up polling for participant changes (since direct realtime exposes emails)
-    // Default poll interval: 3 seconds, reduced to 2 seconds during active phases
-    let lastParticipantIds = new Set<string>();
-    // Track last known state to detect actual changes
-    let lastParticipantState = new Map<string, { groupNumber?: number; readyConfirmed: boolean }>();
+    const lastParticipantState = lastParticipantStateRef.current;
     
     const doPoll = async () => {
       const participants = await pollParticipants();
@@ -171,11 +240,11 @@ export const useRealtimeSecure = ({
       
       // Check for new participants
       for (const p of participants) {
-        if (!lastParticipantIds.has(p.id!) && onParticipantJoined) {
+        if (!lastParticipantIdsRef.current.has(p.id!) && onParticipantJoined) {
           onParticipantJoined({
             id: p.id!,
             name: p.name!,
-            email: "", // Email excluded by view
+            email: "",
             gender: p.gender as "male" | "female",
             groupNumber: p.group_number || undefined,
             joinedAt: new Date(p.joined_at!),
@@ -185,13 +254,12 @@ export const useRealtimeSecure = ({
         }
       }
       
-      // Check for updates (group assignments, ready status) - compare against last known state
+      // Check for updates - compare against last known state
       for (const p of participants) {
         const lastState = lastParticipantState.get(p.id!);
         const currentGroupNumber = p.group_number || undefined;
         const currentReadyConfirmed = p.ready_confirmed || false;
         
-        // Only fire update if state actually changed
         const groupChanged = lastState?.groupNumber !== currentGroupNumber;
         const readyChanged = lastState?.readyConfirmed !== currentReadyConfirmed;
         
@@ -199,7 +267,7 @@ export const useRealtimeSecure = ({
           onParticipantUpdated({
             id: p.id!,
             name: p.name!,
-            email: "", // Email excluded by view
+            email: "",
             gender: p.gender as "male" | "female",
             groupNumber: currentGroupNumber,
             joinedAt: new Date(p.joined_at!),
@@ -208,21 +276,45 @@ export const useRealtimeSecure = ({
           });
         }
         
-        // Update tracked state
         lastParticipantState.set(p.id!, {
           groupNumber: currentGroupNumber,
           readyConfirmed: currentReadyConfirmed,
         });
       }
       
-      lastParticipantIds = currentIds;
+      lastParticipantIdsRef.current = currentIds;
     };
     
-    // Poll every 2 seconds (faster than before to catch group assignments quickly)
-    const pollInterval = setInterval(doPoll, 2000);
+    // FAIL-SAFE POLLING: Every 3 seconds, do a full status check
+    // This catches missed WebSocket events on mobile
+    const heartbeatInterval = setInterval(() => {
+      fullStatusCheck();
+      doPoll();
+    }, 3000);
+    
+    // Initial check
+    fullStatusCheck();
+    doPoll();
+
+    // VISIBILITY CHANGE: When user returns to tab/unlocks phone, immediately refresh
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[Realtime] Tab/app became visible, running immediate status check...');
+        fullStatusCheck();
+        doPoll();
+      }
+    };
+    
+    const handleFocus = () => {
+      console.log('[Realtime] Window focused, running immediate status check...');
+      fullStatusCheck();
+      doPoll();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
 
     // Subscribe to session and submission changes via realtime
-    // These don't expose sensitive data
     const channel = supabase
       .channel(`session-secure-${sessionId}`)
       .on(
@@ -240,7 +332,6 @@ export const useRealtimeSecure = ({
             status: string;
             created_at: string;
           }>);
-          // Also trigger an immediate poll when session status changes
           doPoll();
         }
       )
@@ -257,8 +348,15 @@ export const useRealtimeSecure = ({
       .subscribe();
 
     return () => {
-      clearInterval(pollInterval);
+      clearInterval(heartbeatInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
       supabase.removeChannel(channel);
     };
-  }, [sessionId, pollParticipants, handleSessionChange, handleSubmissionChange, onParticipantJoined, onParticipantUpdated]);
+  }, [sessionId, pollParticipants, handleSessionChange, handleSubmissionChange, onParticipantJoined, onParticipantUpdated, fullStatusCheck]);
+  
+  // Expose force refresh for manual refresh button
+  return {
+    forceRefresh: fullStatusCheck,
+  };
 };

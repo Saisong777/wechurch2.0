@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtimeSecure } from '@/hooks/useRealtimeSecure';
-import { Clock, Users, MapPin } from 'lucide-react';
+import { Clock, Users, MapPin, RefreshCw } from 'lucide-react';
 
 interface WaitingRoomProps {
   onGroupingStarted: () => void;
@@ -10,15 +11,15 @@ interface WaitingRoomProps {
 
 export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) => {
   const { currentUser, users, currentSession, setCurrentSession, updateUser, setCurrentUser } = useSession();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Listen for session status updates and participant group assignments
-  // Using secure realtime hook that strips email data for privacy
-  // Key: Pass currentUserId to enable force-refetch when session status changes
-  useRealtimeSecure({
+  // Using secure realtime hook with aggressive mobile sync features
+  const { forceRefresh } = useRealtimeSecure({
     sessionId: currentSession?.id || null,
     currentUserId: currentUser?.id || null,
     onSessionUpdated: (sessionUpdate) => {
-      if ((sessionUpdate.status === 'studying' || sessionUpdate.status === 'grouping') && currentSession) {
+      if ((sessionUpdate.status === 'studying' || sessionUpdate.status === 'grouping' || sessionUpdate.status === 'verification') && currentSession) {
         setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
       }
     },
@@ -29,7 +30,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
         onGroupingStarted();
       }
     },
-    // NEW: Handle force-refetched user data when session status changes
+    // Handle force-refetched user data when session status changes
     onCurrentUserRefetched: (user) => {
       console.log('[WaitingRoom] User refetched:', user.name, 'groupNumber:', user.groupNumber);
       setCurrentUser(user);
@@ -39,7 +40,21 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
         onGroupingStarted();
       }
     },
+    // Direct callback when grouping is detected (backup for missed events)
+    onGroupingDetected: () => {
+      console.log('[WaitingRoom] Grouping detected via heartbeat!');
+      onGroupingStarted();
+    },
   });
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await forceRefresh();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   const isRemote = currentUser?.location && currentUser.location !== 'On-site';
 
@@ -93,6 +108,20 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
                 <span>{currentUser?.location}</span>
               </div>
             )}
+          </div>
+
+          {/* Manual Refresh Button for Mobile Users */}
+          <div className="mt-6 pt-4 border-t text-center">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? '更新中...' : '狀態沒更新？點此刷新'}
+            </Button>
           </div>
         </CardContent>
       </Card>

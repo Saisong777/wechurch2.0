@@ -13,7 +13,7 @@ export interface Session {
   id: string;
   bibleVerse: string;
   verseReference: string;
-  status: 'waiting' | 'grouping' | 'studying' | 'completed';
+  status: 'waiting' | 'grouping' | 'verification' | 'studying' | 'completed';
   createdAt: Date;
   groups: Group[];
 }
