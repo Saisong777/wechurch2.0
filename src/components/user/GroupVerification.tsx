@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,15 +20,34 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   const [hasConfirmed, setHasConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const groupNumber = currentUser?.groupNumber;
+  const globalGroupNumber = currentUser?.groupNumber;
   const location = currentUser?.location || 'On-site';
   const isRemote = location !== 'On-site';
 
+  // Calculate local group number within the user's location
+  const localGroupNumber = useMemo(() => {
+    if (!currentSession?.groups || !globalGroupNumber) {
+      return globalGroupNumber || 1;
+    }
+
+    // Get all groups in the user's location
+    const locationGroups = currentSession.groups
+      .filter(g => {
+        const groupLocation = g.members[0]?.location || 'On-site';
+        return groupLocation === location;
+      })
+      .sort((a, b) => a.number - b.number);
+
+    // Find the local index of the user's group within their location
+    const localIndex = locationGroups.findIndex(g => g.number === globalGroupNumber);
+    return localIndex >= 0 ? localIndex + 1 : 1;
+  }, [currentSession?.groups, globalGroupNumber, location]);
+
   // Fetch group members and poll for updates
   const fetchMembers = useCallback(async () => {
-    if (!currentSession?.id || !groupNumber) return;
+    if (!currentSession?.id || !globalGroupNumber) return;
     
-    const members = await fetchGroupMembers(currentSession.id, groupNumber);
+    const members = await fetchGroupMembers(currentSession.id, globalGroupNumber);
     setGroupMembers(members);
     
     // Check if all members are ready - auto redirect
@@ -39,8 +58,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     }
     
     return members;
-  }, [currentSession?.id, groupNumber, onAllReady]);
-
+  }, [currentSession?.id, globalGroupNumber, onAllReady]);
   // Initial load
   useEffect(() => {
     const load = async () => {
@@ -52,14 +70,14 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
 
   // Poll for member status updates every 2 seconds
   useEffect(() => {
-    if (!currentSession?.id || !groupNumber) return;
+    if (!currentSession?.id || !globalGroupNumber) return;
     
     const pollInterval = setInterval(async () => {
       await fetchMembers();
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [currentSession?.id, groupNumber, fetchMembers]);
+  }, [currentSession?.id, globalGroupNumber, fetchMembers]);
 
   const handleCheckMember = (memberId: string, checked: boolean) => {
     const newChecked = new Set(checkedMembers);
@@ -129,7 +147,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
                 </span>
               </div>
             </div>
-            <p className="mt-4 text-muted-foreground">小組 #{groupNumber}</p>
+            <p className="mt-4 text-muted-foreground">第 {localGroupNumber} 組</p>
           </>
         ) : (
           <>
@@ -141,12 +159,12 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
               <div className="absolute inset-0 bg-secondary/40 rounded-full blur-3xl animate-pulse-soft" />
               <div className="relative w-44 h-44 md:w-56 md:h-56 rounded-full gradient-gold flex items-center justify-center glow-gold shadow-2xl">
                 <span className="font-serif text-8xl md:text-9xl font-bold text-secondary-foreground drop-shadow-lg">
-                  {groupNumber}
+                  {localGroupNumber}
                 </span>
               </div>
             </div>
             <p className="mt-6 font-serif text-3xl font-bold text-foreground">
-              第 {groupNumber} 組
+              第 {localGroupNumber} 組
             </p>
             <p className="mt-2 text-sm text-muted-foreground">現場 On-site</p>
           </>
