@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
-import { useRealtime } from '@/hooks/useRealtime';
+import { useRealtimeSecure } from '@/hooks/useRealtimeSecure';
 import { Clock, Users } from 'lucide-react';
 
 interface WaitingRoomProps {
@@ -12,7 +12,8 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
   const { currentUser, users, currentSession, setCurrentSession, updateUser } = useSession();
 
   // Listen for session status updates and participant group assignments
-  useRealtime({
+  // Using secure realtime hook that strips email data for privacy
+  useRealtimeSecure({
     sessionId: currentSession?.id || null,
     onSessionUpdated: (sessionUpdate) => {
       if (sessionUpdate.status === 'studying' && currentSession) {
