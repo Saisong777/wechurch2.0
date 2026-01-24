@@ -63,7 +63,9 @@ export type Database = {
           group_number: number | null
           id: string
           joined_at: string
+          location: string
           name: string
+          ready_confirmed: boolean
           session_id: string
         }
         Insert: {
@@ -72,7 +74,9 @@ export type Database = {
           group_number?: number | null
           id?: string
           joined_at?: string
+          location?: string
           name: string
+          ready_confirmed?: boolean
           session_id: string
         }
         Update: {
@@ -81,7 +85,9 @@ export type Database = {
           group_number?: number | null
           id?: string
           joined_at?: string
+          location?: string
           name?: string
+          ready_confirmed?: boolean
           session_id?: string
         }
         Relationships: [
@@ -250,7 +256,9 @@ export type Database = {
           group_number: number | null
           id: string | null
           joined_at: string | null
+          location: string | null
           name: string | null
+          ready_confirmed: boolean | null
           session_id: string | null
         }
         Insert: {
@@ -259,7 +267,9 @@ export type Database = {
           group_number?: number | null
           id?: string | null
           joined_at?: string | null
+          location?: string | null
           name?: string | null
+          ready_confirmed?: boolean | null
           session_id?: string | null
         }
         Update: {
@@ -268,7 +278,9 @@ export type Database = {
           group_number?: number | null
           id?: string | null
           joined_at?: string | null
+          location?: string | null
           name?: string | null
+          ready_confirmed?: boolean | null
           session_id?: string | null
         }
         Relationships: [
