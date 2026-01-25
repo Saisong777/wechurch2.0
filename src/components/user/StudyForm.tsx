@@ -69,14 +69,14 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto animate-fade-in px-1 sm:px-0">
-      {/* Session info card - more compact on mobile */}
+    <div className="w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto animate-fade-in px-1 sm:px-0">
+      {/* Session info card - more compact on mobile, spacious on desktop */}
       <Card variant="highlight" className="mb-4 md:mb-6">
         <CardContent className="py-4 md:py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 text-sm">
             <div>
               <p className="text-xs md:text-sm text-muted-foreground">小組 Group</p>
-              <p className="font-bold text-base md:text-lg text-primary">#{currentUser?.groupNumber}</p>
+              <p className="font-bold text-base md:text-xl text-primary">#{currentUser?.groupNumber}</p>
             </div>
             <div>
               <p className="text-xs md:text-sm text-muted-foreground">姓名 Name</p>
@@ -84,33 +84,62 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
             </div>
             <div className="col-span-2">
               <p className="text-xs md:text-sm text-muted-foreground">經文 Verse</p>
-              <p className="font-serif font-medium text-sm md:text-base">{currentSession?.verseReference}</p>
+              <p className="font-serif font-medium text-sm md:text-lg">{currentSession?.verseReference}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Study form - optimized for mobile input */}
-      <Card className="shadow-sm md:shadow">
+      {/* Study form - responsive layout */}
+      <Card className="shadow-sm md:shadow-lg">
         <CardHeader className="pb-3 md:pb-6">
-          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-            <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-secondary" />
+          <CardTitle className="flex items-center gap-2 text-lg md:text-2xl">
+            <BookOpen className="w-5 h-5 md:w-7 md:h-7 text-secondary" />
             查經筆記 Study Notes
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-6">
           <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
-            {formFields.map(({ id, label, icon: Icon, placeholder }, index) => (
+            {/* Two-column grid for larger screens */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6">
+              {formFields.slice(0, 6).map(({ id, label, icon: Icon, placeholder }, index) => (
+                <div 
+                  key={id} 
+                  className="space-y-2 animate-fade-in"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <Label 
+                    htmlFor={id} 
+                    className="text-sm md:text-base flex items-center gap-2 font-medium"
+                  >
+                    <Icon className="w-4 h-4 md:w-5 md:h-5 text-secondary flex-shrink-0" />
+                    <span>{label}</span>
+                  </Label>
+                  <AutoResizeTextarea
+                    id={id}
+                    value={formData[id] || ''}
+                    onChange={(e) => handleChange(id, e.target.value)}
+                    placeholder={placeholder}
+                    minRows={3}
+                    maxRows={10}
+                    className="text-base md:text-base leading-relaxed focus:ring-secondary/50 lg:min-h-[120px]"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* "Others" field spans full width */}
+            {formFields.slice(6).map(({ id, label, icon: Icon, placeholder }, index) => (
               <div 
                 key={id} 
                 className="space-y-2 animate-fade-in"
-                style={{ animationDelay: `${index * 50}ms` }}
+                style={{ animationDelay: `${(index + 6) * 50}ms` }}
               >
                 <Label 
                   htmlFor={id} 
                   className="text-sm md:text-base flex items-center gap-2 font-medium"
                 >
-                  <Icon className="w-4 h-4 text-secondary flex-shrink-0" />
+                  <Icon className="w-4 h-4 md:w-5 md:h-5 text-secondary flex-shrink-0" />
                   <span>{label}</span>
                 </Label>
                 <AutoResizeTextarea
@@ -118,20 +147,20 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
                   value={formData[id] || ''}
                   onChange={(e) => handleChange(id, e.target.value)}
                   placeholder={placeholder}
-                  minRows={id === 'others' ? 2 : 2}
-                  maxRows={8}
-                  className="text-base leading-relaxed focus:ring-secondary/50"
+                  minRows={2}
+                  maxRows={6}
+                  className="text-base md:text-base leading-relaxed focus:ring-secondary/50"
                 />
               </div>
             ))}
 
-            {/* Submit button - sticky on mobile for easy access */}
-            <div className="pt-4 md:pt-6 sticky bottom-0 bg-card pb-2 -mx-6 px-6 md:static md:mx-0 md:px-0 md:pb-0">
+            {/* Submit button */}
+            <div className="pt-4 md:pt-6 sticky bottom-0 bg-card pb-2 -mx-6 px-6 md:static md:mx-0 md:px-0 md:pb-0 lg:flex lg:justify-end">
               <Button
                 type="submit"
                 variant="gold"
                 size="xl"
-                className="w-full text-base md:text-lg py-4 md:py-3"
+                className="w-full lg:w-auto lg:min-w-[240px] text-base md:text-lg py-4 md:py-3"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
