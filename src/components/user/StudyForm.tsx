@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useSession } from '@/contexts/SessionContext';
 import { submitStudyNotes } from '@/lib/supabase-helpers';
 import { BookOpen, Send, Sparkles, Heart, Lightbulb, CheckCircle } from 'lucide-react';
@@ -69,62 +69,69 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto animate-fade-in">
-      <Card variant="highlight" className="mb-6">
-        <CardContent className="py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+    <div className="w-full max-w-2xl mx-auto animate-fade-in px-1 sm:px-0">
+      {/* Session info card - more compact on mobile */}
+      <Card variant="highlight" className="mb-4 md:mb-6">
+        <CardContent className="py-4 md:py-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
             <div>
-              <p className="text-muted-foreground">小組 Group</p>
-              <p className="font-bold text-lg text-primary">#{currentUser?.groupNumber}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">小組 Group</p>
+              <p className="font-bold text-base md:text-lg text-primary">#{currentUser?.groupNumber}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">姓名 Name</p>
-              <p className="font-medium">{currentUser?.name}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">姓名 Name</p>
+              <p className="font-medium text-sm md:text-base truncate">{currentUser?.name}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-muted-foreground">經文 Verse</p>
-              <p className="font-serif font-medium">{currentSession?.verseReference}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">經文 Verse</p>
+              <p className="font-serif font-medium text-sm md:text-base">{currentSession?.verseReference}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-secondary" />
+      {/* Study form - optimized for mobile input */}
+      <Card className="shadow-sm md:shadow">
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+            <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-secondary" />
             查經筆記 Study Notes
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="pb-6">
+          <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
             {formFields.map(({ id, label, icon: Icon, placeholder }, index) => (
               <div 
                 key={id} 
                 className="space-y-2 animate-fade-in"
-                style={{ animationDelay: `${index * 100}ms` }}
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                <Label htmlFor={id} className="text-base flex items-center gap-2">
-                  <Icon className="w-4 h-4 text-secondary" />
-                  {label}
+                <Label 
+                  htmlFor={id} 
+                  className="text-sm md:text-base flex items-center gap-2 font-medium"
+                >
+                  <Icon className="w-4 h-4 text-secondary flex-shrink-0" />
+                  <span>{label}</span>
                 </Label>
-                <Textarea
+                <AutoResizeTextarea
                   id={id}
                   value={formData[id] || ''}
                   onChange={(e) => handleChange(id, e.target.value)}
                   placeholder={placeholder}
-                  rows={id === 'others' ? 3 : 2}
-                  className="resize-none"
+                  minRows={id === 'others' ? 2 : 2}
+                  maxRows={8}
+                  className="text-base leading-relaxed focus:ring-secondary/50"
                 />
               </div>
             ))}
 
-            <div className="pt-4">
+            {/* Submit button - sticky on mobile for easy access */}
+            <div className="pt-4 md:pt-6 sticky bottom-0 bg-card pb-2 -mx-6 px-6 md:static md:mx-0 md:px-0 md:pb-0">
               <Button
                 type="submit"
                 variant="gold"
                 size="xl"
-                className="w-full"
+                className="w-full text-base md:text-lg py-4 md:py-3"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
