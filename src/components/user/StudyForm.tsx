@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useSession } from '@/contexts/SessionContext';
 import { submitStudyNotes } from '@/lib/supabase-helpers';
-import { BookOpen, Send, Sparkles, Heart, Lightbulb, CheckCircle } from 'lucide-react';
+import { BookOpen, Send, Sparkles, Heart, Lightbulb, CheckCircle, Cloud, CloudOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface StudyFormProps {
@@ -22,10 +22,95 @@ const formFields = [
   { id: 'others', label: '其他 Others', icon: Sparkles, placeholder: '其他想法或問題' },
 ];
 
+const DRAFT_STORAGE_KEY = 'bible_study_draft';
+const AUTO_SAVE_INTERVAL = 3000; // 3 seconds
+
 export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
   const { currentUser, currentSession, addSubmission } = useSession();
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasLoadedDraft = useRef(false);
+
+  // Generate storage key unique to session and user
+  const getDraftKey = useCallback(() => {
+    if (!currentSession?.id || !currentUser?.id) return null;
+    return `${DRAFT_STORAGE_KEY}_${currentSession.id}_${currentUser.id}`;
+  }, [currentSession?.id, currentUser?.id]);
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    if (hasLoadedDraft.current) return;
+    const draftKey = getDraftKey();
+    if (!draftKey) return;
+
+    try {
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.data && Object.keys(parsed.data).some(k => parsed.data[k])) {
+          setFormData(parsed.data);
+          setLastSaved(parsed.savedAt ? new Date(parsed.savedAt) : null);
+          toast.info('已載入上次的草稿 Draft restored', { duration: 2000 });
+        }
+      }
+      hasLoadedDraft.current = true;
+    } catch (e) {
+      console.error('Failed to load draft:', e);
+    }
+  }, [getDraftKey]);
+
+  // Auto-save draft to localStorage
+  const saveDraft = useCallback(() => {
+    const draftKey = getDraftKey();
+    if (!draftKey) return;
+
+    // Only save if there's actual content
+    const hasContent = Object.values(formData).some(v => v && v.trim());
+    if (!hasContent) return;
+
+    setIsSaving(true);
+    try {
+      const draft = {
+        data: formData,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+      setLastSaved(new Date());
+    } catch (e) {
+      console.error('Failed to save draft:', e);
+    }
+    setTimeout(() => setIsSaving(false), 500);
+  }, [formData, getDraftKey]);
+
+  // Debounced auto-save
+  useEffect(() => {
+    if (!hasLoadedDraft.current) return;
+    
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      saveDraft();
+    }, AUTO_SAVE_INTERVAL);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [formData, saveDraft]);
+
+  // Clear draft after successful submission
+  const clearDraft = useCallback(() => {
+    const draftKey = getDraftKey();
+    if (draftKey) {
+      localStorage.removeItem(draftKey);
+    }
+  }, [getDraftKey]);
 
   const handleChange = (id: string, value: string) => {
     setFormData(prev => ({ ...prev, [id]: value }));
@@ -58,6 +143,7 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
     });
 
     if (submission) {
+      clearDraft();
       addSubmission(submission);
       toast.success('提交成功！Submission successful!');
       onSubmitted();
@@ -93,10 +179,26 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
       {/* Study form - responsive layout */}
       <Card className="shadow-sm md:shadow-lg">
         <CardHeader className="pb-3 md:pb-6">
-          <CardTitle className="flex items-center gap-2 text-lg md:text-2xl">
-            <BookOpen className="w-5 h-5 md:w-7 md:h-7 text-secondary" />
-            查經筆記 Study Notes
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg md:text-2xl">
+              <BookOpen className="w-5 h-5 md:w-7 md:h-7 text-secondary" />
+              查經筆記 Study Notes
+            </CardTitle>
+            {/* Auto-save indicator */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {isSaving ? (
+                <>
+                  <Cloud className="w-4 h-4 animate-pulse text-secondary" />
+                  <span className="hidden sm:inline">儲存中...</span>
+                </>
+              ) : lastSaved ? (
+                <>
+                  <Cloud className="w-4 h-4 text-secondary" />
+                  <span className="hidden sm:inline">已自動儲存</span>
+                </>
+              ) : null}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="pb-6">
           <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
