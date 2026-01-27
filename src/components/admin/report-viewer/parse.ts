@@ -156,40 +156,44 @@ export function parseReportContent(content: string): GroupReport[] {
     // Section markers to look for (order matters for proper boundary detection)
     const SECTION_MARKERS = ['**📖', '📖', '**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤'];
     
-    // Extract themes - handle both **📖 主題：** and **📖 主題：**\n formats
+    // Extract themes - handle various formats:
+    // **📖 主題（Themes）：** or **📖 主題：** or 📖 主題： or 主題（Themes）：
     const themesContent = extractSectionContent(
       groupReport,
-      /\*\*?📖\s*主題[：:]?\s*\*\*\s*/i,
+      /(?:\*\*)?📖?\s*主題(?:（Themes）)?[：:]?\s*(?:\*\*)?\s*/i,
       ['**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤']
     );
     if (themesContent) {
       section.themes = cleanMarkdown(themesContent);
     }
     
-    // Extract observations - handle **🔍 事實發現：** format
+    // Extract observations - handle various formats:
+    // **🔍 事實發現（Observations）：** or **🔍 事實發現：** or 事實發現：
     const obsContent = extractSectionContent(
       groupReport,
-      /\*\*?🔍\s*事實發現[：:]?\s*\*\*\s*/i,
+      /(?:\*\*)?🔍?\s*事實發現(?:（Observations）)?[：:]?\s*(?:\*\*)?\s*/i,
       ['**💡', '💡', '**🎯', '🎯', '**👤', '👤']
     );
     if (obsContent) {
       section.observations = cleanMarkdown(obsContent);
     }
     
-    // Extract insights (獨特亮光) - handle **💡 獨特亮光：** format
+    // Extract insights (獨特亮光) - handle various formats:
+    // **💡 獨特亮光（Unique Insights）：** or **💡 獨特亮光：** or 獨特亮光：
     const insightsContent = extractSectionContent(
       groupReport,
-      /\*\*?💡\s*獨特亮光[：:]?\s*\*\*\s*/i,
+      /(?:\*\*)?💡?\s*獨特亮光(?:（Unique Insights）)?[：:]?\s*(?:\*\*)?\s*/i,
       ['**🎯', '🎯', '**👤', '👤']
     );
     if (insightsContent) {
       section.insights = cleanMarkdown(insightsContent);
     }
     
-    // Extract applications - handle **🎯 如何應用：** format
+    // Extract applications - handle various formats:
+    // **🎯 如何應用（Applications）：** or **🎯 應用：** or 如何應用：
     const appContent = extractSectionContent(
       groupReport,
-      /\*\*?🎯\s*(?:如何)?應用[：:]?\s*\*\*\s*/i,
+      /(?:\*\*)?🎯?\s*(?:如何)?應用(?:（Applications）)?[：:]?\s*(?:\*\*)?\s*/i,
       ['**👤', '👤']
     );
     if (appContent) {
