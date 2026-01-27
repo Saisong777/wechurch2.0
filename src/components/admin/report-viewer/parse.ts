@@ -160,7 +160,7 @@ export function parseReportContent(content: string): GroupReport[] {
     // **📖 主題（Themes）：** or **📖 主題：** or 📖 主題： or 主題（Themes）：
     const themesContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?📖?\s*主題(?:（Themes）)?[：:]?\s*(?:\*\*)?\s*/i,
+      /\*{0,2}📖?\s*主題(?:（Themes）)?[：:\s]*\*{0,2}\s*/i,
       ['**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤']
     );
     if (themesContent) {
@@ -171,7 +171,7 @@ export function parseReportContent(content: string): GroupReport[] {
     // **🔍 事實發現（Observations）：** or **🔍 事實發現：** or 事實發現：
     const obsContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?🔍?\s*事實發現(?:（Observations）)?[：:]?\s*(?:\*\*)?\s*/i,
+      /\*{0,2}🔍?\s*事實發現(?:（Observations）)?[：:\s]*\*{0,2}\s*/i,
       ['**💡', '💡', '**🎯', '🎯', '**👤', '👤']
     );
     if (obsContent) {
@@ -182,7 +182,7 @@ export function parseReportContent(content: string): GroupReport[] {
     // **💡 獨特亮光（Unique Insights）：** or **💡 獨特亮光：** or 獨特亮光：
     const insightsContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?💡?\s*獨特亮光(?:（Unique Insights）)?[：:]?\s*(?:\*\*)?\s*/i,
+      /\*{0,2}💡\s*獨特亮光[^*\n]*\*{0,2}\s*/i,
       ['**🎯', '🎯', '**👤', '👤']
     );
     if (insightsContent) {
@@ -193,7 +193,7 @@ export function parseReportContent(content: string): GroupReport[] {
     // **🎯 如何應用（Applications）：** or **🎯 應用：** or 如何應用：
     const appContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?🎯?\s*(?:如何)?應用(?:（Applications）)?[：:]?\s*(?:\*\*)?\s*/i,
+      /\*{0,2}🎯?\s*(?:如何)?應用(?:（Applications）)?[：:\s]*\*{0,2}\s*/i,
       ['**👤', '👤']
     );
     if (appContent) {
@@ -203,7 +203,7 @@ export function parseReportContent(content: string): GroupReport[] {
     // Extract personal contributions (at the end) - handle **👤 個人貢獻摘要：** format
     const contribContent = extractSectionContent(
       groupReport,
-      /\*\*?👤\s*個人貢獻[^：:\n]*[：:]?\s*\*\*\s*/i,
+      /\*{0,2}👤\s*個人貢獻[^：:\n]*[：:\s]*\*{0,2}\s*/i,
       [] // Last section, no end markers
     );
     if (contribContent) {

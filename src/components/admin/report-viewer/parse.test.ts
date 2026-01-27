@@ -292,6 +292,51 @@ describe('parseReportContent', () => {
       expect(result[0].groupInfo).toBe('第 1 組');
       expect(result[0].members).toBe('松小貓、陳俊傑');
     });
+
+    it('should parse real database format with bold section endings', () => {
+      const content = `**組別：** 第 5 組
+**組員：** 郭小萱、周俊宏
+**已分析筆記數：** 2/2
+**查經經文：** 太 1:1-5
+---
+**📖 主題：** 勇氣的代價、信心的飛躍
+**🔍 事實發現：**
+* 看到群眾的反應和耶穌形成對比。
+* 看到了一個勇敢的人面對困難。
+**💡 獨特亮光：**
+* 👤 郭小萱：第五節讓她心跳加速，這個發現讓她重新思考信仰。
+* 👤 周俊宏：這句話深深觸動他的心，他對這節經文有強烈的感受。
+**🎯 如何應用：**
+* 郭小萱：重新思考信仰。
+* 周俊宏：未填寫
+---
+**👤 個人貢獻摘要：**
+* 郭小萱：觀察到群眾反應與耶穌的對比，並因第五節而重新思考信仰。
+* 周俊宏：觀察到勇敢的人面對困難，並對經文有深刻的觸動。`;
+
+      // Debug: Test the regex directly
+      const insightRegex = /\*{0,2}💡?\s*獨特亮光(?:（Unique Insights）)?[：:\s]*\*{0,2}\s*/i;
+      const match = content.match(insightRegex);
+      console.log('Regex match:', match);
+      if (match) {
+        const startIdx = match.index! + match[0].length;
+        const endIdx = content.indexOf('**🎯', startIdx);
+        console.log('Start idx:', startIdx, 'End idx:', endIdx);
+        console.log('Extracted:', content.slice(startIdx, endIdx));
+      }
+
+      const result = parseReportContent(content);
+      
+      expect(result).toHaveLength(1);
+      expect(result[0].groupNumber).toBe(5);
+      expect(result[0].members).toBe('郭小萱、周俊宏');
+      expect(result[0].themes).toContain('勇氣的代價');
+      expect(result[0].observations).toContain('群眾的反應');
+      expect(result[0].insights).toContain('郭小萱');
+      expect(result[0].insights).toContain('心跳加速');
+      expect(result[0].applications).toContain('重新思考信仰');
+      expect(result[0].contributions).toContain('郭小萱');
+    });
   });
 
   describe('markdown cleaning in parsed fields', () => {
