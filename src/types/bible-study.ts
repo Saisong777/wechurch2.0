@@ -18,6 +18,7 @@ export interface Session {
   createdAt: Date;
   groups: Group[];
   allowLatecomers?: boolean;
+  icebreakerEnabled?: boolean;
 }
 
 export interface Group {

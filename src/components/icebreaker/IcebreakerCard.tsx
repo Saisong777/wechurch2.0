@@ -7,9 +7,11 @@ type CardLevel = Database['public']['Enums']['card_level'];
 
 interface IcebreakerCardProps {
   content: string | null;
+  contentEn?: string | null;
   level: CardLevel;
   isFlipped: boolean;
   isDrawing: boolean;
+  showEnglish?: boolean;
   onTap?: () => void;
 }
 
@@ -45,12 +47,17 @@ const levelConfig: Record<CardLevel, {
 
 export const IcebreakerCard: React.FC<IcebreakerCardProps> = ({
   content,
+  contentEn,
   level,
   isFlipped,
   isDrawing,
+  showEnglish = false,
   onTap,
 }) => {
   const config = levelConfig[level];
+
+  // Determine which content to display
+  const displayContent = showEnglish && contentEn ? contentEn : content;
 
   return (
     <div 
@@ -117,19 +124,26 @@ export const IcebreakerCard: React.FC<IcebreakerCardProps> = ({
               config.bgClass
             )}
           >
-            {config.label}
+            {showEnglish ? config.labelEn : config.label}
           </div>
 
           {/* Question Content */}
           <div className="flex-1 flex items-center justify-center w-full">
             <p className="text-xl md:text-2xl font-medium text-center leading-relaxed">
-              {content || '正在載入...'}
+              {displayContent || '正在載入...'}
             </p>
           </div>
 
+          {/* Secondary language hint if both are available */}
+          {content && contentEn && (
+            <p className="text-muted-foreground text-xs text-center mb-2 opacity-70">
+              {showEnglish ? content : contentEn}
+            </p>
+          )}
+
           {/* Hint */}
           <p className="text-muted-foreground text-sm text-center">
-            輕鬆回答，沒有標準答案 ✨
+            {showEnglish ? 'Answer freely, no right or wrong ✨' : '輕鬆回答，沒有標準答案 ✨'}
           </p>
         </div>
       </motion.div>

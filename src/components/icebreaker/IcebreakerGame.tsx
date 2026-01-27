@@ -7,7 +7,9 @@ import { useIcebreakerGame } from '@/hooks/useIcebreakerGame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -46,6 +48,7 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
 
   const [showLobby, setShowLobby] = useState(!autoStart);
   const [copied, setCopied] = useState(false);
+  const [showEnglish, setShowEnglish] = useState(false);
 
   // Auto-start for session mode
   useEffect(() => {
@@ -126,14 +129,14 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
           <Sparkles className="w-6 h-6 text-primary" />
-          破冰遊戲
+          {showEnglish ? 'Icebreaker' : '破冰遊戲'}
         </h1>
         
         {/* Room Code Display */}
         {roomCode && (
           <div className="flex items-center justify-center gap-2">
             <Badge variant="outline" className="text-sm font-mono px-3 py-1">
-              房間: {roomCode}
+              {showEnglish ? 'Room' : '房間'}: {roomCode}
             </Badge>
             <Button
               variant="ghost"
@@ -154,9 +157,30 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
         {mode === 'session' && (
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Users className="w-4 h-4" />
-            <span>小組模式 {isHost ? '(主持人)' : '(同步中)'}</span>
+            <span>
+              {showEnglish 
+                ? `Group Mode ${isHost ? '(Host)' : '(Syncing)'}`
+                : `小組模式 ${isHost ? '(主持人)' : '(同步中)'}`
+              }
+            </span>
           </div>
         )}
+      </div>
+
+      {/* Language Toggle */}
+      <div className="flex items-center justify-center gap-2">
+        <Languages className="w-4 h-4 text-muted-foreground" />
+        <Label htmlFor="language-toggle" className="text-sm text-muted-foreground cursor-pointer">
+          中文
+        </Label>
+        <Switch
+          id="language-toggle"
+          checked={showEnglish}
+          onCheckedChange={setShowEnglish}
+        />
+        <Label htmlFor="language-toggle" className="text-sm text-muted-foreground cursor-pointer">
+          English
+        </Label>
       </div>
 
       {/* Level Selector - only for host in group mode */}
@@ -184,9 +208,11 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
         >
           <IcebreakerCard
             content={currentCard?.content || null}
+            contentEn={currentCard?.contentEn || null}
             level={currentLevel}
             isFlipped={isFlipped}
             isDrawing={isDrawing}
+            showEnglish={showEnglish}
             onTap={handleCardTap}
           />
         </motion.div>
@@ -198,7 +224,11 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
           <div className="flex justify-between items-center text-sm">
             <div className="flex items-center gap-4">
               <span className="text-muted-foreground">
-                剩餘 <span className="font-bold text-foreground">{cardsRemaining}</span> 張
+                {showEnglish ? (
+                  <><span className="font-bold text-foreground">{cardsRemaining}</span> remaining</>
+                ) : (
+                  <>剩餘 <span className="font-bold text-foreground">{cardsRemaining}</span> 張</>
+                )}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -245,7 +275,10 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
             onClick={() => drawCard()}
             disabled={isDrawing}
           >
-            {isFlipped ? '下一題' : '抽牌'}
+            {isFlipped 
+              ? (showEnglish ? 'Next' : '下一題') 
+              : (showEnglish ? 'Draw' : '抽牌')
+            }
           </Button>
         </div>
       )}
@@ -254,7 +287,10 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
       {mode === 'session' && !isHost && (
         <div className="text-center py-4">
           <p className="text-muted-foreground">
-            等待主持人抽取下一張牌...
+            {showEnglish 
+              ? 'Waiting for the host to draw the next card...'
+              : '等待主持人抽取下一張牌...'
+            }
           </p>
         </div>
       )}
@@ -270,7 +306,7 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
             className="text-muted-foreground"
           >
             <RotateCcw className="w-4 h-4 mr-2" />
-            重置牌堆
+            {showEnglish ? 'Reset Deck' : '重置牌堆'}
           </Button>
         </div>
       )}

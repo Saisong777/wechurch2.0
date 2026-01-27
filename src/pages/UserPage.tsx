@@ -5,6 +5,7 @@ import { JoinForm } from '@/components/user/JoinForm';
 import { WaitingRoom } from '@/components/user/WaitingRoom';
 import { GroupReveal } from '@/components/user/GroupReveal';
 import { GroupVerification } from '@/components/user/GroupVerification';
+import { GroupIcebreaker } from '@/components/user/GroupIcebreaker';
 import { SpiritualFitnessForm } from '@/components/user/SpiritualFitnessForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
 import { QRCodeScanner } from '@/components/user/QRCodeScanner';
@@ -20,9 +21,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isShortCode } from '@/lib/url-helpers';
 
-type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'study' | 'review' | 'notebook';
+type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'icebreaker' | 'study' | 'review' | 'notebook';
 
-const VALID_STEPS: UserStep[] = ['landing', 'enter-session', 'join', 'waiting', 'group-reveal', 'verification', 'study', 'review', 'notebook'];
+const VALID_STEPS: UserStep[] = ['landing', 'enter-session', 'join', 'waiting', 'group-reveal', 'verification', 'icebreaker', 'study', 'review', 'notebook'];
 
 // localStorage keys for session persistence
 const STORAGE_KEYS = {
@@ -151,6 +152,7 @@ export const UserPage: React.FC = () => {
         createdAt: new Date(sessionData.created_at),
         groups: [],
         allowLatecomers: sessionData.allow_latecomers || false,
+        icebreakerEnabled: sessionData.icebreaker_enabled || false,
       });
 
       // Restore user state
@@ -309,6 +311,7 @@ export const UserPage: React.FC = () => {
       status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
       createdAt: new Date(sessionData.created_at),
       groups: [],
+      icebreakerEnabled: sessionData.icebreaker_enabled || false,
     });
 
     setIsLoading(false);
@@ -514,7 +517,30 @@ export const UserPage: React.FC = () => {
       case 'verification':
         return (
           <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <GroupVerification onAllReady={() => setStep('study')} />
+            <GroupVerification onAllReady={() => {
+              // Check if icebreaker is enabled for this session
+              if (currentSession?.icebreakerEnabled && currentUser?.groupNumber) {
+                setStep('icebreaker');
+              } else {
+                setStep('study');
+              }
+            }} />
+          </div>
+        );
+
+      case 'icebreaker':
+        if (!currentSession?.id || !currentUser?.groupNumber) {
+          setStep('study');
+          return null;
+        }
+        return (
+          <div className="px-3 sm:px-4 py-4 sm:py-8">
+            <GroupIcebreaker 
+              sessionId={currentSession.id}
+              groupNumber={currentUser.groupNumber}
+              onComplete={() => setStep('study')}
+              onSkip={() => setStep('study')}
+            />
           </div>
         );
 

@@ -291,6 +291,7 @@ export type Database = {
           created_at: string
           group_size: number | null
           grouping_method: string | null
+          icebreaker_enabled: boolean
           id: string
           owner_id: string | null
           short_code: string | null
@@ -302,6 +303,7 @@ export type Database = {
           created_at?: string
           group_size?: number | null
           grouping_method?: string | null
+          icebreaker_enabled?: boolean
           id?: string
           owner_id?: string | null
           short_code?: string | null
@@ -313,6 +315,7 @@ export type Database = {
           created_at?: string
           group_size?: number | null
           grouping_method?: string | null
+          icebreaker_enabled?: boolean
           id?: string
           owner_id?: string | null
           short_code?: string | null
@@ -556,6 +559,7 @@ export type Database = {
           created_at: string | null
           group_size: number | null
           grouping_method: string | null
+          icebreaker_enabled: boolean | null
           id: string | null
           short_code: string | null
           status: string | null
@@ -566,6 +570,7 @@ export type Database = {
           created_at?: string | null
           group_size?: number | null
           grouping_method?: string | null
+          icebreaker_enabled?: boolean | null
           id?: string | null
           short_code?: string | null
           status?: string | null
@@ -576,6 +581,7 @@ export type Database = {
           created_at?: string | null
           group_size?: number | null
           grouping_method?: string | null
+          icebreaker_enabled?: boolean | null
           id?: string | null
           short_code?: string | null
           status?: string | null

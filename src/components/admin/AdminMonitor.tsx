@@ -5,9 +5,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
-import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers } from '@/lib/supabase-helpers';
+import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/supabase-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell } from 'lucide-react';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -42,6 +42,7 @@ export const AdminMonitor: React.FC = () => {
   const [isRegrouping, setIsRegrouping] = useState(false);
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
   const [allowLatecomers, setAllowLatecomers] = useState(currentSession?.allowLatecomers || false);
+  const [icebreakerEnabled, setIcebreakerEnabled] = useState(currentSession?.icebreakerEnabled || false);
   
   // AI generation options
   const [fastMode, setFastMode] = useState(true);  // Default to fast mode
@@ -95,10 +96,11 @@ export const AdminMonitor: React.FC = () => {
     setAllSubmittedNotified(false);
   }, [currentSession?.id]);
   
-  // Sync allowLatecomers with session
+  // Sync allowLatecomers and icebreakerEnabled with session
   useEffect(() => {
     setAllowLatecomers(currentSession?.allowLatecomers || false);
-  }, [currentSession?.allowLatecomers]);
+    setIcebreakerEnabled(currentSession?.icebreakerEnabled || false);
+  }, [currentSession?.allowLatecomers, currentSession?.icebreakerEnabled]);
 
   const handleToggleLatecomers = async (checked: boolean) => {
     if (!currentSession?.id) return;
@@ -109,6 +111,19 @@ export const AdminMonitor: React.FC = () => {
       toast.success(checked ? '已開啟遲到者加入功能' : '已關閉遲到者加入功能');
     } else {
       setAllowLatecomers(!checked); // Revert on failure
+      toast.error('更新失敗');
+    }
+  };
+
+  const handleToggleIcebreaker = async (checked: boolean) => {
+    if (!currentSession?.id) return;
+    setIcebreakerEnabled(checked);
+    const success = await updateSessionIcebreakerEnabled(currentSession.id, checked);
+    if (success) {
+      setCurrentSession({ ...currentSession, icebreakerEnabled: checked });
+      toast.success(checked ? '已開啟破冰遊戲環節' : '已關閉破冰遊戲環節');
+    } else {
+      setIcebreakerEnabled(!checked); // Revert on failure
       toast.error('更新失敗');
     }
   };
@@ -441,6 +456,30 @@ export const AdminMonitor: React.FC = () => {
                 <div className="text-center py-2 px-4 bg-accent/10 rounded-lg border border-accent/30">
                   <p className="text-sm font-medium text-accent">🎉 全員交卷完成！</p>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Icebreaker Toggle - show before grouping or during verification */}
+          {(!isStudyingPhase || isVerificationPhase) && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gamepad2 className="w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="enable-icebreaker" className="text-sm cursor-pointer">
+                    啟用破冰遊戲
+                  </Label>
+                </div>
+                <Switch
+                  id="enable-icebreaker"
+                  checked={icebreakerEnabled}
+                  onCheckedChange={handleToggleIcebreaker}
+                />
+              </div>
+              {icebreakerEnabled && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  🎮 分組確認後會進入破冰遊戲環節
+                </p>
               )}
             </div>
           )}
