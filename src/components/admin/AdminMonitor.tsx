@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -31,6 +32,7 @@ import { useAdminStudyResponses } from '@/hooks/useAdminStudyResponses';
 import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
 
 export const AdminMonitor: React.FC = () => {
+  const navigate = useNavigate();
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
   const [isGeneratingGroup, setIsGeneratingGroup] = useState(false);
   const [isGeneratingOverall, setIsGeneratingOverall] = useState(false);
@@ -293,14 +295,18 @@ export const AdminMonitor: React.FC = () => {
     if (result.success) {
       toast.success('🎉 查經已結束！', {
         description: '所有資料已封存，可在歷史資料中查看',
-        duration: 5000,
+        duration: 3000,
       });
-      setCurrentSession({ ...currentSession, status: 'completed' });
+      // Clear local session state
+      setCurrentSession(null);
+      // Redirect host to homepage after a short delay
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
     } else {
       toast.error(`操作失敗: ${result.error}`);
+      setIsEndingSession(false);
     }
-
-    setIsEndingSession(false);
   };
 
   const handleGenerateGroupSummary = async () => {
