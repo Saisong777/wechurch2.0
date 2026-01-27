@@ -114,30 +114,26 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
           user_id: participant.id,
         };
 
-        // Phase 1 (Green) - 70% chance
-        if (progressLevel > 0.3) {
-          mockResponse.title_phrase = getRandomItem(MOCK_TITLE_PHRASES);
-          mockResponse.heartbeat_verse = getRandomItem(MOCK_HEARTBEAT_VERSES);
-          mockResponse.observation = getRandomItem(MOCK_OBSERVATIONS);
-        }
+        // Phase 1 (Green) - ALWAYS include at least this phase so everyone has data
+        mockResponse.title_phrase = getRandomItem(MOCK_TITLE_PHRASES);
+        mockResponse.heartbeat_verse = getRandomItem(MOCK_HEARTBEAT_VERSES);
+        mockResponse.observation = getRandomItem(MOCK_OBSERVATIONS);
 
-        // Phase 2 (Yellow) - 50% chance
-        if (progressLevel > 0.5) {
+        // Phase 2 (Yellow) - 60% chance
+        if (progressLevel > 0.4) {
           mockResponse.core_insight_category = getRandomCategory();
           mockResponse.core_insight_note = getRandomItem(MOCK_CORE_NOTES);
           mockResponse.scholars_note = getRandomItem(MOCK_SCHOLARS_NOTES);
         }
 
-        // Phase 3 (Blue) - 30% chance
-        if (progressLevel > 0.7) {
+        // Phase 3 (Blue) - 40% chance
+        if (progressLevel > 0.6) {
           mockResponse.action_plan = getRandomItem(MOCK_ACTION_PLANS);
           mockResponse.cool_down_note = getRandomItem(MOCK_COOL_DOWN_NOTES);
         }
 
-        // Only include if there's at least some content
-        if (Object.keys(mockResponse).length > 2) {
-          mockResponses.push(mockResponse);
-        }
+        // Always add since Phase 1 is guaranteed
+        mockResponses.push(mockResponse);
       }
 
       if (mockResponses.length === 0) {
