@@ -2,16 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Users, BookOpen, Share2, Download, User } from 'lucide-react';
+import { Sparkles, Users, BookOpen, Search, Lightbulb, Target, Share2, Download } from 'lucide-react';
 import { fetchAIReports } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
-import { EnhancedSection } from '@/components/admin/report-elements';
-import {
-  parseReportContent as parseReportContentFull,
-  generateSectionMarkdown,
-  downloadBlob,
-  GroupReport,
-} from '@/components/admin/report-viewer';
+import { 
+  EnhancedSection, 
+  extractKeywords,
+  KeywordTagCloud 
+} from '@/components/admin/ReportVisualElements';
 
 interface GroupReportViewerProps {
   sessionId: string;
@@ -19,11 +17,9 @@ interface GroupReportViewerProps {
   verseReference?: string;
 }
 
-// Simplified parsed report for single group (compatible with existing UI)
 interface ParsedReport {
   members?: string;
   verse?: string;
-  contributions?: string;
   themes?: string;
   observations?: string;
   insights?: string;
@@ -31,44 +27,86 @@ interface ParsedReport {
   raw: string;
 }
 
-// Convert full GroupReport to simplified ParsedReport for UI compatibility
+// Clean markdown formatting - remove ** and handle list items
+function cleanMarkdown(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove bold **text**
+    .replace(/^\s*\*\s+/gm, '• ')        // Replace * at line start with bullet
+    .replace(/^\s*-\s+/gm, '• ')         // Replace - at line start with bullet
+    .trim();
+}
+
 function parseReportContent(content: string): ParsedReport {
-  const sections = parseReportContentFull(content);
-  const section = sections[0];
+  const result: ParsedReport = { raw: cleanMarkdown(content) };
   
-  if (!section) {
-    return { raw: content };
-  }
+  // Extract members
+  const membersMatch = content.match(/(?:\*\*)?組員(?:\*\*)?[：:]\s*([^\n]+)/);
+  if (membersMatch) result.members = cleanMarkdown(membersMatch[1]);
   
-  return {
-    members: section.members,
-    verse: section.verse,
-    contributions: section.contributions,
-    themes: section.themes,
-    observations: section.observations,
-    insights: section.insights,
-    applications: section.applications,
-    raw: section.raw,
-  };
+  // Extract verse
+  const verseMatch = content.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*([^\n]+)/);
+  if (verseMatch) result.verse = cleanMarkdown(verseMatch[1]);
+  
+  // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題 Themes："
+  const themesMatch = content.match(/(?:\*\*)?📖?\s*主題[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🔍|(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
+  if (themesMatch) result.themes = cleanMarkdown(themesMatch[1]);
+  
+  // Extract observations - handle formats like "**🔍 事實發現（Observations）：**"
+  const obsMatch = content.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
+  if (obsMatch) result.observations = cleanMarkdown(obsMatch[1]);
+  
+  // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**"
+  const insightsMatch = content.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🎯|---|ℹ️|$)/i);
+  if (insightsMatch) result.insights = cleanMarkdown(insightsMatch[1]);
+  
+  // Extract applications - handle formats like "**🎯 如何應用（Applications）：**"
+  const appMatch = content.match(/(?:\*\*)?🎯?\s*如何應用[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=---|ℹ️|$)/i);
+  if (appMatch) result.applications = cleanMarkdown(appMatch[1]);
+  
+  return result;
 }
 
 // Generate structured Markdown from a parsed report (for downloads)
 function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verseReference?: string): string {
-  // Convert ParsedReport to GroupReport format for the shared generator
-  const section: GroupReport = {
-    groupNumber,
-    groupInfo: `第 ${groupNumber} 組`,
-    members: parsed.members,
-    verse: parsed.verse,
-    contributions: parsed.contributions,
-    themes: parsed.themes,
-    observations: parsed.observations,
-    insights: parsed.insights,
-    applications: parsed.applications,
-    raw: parsed.raw,
-  };
+  const lines: string[] = [];
   
-  return generateSectionMarkdown(section, verseReference);
+  lines.push('### 小組查經整合文件\n');
+  lines.push(`**組別：** 第 ${groupNumber} 組\n`);
+  
+  if (parsed.members) {
+    lines.push(`**組員：** ${parsed.members}\n`);
+  }
+  
+  if (parsed.verse || verseReference) {
+    lines.push(`**查經經文：** ${parsed.verse || verseReference}\n`);
+  }
+  
+  lines.push('---\n');
+  
+  if (parsed.themes) {
+    lines.push(`**📖 主題（Themes）：**\n${parsed.themes}\n`);
+  }
+  
+  if (parsed.observations) {
+    lines.push(`**🔍 事實發現（Observations）：**\n${parsed.observations}\n`);
+  }
+  
+  if (parsed.insights) {
+    lines.push(`**💡 獨特亮光（Unique Insights）：**\n${parsed.insights}\n`);
+  }
+  
+  if (parsed.applications) {
+    lines.push(`**🎯 如何應用（Applications）：**\n${parsed.applications}\n`);
+  }
+  
+  // If no structured content, fall back to raw
+  const hasStructured = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
+  if (!hasStructured && parsed.raw) {
+    lines.push(parsed.raw);
+  }
+  
+  return lines.join('\n');
 }
 
 export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
@@ -128,8 +166,12 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
     const markdown = generateReportMarkdown(parsed, groupNumber, verseReference);
     
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
-    const filename = `第${groupNumber}組報告-${verseReference || 'export'}.md`;
-    downloadBlob(blob, filename);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `第${groupNumber}組報告-${verseReference || 'export'}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
     
     toast.success('已下載！');
   };
@@ -166,8 +208,12 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   }
 
   const parsed = parseReportContent(report);
-  const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications;
+  const hasStructuredContent = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
 
+  // Extract unique keywords - deduplicate
+  const themeKeywords = extractKeywords(parsed.themes || '');
+  const observationKeywords = extractKeywords(parsed.observations || '');
+  const combinedKeywords = [...new Set([...themeKeywords, ...observationKeywords])].slice(0, 5);
 
   return (
     <Card>
@@ -193,38 +239,37 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           </p>
         )}
         
+        {/* Summary keyword cloud at top - deduplicated */}
+        {combinedKeywords.length > 0 && (
+          <div className="mt-3">
+            <KeywordTagCloud keywords={combinedKeywords} variant="themes" />
+          </div>
+        )}
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         {/* Group Meta Info */}
         {(parsed.members || parsed.verse) && (
-          <div className="bg-gradient-to-r from-muted/60 to-muted/30 p-4 rounded-lg">
+          <div className="bg-muted/50 p-4 rounded-lg">
             {parsed.members && (
-              <p className="text-sm flex items-start gap-2">
-                <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                <span className="font-medium shrink-0">組員：</span> 
-                <span>
-                  {parsed.members.split(/[,，、]/).map((name, idx, arr) => (
-                    <span key={idx}>
-                      <span className="font-medium text-primary">{name.trim()}</span>
-                      {idx < arr.length - 1 && <span className="text-muted-foreground">、</span>}
-                    </span>
-                  ))}
-                </span>
+              <p className="text-sm flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                <span className="font-medium">組員：</span> 
+                <span className="text-muted-foreground">{parsed.members}</span>
               </p>
             )}
             {parsed.verse && (
-              <p className="text-sm flex items-start gap-2 mt-2">
-                <BookOpen className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                <span className="font-medium shrink-0">經文：</span>
-                <span className="text-muted-foreground italic">{parsed.verse}</span>
+              <p className="text-sm flex items-center gap-2 mt-1">
+                <BookOpen className="w-4 h-4 text-primary" />
+                <span className="font-medium">經文：</span>
+                <span className="text-muted-foreground">{parsed.verse}</span>
               </p>
             )}
           </div>
         )}
 
-        {/* Structured Sections */}
+        {/* Structured Sections - don't show keywords again since we have summary at top */}
         {hasStructuredContent ? (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {parsed.themes && (
               <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
             )}
@@ -240,69 +285,15 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             {parsed.applications && (
               <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
             )}
-            
-            {/* Personal Contributions Section - at the bottom */}
-            {parsed.contributions && (
-              <ContributionsSectionUser contributions={parsed.contributions} />
-            )}
           </div>
         ) : (
-          <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
-            <div className="text-sm text-foreground whitespace-pre-wrap leading-7">
+          <div className="p-4 bg-card border border-border rounded-lg">
+            <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
               {parsed.raw}
             </div>
           </div>
         )}
       </CardContent>
     </Card>
-  );
-};
-
-// Separate component for contributions with name highlighting
-const ContributionsSectionUser: React.FC<{ contributions: string }> = ({ contributions }) => {
-  const formatContributions = (text: string): React.ReactNode => {
-    const lines = text.split('\n').filter(l => l.trim());
-    
-    return lines.map((line, idx) => {
-      const nameMatch = line.match(/^[-•]?\s*([^\s：:]+(?:弟兄|姊妹|姐妹|同學|老師|[A-Za-z]+))[\s]*[：:]\s*(.+)/);
-      
-      if (nameMatch) {
-        return (
-          <div key={idx} className="flex gap-2 py-2 border-b border-accent/20 last:border-0">
-            <span className="font-bold text-primary shrink-0 min-w-[5rem]">
-              {nameMatch[1]}
-            </span>
-            <span className="text-foreground/90">{nameMatch[2]}</span>
-          </div>
-        );
-      }
-      
-      const namePattern = /([^\s，。、：:]+(?:弟兄|姊妹|姐妹|同學|老師))/g;
-      const parts = line.replace(/^[-•]\s*/, '').split(namePattern);
-      
-      return (
-        <div key={idx} className="py-1.5">
-          {parts.map((part, pIdx) => {
-            if (namePattern.test(part)) {
-              namePattern.lastIndex = 0;
-              return <span key={pIdx} className="font-semibold text-primary">{part}</span>;
-            }
-            return part;
-          })}
-        </div>
-      );
-    });
-  };
-  
-  return (
-    <div className="p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent shadow-sm">
-      <h3 className="flex items-center gap-2 font-bold text-base mb-4 text-accent">
-        <User className="w-5 h-5" />
-        👤 個人貢獻摘要 Personal Contributions
-      </h3>
-      <div className="text-sm leading-relaxed pl-1">
-        {formatContributions(contributions)}
-      </div>
-    </div>
   );
 };
