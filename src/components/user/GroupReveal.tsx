@@ -85,12 +85,12 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
   const groupColor = getGroupColor(localNumber);
 
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
+    <div className="min-h-[60vh] flex flex-col items-center justify-center">
       <div className="text-center">
         {!showNumber && (
           <div className="animate-pulse">
-            <p className="text-muted-foreground text-lg">正在分組中...</p>
-            <p className="text-muted-foreground text-sm mt-2">Assigning groups...</p>
+            <p className="text-muted-foreground text-lg sm:text-lg">正在分組中...</p>
+            <p className="text-muted-foreground text-base sm:text-sm mt-2">Assigning groups...</p>
           </div>
         )}
         
@@ -98,38 +98,38 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
           <div className="animate-scale-in">
             {/* Show location if remote */}
             {isRemote && (
-              <div className="flex items-center justify-center gap-2 mb-4 text-muted-foreground">
-                <MapPin className="w-4 h-4" />
+              <div className="flex items-center justify-center gap-2 mb-4 text-muted-foreground text-lg sm:text-base">
+                <MapPin className="w-5 h-5 sm:w-4 sm:h-4" />
                 <span>{userLocation}</span>
               </div>
             )}
             
-            <p className="text-muted-foreground text-lg mb-4">您的小組</p>
+            <p className="text-muted-foreground text-lg sm:text-lg mb-4">您的小組</p>
             
             <div className="relative inline-block">
               <div className={`absolute inset-0 ${groupColor.glow} rounded-full blur-3xl animate-pulse-soft`} />
-              <div className={`relative w-48 h-48 md:w-64 md:h-64 rounded-full bg-gradient-to-br ${groupColor.bg} flex items-center justify-center shadow-2xl`}>
-                <span className={`font-serif text-8xl md:text-9xl font-bold ${groupColor.text} drop-shadow-lg`}>
+              <div className={`relative w-52 h-52 sm:w-48 sm:h-48 md:w-64 md:h-64 rounded-full bg-gradient-to-br ${groupColor.bg} flex items-center justify-center shadow-2xl`}>
+                <span className={`font-serif text-8xl sm:text-8xl md:text-9xl font-bold ${groupColor.text} drop-shadow-lg`}>
                   {localNumber}
                 </span>
               </div>
             </div>
             
-            <p className="mt-6 font-serif text-3xl md:text-4xl font-bold text-foreground">
+            <p className="mt-6 sm:mt-6 font-serif text-3xl sm:text-3xl md:text-4xl font-bold text-foreground">
               第 {localNumber} 組
             </p>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-base sm:text-base text-muted-foreground mt-2">
               {isRemote ? `${userLocation} - Group #${localNumber}` : `Group #${localNumber}`}
             </p>
           </div>
         )}
         
         {showDetails && (
-          <div className="mt-12 animate-fade-in space-y-4">
-            <p className="text-lg text-muted-foreground">
+          <div className="mt-10 sm:mt-12 animate-fade-in space-y-4">
+            <p className="text-lg sm:text-lg text-muted-foreground">
               {isRemote ? '請與您的線上小組成員會合' : '請移動至您的小組座位區'}
             </p>
-            <p className="text-muted-foreground">
+            <p className="text-base sm:text-base text-muted-foreground">
               {isRemote ? 'Please join your online group members' : 'Please move to your group seating area'}
             </p>
             
@@ -137,7 +137,7 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
               variant="gold"
               size="xl"
               onClick={onContinue}
-              className="mt-8"
+              className="mt-8 w-full sm:w-auto h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
             >
               開始查經 Start Study
               <ArrowRight className="w-5 h-5" />

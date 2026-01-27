@@ -133,16 +133,16 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       <Card variant="highlight" className="text-center">
-        <CardContent className="py-8">
-          <div className="w-16 h-16 rounded-full gradient-gold mx-auto mb-4 flex items-center justify-center glow-gold">
-            <CheckCircle className="w-8 h-8 text-secondary-foreground" />
+        <CardContent className="py-6 sm:py-8">
+          <div className="w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold mx-auto mb-4 flex items-center justify-center glow-gold">
+            <CheckCircle className="w-10 h-10 sm:w-8 sm:h-8 text-secondary-foreground" />
           </div>
-          <h2 className="font-serif text-2xl font-bold text-foreground">
+          <h2 className="font-serif text-2xl sm:text-2xl font-bold text-foreground">
             提交成功！
           </h2>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-base sm:text-base text-muted-foreground mt-2">
             Your Spiritual Fitness notes have been saved
           </p>
         </CardContent>
@@ -150,55 +150,55 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
 
       {/* Tab Navigation between Personal and Group Report */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'personal' | 'group')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="personal" className="gap-2">
-            <Dumbbell className="w-4 h-4" />
+        <TabsList className="grid w-full grid-cols-2 h-12 sm:h-10">
+          <TabsTrigger value="personal" className="gap-2 text-base sm:text-sm">
+            <Dumbbell className="w-5 h-5 sm:w-4 sm:h-4" />
             我的筆記
           </TabsTrigger>
-          <TabsTrigger value="group" className="gap-2">
-            <Sparkles className="w-4 h-4" />
+          <TabsTrigger value="group" className="gap-2 text-base sm:text-sm">
+            <Sparkles className="w-5 h-5 sm:w-4 sm:h-4" />
             小組報告
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="personal" className="mt-4">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">您的 Spiritual Fitness 筆記</CardTitle>
+            <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-2">
+                <CardTitle className="text-xl sm:text-xl">您的 Spiritual Fitness 筆記</CardTitle>
                 <div className="flex gap-2">
                   {onEdit && (
-                    <Button variant="outline" size="sm" onClick={onEdit}>
-                      <Pencil className="w-4 h-4 mr-2" />
+                    <Button variant="outline" size="default" onClick={onEdit} className="flex-1 sm:flex-none h-11 sm:h-9 text-base sm:text-sm touch-manipulation active:scale-[0.98]">
+                      <Pencil className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
                       繼續編輯
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={handleSharePersonal}>
-                    <Share2 className="w-4 h-4 mr-2" />
+                  <Button variant="outline" size="default" onClick={handleSharePersonal} className="flex-1 sm:flex-none h-11 sm:h-9 text-base sm:text-sm touch-manipulation active:scale-[0.98]">
+                    <Share2 className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
                     分享
                   </Button>
                 </div>
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-base sm:text-sm text-muted-foreground mt-2 sm:mt-0">
                 <span className="font-medium text-foreground">{currentSession?.verseReference}</span>
                 {' · '}
                 <span>第 {currentUser?.groupNumber} 組</span>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="px-4 sm:px-6 pb-6 space-y-5 sm:space-y-6">
               {phases.map((phase) => (
                 <div key={phase.title} className={`rounded-lg border-l-4 p-4 ${phase.color}`}>
-                  <h3 className="font-semibold text-sm mb-3">{phase.title}</h3>
-                  <div className="space-y-4">
+                  <h3 className="font-semibold text-base sm:text-sm mb-3">{phase.title}</h3>
+                  <div className="space-y-4 sm:space-y-4">
                     {phase.fields.map(({ key, label, icon: Icon, value }) => {
                       if (!value) return null;
                       return (
                         <div key={key} className="space-y-1">
                           <div className="flex items-center gap-2 text-muted-foreground">
-                            <Icon className="w-4 h-4 text-secondary" />
-                            <span className="text-sm font-medium">{label}</span>
+                            <Icon className="w-5 h-5 sm:w-4 sm:h-4 text-secondary" />
+                            <span className="text-base sm:text-sm font-medium">{label}</span>
                           </div>
-                          <p className="text-foreground pl-6 whitespace-pre-wrap">{value}</p>
+                          <p className="text-base sm:text-sm text-foreground pl-7 sm:pl-6 whitespace-pre-wrap">{value}</p>
                         </div>
                       );
                     })}

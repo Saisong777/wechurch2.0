@@ -117,7 +117,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
   const isRemote = currentUser?.location && currentUser.location !== 'On-site';
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-6 animate-fade-in">
+    <div className="w-full max-w-md mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       {/* Connection Status Indicator */}
       <div className="flex justify-center">
         <ConnectionStatus 
@@ -127,37 +127,37 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
       </div>
 
       <Card variant="highlight" className="text-center">
-        <CardContent className="py-12">
+        <CardContent className="py-10 sm:py-12">
           <div className="relative inline-block mb-6">
             <div className="absolute inset-0 bg-secondary/30 rounded-full blur-xl animate-pulse-soft" />
-            <div className="relative w-20 h-20 rounded-full gradient-gold flex items-center justify-center glow-gold">
-              <Clock className="w-10 h-10 text-secondary-foreground animate-pulse" />
+            <div className="relative w-24 h-24 sm:w-20 sm:h-20 rounded-full gradient-gold flex items-center justify-center glow-gold">
+              <Clock className="w-12 h-12 sm:w-10 sm:h-10 text-secondary-foreground animate-pulse" />
             </div>
           </div>
           
-          <h2 className="font-serif text-2xl font-bold text-foreground mb-2">
+          <h2 className="font-serif text-2xl sm:text-2xl font-bold text-foreground mb-2">
             等待主持人開始...
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-base sm:text-base text-muted-foreground">
             Waiting for the host to start grouping
           </p>
         </CardContent>
       </Card>
 
       <Card>
-        <CardContent className="py-6">
+        <CardContent className="py-5 sm:py-6 px-4 sm:px-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="w-5 h-5" />
-              <span className="font-medium">已加入成員</span>
+              <Users className="w-5 h-5 sm:w-5 sm:h-5" />
+              <span className="font-medium text-base sm:text-sm">已加入成員</span>
             </div>
-            <span className="text-lg font-bold text-primary">{users.length} 人</span>
+            <span className="text-xl sm:text-lg font-bold text-primary">{users.length} 人</span>
           </div>
 
           {currentSession?.verseReference && (
             <div className="mt-4 p-4 rounded-lg bg-muted/50">
               <p className="text-sm text-muted-foreground mb-1">今日經文</p>
-              <p className="font-serif text-lg font-medium text-foreground">
+              <p className="font-serif text-lg sm:text-lg font-medium text-foreground">
                 {currentSession.verseReference}
               </p>
             </div>
@@ -165,7 +165,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
 
           <div className="mt-6 pt-4 border-t">
             <p className="text-sm text-muted-foreground">您已登記為</p>
-            <p className="font-medium text-foreground mt-1">
+            <p className="font-medium text-lg sm:text-base text-foreground mt-1">
               {currentUser?.name} ({currentUser?.gender === 'male' ? '男' : '女'})
             </p>
             {isRemote && (
@@ -178,17 +178,17 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
 
           {/* Manual Refresh Button for Mobile Users */}
           <div className="mt-6 pt-4 border-t text-center">
-            <p className="text-xs text-muted-foreground mb-2">
+            <p className="text-xs text-muted-foreground mb-3">
               📱 手機用戶若畫面沒更新，請點擊下方按鈕
             </p>
             <Button 
               variant="outline" 
-              size="default"
+              size="lg"
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className="w-full text-foreground border-primary/50 hover:bg-primary/10"
+              className="w-full h-14 sm:h-11 text-base sm:text-sm text-foreground border-primary/50 hover:bg-primary/10 touch-manipulation active:scale-[0.98]"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-5 h-5 sm:w-4 sm:h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? '更新中...' : '狀態沒更新？點此刷新'}
             </Button>
           </div>
