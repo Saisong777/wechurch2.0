@@ -52,15 +52,23 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
     
     setIsSubmitting(true);
     
-    // Save any pending changes first
-    if (isDirty) {
-      saveNow();
-      // Wait a moment for the save to complete
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // Save any pending changes first
+      if (isDirty) {
+        await saveNow();
+        // Small delay to ensure state updates
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Navigate to review
+      handleComplete();
+    } catch (error) {
+      console.error('[SpiritualFitnessForm] Error during submission:', error);
+      // Still navigate even if save failed - data is already in localStorage
+      handleComplete();
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
-    handleComplete();
   }, [handleComplete, isDirty, saveNow]);
 
   if (isLoading) {
