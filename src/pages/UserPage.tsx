@@ -120,20 +120,10 @@ export const UserPage: React.FC = () => {
 
       const participant = participantData[0];
 
-      // For guest users returning, ensure they have a valid anonymous session
-      // This is needed for RLS policies and realtime subscriptions
-      const { data: authSession } = await supabase.auth.getSession();
-      if (!authSession.session) {
-        console.log('[UserPage] No auth session, signing in anonymously for guest user');
-        const { error: anonError } = await supabase.auth.signInAnonymously();
-        if (anonError) {
-          console.warn('[UserPage] Anonymous sign-in failed:', anonError);
-          // Continue anyway - participant data is already verified
-        } else {
-          // Attach email to anonymous user for RLS
-          await supabase.auth.updateUser({ email: storedEmail });
-        }
-      }
+      // Note: Guest users don't need an auth session - the edge functions (save-study-response, 
+      // get-study-response) use service role to bypass RLS. The RPC get_participant_for_reentry
+      // is SECURITY DEFINER and also works without auth.
+      console.log('[UserPage] Verified participant via RPC, restoring session');
 
       // Restore session state
       setCurrentSession({
