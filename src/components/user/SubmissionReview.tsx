@@ -1,26 +1,56 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
-import { CheckCircle, BookOpen, Heart, Sparkles, Lightbulb, Share2 } from 'lucide-react';
+import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useStudyResponse } from '@/hooks/useStudyResponse';
+import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
 
 export const SubmissionReview: React.FC = () => {
-  const { currentUser, currentSession, submissions } = useSession();
+  const { currentUser, currentSession } = useSession();
+  const { response } = useStudyResponse({
+    sessionId: currentSession?.id,
+    userId: currentUser?.id,
+    enabled: !!currentSession?.id && !!currentUser?.id,
+  });
 
-  const mySubmission = submissions.find(s => s.userId === currentUser?.id);
-
-  if (!mySubmission) {
+  if (!response) {
     return null;
   }
 
-  const fields = [
-    { key: 'theme', label: '主題', icon: BookOpen },
-    { key: 'movingVerse', label: '最感動的經文', icon: Heart },
-    { key: 'factsDiscovered', label: '發現的事實', icon: Sparkles },
-    { key: 'traditionalExegesis', label: '傳統解經', icon: BookOpen },
-    { key: 'inspirationFromGod', label: '神的啟示', icon: Lightbulb },
-    { key: 'applicationInLife', label: '生活應用', icon: CheckCircle },
-    { key: 'others', label: '其他', icon: Sparkles },
+  const selectedCategory = INSIGHT_CATEGORIES.find(c => c.value === response.core_insight_category);
+
+  const phases = [
+    {
+      title: '🟢 暖身 Warm-up',
+      color: 'border-green-500 bg-green-50/10',
+      fields: [
+        { key: 'title_phrase', label: '定標題', icon: Sparkles, value: response.title_phrase },
+        { key: 'heartbeat_verse', label: '抓心跳', icon: Heart, value: response.heartbeat_verse },
+        { key: 'observation', label: '看現場', icon: Eye, value: response.observation },
+      ],
+    },
+    {
+      title: '🟡 重訓 Core Training',
+      color: 'border-yellow-500 bg-yellow-50/10',
+      fields: [
+        { 
+          key: 'core_insight', 
+          label: `練核心 ${selectedCategory ? `(${selectedCategory.emoji} ${selectedCategory.label})` : ''}`, 
+          icon: Dumbbell, 
+          value: response.core_insight_note 
+        },
+        { key: 'scholars_note', label: '學長姐的話', icon: BookOpen, value: response.scholars_note },
+      ],
+    },
+    {
+      title: '🔵 伸展 Stretch',
+      color: 'border-blue-500 bg-blue-50/10',
+      fields: [
+        { key: 'action_plan', label: '帶一招', icon: Target, value: response.action_plan },
+        { key: 'cool_down_note', label: '自由發揮', icon: MessageCircle, value: response.cool_down_note },
+      ],
+    },
   ];
 
   return (
@@ -34,7 +64,7 @@ export const SubmissionReview: React.FC = () => {
             提交成功！
           </h2>
           <p className="text-muted-foreground mt-2">
-            Your study notes have been submitted successfully
+            Your Spiritual Fitness notes have been saved
           </p>
         </CardContent>
       </Card>
@@ -42,7 +72,7 @@ export const SubmissionReview: React.FC = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">您的查經筆記</CardTitle>
+            <CardTitle className="text-xl">您的 Spiritual Fitness 筆記</CardTitle>
             <Button variant="outline" size="sm">
               <Share2 className="w-4 h-4 mr-2" />
               分享
@@ -55,20 +85,25 @@ export const SubmissionReview: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {fields.map(({ key, label, icon: Icon }) => {
-            const value = mySubmission[key as keyof typeof mySubmission];
-            if (!value || typeof value !== 'string') return null;
-            
-            return (
-              <div key={key} className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Icon className="w-4 h-4 text-secondary" />
-                  <span className="text-sm font-medium">{label}</span>
-                </div>
-                <p className="text-foreground pl-6">{value}</p>
+          {phases.map((phase) => (
+            <div key={phase.title} className={`rounded-lg border-l-4 p-4 ${phase.color}`}>
+              <h3 className="font-semibold text-sm mb-3">{phase.title}</h3>
+              <div className="space-y-4">
+                {phase.fields.map(({ key, label, icon: Icon, value }) => {
+                  if (!value) return null;
+                  return (
+                    <div key={key} className="space-y-1">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Icon className="w-4 h-4 text-secondary" />
+                        <span className="text-sm font-medium">{label}</span>
+                      </div>
+                      <p className="text-foreground pl-6 whitespace-pre-wrap">{value}</p>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>
