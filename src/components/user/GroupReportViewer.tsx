@@ -77,6 +77,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   verseReference,
 }) => {
   // Use the shared hook with polling support
+  // isParticipant: true uses edge function to bypass RLS for guest users
   const { 
     latestAnalysis, 
     isLoading, 
@@ -86,6 +87,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
     sessionId,
     groupNumber,
     reportType: 'group',
+    isParticipant: true,
   });
 
   const report = isCompleted && latestAnalysis ? latestAnalysis.content : null;
