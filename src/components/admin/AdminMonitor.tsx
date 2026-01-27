@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
-import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers } from '@/lib/supabase-helpers';
+import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers } from '@/lib/supabase-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants } from '@/lib/admin-helpers';
 import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StudyProgressMonitor } from './StudyProgressMonitor';
 import { MockDataGenerator } from './MockDataGenerator';
 import { AIReportViewer } from './AIReportViewer';
-// AnalysisDashboard removed per user request - using original AI Analysis card instead
+import { useAdminStudyResponses } from '@/hooks/useAdminStudyResponses';
 
 export const AdminMonitor: React.FC = () => {
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
@@ -43,9 +43,18 @@ export const AdminMonitor: React.FC = () => {
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
   const [allowLatecomers, setAllowLatecomers] = useState(currentSession?.allowLatecomers || false);
 
+  // Fetch study responses to check if we have data for AI analysis
+  const { data: studyResponses } = useAdminStudyResponses({ 
+    sessionId: currentSession?.id, 
+    enabled: !!currentSession?.id 
+  });
+
   // Determine if we're in verification phase
   const isVerificationPhase = currentSession?.status === 'grouping';
   const isStudyingPhase = currentSession?.status === 'studying';
+  
+  // Check if we have any data for AI analysis (either submissions or study responses)
+  const hasDataForAnalysis = submissions.length > 0 || (studyResponses && studyResponses.length > 0);
   
   // Sync allowLatecomers with session
   useEffect(() => {
@@ -120,7 +129,13 @@ export const AdminMonitor: React.FC = () => {
     return () => clearInterval(interval);
   }, [isVerificationPhase, currentSession?.id, refreshReadyStatus]);
 
-  const groups = currentSession?.groups || [];
+  // Derive groups from users - more reliable than currentSession.groups
+  const groupNumbers = [...new Set(users.filter(u => u.groupNumber).map(u => u.groupNumber))].sort((a, b) => (a || 0) - (b || 0));
+  const groups = groupNumbers.map(num => ({
+    id: `group-${num}`,
+    number: num!,
+    members: users.filter(u => u.groupNumber === num),
+  }));
   const submittedCount = submissions.length;
   const totalCount = users.length;
 
@@ -274,17 +289,31 @@ export const AdminMonitor: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    if (submissions.length === 0) {
+    if (!hasDataForAnalysis) {
       toast.error('目前沒有提交資料可導出');
       return;
     }
     
-    const csv = exportSubmissionsAsCSV(submissions);
+    let csv = '';
+    let filename = '';
+    
+    // Export study responses if available, otherwise fall back to submissions
+    if (studyResponses && studyResponses.length > 0) {
+      csv = exportStudyResponsesAsCSV(studyResponses);
+      filename = `spiritual-fitness-${currentSession?.verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.csv`;
+    } else if (submissions.length > 0) {
+      csv = exportSubmissionsAsCSV(submissions);
+      filename = `bible-study-${currentSession?.verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.csv`;
+    } else {
+      toast.error('目前沒有提交資料可導出');
+      return;
+    }
+    
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `bible-study-${currentSession?.verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
     
@@ -710,7 +739,7 @@ export const AdminMonitor: React.FC = () => {
                 size="lg"
                 className="w-full"
                 onClick={handleGenerateGroupSummary}
-                disabled={isGeneratingGroup || submissions.length === 0}
+                disabled={isGeneratingGroup || !hasDataForAnalysis}
               >
                 {isGeneratingGroup ? (
                   <>
@@ -729,7 +758,7 @@ export const AdminMonitor: React.FC = () => {
                 size="lg"
                 className="w-full"
                 onClick={handleGenerateOverallInsight}
-                disabled={isGeneratingOverall || submissions.length === 0}
+                disabled={isGeneratingOverall || !hasDataForAnalysis}
               >
                 {isGeneratingOverall ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -743,7 +772,7 @@ export const AdminMonitor: React.FC = () => {
                 size="lg"
                 className="w-full"
                 onClick={handleExportCSV}
-                disabled={submissions.length === 0}
+                disabled={!hasDataForAnalysis}
               >
                 <Download className="w-5 h-5" />
                 導出 CSV

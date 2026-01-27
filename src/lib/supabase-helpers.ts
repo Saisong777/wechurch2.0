@@ -750,3 +750,59 @@ export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string =
 
   return csvContent;
 };
+
+// Export study responses as CSV
+export const exportStudyResponsesAsCSV = (responses: {
+  participantName: string;
+  groupNumber: number | null;
+  response: {
+    title_phrase?: string | null;
+    heartbeat_verse?: string | null;
+    observation?: string | null;
+    core_insight_category?: string | null;
+    core_insight_note?: string | null;
+    scholars_note?: string | null;
+    action_plan?: string | null;
+    cool_down_note?: string | null;
+    created_at?: string | null;
+  } | null;
+}[]): string => {
+  const headers = [
+    "Group",
+    "Name",
+    "Title Phrase",
+    "Heartbeat Verse",
+    "Observation",
+    "Core Insight Category",
+    "Core Insight Note",
+    "Scholar's Note",
+    "Action Plan",
+    "Cool Down Note",
+    "Created At",
+  ];
+
+  const rows = responses
+    .filter(r => r.response)
+    .map((r) => [
+      r.groupNumber || "",
+      r.participantName,
+      r.response?.title_phrase || "",
+      r.response?.heartbeat_verse || "",
+      r.response?.observation || "",
+      r.response?.core_insight_category || "",
+      r.response?.core_insight_note || "",
+      r.response?.scholars_note || "",
+      r.response?.action_plan || "",
+      r.response?.cool_down_note || "",
+      r.response?.created_at || "",
+    ]);
+
+  const csvContent = [
+    headers.join(","),
+    ...rows.map((row) =>
+      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+    ),
+  ].join("\n");
+
+  return csvContent;
+};
