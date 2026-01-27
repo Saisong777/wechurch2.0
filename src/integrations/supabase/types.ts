@@ -94,7 +94,10 @@ export type Database = {
           bible_study_session_id: string | null
           created_at: string | null
           current_card_id: string | null
+          current_drawer_card_id: string | null
+          current_drawer_id: string | null
           current_level: Database["public"]["Enums"]["card_level"] | null
+          drawer_order: string[] | null
           group_number: number | null
           id: string
           mode: Database["public"]["Enums"]["game_mode"]
@@ -113,7 +116,10 @@ export type Database = {
           bible_study_session_id?: string | null
           created_at?: string | null
           current_card_id?: string | null
+          current_drawer_card_id?: string | null
+          current_drawer_id?: string | null
           current_level?: Database["public"]["Enums"]["card_level"] | null
+          drawer_order?: string[] | null
           group_number?: number | null
           id?: string
           mode?: Database["public"]["Enums"]["game_mode"]
@@ -132,7 +138,10 @@ export type Database = {
           bible_study_session_id?: string | null
           created_at?: string | null
           current_card_id?: string | null
+          current_drawer_card_id?: string | null
+          current_drawer_id?: string | null
           current_level?: Database["public"]["Enums"]["card_level"] | null
+          drawer_order?: string[] | null
           group_number?: number | null
           id?: string
           mode?: Database["public"]["Enums"]["game_mode"]
