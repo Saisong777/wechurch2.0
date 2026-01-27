@@ -12,6 +12,7 @@ interface GameState {
   currentCard: {
     id: string;
     content: string;
+    contentEn: string | null;
     level: CardLevel;
   } | null;
   cardsRemaining: number;
@@ -73,13 +74,14 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
           // Only update if we're not the one who triggered the change
           if (updated.current_card_id && updated.current_card_id !== state.currentCard?.id) {
             // Fetch the card content
-            fetchCardContent(updated.current_card_id).then((cardContent) => {
-              if (cardContent) {
+            fetchCardContent(updated.current_card_id).then((cardData) => {
+              if (cardData) {
                 setState(prev => ({
                   ...prev,
                   currentCard: {
                     id: updated.current_card_id,
-                    content: cardContent,
+                    content: cardData.content,
+                    contentEn: cardData.contentEn,
                     level: updated.current_level,
                   },
                   currentLevel: updated.current_level,
@@ -101,16 +103,16 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     };
   }, [state.gameId, state.mode, state.currentCard?.id]);
 
-  // Fetch card content by ID
-  const fetchCardContent = async (cardId: string): Promise<string | null> => {
+  // Fetch card content by ID (including English)
+  const fetchCardContent = async (cardId: string): Promise<{ content: string; contentEn: string | null } | null> => {
     const { data, error } = await supabase
       .from('card_questions')
-      .select('content_text')
+      .select('content_text, content_text_en')
       .eq('id', cardId)
       .single();
 
     if (error || !data) return null;
-    return data.content_text;
+    return { content: data.content_text, contentEn: data.content_text_en };
   };
 
   // Create a new game
@@ -173,11 +175,12 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
       // Fetch current card content if exists
       let currentCard = null;
       if (data.current_card_id) {
-        const content = await fetchCardContent(data.current_card_id);
-        if (content) {
+        const cardData = await fetchCardContent(data.current_card_id);
+        if (cardData) {
           currentCard = {
             id: data.current_card_id,
-            content,
+            content: cardData.content,
+            contentEn: cardData.contentEn,
             level: data.current_level as CardLevel,
           };
         }
@@ -229,11 +232,12 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
         // Found existing game - join it
         let currentCard = null;
         if (data.current_card_id) {
-          const content = await fetchCardContent(data.current_card_id);
-          if (content) {
+          const cardData = await fetchCardContent(data.current_card_id);
+          if (cardData) {
             currentCard = {
               id: data.current_card_id,
-              content,
+              content: cardData.content,
+              contentEn: cardData.contentEn,
               level: data.current_level as CardLevel,
             };
           }
@@ -292,6 +296,9 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
         return;
       }
 
+      // Fetch English content for the card
+      const cardData = await fetchCardContent(result.card_id);
+
       // Trigger flip animation after a brief delay
       setTimeout(() => {
         setState(prev => ({
@@ -299,6 +306,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
           currentCard: {
             id: result.card_id,
             content: result.card_content,
+            contentEn: cardData?.contentEn || null,
             level: result.card_level as CardLevel,
           },
           cardsRemaining: result.cards_remaining,

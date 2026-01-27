@@ -49,6 +49,7 @@ export const fetchSessionPublic = async (sessionId: string): Promise<{
   groupingMethod: string;
   createdAt: Date;
   allowLatecomers: boolean;
+  icebreakerEnabled: boolean;
 } | null> => {
   const { data, error } = await supabase
     .from("sessions_public")
@@ -68,6 +69,7 @@ export const fetchSessionPublic = async (sessionId: string): Promise<{
     groupingMethod: data.grouping_method || "random",
     createdAt: new Date(data.created_at),
     allowLatecomers: data.allow_latecomers || false,
+    icebreakerEnabled: data.icebreaker_enabled || false,
   };
 };
 
@@ -83,6 +85,23 @@ export const updateSessionAllowLatecomers = async (
 
   if (error) {
     console.error("[updateSessionAllowLatecomers] Failed:", error.message);
+  }
+
+  return !error;
+};
+
+// Update session's icebreaker_enabled setting
+export const updateSessionIcebreakerEnabled = async (
+  sessionId: string,
+  icebreakerEnabled: boolean
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ icebreaker_enabled: icebreakerEnabled })
+    .eq("id", sessionId);
+
+  if (error) {
+    console.error("[updateSessionIcebreakerEnabled] Failed:", error.message);
   }
 
   return !error;
