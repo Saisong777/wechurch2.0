@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns } from 'lucide-react';
+import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,7 @@ import {
   parseReportContent,
   generateSectionMarkdown,
   generatePrintHTML,
+  generatePPTHTML,
   downloadBlob,
   openPrintWindow,
   GroupSection,
@@ -113,6 +114,26 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     downloadBlob(blob, filename);
     
     toast.success(groupNumber === 0 ? '全組總結 Markdown 已下載！' : `第 ${groupNumber} 組 Markdown 已下載！`);
+  };
+
+  // --- PPT Export handler ---
+  const handleDownloadPPT = () => {
+    if (!parsedSections.length) return;
+    
+    const html = generatePPTHTML(parsedSections, verseReference);
+    const pptWindow = window.open('', '_blank');
+    if (!pptWindow) {
+      toast.error('無法開啟簡報視窗，請檢查瀏覽器設定');
+      return;
+    }
+    
+    pptWindow.document.write(html);
+    pptWindow.document.close();
+    
+    toast.success('簡報已開啟！使用方向鍵或點擊切換頁面', {
+      description: '按 Ctrl+P 可列印為 PDF',
+      duration: 5000,
+    });
   };
 
   // Get current content based on active tab
@@ -267,6 +288,10 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               <DropdownMenuItem onClick={() => handleDownloadPDF()}>
                 <FileDown className="w-4 h-4 mr-2" />
                 全部報告 (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadPPT}>
+                <Presentation className="w-4 h-4 mr-2" />
+                簡報模式 (PPT)
               </DropdownMenuItem>
               <DropdownMenuSeparator className="sm:hidden" />
               <DropdownMenuItem onClick={() => handlePrint()} className="sm:hidden">

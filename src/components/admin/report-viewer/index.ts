@@ -6,6 +6,7 @@ export type { GroupReport } from './parse';
 export { 
   generateSectionMarkdown, 
   generatePrintHTML, 
+  generatePPTHTML,
   downloadBlob, 
   openPrintWindow 
 } from './export';
