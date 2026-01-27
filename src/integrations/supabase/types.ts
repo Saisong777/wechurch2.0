@@ -314,6 +314,7 @@ export type Database = {
       }
       prayers: {
         Row: {
+          category: Database["public"]["Enums"]["prayer_category"]
           content: string
           created_at: string
           id: string
@@ -321,6 +322,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: Database["public"]["Enums"]["prayer_category"]
           content: string
           created_at?: string
           id?: string
@@ -328,6 +330,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: Database["public"]["Enums"]["prayer_category"]
           content?: string
           created_at?: string
           id?: string
@@ -831,6 +834,7 @@ export type Database = {
           amen_count: number | null
           author_avatar: string | null
           author_name: string | null
+          category: Database["public"]["Enums"]["prayer_category"] | null
           content: string | null
           created_at: string | null
           has_amened: boolean | null
@@ -911,6 +915,7 @@ export type Database = {
       card_level: "L1" | "L2" | "L3"
       game_mode: "standalone" | "session"
       insight_category_type: "PROMISE" | "COMMAND" | "WARNING" | "GOD_ATTRIBUTE"
+      prayer_category: "thanksgiving" | "supplication" | "praise" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1042,6 +1047,7 @@ export const Constants = {
       card_level: ["L1", "L2", "L3"],
       game_mode: ["standalone", "session"],
       insight_category_type: ["PROMISE", "COMMAND", "WARNING", "GOD_ATTRIBUTE"],
+      prayer_category: ["thanksgiving", "supplication", "praise", "other"],
     },
   },
 } as const

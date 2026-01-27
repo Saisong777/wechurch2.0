@@ -1,25 +1,36 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, Heart, Users } from 'lucide-react';
-import { usePrayerWall } from '@/hooks/usePrayerWall';
+import { usePrayerWall, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { PrayerCard } from './PrayerCard';
 import { CreatePrayerDialog } from './CreatePrayerDialog';
 import { MockPrayerGenerator } from './MockPrayerGenerator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useQueryClient } from '@tanstack/react-query';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+
+type FilterCategory = 'all' | PrayerCategory;
 
 export const PrayerWall: React.FC = () => {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
   const { data: prayers, isLoading, error, isFetching } = usePrayerWall();
   const queryClient = useQueryClient();
+  const [filterCategory, setFilterCategory] = useState<FilterCategory>('all');
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
   };
+
+  // Filter prayers by category
+  const filteredPrayers = useMemo(() => {
+    if (!prayers) return [];
+    if (filterCategory === 'all') return prayers;
+    return prayers.filter((p) => p.category === filterCategory);
+  }, [prayers, filterCategory]);
 
   if (!user) {
     return (
@@ -84,6 +95,30 @@ export const PrayerWall: React.FC = () => {
         </Card>
       </div>
 
+      {/* Category Filter */}
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">篩選分類</p>
+        <ToggleGroup
+          type="single"
+          value={filterCategory}
+          onValueChange={(val) => val && setFilterCategory(val as FilterCategory)}
+          className="flex flex-wrap gap-2 justify-start"
+        >
+          <ToggleGroupItem value="all" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+            全部
+          </ToggleGroupItem>
+          {(Object.keys(CATEGORY_LABELS) as PrayerCategory[]).map((key) => (
+            <ToggleGroupItem
+              key={key}
+              value={key}
+              className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            >
+              {CATEGORY_LABELS[key]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+
       {/* Refresh Button */}
       <div className="flex justify-end">
         <Button
@@ -134,22 +169,24 @@ export const PrayerWall: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!isLoading && !error && prayers?.length === 0 && (
+      {!isLoading && !error && filteredPrayers.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <Heart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">還沒有禱告事項</h3>
+            <h3 className="text-lg font-medium mb-2">
+              {filterCategory === 'all' ? '還沒有禱告事項' : `沒有${CATEGORY_LABELS[filterCategory]}類別的禱告`}
+            </h3>
             <p className="text-muted-foreground mb-4">
-              成為第一個分享禱告的人吧！
+              {filterCategory === 'all' ? '成為第一個分享禱告的人吧！' : '嘗試選擇其他分類或新增禱告'}
             </p>
           </CardContent>
         </Card>
       )}
 
       {/* Prayer List */}
-      {prayers && prayers.length > 0 && (
+      {filteredPrayers.length > 0 && (
         <div className="space-y-4">
-          {prayers.map((prayer) => (
+          {filteredPrayers.map((prayer) => (
             <PrayerCard key={prayer.id} prayer={prayer} />
           ))}
         </div>

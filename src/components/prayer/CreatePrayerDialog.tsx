@@ -10,15 +10,23 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Plus, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useCreatePrayer } from '@/hooks/usePrayerWall';
+import { useCreatePrayer, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 
 export const CreatePrayerDialog: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [category, setCategory] = useState<PrayerCategory>('supplication');
   const createMutation = useCreatePrayer();
 
   const handleSubmit = async () => {
@@ -27,10 +35,12 @@ export const CreatePrayerDialog: React.FC = () => {
     await createMutation.mutateAsync({
       content: content.trim(),
       isAnonymous,
+      category,
     });
 
     setContent('');
     setIsAnonymous(false);
+    setCategory('supplication');
     setOpen(false);
   };
 
@@ -53,6 +63,23 @@ export const CreatePrayerDialog: React.FC = () => {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Category Selector */}
+          <div className="space-y-2">
+            <Label htmlFor="prayer-category">禱告分類</Label>
+            <Select value={category} onValueChange={(val) => setCategory(val as PrayerCategory)}>
+              <SelectTrigger id="prayer-category">
+                <SelectValue placeholder="選擇分類" />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(CATEGORY_LABELS) as PrayerCategory[]).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {CATEGORY_LABELS[key]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="prayer-content">禱告內容</Label>
             <Textarea
