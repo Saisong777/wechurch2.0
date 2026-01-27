@@ -661,13 +661,25 @@ export const fetchSubmissionsPublic = async (sessionId: string): Promise<StudySu
 };
 
 // AI Report functions
+export interface AIReportOptions {
+  fastMode?: boolean;      // Use faster model for group reports
+  filledOnly?: boolean;    // Only analyze entries with content
+}
+
 export const generateAIReport = async (
   sessionId: string,
   reportType: "group" | "overall",
-  groupNumber?: number
+  groupNumber?: number,
+  options?: AIReportOptions
 ): Promise<{ success: boolean; report?: string; reportId?: string; error?: string }> => {
   const { data, error } = await supabase.functions.invoke("generate-report", {
-    body: { sessionId, reportType, groupNumber },
+    body: { 
+      sessionId, 
+      reportType, 
+      groupNumber,
+      fastMode: options?.fastMode ?? false,
+      filledOnly: options?.filledOnly ?? false,
+    },
   });
 
   if (error) {
