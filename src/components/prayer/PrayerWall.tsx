@@ -1,16 +1,19 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, Heart, Users } from 'lucide-react';
 import { usePrayerWall } from '@/hooks/usePrayerWall';
 import { PrayerCard } from './PrayerCard';
 import { CreatePrayerDialog } from './CreatePrayerDialog';
+import { MockPrayerGenerator } from './MockPrayerGenerator';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useQueryClient } from '@tanstack/react-query';
 
 export const PrayerWall: React.FC = () => {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const { data: prayers, isLoading, error, isFetching } = usePrayerWall();
   const queryClient = useQueryClient();
 
@@ -42,7 +45,7 @@ export const PrayerWall: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Heart className="h-6 w-6 text-rose-500" />
+            <Heart className="h-6 w-6 text-destructive" />
             禱告牆
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -51,6 +54,9 @@ export const PrayerWall: React.FC = () => {
         </div>
         <CreatePrayerDialog />
       </div>
+
+      {/* Admin: Mock Data Generator */}
+      {isAdmin && <MockPrayerGenerator />}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
@@ -67,8 +73,8 @@ export const PrayerWall: React.FC = () => {
         </Card>
         <Card>
           <CardContent className="py-4 flex items-center gap-3">
-            <div className="p-2 rounded-full bg-rose-500/10">
-              <Heart className="h-5 w-5 text-rose-500" />
+            <div className="p-2 rounded-full bg-destructive/10">
+              <Heart className="h-5 w-5 text-destructive" />
             </div>
             <div>
               <p className="text-2xl font-bold">{totalAmens}</p>
