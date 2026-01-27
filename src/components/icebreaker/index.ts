@@ -4,3 +4,4 @@ export { LevelSelector } from './LevelSelector';
 export { GameLobby } from './GameLobby';
 export { GameTimer } from './GameTimer';
 export { SharingRound } from './SharingRound';
+export { TurnBasedCardGame } from './TurnBasedCardGame';
