@@ -92,7 +92,10 @@ export function useSessionAnalysis({ sessionId, groupNumber, reportType, isParti
       return (data || []).map(r => ({
         id: r.id,
         sessionId: r.session_id,
-        reportType: r.report_type as 'group' | 'overall',
+        // Normalize: null group_number OR report_type='overall' means overall report
+        reportType: (r.report_type === 'overall' || r.group_number === null || r.group_number === 0) 
+          ? 'overall' as const 
+          : r.report_type as 'group' | 'overall',
         // Normalize: null group_number means overall report (treat as 0)
         groupNumber: r.group_number ?? 0,
         content: r.content,
