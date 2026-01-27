@@ -35,44 +35,34 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 py-12">
+      <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-4xl mx-auto">
-          {/* Hero Section */}
-          <div className="text-center mb-16 animate-fade-in">
-            <div className="relative inline-block mb-8">
-              <div className="absolute inset-0 bg-secondary/30 rounded-full blur-3xl animate-pulse-soft" />
-              <div className="relative w-32 h-32 rounded-full gradient-gold flex items-center justify-center glow-gold animate-float">
-                <Dumbbell className="w-16 h-16 text-secondary-foreground" />
-              </div>
-            </div>
-            
-            <h1 className="font-serif text-4xl md:text-6xl font-bold text-foreground mb-4">
-              靈魂健身房
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Soul Gym
-            </p>
-            <p className="text-muted-foreground mt-4 max-w-lg mx-auto">
-              一起，活出耶穌的豐盛生命
-            </p>
-          </div>
-
           {/* Entry Points */}
           <div className="flex flex-col gap-8 mb-16">
-            {/* Main Participant Entry - Hero Card */}
+            {/* Main Participant Entry - Hero Card with animated logo */}
             <Card variant="highlight" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer border-2 border-primary/30 shadow-xl hover:shadow-2xl hover:border-primary/50 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
               <Link to="/user">
-                <CardContent className="py-16 md:py-20 text-center relative">
-                  <div className="mx-auto w-28 h-28 md:w-32 md:h-32 rounded-full gradient-gold flex items-center justify-center mb-8 group-hover:glow-gold transition-all duration-300 shadow-lg group-hover:scale-105">
-                    <Dumbbell className="w-14 h-14 md:w-16 md:h-16 text-secondary-foreground" />
+                <CardContent className="py-12 md:py-16 text-center relative">
+                  {/* Animated Logo */}
+                  <div className="relative inline-block mb-6">
+                    <div className="absolute inset-0 bg-secondary/30 rounded-full blur-3xl animate-pulse-soft" />
+                    <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full gradient-gold flex items-center justify-center glow-gold animate-float shadow-lg">
+                      <Dumbbell className="w-14 h-14 md:w-16 md:h-16 text-secondary-foreground" />
+                    </div>
                   </div>
-                  <h2 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-3">
-                    參加者入口
-                  </h2>
-                  <p className="text-lg text-muted-foreground mb-8">
-                    Participant Entry
+                  
+                  {/* Title & Tagline */}
+                  <h1 className="font-serif text-3xl md:text-5xl font-bold text-foreground mb-2">
+                    靈魂健身房
+                  </h1>
+                  <p className="text-lg md:text-xl text-muted-foreground mb-2">
+                    Soul Gym
                   </p>
+                  <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+                    一起，活出耶穌的豐盛生命
+                  </p>
+                  
                   <Button variant="gold" size="xl" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl">
                     開始健身 Join Session
                   </Button>
