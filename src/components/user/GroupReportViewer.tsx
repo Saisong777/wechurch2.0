@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Users, BookOpen, Share2, Download } from 'lucide-react';
+import { Sparkles, Users, BookOpen, Share2, Download, User } from 'lucide-react';
 import { fetchAIReports } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
 import { EnhancedSection } from '@/components/admin/report-elements';
@@ -23,6 +23,7 @@ interface GroupReportViewerProps {
 interface ParsedReport {
   members?: string;
   verse?: string;
+  contributions?: string;
   themes?: string;
   observations?: string;
   insights?: string;
@@ -42,6 +43,7 @@ function parseReportContent(content: string): ParsedReport {
   return {
     members: section.members,
     verse: section.verse,
+    contributions: section.contributions,
     themes: section.themes,
     observations: section.observations,
     insights: section.insights,
@@ -58,6 +60,7 @@ function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verse
     groupInfo: `第 ${groupNumber} 組`,
     members: parsed.members,
     verse: parsed.verse,
+    contributions: parsed.contributions,
     themes: parsed.themes,
     observations: parsed.observations,
     insights: parsed.insights,
@@ -163,7 +166,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   }
 
   const parsed = parseReportContent(report);
-  const hasStructuredContent = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
+  const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications;
 
 
   return (
@@ -212,9 +215,22 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           </div>
         )}
 
-        {/* Structured Sections - don't show keywords again since we have summary at top */}
+        {/* Structured Sections */}
         {hasStructuredContent ? (
           <div className="space-y-4">
+            {/* Personal Contributions Section */}
+            {parsed.contributions && (
+              <div className="p-5 border-l-4 rounded-r-lg bg-accent/10 border-accent">
+                <h3 className="flex items-center gap-2 font-semibold mb-3 text-accent">
+                  <User className="w-5 h-5" />
+                  👤 個人貢獻摘要 Personal Contributions
+                </h3>
+                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
+                  {parsed.contributions}
+                </div>
+              </div>
+            )}
+            
             {parsed.themes && (
               <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
             )}

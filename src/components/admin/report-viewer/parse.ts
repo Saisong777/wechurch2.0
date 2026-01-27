@@ -5,6 +5,7 @@ export interface GroupReport {
   groupInfo?: string;
   members?: string;
   verse?: string;
+  contributions?: string;  // Personal contributions summary
   themes?: string;
   observations?: string;
   insights?: string;
@@ -27,6 +28,7 @@ function getScore(s: Partial<GroupReport>): number {
   const len = (v?: string) => (v ? v.trim().length : 0);
   // Prefer structured sections heavily; raw-only headers will score low.
   return (
+    len(s.contributions) +
     len(s.themes) +
     len(s.observations) +
     len(s.insights) +
@@ -68,6 +70,12 @@ export function parseReportContent(content: string): GroupReport[] {
     const verseMatch = groupReport.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*(?:\*\*)?\s*([^\n]+)/);
     if (verseMatch) {
       section.verse = cleanMarkdown(verseMatch[1]);
+    }
+    
+    // Extract personal contributions - handle formats like "**👤 個人貢獻摘要（Personal Contributions）：**"
+    const contribMatch = groupReport.match(/(?:\*\*)?👤?\s*個人貢獻[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?📖|---|$)/i);
+    if (contribMatch) {
+      section.contributions = cleanMarkdown(contribMatch[1]);
     }
     
     // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題 Themes："
