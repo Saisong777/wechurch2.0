@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchParticipants, assignGroupsToParticipants } from '@/lib/supabase-helpers';
-import { Users, UserCheck, Settings, Shuffle, Scale, Copy, UserX } from 'lucide-react';
+import { Users, UserCheck, Settings, Shuffle, Scale, Copy, UserX, Share2 } from 'lucide-react';
 import { GroupingSettings } from '@/types/bible-study';
 import { toast } from 'sonner';
 import { SessionQRCode } from './SessionQRCode';
 import { StressTestSimulator } from './StressTestSimulator';
+import { getSessionJoinUrl } from '@/lib/url-helpers';
 
 interface AdminWaitingRoomProps {
   onGroupingComplete: () => void;
@@ -66,6 +67,36 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
     }
   };
 
+  const handleShare = async () => {
+    const code = currentSession?.shortCode || currentSession?.id;
+    if (!code) return;
+    
+    const joinUrl = getSessionJoinUrl(code);
+    const shareText = `🏋️ Soul Gym 靈魂健身房\n\n📖 ${currentSession?.verseReference || '查經聚會'}\n\n加入代碼: ${code}\n點擊連結加入: ${joinUrl}`;
+    
+    // Check if Web Share API is available (mainly mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Soul Gym 靈魂健身房',
+          text: shareText,
+          url: joinUrl,
+        });
+        toast.success('分享成功！');
+      } catch (err) {
+        // User cancelled or share failed - copy to clipboard as fallback
+        if ((err as Error).name !== 'AbortError') {
+          navigator.clipboard.writeText(shareText);
+          toast.success('已複製分享內容！');
+        }
+      }
+    } else {
+      // Fallback for desktop - copy formatted text
+      navigator.clipboard.writeText(shareText);
+      toast.success('已複製分享內容，可貼到 LINE 或其他軟體！');
+    }
+  };
+
   const handleStartGrouping = async () => {
     if (!currentSession?.id) return;
     
@@ -112,12 +143,15 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                 </p>
               </div>
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
+                <div className="flex items-center gap-1 px-3 py-1.5 bg-muted rounded-lg">
                   <span className="font-mono font-bold text-lg">
                     {currentSession?.shortCode || currentSession?.id?.slice(0, 8)}
                   </span>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopySessionId}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopySessionId} title="複製代碼">
                     <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={handleShare} title="分享到 LINE">
+                    <Share2 className="w-4 h-4" />
                   </Button>
                 </div>
                 <div className="flex items-center gap-2 text-accent">
