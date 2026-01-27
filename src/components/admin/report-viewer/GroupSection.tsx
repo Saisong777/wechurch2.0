@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Copy, Download, ChevronDown, Users, FileText, FileDown, Printer } from 'lucide-react';
+import { Copy, Download, ChevronDown, Users, FileText, FileDown, Printer, User } from 'lucide-react';
 import { EnhancedSection } from '../report-elements';
 import { GroupReport } from './parse';
 
@@ -30,7 +30,7 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
   onDownloadPDF,
   onPrint,
 }) => {
-  const hasStructuredContent = section.themes || section.observations || section.insights || section.applications;
+  const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications;
   
   return (
     <div className="group-section space-y-4">
@@ -102,6 +102,19 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
       {/* Structured Sections with Enhanced Visual Elements */}
       {hasStructuredContent ? (
         <div className="space-y-4">
+          {/* Personal Contributions Section */}
+          {section.contributions && (
+            <div className="p-5 border-l-4 rounded-r-lg bg-accent/10 border-accent">
+              <h3 className="flex items-center gap-2 font-semibold mb-3 text-accent">
+                <User className="w-5 h-5" />
+                👤 個人貢獻摘要 Personal Contributions
+              </h3>
+              <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
+                {section.contributions}
+              </div>
+            </div>
+          )}
+          
           {section.themes && (
             <EnhancedSection type="themes" content={section.themes} showKeywords={false} />
           )}

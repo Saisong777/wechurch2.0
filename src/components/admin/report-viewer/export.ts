@@ -22,6 +22,10 @@ export function generateSectionMarkdown(section: GroupReport, verseReference?: s
   
   lines.push('---\n');
   
+  if (section.contributions) {
+    lines.push(`**👤 個人貢獻摘要（Personal Contributions）：**\n${section.contributions}\n`);
+  }
+  
   if (section.themes) {
     lines.push(`**📖 主題（Themes）：**\n${section.themes}\n`);
   }
@@ -39,7 +43,7 @@ export function generateSectionMarkdown(section: GroupReport, verseReference?: s
   }
   
   // If no structured content, fall back to raw
-  const hasStructured = section.themes || section.observations || section.insights || section.applications;
+  const hasStructured = section.contributions || section.themes || section.observations || section.insights || section.applications;
   if (!hasStructured && section.raw) {
     lines.push(section.raw);
   }
@@ -165,6 +169,12 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
       }
       .section.applications h3 { color: #2563eb; }
       
+      .section.contributions {
+        background: #faf5ff;
+        border-left-color: #a855f7;
+      }
+      .section.contributions h3 { color: #9333ea; }
+      
       .footer {
         margin-top: 48px;
         padding-top: 24px;
@@ -183,7 +193,7 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
   `;
   
   const groupsHTML = filteredSections.map(section => {
-    const hasStructuredContent = section.themes || section.observations || section.insights || section.applications;
+    const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications;
     
     return `
       <div class="group-section">
@@ -201,6 +211,13 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
         ` : ''}
         
         ${hasStructuredContent ? `
+          ${section.contributions ? `
+            <div class="section contributions">
+              <h3>👤 個人貢獻摘要 Personal Contributions</h3>
+              <div class="section-content">${section.contributions}</div>
+            </div>
+          ` : ''}
+          
           ${section.themes ? `
             <div class="section themes">
               <h3>📖 主題 Themes</h3>
