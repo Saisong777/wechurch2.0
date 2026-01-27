@@ -185,12 +185,13 @@ serve(async (req) => {
     const tAuth = Date.now();
 
     // Create PENDING record first for optimistic UI
+    // Use group_number: 0 for overall reports to distinguish from group reports
     const { data: pendingReport, error: pendingError } = await supabase
       .from("ai_reports")
       .insert({
         session_id: sessionId,
         report_type: reportType,
-        group_number: reportType === "group" ? groupNumber : null,
+        group_number: reportType === "group" ? groupNumber : 0,
         content: "生成中...",
         status: "PENDING",
       })
