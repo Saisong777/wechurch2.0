@@ -51,12 +51,12 @@ export const PrayerWall: React.FC = () => {
   const totalAmens = prayers?.reduce((sum, p) => sum + p.amen_count, 0) || 0;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 px-4 sm:px-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Heart className="h-6 w-6 text-destructive" />
+            <Heart className="h-6 w-6 text-rose-500" />
             禱告牆
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -70,10 +70,10 @@ export const PrayerWall: React.FC = () => {
       {isAdmin && <MockPrayerGenerator />}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10">
           <CardContent className="py-4 flex items-center gap-3">
-            <div className="p-2 rounded-full bg-primary/10">
+            <div className="p-2.5 rounded-full bg-primary/10">
               <Users className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -82,10 +82,10 @@ export const PrayerWall: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-rose-500/5 to-rose-500/10">
           <CardContent className="py-4 flex items-center gap-3">
-            <div className="p-2 rounded-full bg-destructive/10">
-              <Heart className="h-5 w-5 text-destructive" />
+            <div className="p-2.5 rounded-full bg-rose-500/10">
+              <Heart className="h-5 w-5 text-rose-500" />
             </div>
             <div>
               <p className="text-2xl font-bold">{totalAmens}</p>

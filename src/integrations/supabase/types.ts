@@ -312,6 +312,45 @@ export type Database = {
           },
         ]
       }
+      prayer_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          prayer_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          prayer_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          prayer_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prayer_comments_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "prayers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prayer_comments_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "v_prayer_wall"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prayers: {
         Row: {
           category: Database["public"]["Enums"]["prayer_category"]
@@ -825,6 +864,34 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_prayer_comments: {
+        Row: {
+          author_avatar: string | null
+          author_name: string | null
+          content: string | null
+          created_at: string | null
+          id: string | null
+          is_owner: boolean | null
+          prayer_id: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prayer_comments_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "prayers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prayer_comments_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "v_prayer_wall"
             referencedColumns: ["id"]
           },
         ]
