@@ -63,8 +63,8 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Left spacer for balance */}
           <div className="w-10 sm:w-12" />
           
-          {/* Center: Logo and Title */}
-          <div className="flex items-center justify-center gap-2 sm:gap-3">
+          {/* Center: Logo and Title - Clickable to go home */}
+          <Link to="/" className="flex items-center justify-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity">
             {showLogo && (
               <div className="relative">
                 <div className="absolute inset-0 bg-secondary/20 rounded-full blur-xl animate-pulse-soft" />
@@ -84,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </p>
               )}
             </div>
-          </div>
+          </Link>
 
           {/* Right: Auth Status */}
           <div className="w-10 sm:w-12 flex justify-end">
@@ -125,21 +125,14 @@ export const Header: React.FC<HeaderProps> = ({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full w-9 h-9">
-                    <User className="w-5 h-5 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem asChild>
-                    <Link to="/notebook" className="flex items-center gap-2 cursor-pointer">
-                      <LogIn className="w-4 h-4" />
-                      登入
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full w-9 h-9"
+                onClick={() => navigate('/notebook')}
+              >
+                <User className="w-5 h-5 text-muted-foreground" />
+              </Button>
             )}
           </div>
         </div>
