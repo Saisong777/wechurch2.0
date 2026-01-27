@@ -119,6 +119,8 @@ export const useRealtimeSecure = ({
         id: session.id!,
         verseReference: session.verse_reference!,
         status: session.status as Session["status"],
+        icebreakerEnabled: session.icebreaker_enabled || false,
+        allowLatecomers: session.allow_latecomers || false,
       });
     }
     

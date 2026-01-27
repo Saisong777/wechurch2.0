@@ -171,7 +171,14 @@ export const UserPage: React.FC = () => {
       let restoredStep: UserStep = 'waiting';
       
       if (sessionData.status === 'studying') {
-        restoredStep = 'study';
+        // Check if icebreaker is enabled and user hasn't completed it yet
+        if (sessionData.icebreaker_enabled && participant.group_number) {
+          // Check localStorage if user already completed icebreaker
+          const completedIcebreaker = localStorage.getItem(`icebreaker_completed_${storedSessionId}_${participant.id}`);
+          restoredStep = completedIcebreaker ? 'study' : 'icebreaker';
+        } else {
+          restoredStep = 'study';
+        }
       } else if (sessionData.status === 'grouping') {
         if (participant.ready_confirmed) {
           restoredStep = 'study'; // All confirmed, waiting for others
@@ -539,8 +546,16 @@ export const UserPage: React.FC = () => {
               sessionId={currentSession.id}
               groupNumber={currentUser.groupNumber}
               currentUserId={currentUser.id}
-              onComplete={() => setStep('study')}
-              onSkip={() => setStep('study')}
+              onComplete={() => {
+                // Mark icebreaker as completed in localStorage
+                localStorage.setItem(`icebreaker_completed_${currentSession.id}_${currentUser.id}`, 'true');
+                setStep('study');
+              }}
+              onSkip={() => {
+                // Mark icebreaker as completed even when skipped
+                localStorage.setItem(`icebreaker_completed_${currentSession.id}_${currentUser.id}`, 'true');
+                setStep('study');
+              }}
             />
           </div>
         );
