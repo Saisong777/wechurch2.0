@@ -7,7 +7,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/supabase-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants, endStudySession } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut } from 'lucide-react';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -28,6 +28,7 @@ import { StudyProgressMonitor } from './StudyProgressMonitor';
 import { MockDataGenerator } from './MockDataGenerator';
 import { AIReportViewer } from './AIReportViewer';
 import { useAdminStudyResponses } from '@/hooks/useAdminStudyResponses';
+import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
 
 export const AdminMonitor: React.FC = () => {
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
@@ -54,6 +55,11 @@ export const AdminMonitor: React.FC = () => {
   const { data: studyResponses } = useAdminStudyResponses({ 
     sessionId: currentSession?.id, 
     enabled: !!currentSession?.id 
+  });
+
+  // Fetch existing AI reports for viewing
+  const { analyses: existingReports, refetch: refetchReports } = useSessionAnalysis({
+    sessionId: currentSession?.id || '',
   });
 
   // Determine if we're in verification phase
@@ -338,6 +344,8 @@ export const AdminMonitor: React.FC = () => {
       toast.success(`成功生成 ${successCount}/${groups.length} 個小組報告！`, {
         description: '每位參與者現在可以在自己的頁面查看小組報告',
       });
+      // Refetch reports list
+      refetchReports();
     }
     
     setGenerationProgress({ current: 0, total: 0 });
@@ -359,11 +367,46 @@ export const AdminMonitor: React.FC = () => {
       setReportContent(result.report);
       setShowReportDialog(true);
       toast.success('整體洞察報告已生成！');
+      // Refetch reports list
+      refetchReports();
     } else {
       toast.error(`生成失敗: ${result.error}`);
     }
     
     setIsGeneratingOverall(false);
+  };
+
+  // Handler to view existing reports
+  const handleViewExistingReports = () => {
+    if (existingReports.length === 0) {
+      toast.info('目前沒有已生成的報告');
+      return;
+    }
+    
+    // Combine all group reports for viewing
+    const groupReports = existingReports.filter(r => r.reportType === 'group');
+    const overallReports = existingReports.filter(r => r.reportType === 'overall');
+    
+    let combinedContent = '';
+    
+    // Add group reports first (sorted by group number)
+    const sortedGroupReports = [...groupReports].sort((a, b) => 
+      (a.groupNumber || 0) - (b.groupNumber || 0)
+    );
+    
+    for (const report of sortedGroupReports) {
+      combinedContent += `\n\n${'='.repeat(50)}\n第 ${report.groupNumber} 組報告\n${'='.repeat(50)}\n\n${report.content}`;
+    }
+    
+    // Add overall reports
+    for (const report of overallReports) {
+      combinedContent += `\n\n${'='.repeat(50)}\n整體洞察報告\n${'='.repeat(50)}\n\n${report.content}`;
+    }
+    
+    if (combinedContent) {
+      setReportContent(combinedContent);
+      setShowReportDialog(true);
+    }
   };
 
   const handleExportCSV = () => {
@@ -931,49 +974,69 @@ export const AdminMonitor: React.FC = () => {
             )}
             
             {/* Action buttons - stack on mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
               <Button
                 variant="navy"
                 size="lg"
-                className="w-full h-12 sm:h-11 text-sm sm:text-base"
+                className="w-full h-12 sm:h-11 text-xs sm:text-sm"
                 onClick={handleGenerateGroupSummary}
                 disabled={isGeneratingGroup || !hasDataForAnalysis}
               >
                 {isGeneratingGroup ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    生成中 ({generationProgress.current}/{generationProgress.total})
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                    <span className="hidden sm:inline">生成中 ({generationProgress.current}/{generationProgress.total})</span>
+                    <span className="sm:hidden">{generationProgress.current}/{generationProgress.total}</span>
                   </>
                 ) : (
                   <>
-                    <FileText className="w-5 h-5" />
-                    生成小組摘要
+                    <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline">生成小組摘要</span>
+                    <span className="sm:hidden">小組報告</span>
                   </>
                 )}
               </Button>
               <Button
                 variant="gold"
                 size="lg"
-                className="w-full h-12 sm:h-11 text-sm sm:text-base"
+                className="w-full h-12 sm:h-11 text-xs sm:text-sm"
                 onClick={handleGenerateOverallInsight}
                 disabled={isGeneratingOverall || !hasDataForAnalysis}
               >
                 {isGeneratingOverall ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                 ) : (
-                  <Sparkles className="w-5 h-5" />
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
-                生成整體洞察
+                <span className="hidden sm:inline">生成整體洞察</span>
+                <span className="sm:hidden">整體報告</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                className="w-full h-12 sm:h-11 text-xs sm:text-sm"
+                onClick={handleViewExistingReports}
+                disabled={existingReports.length === 0}
+              >
+                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">查閱報告</span>
+                <span className="sm:hidden">查閱</span>
+                {existingReports.length > 0 && (
+                  <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 h-4">
+                    {existingReports.length}
+                  </Badge>
+                )}
               </Button>
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full h-12 sm:h-11 text-sm sm:text-base"
+                className="w-full h-12 sm:h-11 text-xs sm:text-sm"
                 onClick={handleExportCSV}
                 disabled={!hasDataForAnalysis}
               >
-                <Download className="w-5 h-5" />
-                導出 CSV
+                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">導出 CSV</span>
+                <span className="sm:hidden">CSV</span>
               </Button>
             </div>
           </CardContent>
