@@ -48,20 +48,20 @@ function parseReportContent(content: string): ParsedReport {
   const verseMatch = content.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*([^\n]+)/);
   if (verseMatch) result.verse = cleanMarkdown(verseMatch[1]);
   
-  // Extract themes
-  const themesMatch = content.match(/(?:📖\s*)?(?:\*\*)?主題.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🔍|💡|🎯|---|\*\*事實|\*\*獨特|\*\*如何|$))/i);
+  // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題 Themes："
+  const themesMatch = content.match(/(?:\*\*)?📖?\s*主題[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🔍|(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
   if (themesMatch) result.themes = cleanMarkdown(themesMatch[1]);
   
-  // Extract observations
-  const obsMatch = content.match(/(?:🔍\s*)?(?:\*\*)?事實發現.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:💡|🎯|---|\*\*獨特|\*\*如何|$))/i);
+  // Extract observations - handle formats like "**🔍 事實發現（Observations）：**"
+  const obsMatch = content.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
   if (obsMatch) result.observations = cleanMarkdown(obsMatch[1]);
   
-  // Extract insights
-  const insightsMatch = content.match(/(?:💡\s*)?(?:\*\*)?獨特亮光.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🎯|---|\*\*如何|$))/i);
+  // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**"
+  const insightsMatch = content.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🎯|---|ℹ️|$)/i);
   if (insightsMatch) result.insights = cleanMarkdown(insightsMatch[1]);
   
-  // Extract applications
-  const appMatch = content.match(/(?:🎯\s*)?(?:\*\*)?如何應用.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:---|$))/i);
+  // Extract applications - handle formats like "**🎯 如何應用（Applications）：**"
+  const appMatch = content.match(/(?:\*\*)?🎯?\s*如何應用[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=---|ℹ️|$)/i);
   if (appMatch) result.applications = cleanMarkdown(appMatch[1]);
   
   return result;
