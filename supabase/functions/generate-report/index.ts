@@ -43,7 +43,17 @@ d) 若某欄位為空、未填、或資料不足：
    - 必須如實反映「成員未提及」
    - 不可自行補齊
 
-### 2️⃣ 內容整合原則
+### ⚠️ 2️⃣ 完整性原則（極度重要）
+
+a) **每一位成員的資料都必須被納入分析**
+   - 不可遺漏任何一個人的查經筆記
+   - 即使某人的內容較短或較簡單，也必須納入考量
+b) **在「獨特亮光」區塊，必須盡可能標註每位成員的貢獻**
+   - 如果成員有獨特見解，一定要標明「某某弟兄/姊妹提到...」
+c) **在報告開頭確認已分析的成員名單**
+   - 列出所有被納入分析的成員姓名
+
+### 3️⃣ 內容整合原則
 
 a) 對於**同一組中意思相近或重複出現的內容**：
    - 進行歸納與合併
@@ -59,7 +69,7 @@ c) 若同一主題出現不同理解：
    - 不裁定對錯
    - 不強行整合
 
-### 3️⃣ 神學風險處理原則（非常重要）
+### 4️⃣ 神學風險處理原則（非常重要）
 
 若在成員筆記中發現：
 - 明顯違反基要信仰
@@ -77,7 +87,9 @@ c) 若同一主題出現不同理解：
 
 **組別：**（group number）
 
-**組員：**（列出該組所有成員姓名）
+**組員：**（列出該組所有成員姓名，確保無人遺漏）
+
+**已分析筆記數：**（確認共分析了幾份筆記）
 
 **查經經文：**（本次查考的聖經經文）
 
@@ -87,12 +99,13 @@ c) 若同一主題出現不同理解：
 AI 整合該組所有成員共同出現的主題
 
 **🔍 事實發現（Observations）：**
-成員在經文中實際觀察到的內容
+成員在經文中實際觀察到的內容（綜合所有成員的觀察）
 
 **💡 獨特亮光（Unique Insights）：**
 清楚標註：
 - 亮光內容
 - 分享者姓名
+- 盡可能涵蓋每位成員的獨特貢獻
 
 **🎯 如何應用（Applications）：**
 整合該組成員實際提出的應用方向（不新增、不延伸、不美化）
@@ -114,10 +127,12 @@ AI 整合該組所有成員共同出現的主題
 ❌ 不可加入你自己的神學立場
 ❌ 不可替成員「優化」沒寫的內容
 ❌ 不可把少數觀點硬整合成共識
+❌ 不可遺漏任何成員的筆記資料
 
 ## 最後提醒
 
 你整理的是「神已經透過人說過的話」，不是你想幫神補說的話。
+**確保每一位成員的聲音都被聽見、被納入報告中。**
 
 請一律使用繁體中文輸出。`;
 
@@ -210,54 +225,105 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Fetch submissions
-    let query = supabase
+    // Fetch submissions (traditional form)
+    let submissionsQuery = supabase
       .from("submissions")
       .select("*")
       .eq("session_id", sessionId);
     
     if (reportType === "group" && groupNumber) {
-      query = query.eq("group_number", groupNumber);
+      submissionsQuery = submissionsQuery.eq("group_number", groupNumber);
     }
 
-    const { data: submissions, error: fetchError } = await query;
+    const { data: submissions, error: submissionsError } = await submissionsQuery;
     
-    if (fetchError) {
-      throw new Error(`Failed to fetch submissions: ${fetchError.message}`);
+    if (submissionsError) {
+      throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
     }
 
-    if (!submissions || submissions.length === 0) {
+    // Fetch study responses (spiritual fitness form) with participant info
+    let studyQuery = supabase
+      .from("study_responses_public")
+      .select("*")
+      .eq("session_id", sessionId);
+    
+    if (reportType === "group" && groupNumber) {
+      studyQuery = studyQuery.eq("group_number", groupNumber);
+    }
+
+    const { data: studyResponses, error: studyError } = await studyQuery;
+    
+    if (studyError) {
+      throw new Error(`Failed to fetch study responses: ${studyError.message}`);
+    }
+
+    // Combine both data sources
+    const hasSubmissions = submissions && submissions.length > 0;
+    const hasStudyResponses = studyResponses && studyResponses.length > 0;
+
+    if (!hasSubmissions && !hasStudyResponses) {
       return new Response(
         JSON.stringify({ error: "No submissions found" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Format submissions for AI
-    const formattedData = submissions.map((s) => ({
-      Name: s.name,
-      Group: s.group_number,
-      Theme: s.theme || "",
-      "Moving Verse": s.moving_verse || "",
-      "Facts Discovered": s.facts_discovered || "",
-      "Traditional Exegesis": s.traditional_exegesis || "",
-      Inspiration: s.inspiration_from_god || "",
-      Application: s.application_in_life || "",
-      Others: s.others || "",
+    // Format traditional submissions
+    const formattedSubmissions = (submissions || []).map((s) => ({
+      來源: "傳統查經表",
+      姓名: s.name,
+      組別: s.group_number,
+      主題: s.theme || "",
+      感動經節: s.moving_verse || "",
+      事實發現: s.facts_discovered || "",
+      傳統解經: s.traditional_exegesis || "",
+      神的啟示: s.inspiration_from_god || "",
+      生活應用: s.application_in_life || "",
+      其他: s.others || "",
     }));
+
+    // Format spiritual fitness responses
+    const formattedStudyResponses = (studyResponses || []).map((s) => ({
+      來源: "靈魂健身筆記",
+      姓名: s.participant_name || "未知",
+      組別: s.group_number,
+      標題短語: s.title_phrase || "",
+      心跳經節: s.heartbeat_verse || "",
+      經文觀察: s.observation || "",
+      核心洞察類型: s.core_insight_category || "",
+      核心洞察筆記: s.core_insight_note || "",
+      學者筆記: s.scholars_note || "",
+      行動計劃: s.action_plan || "",
+      冷卻反思: s.cool_down_note || "",
+    }));
+
+    // Combine all data
+    const allData = [...formattedSubmissions, ...formattedStudyResponses];
+    const totalMembers = allData.length;
+    const memberNames = allData.map(d => d.姓名).filter(Boolean).join("、");
+
+    // Get verse reference
+    const verseRef = submissions?.[0]?.bible_verse || 
+      (await supabase.from("sessions").select("verse_reference").eq("id", sessionId).single()).data?.verse_reference ||
+      "未指定";
 
     const reportTypeLabel = reportType === "group" 
       ? `第 ${groupNumber} 組小組報告 (Group ${groupNumber} Report)`
       : "整體健身報告 (Overall Assembly Report)";
 
-    const userPrompt = `請根據以下靈魂健身筆記資料，生成一份${reportTypeLabel}：
+    const userPrompt = `請根據以下查經筆記資料，生成一份${reportTypeLabel}。
 
-經文：${submissions[0]?.bible_verse || "未指定"}
+⚠️ 重要提醒：
+- 共有 ${totalMembers} 位成員的筆記需要分析
+- 成員名單：${memberNames}
+- 請確保每一位成員的內容都被納入分析，不可遺漏任何人
 
-健身筆記資料：
-${JSON.stringify(formattedData, null, 2)}
+經文：${verseRef}
 
-請依照指定格式生成報告。`;
+查經筆記資料（共 ${totalMembers} 份）：
+${JSON.stringify(allData, null, 2)}
+
+請依照指定格式生成完整報告，確保涵蓋所有 ${totalMembers} 位成員的貢獻。`;
 
     // Call Lovable AI
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
