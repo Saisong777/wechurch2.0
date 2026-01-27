@@ -124,26 +124,26 @@ export function parseReportContent(content: string): GroupReport[] {
       section.verse = cleanMarkdown(verseMatch[1]);
     }
     
-    // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題 Themes："
-    const themesMatch = groupReport.match(/(?:\*\*)?📖?\s*主題[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🔍|(?:\*\*)?💡|(?:\*\*)?🎯|(?:\*\*)?👤|---|ℹ️|$)/i);
+    // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題：" (with or without English description)
+    const themesMatch = groupReport.match(/(?:\*\*)?📖?\s*主題[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?[🔍💡🎯👤]|---|\n\*\*[🔍💡🎯👤]|$)/i);
     if (themesMatch) {
       section.themes = cleanMarkdown(themesMatch[1]);
     }
     
-    // Extract observations - handle formats like "**🔍 事實發現（Observations）：**"
-    const obsMatch = groupReport.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?💡|(?:\*\*)?🎯|(?:\*\*)?👤|---|ℹ️|$)/i);
+    // Extract observations - handle formats like "**🔍 事實發現（Observations）：**" or "**🔍 事實發現：**"
+    const obsMatch = groupReport.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?[💡🎯👤]|---|\n\*\*[💡🎯👤]|$)/i);
     if (obsMatch) {
       section.observations = cleanMarkdown(obsMatch[1]);
     }
     
-    // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**"
-    const insightsMatch = groupReport.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🎯|(?:\*\*)?👤|---|ℹ️|$)/i);
+    // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**" or "**💡 獨特亮光：**"
+    const insightsMatch = groupReport.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?[🎯👤]|---|\n\*\*[🎯👤]|$)/i);
     if (insightsMatch) {
       section.insights = cleanMarkdown(insightsMatch[1]);
     }
     
-    // Extract applications - handle formats like "**🎯 如何應用（Applications）：**"
-    const appMatch = groupReport.match(/(?:\*\*)?🎯?\s*如何應用[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?👤|---|ℹ️|$)/i);
+    // Extract applications - handle formats like "**🎯 如何應用（Applications）：**" or "**🎯 如何應用：**"
+    const appMatch = groupReport.match(/(?:\*\*)?🎯?\s*(?:如何)?應用[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?👤|---|\n\*\*👤|$)/i);
     if (appMatch) {
       section.applications = cleanMarkdown(appMatch[1]);
     }
