@@ -662,7 +662,7 @@ export const generateAIReport = async (
   sessionId: string,
   reportType: "group" | "overall",
   groupNumber?: number
-): Promise<{ success: boolean; report?: string; error?: string }> => {
+): Promise<{ success: boolean; report?: string; reportId?: string; error?: string }> => {
   const { data, error } = await supabase.functions.invoke("generate-report", {
     body: { sessionId, reportType, groupNumber },
   });
@@ -675,7 +675,38 @@ export const generateAIReport = async (
     return { success: false, error: data.error };
   }
 
-  return { success: true, report: data.report };
+  return { success: true, report: data.report, reportId: data.reportId };
+};
+
+// Fetch AI reports for a session
+export const fetchAIReports = async (
+  sessionId: string,
+  groupNumber?: number
+): Promise<{ id: string; content: string; reportType: string; groupNumber: number | null; createdAt: Date }[]> => {
+  let query = supabase
+    .from('ai_reports')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false });
+  
+  if (groupNumber !== undefined) {
+    query = query.eq('group_number', groupNumber);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error || !data) {
+    console.error('[fetchAIReports] Error:', error);
+    return [];
+  }
+  
+  return data.map(r => ({
+    id: r.id,
+    content: r.content,
+    reportType: r.report_type,
+    groupNumber: r.group_number,
+    createdAt: new Date(r.created_at),
+  }));
 };
 
 // Export submissions as CSV

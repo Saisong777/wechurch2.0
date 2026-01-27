@@ -213,7 +213,9 @@ export const AdminMonitor: React.FC = () => {
     setIsGeneratingGroup(true);
     setGenerationProgress({ current: 0, total: groups.length });
     
-    toast.info(`開始並行生成 ${groups.length} 個小組報告...`);
+    toast.info(`開始並行生成 ${groups.length} 個小組報告...`, {
+      description: 'AI 正在分析每組的讀經筆記...',
+    });
     
     // Generate all reports in parallel for speed
     const reportPromises = groups.map(async (group) => {
@@ -242,7 +244,9 @@ export const AdminMonitor: React.FC = () => {
     if (allReports) {
       setReportContent(allReports);
       setShowReportDialog(true);
-      toast.success(`成功生成 ${successCount}/${groups.length} 個小組報告！`);
+      toast.success(`成功生成 ${successCount}/${groups.length} 個小組報告！`, {
+        description: '每位參與者現在可以在自己的頁面查看小組報告',
+      });
     }
     
     setGenerationProgress({ current: 0, total: 0 });
