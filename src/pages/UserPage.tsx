@@ -529,7 +529,7 @@ export const UserPage: React.FC = () => {
         );
 
       case 'icebreaker':
-        if (!currentSession?.id || !currentUser?.groupNumber) {
+        if (!currentSession?.id || !currentUser?.groupNumber || !currentUser?.id) {
           setStep('study');
           return null;
         }
@@ -538,6 +538,7 @@ export const UserPage: React.FC = () => {
             <GroupIcebreaker 
               sessionId={currentSession.id}
               groupNumber={currentUser.groupNumber}
+              currentUserId={currentUser.id}
               onComplete={() => setStep('study')}
               onSkip={() => setStep('study')}
             />

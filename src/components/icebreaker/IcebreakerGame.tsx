@@ -11,9 +11,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check, Languages, Volume2, VolumeX, Timer } from 'lucide-react';
+import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check, Languages, Volume2, VolumeX, Timer, MessageCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface IcebreakerGameProps {
   sessionId?: string;
@@ -58,6 +59,7 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showTimer, setShowTimer] = useState(false);
   const [autoPassEnabled, setAutoPassEnabled] = useState(true);
+  const [isStartingSharing, setIsStartingSharing] = useState(false);
 
   const { playFlipSound, playDrawSound } = useSoundEffects({ enabled: soundEnabled });
 
@@ -131,6 +133,30 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
       setCopied(true);
       toast.success('房間代碼已複製！');
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Start sharing round - enables sharing mode for this game
+  const startSharingRound = async () => {
+    if (!gameId || isStartingSharing) return;
+    
+    setIsStartingSharing(true);
+    try {
+      const { error } = await supabase
+        .from('icebreaker_games')
+        .update({ 
+          sharing_mode: true,
+          shared_member_ids: [],
+        })
+        .eq('id', gameId);
+
+      if (error) throw error;
+      toast.success(showEnglish ? 'Sharing round started!' : '分享環節已開始！');
+    } catch (error) {
+      console.error('[IcebreakerGame] Failed to start sharing:', error);
+      toast.error(showEnglish ? 'Failed to start sharing' : '開啟分享環節失敗');
+    } finally {
+      setIsStartingSharing(false);
     }
   };
 
@@ -390,7 +416,7 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
 
       {/* Reset Button - only for host or standalone */}
       {(mode === 'standalone' || isHost) && (
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-3 flex-wrap">
           <Button
             variant="ghost"
             size="sm"
@@ -401,6 +427,24 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
             <RotateCcw className="w-4 h-4 mr-2" />
             {showEnglish ? 'Reset Deck' : '重置牌堆'}
           </Button>
+          
+          {/* Start Sharing Round - only for session mode host */}
+          {mode === 'session' && isHost && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={startSharingRound}
+              disabled={isStartingSharing}
+              className="text-primary border-primary/30"
+            >
+              {isStartingSharing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <MessageCircle className="w-4 h-4 mr-2" />
+              )}
+              {showEnglish ? 'Start Sharing' : '開啟分享環節'}
+            </Button>
+          )}
         </div>
       )}
     </div>
