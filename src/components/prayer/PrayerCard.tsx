@@ -2,14 +2,19 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Heart, Trash2, User } from 'lucide-react';
+import { Heart, Trash2, User, Pin } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { Prayer, useDeletePrayer, useToggleAmen, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
+import { Prayer, useDeletePrayer, useToggleAmen, useTogglePinPrayer, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { useUserRole } from '@/hooks/useUserRole';
 import { cn } from '@/lib/utils';
 import { PrayerComments } from './PrayerComments';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,13 +42,22 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
   const { isAdmin } = useUserRole();
   const deleteMutation = useDeletePrayer();
   const toggleAmenMutation = useToggleAmen();
+  const togglePinMutation = useTogglePinPrayer();
 
   const canDelete = prayer.is_owner || isAdmin;
+  const canPin = prayer.is_owner;
 
   const handleToggleAmen = () => {
     toggleAmenMutation.mutate({
       prayerId: prayer.id,
       hasAmened: prayer.has_amened,
+    });
+  };
+
+  const handleTogglePin = () => {
+    togglePinMutation.mutate({
+      prayerId: prayer.id,
+      isPinned: prayer.is_pinned,
     });
   };
 
@@ -57,11 +71,20 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
   });
 
   return (
-    <Card className="transition-all hover:shadow-md overflow-hidden">
+    <Card className={cn(
+      "transition-all hover:shadow-md overflow-hidden",
+      prayer.is_pinned && "ring-2 ring-amber-400 dark:ring-amber-500"
+    )}>
       <CardContent className="p-0">
-        {/* Category Banner */}
-        <div className={cn('px-4 py-2', CATEGORY_COLORS[prayer.category] || CATEGORY_COLORS.other)}>
+        {/* Category Banner with Pin indicator */}
+        <div className={cn('px-4 py-2 flex items-center justify-between', CATEGORY_COLORS[prayer.category] || CATEGORY_COLORS.other)}>
           <span className="text-xs font-medium">{CATEGORY_LABELS[prayer.category]}</span>
+          {prayer.is_pinned && (
+            <span className="flex items-center gap-1 text-xs font-medium">
+              <Pin className="h-3 w-3" />
+              置頂
+            </span>
+          )}
         </div>
 
         <div className="p-4 space-y-4">
@@ -99,34 +122,64 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
               </div>
             </div>
 
-            {canDelete && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>確定要刪除這個禱告嗎？</AlertDialogTitle>
-                    <AlertDialogDescription>此操作無法復原。</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            <div className="flex items-center gap-1">
+              {/* Pin Button */}
+              {canPin && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-8 w-8",
+                          prayer.is_pinned 
+                            ? "text-amber-500 hover:text-amber-600" 
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={handleTogglePin}
+                        disabled={togglePinMutation.isPending}
+                      >
+                        <Pin className={cn("h-4 w-4", prayer.is_pinned && "fill-current")} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {prayer.is_pinned ? '取消置頂' : '置頂禱告'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
+              {/* Delete Button */}
+              {canDelete && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     >
-                      刪除
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>確定要刪除這個禱告嗎？</AlertDialogTitle>
+                      <AlertDialogDescription>此操作無法復原。</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        刪除
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
           </div>
 
           {/* Content */}

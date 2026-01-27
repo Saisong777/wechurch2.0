@@ -19,6 +19,7 @@ export interface Prayer {
   created_at: string;
   user_id: string;
   category: PrayerCategory;
+  is_pinned: boolean;
   author_name: string;
   author_avatar: string | null;
   amen_count: number;
@@ -154,6 +155,42 @@ export const useToggleAmen = () => {
         queryClient.setQueryData(['prayer-wall'], context.previousPrayers);
       }
       toast.error('操作失敗 Action failed');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
+    },
+  });
+};
+
+export const useTogglePinPrayer = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ prayerId, isPinned }: { prayerId: string; isPinned: boolean }) => {
+      const { error } = await supabase
+        .from('prayers')
+        .update({ is_pinned: !isPinned })
+        .eq('id', prayerId);
+
+      if (error) throw error;
+    },
+    onMutate: async ({ prayerId, isPinned }) => {
+      await queryClient.cancelQueries({ queryKey: ['prayer-wall'] });
+      const previousPrayers = queryClient.getQueryData<Prayer[]>(['prayer-wall']);
+
+      queryClient.setQueryData<Prayer[]>(['prayer-wall'], (old) =>
+        old?.map((prayer) =>
+          prayer.id === prayerId ? { ...prayer, is_pinned: !isPinned } : prayer
+        )
+      );
+
+      return { previousPrayers };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousPrayers) {
+        queryClient.setQueryData(['prayer-wall'], context.previousPrayers);
+      }
+      toast.error('操作失敗');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
