@@ -176,9 +176,9 @@ serve(async (req) => {
       throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
     }
 
-    // Fetch study responses (spiritual fitness form) with participant info
+    // Fetch study responses from the CORRECT view (v_ai_notes_feed) - NOT study_responses_public which has CROSS JOIN bug!
     let studyQuery = supabase
-      .from("study_responses_public")
+      .from("v_ai_notes_feed")
       .select("*")
       .eq("session_id", sessionId);
     
@@ -187,7 +187,7 @@ serve(async (req) => {
     }
 
     const { data: studyResponses, error: studyError } = await studyQuery;
-    
+
     if (studyError) {
       throw new Error(`Failed to fetch study responses: ${studyError.message}`);
     }
@@ -229,22 +229,22 @@ serve(async (req) => {
       其他: s.others || "",
     }));
 
-    // Deduplicate study responses by participant name + group
+    // Deduplicate study responses by first_name + group (v_ai_notes_feed uses first_name, not participant_name)
     const seenStudyResponses = new Set<string>();
     const uniqueStudyResponses = (studyResponses || []).filter((s) => {
-      const key = (s.participant_name || 'unknown') + '-' + s.group_number;
+      const key = (s.first_name || 'unknown') + '-' + s.group_number;
       if (seenStudyResponses.has(key)) {
-        console.log(`[generate-report] Duplicate study response filtered: ${s.participant_name}`);
+        console.log(`[generate-report] Duplicate study response filtered: ${s.first_name}`);
         return false;
       }
       seenStudyResponses.add(key);
       return true;
     });
 
-    // Format spiritual fitness responses
+    // Format spiritual fitness responses (using v_ai_notes_feed column names)
     const formattedStudyResponses = uniqueStudyResponses.map((s) => ({
       來源: "靈魂健身筆記",
-      姓名: s.participant_name || "未知",
+      姓名: s.first_name || "未知",
       組別: s.group_number,
       標題短語: s.title_phrase || "",
       心跳經節: s.heartbeat_verse || "",
