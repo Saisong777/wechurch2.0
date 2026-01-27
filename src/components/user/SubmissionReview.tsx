@@ -134,20 +134,6 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
-      <Card variant="highlight" className="text-center">
-        <CardContent className="py-6 sm:py-8">
-          <div className="w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold mx-auto mb-4 flex items-center justify-center glow-gold">
-            <CheckCircle className="w-10 h-10 sm:w-8 sm:h-8 text-secondary-foreground" />
-          </div>
-          <h2 className="font-serif text-2xl sm:text-2xl font-bold text-foreground">
-            提交成功！
-          </h2>
-          <p className="text-base sm:text-base text-muted-foreground mt-2">
-            Your Spiritual Fitness notes have been saved
-          </p>
-        </CardContent>
-      </Card>
-
       {/* Tab Navigation between Personal and Group Report */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'personal' | 'group')} className="w-full">
         <TabsList className="grid w-full grid-cols-2 h-12 sm:h-10">
