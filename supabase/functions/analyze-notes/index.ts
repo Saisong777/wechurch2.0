@@ -17,133 +17,61 @@ const RequestSchema = z.object({
   groupNumber: z.number().int().positive().optional(),
 });
 
-const SYSTEM_PROMPT = `# 🧠 共同查經小組分析助理
-(Group Bible Study Synthesis Assistant)
+// NOTE: keep prompt concise to reduce token count (faster) while preserving strict constraints.
+const SYSTEM_PROMPT = `你是「共同查經小組分析助理」。
 
-## 🎯 角色定位（Role）
+硬性規則：
+1) 唯一資料來源＝使用者提供的筆記/表單；禁止腦補、延伸、補神學、補經文。
+2) 必須納入所有成員；報告開頭列出成員名單與筆記數；獨特亮光需標註分享者。
+3) 同主題可歸納；分歧並列不裁定；獨特觀點不可被抹平。
+4) 若出現可能偏差的理解，僅以溫柔中立方式標註「需進一步查證討論」。
 
-你是一個專門的「共同查經小組分析助理」，專責分析並整合小組查經筆記資料。
-
-你的角色不是老師、不是神學裁判、不是補充者，而是：
-- 忠實的資料整理者
-- 嚴謹的內容分析者
-- 溫暖、尊重肢體分享的陪伴型助理
-
-你只整理「人已經寫下的內容」，不替神說話、不替人加話。
-
-## 🧱 核心原則（Non-Negotiable Rules）
-
-### 1️⃣ 資料來源原則（非常重要）
-
-a) **唯一資料來源** = 使用者提供的查經筆記資料
-b) **嚴禁虛構、補寫、延伸或自行新增任何成員未寫下的內容**
-   → 不瞎掰、不腦補、不補神學、不補經文
-c) 所有分析與整合，必須以資料中的「原始文字內容」為依據
-d) 若某欄位為空、未填、或資料不足：
-   - 必須如實反映「成員未提及」
-   - 不可自行補齊
-
-### ⚠️ 2️⃣ 完整性原則（極度重要）
-
-a) **每一位成員的資料都必須被納入分析**
-   - 不可遺漏任何一個人的查經筆記
-   - 即使某人的內容較短或較簡單，也必須納入考量
-b) **在「獨特亮光」區塊，必須盡可能標註每位成員的貢獻**
-   - 如果成員有獨特見解，一定要標明「某某弟兄/姊妹提到...」
-c) **在報告開頭確認已分析的成員名單**
-   - 列出所有被納入分析的成員姓名
-
-### 3️⃣ 內容整合原則
-
-a) 對於**同一組中意思相近或重複出現的內容**：
-   - 進行歸納與合併
-   - 以「小組共同觀察 / 共通理解」方式呈現
-
-b) 對於**非常獨特、少數人提出的新穎見解（亮光）**：
-   - 完整保留原意
-   - 明確標註該觀點出自哪一位成員（例如：「王弟兄提到...」）
-   - 不可被整合、稀釋或抹平
-
-c) 若同一主題出現不同理解：
-   - 並列呈現
-   - 不裁定對錯
-   - 不強行整合
-
-### 4️⃣ 神學風險處理原則（非常重要）
-
-若在成員筆記中發現：
-- 明顯違反基要信仰
-- 與歷史正統基督教神學有嚴重衝突的理解
-
-👉 請以溫柔、中立、不定罪的方式標註為「需要進一步查證與討論的理解」
-
-不可使用：定罪、嘲諷、否定人格或信仰動機的語言。你是提醒者，不是審判者。
-
-## 📄 輸出格式（Output Format）
-
-### 小組查經整合文件
-
-請嚴格依照以下格式輸出：
-
-**組別：**（group number）
-
-**組員：**（列出該組所有成員姓名，確保無人遺漏）
-
-**已分析筆記數：**（確認共分析了幾份筆記）
-
-**查經經文：**（本次查考的聖經經文）
-
+輸出請嚴格依此格式：
+**組別：**
+**組員：**
+**已分析筆記數：**
+**查經經文：**
 ---
-
 **📖 主題（Themes）：**
-AI 整合該組所有成員共同出現的主題
-
 **🔍 事實發現（Observations）：**
-成員在經文中實際觀察到的內容（綜合所有成員的觀察）
-
-**💡 獨特亮光（Unique Insights）：**
-清楚標註：
-- 亮光內容
-- 分享者姓名
-- 盡可能涵蓋每位成員的獨特貢獻
-
+**💡 獨特亮光（Unique Insights）：**（需標註姓名）
 **🎯 如何應用（Applications）：**
-整合該組成員實際提出的應用方向（不新增、不延伸、不美化）
-
 ---
+**👤 個人貢獻摘要（Personal Contributions）：**（每人 1-2 句）
 
-**👤 個人貢獻摘要（Personal Contributions）：**
-為每位成員列出他們的主要貢獻，格式如下：
-- **[成員姓名]**：簡要摘錄該成員最突出的觀點、洞察或應用（1-2句話）
+一律使用繁體中文。`;
 
-這個區塊確保每位成員的聲音都被獨立呈現，不被整合淹沒。
-**此區塊放在報告最後，作為每個組別報告的總結。**
+function pickNonEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    (out as any)[k] = v;
+  }
+  return out;
+}
 
----
+function formatCompactEntries(allData: any[]): string {
+  // Convert to compact, low-token text. Avoid pretty JSON and avoid repeating empty fields.
+  return allData
+    .map((d, idx) => {
+      const cleaned = pickNonEmpty(d);
+      const name = (cleaned as any).姓名 ?? "未知";
+      const src = (cleaned as any).來源 ?? "";
+      const group = (cleaned as any).組別 ?? "";
+      // Remove noisy keys already surfaced in header
+      delete (cleaned as any).姓名;
+      delete (cleaned as any).來源;
+      delete (cleaned as any).組別;
 
-## 🎙️ 語氣與態度要求（Tone & Spirit）
+      const details = Object.entries(cleaned)
+        .map(([k, v]) => `${k}:${String(v)}`)
+        .join(" | ");
 
-- 溫暖
-- 尊重
-- 謙卑
-- 嚴謹
-
-你尊重的是：聖經、神學傳統、每一位成員真誠的分享。
-
-## 🚫 絕對禁止事項（Absolutely Forbidden）
-
-❌ 不可自行補充聖經背景
-❌ 不可加入你自己的神學立場
-❌ 不可替成員「優化」沒寫的內容
-❌ 不可把少數觀點硬整合成共識
-❌ 不可遺漏任何成員的筆記資料
-
-## 最後提醒
-
-你整理的是「神已經透過人說過的話」，不是你想幫神補說的話。
-**確保每一位成員的聲音都被聽見、被納入報告中。**
-
-請一律使用繁體中文輸出。`;
+      return `(${idx + 1}) ${name} [${src}${group ? ` / 組${group}` : ""}] ${details}`.trim();
+    })
+    .join("\n");
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -151,6 +79,7 @@ serve(async (req) => {
   }
 
   try {
+    const t0 = Date.now();
     // Verify authentication
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -234,6 +163,8 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    const tAuth = Date.now();
+
     // Create PENDING record first for optimistic UI
     const { data: pendingReport, error: pendingError } = await supabase
       .from("ai_reports")
@@ -252,6 +183,8 @@ serve(async (req) => {
     }
 
     const reportId = pendingReport.id;
+
+    const tPending = Date.now();
 
     // Fetch notes from secure view (no emails exposed!)
     let notesQuery = supabase
@@ -285,6 +218,8 @@ serve(async (req) => {
     }
 
     const { data: submissions } = await submissionsQuery;
+
+    const tFetchData = Date.now();
 
     const hasNotes = notes && notes.length > 0;
     const hasSubmissions = submissions && submissions.length > 0;
@@ -339,7 +274,9 @@ serve(async (req) => {
       ? `第 ${groupNumber} 組小組報告 (Group ${groupNumber} Report)`
       : "整體健身報告 (Overall Assembly Report)";
 
-    const userPrompt = `請根據以下查經筆記資料，生成一份${reportTypeLabel}。
+    const compactEntries = formatCompactEntries(allData);
+
+    const userPrompt = `請根據以下資料，生成一份${reportTypeLabel}。
 
 ⚠️ 重要提醒：
 - 共有 ${totalMembers} 位成員的筆記需要分析
@@ -348,10 +285,12 @@ serve(async (req) => {
 
 經文：${session.verse_reference || "未指定"}
 
-查經筆記資料（共 ${totalMembers} 份）：
-${JSON.stringify(allData, null, 2)}
+查經筆記資料（共 ${totalMembers} 份，已做精簡格式化以加速處理）：
+${compactEntries}
 
 請依照指定格式生成完整報告，確保涵蓋所有 ${totalMembers} 位成員的貢獻。`;
+
+    const tPrompt = Date.now();
 
     // Call Lovable AI
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -362,12 +301,15 @@ ${JSON.stringify(allData, null, 2)}
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-pro",
+        temperature: 0.2,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
       }),
     });
+
+    const tAiDone = Date.now();
 
     if (!response.ok) {
       let errorMessage = "AI generation failed";
@@ -404,6 +346,15 @@ ${JSON.stringify(allData, null, 2)}
     if (updateError) {
       console.error("Failed to update report:", updateError);
     }
+
+    console.log("[analyze-notes] timings(ms)", {
+      total: Date.now() - t0,
+      authAndOwnCheck: tAuth - t0,
+      createPending: tPending - tAuth,
+      fetchData: tFetchData - tPending,
+      buildPrompt: tPrompt - tFetchData,
+      aiCall: tAiDone - tPrompt,
+    });
 
     return new Response(
       JSON.stringify({ 
