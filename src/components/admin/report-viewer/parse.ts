@@ -124,34 +124,86 @@ export function parseReportContent(content: string): GroupReport[] {
       section.verse = cleanMarkdown(verseMatch[1]);
     }
     
-    // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題：" (with or without English description)
-    const themesMatch = groupReport.match(/(?:\*\*)?📖?\s*主題[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?[🔍💡🎯👤]|---|\n\*\*[🔍💡🎯👤]|$)/i);
-    if (themesMatch) {
-      section.themes = cleanMarkdown(themesMatch[1]);
+    // Helper function to extract section content by looking for next section header
+    const extractSectionContent = (
+      text: string, 
+      startPattern: RegExp, 
+      endMarkers: string[]
+    ): string | null => {
+      const startMatch = text.match(startPattern);
+      if (!startMatch) return null;
+      
+      const startIdx = startMatch.index! + startMatch[0].length;
+      let endIdx = text.length;
+      
+      // Find the earliest next section marker
+      for (const marker of endMarkers) {
+        const markerIdx = text.indexOf(marker, startIdx);
+        if (markerIdx !== -1 && markerIdx < endIdx) {
+          endIdx = markerIdx;
+        }
+      }
+      
+      // Also look for "---" separator
+      const dashIdx = text.indexOf('---', startIdx);
+      if (dashIdx !== -1 && dashIdx < endIdx) {
+        endIdx = dashIdx;
+      }
+      
+      return text.slice(startIdx, endIdx).trim();
+    };
+    
+    // Section markers to look for (order matters for proper boundary detection)
+    const SECTION_MARKERS = ['**📖', '📖', '**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤'];
+    
+    // Extract themes
+    const themesContent = extractSectionContent(
+      groupReport,
+      /(?:\*\*)?📖?\s*主題[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      ['**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤']
+    );
+    if (themesContent) {
+      section.themes = cleanMarkdown(themesContent);
     }
     
-    // Extract observations - handle formats like "**🔍 事實發現（Observations）：**" or "**🔍 事實發現：**"
-    const obsMatch = groupReport.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?[💡🎯👤]|---|\n\*\*[💡🎯👤]|$)/i);
-    if (obsMatch) {
-      section.observations = cleanMarkdown(obsMatch[1]);
+    // Extract observations
+    const obsContent = extractSectionContent(
+      groupReport,
+      /(?:\*\*)?🔍?\s*事實發現[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      ['**💡', '💡', '**🎯', '🎯', '**👤', '👤']
+    );
+    if (obsContent) {
+      section.observations = cleanMarkdown(obsContent);
     }
     
-    // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**" or "**💡 獨特亮光：**"
-    const insightsMatch = groupReport.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?[🎯👤]|---|\n\*\*[🎯👤]|$)/i);
-    if (insightsMatch) {
-      section.insights = cleanMarkdown(insightsMatch[1]);
+    // Extract insights (獨特亮光)
+    const insightsContent = extractSectionContent(
+      groupReport,
+      /(?:\*\*)?💡?\s*獨特亮光[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      ['**🎯', '🎯', '**👤', '👤']
+    );
+    if (insightsContent) {
+      section.insights = cleanMarkdown(insightsContent);
     }
     
-    // Extract applications - handle formats like "**🎯 如何應用（Applications）：**" or "**🎯 如何應用：**"
-    const appMatch = groupReport.match(/(?:\*\*)?🎯?\s*(?:如何)?應用[^：:\n]*?[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?👤|---|\n\*\*👤|$)/i);
-    if (appMatch) {
-      section.applications = cleanMarkdown(appMatch[1]);
+    // Extract applications
+    const appContent = extractSectionContent(
+      groupReport,
+      /(?:\*\*)?🎯?\s*(?:如何)?應用[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      ['**👤', '👤']
+    );
+    if (appContent) {
+      section.applications = cleanMarkdown(appContent);
     }
     
-    // Extract personal contributions (at the end) - handle formats like "**👤 個人貢獻摘要（Personal Contributions）：**"
-    const contribMatch = groupReport.match(/(?:\*\*)?👤?\s*個人貢獻[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=---|$)/i);
-    if (contribMatch) {
-      section.contributions = cleanMarkdown(contribMatch[1]);
+    // Extract personal contributions (at the end)
+    const contribContent = extractSectionContent(
+      groupReport,
+      /(?:\*\*)?👤?\s*個人貢獻[^：:\n]*[：:]\s*(?:\*\*)?/i,
+      [] // Last section, no end markers
+    );
+    if (contribContent) {
+      section.contributions = cleanMarkdown(contribContent);
     }
     
     // Store raw content as fallback - also cleaned
