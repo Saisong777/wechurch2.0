@@ -115,7 +115,7 @@ const Index = () => {
             {/* My Notebook Entry - for returning users */}
             {hasEmail && (
               <Card variant="default" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer border-secondary/30 hover:border-secondary/50">
-                <Link to="/user?step=notebook">
+                <Link to="/notebook">
                   <CardContent className="py-6 text-center">
                     <div className="flex items-center justify-center gap-6">
                       <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
