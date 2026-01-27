@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { SoulGymLogo } from '@/components/icons/SoulGymLogo';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -31,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   variant = 'default',
 }) => {
   const { user, loading, signOut } = useAuth();
+  const { profile } = useUserProfile();
   const navigate = useNavigate();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
 
@@ -45,6 +47,10 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const getDisplayName = () => {
+    // Prefer profile table data, fallback to user metadata
+    if (profile?.display_name) {
+      return profile.display_name;
+    }
     if (user?.user_metadata?.display_name) {
       return user.user_metadata.display_name;
     }
@@ -53,6 +59,9 @@ export const Header: React.FC<HeaderProps> = ({
     }
     return '使用者';
   };
+
+  // Get avatar URL: prefer profile table, fallback to user metadata
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
   return (
     <header className={cn(
@@ -97,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 p-0">
                     <Avatar className="w-9 h-9">
-                      <AvatarImage src={user.user_metadata?.avatar_url} />
+                      <AvatarImage src={avatarUrl || undefined} />
                       <AvatarFallback className="bg-secondary/20 text-secondary text-sm font-medium">
                         {getInitials(user.email)}
                       </AvatarFallback>
