@@ -70,7 +70,8 @@ serve(async (req) => {
       );
     }
 
-    // Verify session is active
+    // Verify session exists and is not ended
+    // Allow latecomers to save notes during any active phase
     const { data: session, error: sessionError } = await supabase
       .from("sessions")
       .select("id, status, created_at")
@@ -84,10 +85,11 @@ serve(async (req) => {
       );
     }
 
-    const validStatuses = ["waiting", "studying", "grouping", "verification"];
-    if (!validStatuses.includes(session.status)) {
+    // Only block if session is explicitly ended
+    const blockedStatuses = ["ended", "cancelled"];
+    if (blockedStatuses.includes(session.status)) {
       return new Response(
-        JSON.stringify({ error: "Session is not active" }),
+        JSON.stringify({ error: "Session has ended" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
