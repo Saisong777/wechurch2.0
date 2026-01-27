@@ -46,7 +46,11 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   const [activeTab, setActiveTab] = useState('all');
   
   const parsedSections = reportContent ? parseReportContent(reportContent) : [];
-  const hasMultipleGroups = parsedSections.length > 1 && parsedSections[0].groupNumber > 0;
+  
+  // Separate group reports (groupNumber > 0) from overall reports (groupNumber === 0)
+  const groupReports = parsedSections.filter(s => s.groupNumber > 0);
+  const overallReports = parsedSections.filter(s => s.groupNumber === 0);
+  const hasMultipleGroups = groupReports.length > 1 || (groupReports.length >= 1 && overallReports.length >= 1);
   
   // --- Copy handlers ---
   const handleCopyAll = () => {
@@ -179,7 +183,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                   <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                     個別小組
                   </div>
-                  {parsedSections.filter(s => s.groupNumber > 0).map(section => (
+                  {groupReports.map(section => (
                     <DropdownMenuItem 
                       key={section.groupNumber}
                       onClick={() => handleDownloadMarkdownGroup(section.groupNumber)}
@@ -202,7 +206,13 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                 <TabsTrigger value="all" className="px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                   全部 ({parsedSections.length})
                 </TabsTrigger>
-                {parsedSections.filter(s => s.groupNumber > 0).map(section => (
+                {overallReports.length > 0 && (
+                  <TabsTrigger value="overall" className="px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                    <span className="hidden sm:inline">全組總結</span>
+                    <span className="sm:hidden">總結</span>
+                  </TabsTrigger>
+                )}
+                {groupReports.map(section => (
                   <TabsTrigger key={`tab-${section.groupNumber}`} value={`group-${section.groupNumber}`} className="px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                     <span className="hidden sm:inline">第 {section.groupNumber} 組</span>
                     <span className="sm:hidden">{section.groupNumber}組</span>
@@ -214,7 +224,23 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
               <TabsContent value="all" className="mt-0 space-y-6 sm:space-y-8">
                 <div ref={printRef}>
-                  {parsedSections.map((section, index) => (
+                  {/* Show overall reports first */}
+                  {overallReports.map((section, index) => (
+                    <React.Fragment key={`overall-${index}`}>
+                      <GroupSection
+                        section={{ ...section, groupInfo: '全組總結' }}
+                        onCopy={handleCopyGroup}
+                        onDownloadMarkdown={handleDownloadMarkdownGroup}
+                        onDownloadPDF={handleDownloadPDF}
+                        onPrint={handlePrint}
+                      />
+                      {(index < overallReports.length - 1 || groupReports.length > 0) && (
+                        <Separator className="my-6 sm:my-8" />
+                      )}
+                    </React.Fragment>
+                  ))}
+                  {/* Then show group reports */}
+                  {groupReports.map((section, index) => (
                     <React.Fragment key={`all-${section.groupNumber}`}>
                       <GroupSection
                         section={section}
@@ -223,7 +249,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                         onDownloadPDF={handleDownloadPDF}
                         onPrint={handlePrint}
                       />
-                      {index < parsedSections.length - 1 && (
+                      {index < groupReports.length - 1 && (
                         <Separator className="my-6 sm:my-8" />
                       )}
                     </React.Fragment>
@@ -231,7 +257,27 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                 </div>
               </TabsContent>
               
-              {parsedSections.filter(s => s.groupNumber > 0).map(section => (
+              {/* Overall reports tab */}
+              {overallReports.length > 0 && (
+                <TabsContent value="overall" className="mt-0 space-y-6">
+                  {overallReports.map((section, index) => (
+                    <React.Fragment key={`overall-tab-${index}`}>
+                      <GroupSection
+                        section={{ ...section, groupInfo: '全組總結' }}
+                        onCopy={handleCopyGroup}
+                        onDownloadMarkdown={handleDownloadMarkdownGroup}
+                        onDownloadPDF={handleDownloadPDF}
+                        onPrint={handlePrint}
+                      />
+                      {index < overallReports.length - 1 && (
+                        <Separator className="my-6 sm:my-8" />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </TabsContent>
+              )}
+              
+              {groupReports.map(section => (
                 <TabsContent key={`content-${section.groupNumber}`} value={`group-${section.groupNumber}`} className="mt-0">
                   <GroupSection
                     section={section}
@@ -271,7 +317,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
             <span className="hidden sm:inline">報告由 AI 分析助理生成 • </span>
             {new Date().toLocaleDateString('zh-TW')}
-            {hasMultipleGroups && <span className="hidden sm:inline"> • 共 {parsedSections.length} 組</span>}
+            {hasMultipleGroups && <span className="hidden sm:inline"> • 共 {groupReports.length} 組</span>}
           </p>
           <Button variant="gold" size="sm" onClick={() => onOpenChange(false)} className="h-9 px-4 text-sm shrink-0">
             關閉
