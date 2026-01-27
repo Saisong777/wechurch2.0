@@ -90,7 +90,9 @@ export const UserPage: React.FC = () => {
         .maybeSingle();
 
       if (sessionError || !sessionData) {
-        console.log('[UserPage] Session not found or expired, clearing stored data');
+        console.log('[UserPage] Session not found or expired, clearing all stored data');
+        // Clear all session-related data since the session no longer exists
+        localStorage.removeItem(STORAGE_KEYS.SESSION_ID);
         localStorage.removeItem(STORAGE_KEYS.PARTICIPANT_ID);
         localStorage.removeItem(STORAGE_KEYS.USER_STEP);
         setIsRestoring(false);
@@ -111,11 +113,24 @@ export const UserPage: React.FC = () => {
       }
 
       if (!participantData || participantData.length === 0) {
-        console.log('[UserPage] Participant not found, clearing stored data');
+        console.log('[UserPage] Participant not found for this email, may need to rejoin');
+        // Clear participant data but keep session ID so user can rejoin the same session
         localStorage.removeItem(STORAGE_KEYS.PARTICIPANT_ID);
         localStorage.removeItem(STORAGE_KEYS.USER_STEP);
+        // Keep SESSION_ID so user can rejoin - set session context and go to join step
+        setCurrentSession({
+          id: sessionData.id,
+          bibleVerse: '',
+          verseReference: sessionData.verse_reference,
+          status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
+          createdAt: new Date(sessionData.created_at),
+          groups: [],
+          allowLatecomers: sessionData.allow_latecomers || false,
+        });
+        setSessionId(storedSessionId);
+        setStep('join');
         setIsRestoring(false);
-        return false;
+        return true; // Return true since we're handling the redirect
       }
 
       const participant = participantData[0];
