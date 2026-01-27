@@ -16,16 +16,57 @@ interface UseSessionAnalysisOptions {
   sessionId: string;
   groupNumber?: number;
   reportType?: 'group' | 'overall';
+  /** Set to true for participant access (uses edge function to bypass RLS) */
+  isParticipant?: boolean;
 }
 
-export function useSessionAnalysis({ sessionId, groupNumber, reportType }: UseSessionAnalysisOptions) {
+export function useSessionAnalysis({ sessionId, groupNumber, reportType, isParticipant }: UseSessionAnalysisOptions) {
   const queryClient = useQueryClient();
 
-  const queryKey = ['session-analysis', sessionId, reportType, groupNumber];
+  const queryKey = ['session-analysis', sessionId, reportType, groupNumber, isParticipant];
 
   const { data: analyses, isLoading, error, refetch } = useQuery({
     queryKey,
     queryFn: async (): Promise<SessionAnalysis[]> => {
+      // For participants, use edge function to bypass RLS
+      if (isParticipant && reportType === 'group' && groupNumber !== undefined) {
+        const participantEmail = localStorage.getItem('bible_study_guest_email');
+        
+        if (!participantEmail) {
+          console.log('[useSessionAnalysis] No participant email found');
+          return [];
+        }
+
+        const { data, error: fnError } = await supabase.functions.invoke('get-group-report', {
+          body: {
+            sessionId,
+            groupNumber,
+            participantEmail,
+          },
+        });
+
+        if (fnError) {
+          console.error('[useSessionAnalysis] Edge function error:', fnError);
+          throw fnError;
+        }
+
+        if (data?.error) {
+          console.error('[useSessionAnalysis] Edge function returned error:', data.error);
+          return [];
+        }
+
+        return (data?.reports || []).map((r: any) => ({
+          id: r.id,
+          sessionId: r.session_id,
+          reportType: r.report_type as 'group' | 'overall',
+          groupNumber: r.group_number,
+          content: r.content,
+          status: (r.status || 'COMPLETED') as 'PENDING' | 'COMPLETED' | 'FAILED',
+          createdAt: new Date(r.created_at),
+        }));
+      }
+
+      // For admin/owner, use direct query
       let query = supabase
         .from('ai_reports')
         .select('*')
