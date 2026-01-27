@@ -51,7 +51,10 @@ serve(async (req) => {
     }
 
     if (participant.email.toLowerCase() !== participantEmail.toLowerCase()) {
-      console.error("[get-study-response] Email mismatch");
+      console.error("[get-study-response] Email mismatch:", {
+        expected: participant.email.toLowerCase(),
+        received: participantEmail.toLowerCase(),
+      });
       return new Response(
         JSON.stringify({ error: "Email verification failed" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
