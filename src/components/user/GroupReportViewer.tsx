@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Users, BookOpen, Search, Lightbulb, Target, Share2, Download, Loader2 } from 'lucide-react';
+import { Sparkles, Users, BookOpen, Search, Lightbulb, Target, Share2, Download } from 'lucide-react';
 import { fetchAIReports } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
+import { 
+  EnhancedSection, 
+  extractActionItems, 
+  ActionItemList,
+  extractKeywords,
+  KeywordTagCloud 
+} from '@/components/admin/ReportVisualElements';
 
 interface GroupReportViewerProps {
   sessionId: string;
@@ -88,8 +94,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           title: `第 ${groupNumber} 組查經報告`,
           text: report,
         });
-      } catch (err) {
-        // User cancelled or share failed
+      } catch {
         handleCopy();
       }
     } else {
@@ -151,6 +156,12 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   const parsed = parseReportContent(report);
   const hasStructuredContent = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
 
+  // Extract all keywords for a summary tag cloud
+  const allKeywords = [
+    ...extractKeywords(parsed.themes || ''),
+    ...extractKeywords(parsed.observations || ''),
+  ].slice(0, 6);
+
   return (
     <Card>
       <CardHeader>
@@ -174,6 +185,13 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             生成於 {reportDate.toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </p>
         )}
+        
+        {/* Summary keyword cloud at top */}
+        {allKeywords.length > 0 && (
+          <div className="mt-3">
+            <KeywordTagCloud keywords={allKeywords} variant="themes" />
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Group Meta Info */}
@@ -196,54 +214,25 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           </div>
         )}
 
-        {/* Structured Sections with Spiritual Fitness colors */}
+        {/* Structured Sections with Enhanced Visuals */}
         {hasStructuredContent ? (
           <div className="space-y-4">
             {parsed.themes && (
-              <div className="p-4 bg-green-50/50 dark:bg-green-950/20 border-l-4 border-green-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-green-700 dark:text-green-400 mb-2 text-sm">
-                  <BookOpen className="w-4 h-4" />
-                  📖 主題 Themes
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                  {parsed.themes}
-                </div>
-              </div>
+              <EnhancedSection type="themes" content={parsed.themes} />
             )}
             
             {parsed.observations && (
-              <div className="p-4 bg-teal-50/50 dark:bg-teal-950/20 border-l-4 border-teal-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-teal-700 dark:text-teal-400 mb-2 text-sm">
-                  <Search className="w-4 h-4" />
-                  🔍 事實發現 Observations
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                  {parsed.observations}
-                </div>
-              </div>
+              <EnhancedSection type="observations" content={parsed.observations} />
             )}
             
             {parsed.insights && (
-              <div className="p-4 bg-yellow-50/50 dark:bg-yellow-950/20 border-l-4 border-yellow-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-yellow-700 dark:text-yellow-400 mb-2 text-sm">
-                  <Lightbulb className="w-4 h-4" />
-                  💡 獨特亮光 Unique Insights
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                  {parsed.insights}
-                </div>
-              </div>
+              <EnhancedSection type="insights" content={parsed.insights} showQuotes={true} />
             )}
             
             {parsed.applications && (
-              <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 border-l-4 border-blue-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-400 mb-2 text-sm">
-                  <Target className="w-4 h-4" />
-                  🎯 如何應用 Applications
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                  {parsed.applications}
-                </div>
+              <div className="space-y-2">
+                <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
+                <ActionItemList items={extractActionItems(parsed.applications)} />
               </div>
             )}
           </div>

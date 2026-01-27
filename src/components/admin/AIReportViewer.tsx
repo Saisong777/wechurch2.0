@@ -16,9 +16,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, Copy, Printer, Download, BookOpen, Lightbulb, Target, Search, FileText, ChevronDown, Users, FileDown } from 'lucide-react';
+import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { EnhancedSection, extractActionItems, ActionItemList } from './ReportVisualElements';
 
 interface GroupReport {
   groupNumber: number;
@@ -488,54 +488,25 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
           </div>
         )}
         
-        {/* Structured Sections with Spiritual Fitness colors */}
+        {/* Structured Sections with Enhanced Visual Elements */}
         {hasStructuredContent ? (
           <div className="space-y-4">
             {section.themes && (
-              <div className="p-5 bg-green-50/50 dark:bg-green-950/20 border-l-4 border-green-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-green-700 dark:text-green-400 mb-3">
-                  <BookOpen className="w-5 h-5" />
-                  📖 主題 Themes
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
-                  {section.themes}
-                </div>
-              </div>
+              <EnhancedSection type="themes" content={section.themes} />
             )}
             
             {section.observations && (
-              <div className="p-5 bg-teal-50/50 dark:bg-teal-950/20 border-l-4 border-teal-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-teal-700 dark:text-teal-400 mb-3">
-                  <Search className="w-5 h-5" />
-                  🔍 事實發現 Observations
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
-                  {section.observations}
-                </div>
-              </div>
+              <EnhancedSection type="observations" content={section.observations} />
             )}
             
             {section.insights && (
-              <div className="p-5 bg-yellow-50/50 dark:bg-yellow-950/20 border-l-4 border-yellow-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-yellow-700 dark:text-yellow-400 mb-3">
-                  <Lightbulb className="w-5 h-5" />
-                  💡 獨特亮光 Unique Insights
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
-                  {section.insights}
-                </div>
-              </div>
+              <EnhancedSection type="insights" content={section.insights} showQuotes={true} />
             )}
             
             {section.applications && (
-              <div className="p-5 bg-blue-50/50 dark:bg-blue-950/20 border-l-4 border-blue-500 rounded-r-lg">
-                <h3 className="flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-400 mb-3">
-                  <Target className="w-5 h-5" />
-                  🎯 如何應用 Applications
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
-                  {section.applications}
-                </div>
+              <div className="space-y-2">
+                <EnhancedSection type="applications" content={section.applications} showKeywords={false} />
+                <ActionItemList items={extractActionItems(section.applications)} />
               </div>
             )}
           </div>
