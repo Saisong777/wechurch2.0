@@ -23,18 +23,18 @@ export const SoulGymLogo: React.FC<SoulGymLogoProps> = ({
     >
       {/* Background circle with gradient */}
       <defs>
-        <linearGradient id="soulGymOrange" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="hsl(25, 95%, 53%)" />
-          <stop offset="100%" stopColor="hsl(16, 100%, 50%)" />
+        <linearGradient id="soulGymTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="hsl(172, 66%, 45%)" />
+          <stop offset="100%" stopColor="hsl(168, 76%, 42%)" />
         </linearGradient>
         <linearGradient id="soulGymDark" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="hsl(0, 0%, 15%)" />
-          <stop offset="100%" stopColor="hsl(0, 0%, 8%)" />
+          <stop offset="0%" stopColor="hsl(200, 20%, 18%)" />
+          <stop offset="100%" stopColor="hsl(200, 25%, 12%)" />
         </linearGradient>
-        <linearGradient id="fireGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="hsl(25, 95%, 53%)" />
-          <stop offset="50%" stopColor="hsl(16, 100%, 55%)" />
-          <stop offset="100%" stopColor="hsl(45, 100%, 60%)" />
+        <linearGradient id="energyGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="hsl(172, 66%, 45%)" />
+          <stop offset="50%" stopColor="hsl(180, 70%, 50%)" />
+          <stop offset="100%" stopColor="hsl(185, 75%, 55%)" />
         </linearGradient>
       </defs>
       
@@ -43,7 +43,7 @@ export const SoulGymLogo: React.FC<SoulGymLogoProps> = ({
         cx="32"
         cy="32"
         r="30"
-        stroke="url(#soulGymOrange)"
+        stroke="url(#soulGymTeal)"
         strokeWidth="3"
         fill="none"
       />
@@ -85,7 +85,7 @@ export const SoulGymLogo: React.FC<SoulGymLogoProps> = ({
         width="4"
         height="32"
         rx="1"
-        fill="url(#soulGymOrange)"
+        fill="url(#soulGymTeal)"
       />
       
       {/* Cross - horizontal beam */}
@@ -95,16 +95,16 @@ export const SoulGymLogo: React.FC<SoulGymLogoProps> = ({
         width="20"
         height="4"
         rx="1"
-        fill="url(#soulGymOrange)"
+        fill="url(#soulGymTeal)"
       />
       
-      {/* Fire/energy rays */}
+      {/* Energy rays */}
       <g opacity="0.8">
-        <path d="M32 6 L34 12 L30 12 Z" fill="url(#fireGradient)" />
-        <path d="M50 14 L46 18 L48 20 Z" fill="url(#fireGradient)" />
-        <path d="M58 32 L52 30 L52 34 Z" fill="url(#fireGradient)" />
-        <path d="M14 14 L18 18 L16 20 Z" fill="url(#fireGradient)" />
-        <path d="M6 32 L12 30 L12 34 Z" fill="url(#fireGradient)" />
+        <path d="M32 6 L34 12 L30 12 Z" fill="url(#energyGradient)" />
+        <path d="M50 14 L46 18 L48 20 Z" fill="url(#energyGradient)" />
+        <path d="M58 32 L52 30 L52 34 Z" fill="url(#energyGradient)" />
+        <path d="M14 14 L18 18 L16 20 Z" fill="url(#energyGradient)" />
+        <path d="M6 32 L12 30 L12 34 Z" fill="url(#energyGradient)" />
       </g>
     </svg>
   );
