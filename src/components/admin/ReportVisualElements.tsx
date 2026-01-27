@@ -243,7 +243,10 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
   const quotes = type === 'insights' && showQuotes ? parseInsightsWithQuotes(content) : [];
   
   // Clean markdown formatting from content
-  const cleanContent = content.replace(/\*\*/g, '');
+  const cleanContent = content
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/(?<!\*)\*(?!\*)([^*\n]+)\*(?!\*)/g, '$1')
+    .replace(/^\s*[\*\-•]\s+/gm, '• ');
   
   return (
     <div className={`p-5 border-l-4 rounded-r-lg ${config.bgClass}`}>

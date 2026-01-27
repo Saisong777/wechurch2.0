@@ -39,13 +39,13 @@ interface AIReportViewerProps {
   verseReference?: string;
 }
 
-// Clean markdown formatting - remove ** and *
+// Clean markdown formatting - remove ** and handle list items
 function cleanMarkdown(text: string): string {
   if (!text) return '';
   return text
-    .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold **text**
-    .replace(/\*([^*]+)\*/g, '$1')     // Remove italic *text*
-    .replace(/^\s*[\*\-]\s+/gm, '• ')  // Replace * or - at line start with bullet
+    .replace(/\*\*([^*]+)\*\*/g, '$1')       // Remove bold **text**
+    .replace(/(?<!\*)\*(?!\*)([^*\n]+)\*(?!\*)/g, '$1') // Remove italic *text* but not ** or list items
+    .replace(/^\s*[\*\-•]\s+/gm, '• ')       // Normalize bullets: * or - or • at line start → •
     .trim();
 }
 
