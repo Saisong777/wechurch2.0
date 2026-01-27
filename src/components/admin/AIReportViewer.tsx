@@ -18,7 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { EnhancedSection, extractActionItems, ActionItemList } from './ReportVisualElements';
+import { EnhancedSection } from './ReportVisualElements';
 
 interface GroupReport {
   groupNumber: number;
@@ -39,9 +39,20 @@ interface AIReportViewerProps {
   verseReference?: string;
 }
 
+// Clean markdown formatting - remove ** and *
+function cleanMarkdown(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold **text**
+    .replace(/\*([^*]+)\*/g, '$1')     // Remove italic *text*
+    .replace(/^\s*[\*\-]\s+/gm, '• ')  // Replace * or - at line start with bullet
+    .trim();
+}
+
 // Parse report content into structured sections
 function parseReportContent(content: string): GroupReport[] {
   const sections: GroupReport[] = [];
+  const seenGroups = new Set<number>();
 
   // Split by group separators if multiple groups
   const groupReports = content.split(/={40,}/);
@@ -54,58 +65,63 @@ function parseReportContent(content: string): GroupReport[] {
     // Extract group number
     const groupMatch = groupReport.match(/第\s*(\d+)\s*組(?:報告)?/);
     if (groupMatch) {
-      section.groupNumber = parseInt(groupMatch[1], 10);
+      const groupNum = parseInt(groupMatch[1], 10);
+      // Skip if we've already seen this group number
+      if (seenGroups.has(groupNum)) continue;
+      seenGroups.add(groupNum);
+      
+      section.groupNumber = groupNum;
       section.groupInfo = `第 ${groupMatch[1]} 組`;
     }
     
     // Extract members
     const membersMatch = groupReport.match(/(?:\*\*)?組員(?:\*\*)?[：:]\s*([^\n]+)/);
     if (membersMatch) {
-      section.members = membersMatch[1].trim();
+      section.members = cleanMarkdown(membersMatch[1]);
     }
     
     // Extract verse
     const verseMatch = groupReport.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*([^\n]+)/);
     if (verseMatch) {
-      section.verse = verseMatch[1].trim();
+      section.verse = cleanMarkdown(verseMatch[1]);
     }
     
     // Extract themes
     const themesMatch = groupReport.match(/(?:📖\s*)?(?:\*\*)?主題.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🔍|💡|🎯|---|\*\*事實|\*\*獨特|\*\*如何|$))/i);
     if (themesMatch) {
-      section.themes = themesMatch[1].trim();
+      section.themes = cleanMarkdown(themesMatch[1]);
     }
     
     // Extract observations
     const obsMatch = groupReport.match(/(?:🔍\s*)?(?:\*\*)?事實發現.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:💡|🎯|---|\*\*獨特|\*\*如何|$))/i);
     if (obsMatch) {
-      section.observations = obsMatch[1].trim();
+      section.observations = cleanMarkdown(obsMatch[1]);
     }
     
     // Extract insights
     const insightsMatch = groupReport.match(/(?:💡\s*)?(?:\*\*)?獨特亮光.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🎯|---|\*\*如何|$))/i);
     if (insightsMatch) {
-      section.insights = insightsMatch[1].trim();
+      section.insights = cleanMarkdown(insightsMatch[1]);
     }
     
     // Extract applications
     const appMatch = groupReport.match(/(?:🎯\s*)?(?:\*\*)?如何應用.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:---|$))/i);
     if (appMatch) {
-      section.applications = appMatch[1].trim();
+      section.applications = cleanMarkdown(appMatch[1]);
     }
     
-    // Store raw content as fallback
-    section.raw = groupReport.trim();
+    // Store raw content as fallback - also cleaned
+    section.raw = cleanMarkdown(groupReport);
     
     if (section.groupNumber) {
       sections.push(section as GroupReport);
-    } else if (section.raw) {
-      // For overall reports or ungrouped content
+    } else if (section.raw && section.raw.length > 50) {
+      // For overall reports or ungrouped content - only if substantial
       sections.push({ groupNumber: 0, raw: section.raw, ...section });
     }
   }
   
-  return sections.length > 0 ? sections : [{ groupNumber: 0, raw: content }];
+  return sections.length > 0 ? sections : [{ groupNumber: 0, raw: cleanMarkdown(content) }];
 }
 
 // Generate print-ready HTML for a single group or all groups
@@ -504,10 +520,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             )}
             
             {section.applications && (
-              <div className="space-y-2">
-                <EnhancedSection type="applications" content={section.applications} showKeywords={false} />
-                <ActionItemList items={extractActionItems(section.applications)} />
-              </div>
+              <EnhancedSection type="applications" content={section.applications} showKeywords={false} />
             )}
           </div>
         ) : (
