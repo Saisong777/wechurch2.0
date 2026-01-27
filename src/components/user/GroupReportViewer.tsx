@@ -156,11 +156,10 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   const parsed = parseReportContent(report);
   const hasStructuredContent = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
 
-  // Extract all keywords for a summary tag cloud
-  const allKeywords = [
-    ...extractKeywords(parsed.themes || ''),
-    ...extractKeywords(parsed.observations || ''),
-  ].slice(0, 6);
+  // Extract unique keywords - deduplicate
+  const themeKeywords = extractKeywords(parsed.themes || '');
+  const observationKeywords = extractKeywords(parsed.observations || '');
+  const combinedKeywords = [...new Set([...themeKeywords, ...observationKeywords])].slice(0, 5);
 
   return (
     <Card>
@@ -186,10 +185,10 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           </p>
         )}
         
-        {/* Summary keyword cloud at top */}
-        {allKeywords.length > 0 && (
+        {/* Summary keyword cloud at top - deduplicated */}
+        {combinedKeywords.length > 0 && (
           <div className="mt-3">
-            <KeywordTagCloud keywords={allKeywords} variant="themes" />
+            <KeywordTagCloud keywords={combinedKeywords} variant="themes" />
           </div>
         )}
       </CardHeader>
@@ -214,19 +213,19 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           </div>
         )}
 
-        {/* Structured Sections with Enhanced Visuals */}
+        {/* Structured Sections - don't show keywords again since we have summary at top */}
         {hasStructuredContent ? (
           <div className="space-y-4">
             {parsed.themes && (
-              <EnhancedSection type="themes" content={parsed.themes} />
+              <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
             )}
             
             {parsed.observations && (
-              <EnhancedSection type="observations" content={parsed.observations} />
+              <EnhancedSection type="observations" content={parsed.observations} showKeywords={false} />
             )}
             
             {parsed.insights && (
-              <EnhancedSection type="insights" content={parsed.insights} showQuotes={true} />
+              <EnhancedSection type="insights" content={parsed.insights} showQuotes={true} showKeywords={false} />
             )}
             
             {parsed.applications && (
