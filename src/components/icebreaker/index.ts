@@ -3,3 +3,4 @@ export { IcebreakerGame } from './IcebreakerGame';
 export { LevelSelector } from './LevelSelector';
 export { GameLobby } from './GameLobby';
 export { GameTimer } from './GameTimer';
+export { SharingRound } from './SharingRound';

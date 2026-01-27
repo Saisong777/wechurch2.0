@@ -40,7 +40,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Loader2, Search, Filter, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search, Filter, Sparkles, Upload } from 'lucide-react';
+import { BulkImportDialog } from './BulkImportDialog';
 import { cn } from '@/lib/utils';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -72,6 +73,7 @@ export const CardQuestionManager: React.FC = () => {
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<CardQuestion | null>(null);
   const [questionToDelete, setQuestionToDelete] = useState<CardQuestion | null>(null);
   const [saving, setSaving] = useState(false);
@@ -263,10 +265,16 @@ export const CardQuestionManager: React.FC = () => {
           <Sparkles className="w-6 h-6 text-primary" />
           <h2 className="text-xl font-semibold">破冰題庫管理</h2>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2">
-          <Plus className="w-4 h-4" />
-          新增問題
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setBulkImportOpen(true)} className="gap-2">
+            <Upload className="w-4 h-4" />
+            批量匯入
+          </Button>
+          <Button onClick={openCreateDialog} className="gap-2">
+            <Plus className="w-4 h-4" />
+            新增問題
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -522,6 +530,13 @@ export const CardQuestionManager: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={bulkImportOpen}
+        onOpenChange={setBulkImportOpen}
+        onSuccess={fetchQuestions}
+      />
     </div>
   );
 };

@@ -100,6 +100,8 @@ export type Database = {
           mode: Database["public"]["Enums"]["game_mode"]
           pass_count: number | null
           room_code: string
+          shared_member_ids: string[] | null
+          sharing_mode: boolean
           status: string
           timer_duration: number | null
           timer_running: boolean | null
@@ -117,6 +119,8 @@ export type Database = {
           mode?: Database["public"]["Enums"]["game_mode"]
           pass_count?: number | null
           room_code?: string
+          shared_member_ids?: string[] | null
+          sharing_mode?: boolean
           status?: string
           timer_duration?: number | null
           timer_running?: boolean | null
@@ -134,6 +138,8 @@ export type Database = {
           mode?: Database["public"]["Enums"]["game_mode"]
           pass_count?: number | null
           room_code?: string
+          shared_member_ids?: string[] | null
+          sharing_mode?: boolean
           status?: string
           timer_duration?: number | null
           timer_running?: boolean | null
