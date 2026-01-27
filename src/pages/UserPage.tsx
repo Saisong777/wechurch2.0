@@ -8,20 +8,21 @@ import { GroupVerification } from '@/components/user/GroupVerification';
 import { SpiritualFitnessForm } from '@/components/user/SpiritualFitnessForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
 import { QRCodeScanner } from '@/components/user/QRCodeScanner';
+import { MyNotebook } from '@/components/user/MyNotebook';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Dumbbell, ArrowRight, QrCode } from 'lucide-react';
+import { Dumbbell, ArrowRight, QrCode, BookMarked, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isShortCode } from '@/lib/url-helpers';
 
-type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'study' | 'review';
+type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'study' | 'review' | 'notebook';
 
-const VALID_STEPS: UserStep[] = ['landing', 'enter-session', 'join', 'waiting', 'group-reveal', 'verification', 'study', 'review'];
+const VALID_STEPS: UserStep[] = ['landing', 'enter-session', 'join', 'waiting', 'group-reveal', 'verification', 'study', 'review', 'notebook'];
 
 // localStorage keys for session persistence
 const STORAGE_KEYS = {
@@ -363,6 +364,7 @@ export const UserPage: React.FC = () => {
         );
 
       case 'enter-session':
+        const storedEmail = localStorage.getItem('bible_study_guest_email');
         return (
           <div className="w-full max-w-md mx-auto px-4 sm:px-4 py-6 sm:py-8 animate-fade-in">
             <Card variant="highlight" className="border-2">
@@ -428,6 +430,22 @@ export const UserPage: React.FC = () => {
                   <QrCode className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                   掃描 QR Code
                 </Button>
+
+                {/* My Notebook Button - only show if user has previously joined */}
+                {storedEmail && (
+                  <>
+                    <Separator />
+                    <Button
+                      variant="ghost"
+                      size="lg"
+                      className="w-full h-12 text-base"
+                      onClick={() => setStep('notebook')}
+                    >
+                      <BookMarked className="w-5 h-5 mr-2" />
+                      我的筆記本 My Notebook
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
             
@@ -436,6 +454,25 @@ export const UserPage: React.FC = () => {
               onClose={() => setShowScanner(false)} 
               onScan={handleQRScan}
             />
+          </div>
+        );
+
+      case 'notebook':
+        const notebookEmail = localStorage.getItem('bible_study_guest_email') || '';
+        return (
+          <div className="w-full max-w-2xl mx-auto px-4 py-6 sm:py-8 animate-fade-in">
+            <div className="mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStep('enter-session')}
+                className="gap-2"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                返回
+              </Button>
+            </div>
+            <MyNotebook userEmail={notebookEmail} />
           </div>
         );
 
