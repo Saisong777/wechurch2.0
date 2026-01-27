@@ -3,7 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart, BookMarked } from 'lucide-react';
+import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart, BookMarked, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { SoulGymLogo } from '@/components/icons/SoulGymLogo';
@@ -134,10 +134,34 @@ const Index = () => {
                       </Button>
                     </div>
                   </CardContent>
-                </Link>
-              </Card>
-            )}
-          </div>
+              </Link>
+            </Card>
+          )}
+
+          {/* Icebreaker Game Entry */}
+          <Card variant="default" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer border-primary/20 hover:border-primary/40">
+            <Link to="/icebreaker">
+              <CardContent className="py-6 text-center">
+                <div className="flex items-center justify-center gap-6">
+                  <div className="w-12 h-12 rounded-full gradient-gold flex items-center justify-center shrink-0">
+                    <Zap className="w-6 h-6 text-secondary-foreground" />
+                  </div>
+                  <div className="text-left">
+                    <h2 className="font-serif text-lg font-bold text-foreground">
+                      破冰遊戲
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Icebreaker Cards
+                    </p>
+                  </div>
+                  <Button variant="outline" size="default" className="ml-auto">
+                    開始 Play
+                  </Button>
+                </div>
+              </CardContent>
+            </Link>
+          </Card>
+        </div>
 
           {/* Features Preview */}
           <div className="grid md:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '200ms' }}>

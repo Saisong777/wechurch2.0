@@ -1,14 +1,27 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IcebreakerCard } from './IcebreakerCard';
 import { LevelSelector } from './LevelSelector';
+import { GameLobby } from './GameLobby';
 import { useIcebreakerGame } from '@/hooks/useIcebreakerGame';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RotateCcw, SkipForward, Sparkles, Dumbbell } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
-export const IcebreakerGame: React.FC = () => {
+interface IcebreakerGameProps {
+  sessionId?: string;
+  groupNumber?: number;
+  autoStart?: boolean; // For session mode - skip lobby
+}
+
+export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
+  sessionId,
+  groupNumber,
+  autoStart = false,
+}) => {
   const {
     gameId,
     roomCode,
@@ -20,27 +33,71 @@ export const IcebreakerGame: React.FC = () => {
     isDrawing,
     remainingPasses,
     maxPasses,
+    mode,
+    isHost,
     createGame,
+    joinGame,
+    findSessionGame,
     drawCard,
     passCard,
     changeLevel,
     resetDeck,
-  } = useIcebreakerGame();
+  } = useIcebreakerGame({ sessionId, groupNumber });
 
-  // Auto-create game on mount
+  const [showLobby, setShowLobby] = useState(!autoStart);
+  const [copied, setCopied] = useState(false);
+
+  // Auto-start for session mode
   useEffect(() => {
-    if (!gameId) {
-      createGame();
+    const init = async () => {
+      if (autoStart && sessionId && groupNumber) {
+        // Try to find existing game for this group
+        const existingGame = await findSessionGame();
+        if (!existingGame) {
+          // Create new game for this group
+          await createGame('session');
+        }
+        setShowLobby(false);
+      }
+    };
+    init();
+  }, [autoStart, sessionId, groupNumber, findSessionGame, createGame]);
+
+  const handleCreateGame = async () => {
+    const game = await createGame('standalone');
+    if (game) {
+      setShowLobby(false);
     }
-  }, [gameId, createGame]);
+  };
+
+  const handleJoinGame = async (code: string) => {
+    const game = await joinGame(code);
+    if (game) {
+      setShowLobby(false);
+    }
+  };
 
   const handleCardTap = () => {
+    // In group mode, only host can draw
+    if (mode === 'session' && !isHost) {
+      toast.info('等待主持人抽牌...');
+      return;
+    }
     if (!isFlipped && !isDrawing) {
       drawCard();
     }
   };
 
-  if (isLoading) {
+  const copyRoomCode = () => {
+    if (roomCode) {
+      navigator.clipboard.writeText(roomCode);
+      setCopied(true);
+      toast.success('房間代碼已複製！');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (isLoading && !gameId) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-4">
@@ -53,6 +110,16 @@ export const IcebreakerGame: React.FC = () => {
     );
   }
 
+  if (showLobby && !gameId) {
+    return (
+      <GameLobby
+        onCreateGame={handleCreateGame}
+        onJoinGame={handleJoinGame}
+        isLoading={isLoading}
+      />
+    );
+  }
+
   return (
     <div className="w-full max-w-lg mx-auto px-4 py-6 space-y-6">
       {/* Header */}
@@ -61,25 +128,50 @@ export const IcebreakerGame: React.FC = () => {
           <Sparkles className="w-6 h-6 text-primary" />
           破冰遊戲
         </h1>
+        
+        {/* Room Code Display */}
         {roomCode && (
-          <p className="text-sm text-muted-foreground">
-            房間代碼: <span className="font-mono font-bold">{roomCode}</span>
-          </p>
+          <div className="flex items-center justify-center gap-2">
+            <Badge variant="outline" className="text-sm font-mono px-3 py-1">
+              房間: {roomCode}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={copyRoomCode}
+            >
+              {copied ? (
+                <Check className="w-4 h-4 text-accent" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Mode indicator */}
+        {mode === 'session' && (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Users className="w-4 h-4" />
+            <span>小組模式 {isHost ? '(主持人)' : '(同步中)'}</span>
+          </div>
         )}
       </div>
 
-      {/* Level Selector */}
-      <LevelSelector
-        currentLevel={currentLevel}
-        onLevelChange={(level) => {
-          changeLevel(level);
-          if (isFlipped) {
-            // Draw new card at new level
-            drawCard(level);
-          }
-        }}
-        disabled={isDrawing}
-      />
+      {/* Level Selector - only for host in group mode */}
+      {(mode === 'standalone' || isHost) && (
+        <LevelSelector
+          currentLevel={currentLevel}
+          onLevelChange={(level) => {
+            changeLevel(level);
+            if (isFlipped) {
+              drawCard(level);
+            }
+          }}
+          disabled={isDrawing}
+        />
+      )}
 
       {/* Card */}
       <AnimatePresence mode="wait">
@@ -129,46 +221,59 @@ export const IcebreakerGame: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
-      <div className="flex gap-3">
-        <Button
-          variant="outline"
-          size="lg"
-          className="flex-1 h-14"
-          onClick={passCard}
-          disabled={isDrawing || remainingPasses === 0 || !isFlipped}
-        >
-          <SkipForward className="w-5 h-5 mr-2" />
-          PASS
-          {remainingPasses > 0 && (
-            <span className="ml-1 text-xs opacity-70">({remainingPasses})</span>
-          )}
-        </Button>
+      {/* Action Buttons - only for host or standalone */}
+      {(mode === 'standalone' || isHost) && (
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1 h-14"
+            onClick={passCard}
+            disabled={isDrawing || remainingPasses === 0 || !isFlipped}
+          >
+            <SkipForward className="w-5 h-5 mr-2" />
+            PASS
+            {remainingPasses > 0 && (
+              <span className="ml-1 text-xs opacity-70">({remainingPasses})</span>
+            )}
+          </Button>
 
-        <Button
-          variant="gold"
-          size="lg"
-          className="flex-1 h-14"
-          onClick={() => drawCard()}
-          disabled={isDrawing}
-        >
-          {isFlipped ? '下一題' : '抽牌'}
-        </Button>
-      </div>
+          <Button
+            variant="gold"
+            size="lg"
+            className="flex-1 h-14"
+            onClick={() => drawCard()}
+            disabled={isDrawing}
+          >
+            {isFlipped ? '下一題' : '抽牌'}
+          </Button>
+        </div>
+      )}
 
-      {/* Reset Button */}
-      <div className="flex justify-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={resetDeck}
-          disabled={isDrawing}
-          className="text-muted-foreground"
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          重置牌堆
-        </Button>
-      </div>
+      {/* Non-host message */}
+      {mode === 'session' && !isHost && (
+        <div className="text-center py-4">
+          <p className="text-muted-foreground">
+            等待主持人抽取下一張牌...
+          </p>
+        </div>
+      )}
+
+      {/* Reset Button - only for host or standalone */}
+      {(mode === 'standalone' || isHost) && (
+        <div className="flex justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetDeck}
+            disabled={isDrawing}
+            className="text-muted-foreground"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            重置牌堆
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
