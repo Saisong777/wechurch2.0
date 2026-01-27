@@ -81,34 +81,43 @@ export function parseReportContent(content: string): GroupReport[] {
     
     const section: Partial<GroupReport> = {};
     
-    // Extract group number - support multiple formats
-    // Pattern 1: 第 N 組 or 第N組報告 (with Arabic numeral)
-    const arabicMatch = groupReport.match(/第\s*(\d+)\s*組(?:報告)?/);
-    // Pattern 2: 第N組 (with Chinese numeral like 第一組, 第二組)
-    const chineseMatch = groupReport.match(/第([一二三四五六七八九十]+)組(?:報告)?/);
-    // Pattern 3: **組別：** 第一組 or **組別：** 第 1 組 format
-    const labelArabicMatch = groupReport.match(/組別[：:]\s*(?:\*\*)?\s*第\s*(\d+)\s*組/);
-    const labelChineseMatch = groupReport.match(/組別[：:]\s*(?:\*\*)?\s*第([一二三四五六七八九十]+)組/);
+    // Check for overall/synthesis report first
+    // Pattern: "全會眾綜合分析" or "全體" or "第 0 組" (overall marker)
+    const overallMatch = groupReport.match(/全會眾(?:綜合)?分析|全體(?:整合)?報告|第\s*0\s*組/i);
     
-    if (arabicMatch) {
-      const groupNum = parseInt(arabicMatch[1], 10);
-      section.groupNumber = groupNum;
-      section.groupInfo = `第 ${groupNum} 組`;
-    } else if (chineseMatch) {
-      const groupNum = parseChineseNumeral(chineseMatch[1]);
-      if (groupNum) {
+    if (overallMatch) {
+      section.groupNumber = 0;
+      section.groupInfo = '📊 全會眾綜合分析';
+    } else {
+      // Extract group number - support multiple formats
+      // Pattern 1: 第 N 組 or 第N組報告 (with Arabic numeral)
+      const arabicMatch = groupReport.match(/第\s*(\d+)\s*組(?:報告)?/);
+      // Pattern 2: 第N組 (with Chinese numeral like 第一組, 第二組)
+      const chineseMatch = groupReport.match(/第([一二三四五六七八九十]+)組(?:報告)?/);
+      // Pattern 3: **組別：** 第一組 or **組別：** 第 1 組 format
+      const labelArabicMatch = groupReport.match(/組別[：:]\s*(?:\*\*)?\s*第\s*(\d+)\s*組/);
+      const labelChineseMatch = groupReport.match(/組別[：:]\s*(?:\*\*)?\s*第([一二三四五六七八九十]+)組/);
+      
+      if (arabicMatch) {
+        const groupNum = parseInt(arabicMatch[1], 10);
         section.groupNumber = groupNum;
         section.groupInfo = `第 ${groupNum} 組`;
-      }
-    } else if (labelArabicMatch) {
-      const groupNum = parseInt(labelArabicMatch[1], 10);
-      section.groupNumber = groupNum;
-      section.groupInfo = `第 ${groupNum} 組`;
-    } else if (labelChineseMatch) {
-      const groupNum = parseChineseNumeral(labelChineseMatch[1]);
-      if (groupNum) {
+      } else if (chineseMatch) {
+        const groupNum = parseChineseNumeral(chineseMatch[1]);
+        if (groupNum) {
+          section.groupNumber = groupNum;
+          section.groupInfo = `第 ${groupNum} 組`;
+        }
+      } else if (labelArabicMatch) {
+        const groupNum = parseInt(labelArabicMatch[1], 10);
         section.groupNumber = groupNum;
         section.groupInfo = `第 ${groupNum} 組`;
+      } else if (labelChineseMatch) {
+        const groupNum = parseChineseNumeral(labelChineseMatch[1]);
+        if (groupNum) {
+          section.groupNumber = groupNum;
+          section.groupInfo = `第 ${groupNum} 組`;
+        }
       }
     }
     
