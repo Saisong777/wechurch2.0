@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StudyProgressMonitor } from './StudyProgressMonitor';
 import { MockDataGenerator } from './MockDataGenerator';
 import { AIReportViewer } from './AIReportViewer';
-import { AnalysisDashboard } from './AnalysisDashboard';
+// AnalysisDashboard removed per user request - using original AI Analysis card instead
 
 export const AdminMonitor: React.FC = () => {
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
@@ -756,14 +756,10 @@ export const AdminMonitor: React.FC = () => {
       {/* Spiritual Fitness Monitoring Section */}
       {isStudyingPhase && currentSession?.id && (
         <Tabs defaultValue="progress" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="progress" className="gap-2">
               <Dumbbell className="w-4 h-4" />
               進度監控
-            </TabsTrigger>
-            <TabsTrigger value="analysis" className="gap-2">
-              <Sparkles className="w-4 h-4" />
-              AI 分析
             </TabsTrigger>
             <TabsTrigger value="tools" className="gap-2">
               <Zap className="w-4 h-4" />
@@ -772,15 +768,6 @@ export const AdminMonitor: React.FC = () => {
           </TabsList>
           <TabsContent value="progress" className="mt-4">
             <StudyProgressMonitor sessionId={currentSession.id} />
-          </TabsContent>
-          <TabsContent value="analysis" className="mt-4">
-            <AnalysisDashboard 
-              sessionId={currentSession.id} 
-              groups={currentSession.groups?.map(g => ({ 
-                number: g.number, 
-                memberCount: g.members.length 
-              })) || []}
-            />
           </TabsContent>
           <TabsContent value="tools" className="mt-4">
             <MockDataGenerator sessionId={currentSession.id} />
