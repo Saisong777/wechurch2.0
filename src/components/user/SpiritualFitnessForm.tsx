@@ -145,7 +145,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             <Eye className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
             <span className="truncate">🟢 暖身 Warm-up</span>
           </CardTitle>
-          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">看一看、摸一摸</p>
+          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">先從簡單的開始</p>
         </CardHeader>
         <CardContent className="px-3 sm:px-4 md:px-6 pb-4 space-y-3 sm:space-y-4">
           {/* 1. 定標題 */}
@@ -160,16 +160,16 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               value={formData.title_phrase}
               onChange={(e) => updateField('title_phrase', e.target.value)}
               onBlur={saveNow}
-              placeholder="幫這段經文取個有趣的片名..."
+              placeholder="幫這段經文下一個標題"
               className="text-sm sm:text-base h-10 sm:h-11"
             />
           </div>
 
-          {/* 2. 抓心跳 */}
+          {/* 2. 心跳的時刻 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="heartbeat_verse" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 shrink-0" />
-              <span>2. 抓心跳</span>
+              <span>2. 心跳的時刻</span>
               {formData.heartbeat_verse && <Check className="w-3 h-3 text-green-500" />}
             </Label>
             <AutoResizeTextarea
@@ -177,18 +177,18 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               value={formData.heartbeat_verse}
               onChange={(e) => updateField('heartbeat_verse', e.target.value)}
               onBlur={saveNow}
-              placeholder="哪一句話讓你心跳加速？"
+              placeholder="哪一句話讓你感動"
               minRows={2}
               maxRows={5}
               className="text-sm sm:text-base"
             />
           </div>
 
-          {/* 3. 看現場 */}
+          {/* 3. 查看聖經的資訊 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="observation" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 shrink-0" />
-              <span>3. 看現場</span>
+              <span>3. 查看聖經的資訊</span>
               {formData.observation && <Check className="w-3 h-3 text-green-500" />}
             </Label>
             <AutoResizeTextarea
@@ -196,7 +196,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               value={formData.observation}
               onChange={(e) => updateField('observation', e.target.value)}
               onBlur={saveNow}
-              placeholder="看到了什麼人事物？純觀察..."
+              placeholder="有什麼人事時地物或有趣的事"
               minRows={2}
               maxRows={5}
               className="text-sm sm:text-base"
@@ -212,16 +212,17 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             <Dumbbell className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
             <span className="truncate">🟡 重訓 Core Training</span>
           </CardTitle>
-          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">舉重量、查筆記</p>
+          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">來點重量、查筆記</p>
         </CardHeader>
         <CardContent className="px-3 sm:px-4 md:px-6 pb-4 space-y-3 sm:space-y-4">
-          {/* 4. 練核心 */}
+          {/* 4. 思想神的話 */}
           <div className="space-y-2 sm:space-y-3">
             <Label className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600 shrink-0" />
-              <span>4. 練核心</span>
+              <span>4. 思想神的話</span>
               {formData.core_insight_category && formData.core_insight_note && <Check className="w-3 h-3 text-green-500" />}
             </Label>
+            <p className="text-[10px] sm:text-xs text-muted-foreground -mt-1">至少寫一個類別</p>
             
             {/* Category selector - responsive grid */}
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
@@ -276,7 +277,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               value={formData.scholars_note}
               onChange={(e) => updateField('scholars_note', e.target.value)}
               onBlur={saveNow}
-              placeholder="歷代學長姐或注釋書怎麼說？可以查 Google/AI"
+              placeholder="歷代學長姐（注釋書）/ 或去問 AI"
               minRows={3}
               maxRows={8}
               className="text-sm sm:text-base"
@@ -292,14 +293,14 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
             <span className="truncate">🔵 伸展 Stretch</span>
           </CardTitle>
-          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">帶一招、聊一聊</p>
+          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">與神同行，帶出行動</p>
         </CardHeader>
         <CardContent className="px-3 sm:px-4 md:px-6 pb-4 space-y-3 sm:space-y-4">
-          {/* 6. 帶一招 */}
+          {/* 6. 我決定要這樣做 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="action_plan" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 shrink-0" />
-              <span>6. 帶一招</span>
+              <span>6. 我決定要這樣做</span>
               {formData.action_plan && <Check className="w-3 h-3 text-green-500" />}
             </Label>
             <AutoResizeTextarea
@@ -307,7 +308,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               value={formData.action_plan}
               onChange={(e) => updateField('action_plan', e.target.value)}
               onBlur={saveNow}
-              placeholder="本週具體可行的一個小練習..."
+              placeholder="本週具體可以做的小練習"
               minRows={2}
               maxRows={5}
               className="text-sm sm:text-base"
@@ -326,7 +327,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               value={formData.cool_down_note}
               onChange={(e) => updateField('cool_down_note', e.target.value)}
               onBlur={saveNow}
-              placeholder="剛剛沒講完的感動、代禱或閒聊..."
+              placeholder="隨意發揮～"
               minRows={2}
               maxRows={5}
               className="text-sm sm:text-base"
