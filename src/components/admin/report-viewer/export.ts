@@ -22,10 +22,6 @@ export function generateSectionMarkdown(section: GroupReport, verseReference?: s
   
   lines.push('---\n');
   
-  if (section.contributions) {
-    lines.push(`**👤 個人貢獻摘要（Personal Contributions）：**\n${section.contributions}\n`);
-  }
-  
   if (section.themes) {
     lines.push(`**📖 主題（Themes）：**\n${section.themes}\n`);
   }
@@ -40,6 +36,10 @@ export function generateSectionMarkdown(section: GroupReport, verseReference?: s
   
   if (section.applications) {
     lines.push(`**🎯 如何應用（Applications）：**\n${section.applications}\n`);
+  }
+  
+  if (section.contributions) {
+    lines.push(`**👤 個人貢獻摘要（Personal Contributions）：**\n${section.contributions}\n`);
   }
   
   // If no structured content, fall back to raw
@@ -211,13 +211,6 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
         ` : ''}
         
         ${hasStructuredContent ? `
-          ${section.contributions ? `
-            <div class="section contributions">
-              <h3>👤 個人貢獻摘要 Personal Contributions</h3>
-              <div class="section-content">${section.contributions}</div>
-            </div>
-          ` : ''}
-          
           ${section.themes ? `
             <div class="section themes">
               <h3>📖 主題 Themes</h3>
@@ -243,6 +236,13 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
             <div class="section applications">
               <h3>🎯 如何應用 Applications</h3>
               <div class="section-content">${section.applications}</div>
+            </div>
+          ` : ''}
+          
+          ${section.contributions ? `
+            <div class="section contributions">
+              <h3>👤 個人貢獻摘要 Personal Contributions</h3>
+              <div class="section-content">${section.contributions}</div>
             </div>
           ` : ''}
         ` : `
