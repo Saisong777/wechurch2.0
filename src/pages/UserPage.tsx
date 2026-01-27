@@ -216,6 +216,14 @@ export const UserPage: React.FC = () => {
     const initializeSession = async () => {
       // Support both ?session= (new short code) and ?session_id= (legacy UUID)
       const sessionFromUrl = searchParams.get('session') || searchParams.get('session_id');
+      const stepFromUrl = searchParams.get('step');
+      
+      // If URL has step=notebook, go directly to notebook
+      if (stepFromUrl === 'notebook') {
+        setStep('notebook');
+        setIsRestoring(false);
+        return;
+      }
       
       // If URL has a session code/ID, use that (new session join)
       if (sessionFromUrl) {

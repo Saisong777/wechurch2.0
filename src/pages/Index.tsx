@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart, BookOpen } from 'lucide-react';
+import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart, BookMarked } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { SoulGymLogo } from '@/components/icons/SoulGymLogo';
@@ -13,8 +13,15 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { canCreateSession, loading: roleLoading } = useUserRole();
+  const [hasEmail, setHasEmail] = useState(false);
   
   const loading = authLoading || (user && roleLoading);
+
+  // Check if user has saved email (returning user)
+  useEffect(() => {
+    const storedEmail = localStorage.getItem('bible_study_guest_email');
+    setHasEmail(!!storedEmail);
+  }, []);
   
   // If session ID is in URL, redirect to user page with that session
   useEffect(() => {
@@ -104,6 +111,32 @@ const Index = () => {
                 </Link>
               </Card>
             ) : null}
+
+            {/* My Notebook Entry - for returning users */}
+            {hasEmail && (
+              <Card variant="default" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer border-secondary/30 hover:border-secondary/50">
+                <Link to="/user?step=notebook">
+                  <CardContent className="py-6 text-center">
+                    <div className="flex items-center justify-center gap-6">
+                      <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+                        <BookMarked className="w-6 h-6 text-secondary" />
+                      </div>
+                      <div className="text-left">
+                        <h2 className="font-serif text-lg font-bold text-foreground">
+                          我的筆記本
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          查看歷史查經筆記
+                        </p>
+                      </div>
+                      <Button variant="outline" size="default" className="ml-auto">
+                        查看 View
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Link>
+              </Card>
+            )}
           </div>
 
           {/* Features Preview */}
