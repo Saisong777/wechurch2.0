@@ -59,7 +59,8 @@ export function useSessionAnalysis({ sessionId, groupNumber, reportType, isParti
           id: r.id,
           sessionId: r.session_id,
           reportType: r.report_type as 'group' | 'overall',
-          groupNumber: r.group_number,
+          // Normalize: null group_number means overall report (treat as 0)
+          groupNumber: r.group_number ?? 0,
           content: r.content,
           status: (r.status || 'COMPLETED') as 'PENDING' | 'COMPLETED' | 'FAILED',
           createdAt: new Date(r.created_at),
@@ -92,7 +93,8 @@ export function useSessionAnalysis({ sessionId, groupNumber, reportType, isParti
         id: r.id,
         sessionId: r.session_id,
         reportType: r.report_type as 'group' | 'overall',
-        groupNumber: r.group_number,
+        // Normalize: null group_number means overall report (treat as 0)
+        groupNumber: r.group_number ?? 0,
         content: r.content,
         status: (r.status || 'COMPLETED') as 'PENDING' | 'COMPLETED' | 'FAILED',
         createdAt: new Date(r.created_at),
