@@ -19,11 +19,19 @@ const RequestSchema = z.object({
   filledOnly: z.boolean().optional().default(false),
 });
 
-// Compact prompt for speed
-const SYSTEM_PROMPT_COMPACT = `你是「共同查經小組分析助理」。
-硬性規則：1)唯一資料來源＝使用者提供的筆記/表單；禁止腦補、延伸、補神學、補經文。2)必須納入所有成員；報告開頭列出成員名單與筆記數；獨特亮光需標註分享者。3)同主題可歸納；分歧並列不裁定；獨特觀點不可被抹平。4)若出現可能偏差的理解，僅以溫柔中立方式標註「需進一步查證討論」。
-輸出請嚴格依此格式：**組別：** **組員：** **已分析筆記數：** **查經經文：** --- **📖 主題：** **🔍 事實發現：** **💡 獨特亮光：**（需標註姓名） **🎯 如何應用：** --- **👤 個人貢獻摘要：**（每人 1-2 句）
-一律使用繁體中文。`;
+// Strict prompt: NO hallucination, personal attribution, real content only
+const SYSTEM_PROMPT_COMPACT = `你是「共同查經小組分析助理」。你的工作是**忠實整理**筆記，**絕對禁止**添加任何內容。
+
+🚨 嚴格禁止：❌添加筆記沒有的神學/經文 ❌潤飾美化 ❌編造無人說過的話 ❌推測延伸 ❌空洞形容詞（深刻、寶貴、美好）
+
+✅ 必須遵守：
+1) 只能整理歸納筆記原文，不可添加
+2) 每條「獨特亮光」格式：「👤 [姓名]：[原話摘要]」（禁止寫「小組認為」）
+3) 內容簡短就直接說，不要編造填充
+4) 列出每位成員，沒寫內容就標「未填寫」
+
+格式：**組別：** **組員：** **已分析筆記數：**(有內容數/總人數) **查經經文：** --- **📖 主題：** **🔍 事實發現：** **💡 獨特亮光：**（👤姓名：內容） **🎯 如何應用：** --- **👤 個人貢獻摘要：**（每人1-2句或「未填寫」）
+繁體中文。`;
 
 function pickNonEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Partial<T> = {};
@@ -195,8 +203,20 @@ serve(async (req) => {
       );
     }
 
+    // Deduplicate traditional submissions by name + group
+    const seenSubmissions = new Set<string>();
+    const uniqueSubmissions = (submissions || []).filter((s) => {
+      const key = s.name + '-' + s.group_number;
+      if (seenSubmissions.has(key)) {
+        console.log(`[generate-report] Duplicate submission filtered: ${s.name}`);
+        return false;
+      }
+      seenSubmissions.add(key);
+      return true;
+    });
+
     // Format traditional submissions
-    const formattedSubmissions = (submissions || []).map((s) => ({
+    const formattedSubmissions = uniqueSubmissions.map((s) => ({
       來源: "傳統查經表",
       姓名: s.name,
       組別: s.group_number,
@@ -209,8 +229,20 @@ serve(async (req) => {
       其他: s.others || "",
     }));
 
+    // Deduplicate study responses by participant name + group
+    const seenStudyResponses = new Set<string>();
+    const uniqueStudyResponses = (studyResponses || []).filter((s) => {
+      const key = (s.participant_name || 'unknown') + '-' + s.group_number;
+      if (seenStudyResponses.has(key)) {
+        console.log(`[generate-report] Duplicate study response filtered: ${s.participant_name}`);
+        return false;
+      }
+      seenStudyResponses.add(key);
+      return true;
+    });
+
     // Format spiritual fitness responses
-    const formattedStudyResponses = (studyResponses || []).map((s) => ({
+    const formattedStudyResponses = uniqueStudyResponses.map((s) => ({
       來源: "靈魂健身筆記",
       姓名: s.participant_name || "未知",
       組別: s.group_number,

@@ -19,27 +19,39 @@ const RequestSchema = z.object({
   filledOnly: z.boolean().optional().default(false),
 });
 
-// NOTE: keep prompt concise to reduce token count (faster) while preserving strict constraints.
-const SYSTEM_PROMPT = `你是「共同查經小組分析助理」。
+// Strict prompt: NO hallucination, personal attribution, real content only
+const SYSTEM_PROMPT = `你是「共同查經小組分析助理」。你的工作是**忠實整理**使用者提供的筆記，**絕對禁止**添加任何內容。
 
-硬性規則：
-1) 唯一資料來源＝使用者提供的筆記/表單；禁止腦補、延伸、補神學、補經文。
-2) 必須納入所有成員；報告開頭列出成員名單與筆記數；獨特亮光需標註分享者。
-3) 同主題可歸納；分歧並列不裁定；獨特觀點不可被抹平。
-4) 若出現可能偏差的理解，僅以溫柔中立方式標註「需進一步查證討論」。
+🚨 嚴格禁止事項（違反將導致報告無效）：
+- ❌ 禁止添加筆記中沒有的神學解釋、經文引用、靈修感想
+- ❌ 禁止潤飾或美化原始內容，必須保持原意
+- ❌ 禁止編造任何「弟兄姊妹說」但實際上沒人說的內容
+- ❌ 禁止推測或延伸筆記沒有明確寫出的內容
+- ❌ 禁止使用「深刻」「寶貴」「美好」等空洞形容詞
 
-輸出請嚴格依此格式：
+✅ 必須遵守：
+1) 唯一資料來源 = 使用者提供的筆記原文；只能整理歸納，不可添加
+2) 每一條「獨特亮光」必須是**某個人**的原創觀點，格式：「👤 [姓名]：[原話摘要]」
+3) 如果筆記內容簡短或空白，就直接說「內容簡短」，不要編造內容填充
+4) 必須列出每位成員，若某人沒寫內容就標註「未填寫」
+
+輸出格式（嚴格遵守）：
 **組別：**
-**組員：**
-**已分析筆記數：**
+**組員：**（列出全部姓名）
+**已分析筆記數：**（實際有內容的筆記數 / 總人數）
 **查經經文：**
 ---
-**📖 主題（Themes）：**
-**🔍 事實發現（Observations）：**
-**💡 獨特亮光（Unique Insights）：**（需標註姓名）
-**🎯 如何應用（Applications）：**
+**📖 主題（Themes）：**（從筆記中歸納，不可自創）
+**🔍 事實發現（Observations）：**（筆記中提到的觀察，原文為主）
+**💡 獨特亮光（Unique Insights）：**
+- 👤 [姓名]：[該成員的原創觀點]
+- 👤 [姓名]：[該成員的原創觀點]
+（每條必須標註是誰說的，不可寫「小組認為」）
+**🎯 如何應用（Applications）：**（筆記中提到的應用，保持原意）
 ---
-**👤 個人貢獻摘要（Personal Contributions）：**（每人 1-2 句）
+**👤 個人貢獻摘要（Personal Contributions）：**
+- [姓名]：[1-2句總結該成員寫了什麼]
+- [姓名]：未填寫內容
 
 一律使用繁體中文。`;
 
@@ -244,7 +256,20 @@ serve(async (req) => {
     }
 
     // Format notes from secure view (privacy-safe: only first_name, no email)
-    const formattedNotes = (notes || []).map((n) => ({
+    // Deduplicate by user_id to prevent counting same person multiple times
+    const seenUserIds = new Set<string>();
+    const uniqueNotes = (notes || []).filter((n) => {
+      // Use a unique key based on available identifiers
+      const key = n.first_name + '-' + n.group_number;
+      if (seenUserIds.has(key)) {
+        console.log(`[analyze-notes] Duplicate entry filtered: ${n.first_name}`);
+        return false;
+      }
+      seenUserIds.add(key);
+      return true;
+    });
+
+    const formattedNotes = uniqueNotes.map((n) => ({
       來源: "靈魂健身筆記",
       姓名: n.first_name || "未知",
       組別: n.group_number,
@@ -258,8 +283,20 @@ serve(async (req) => {
       冷卻反思: n.cool_down_note || "",
     }));
 
+    // Deduplicate traditional submissions by name + group
+    const seenSubmissions = new Set<string>();
+    const uniqueSubmissions = (submissions || []).filter((s) => {
+      const key = s.name + '-' + s.group_number;
+      if (seenSubmissions.has(key)) {
+        console.log(`[analyze-notes] Duplicate submission filtered: ${s.name}`);
+        return false;
+      }
+      seenSubmissions.add(key);
+      return true;
+    });
+
     // Format traditional submissions (also privacy-safe: only name)
-    const formattedSubmissions = (submissions || []).map((s) => ({
+    const formattedSubmissions = uniqueSubmissions.map((s) => ({
       來源: "傳統查經表",
       姓名: s.name,
       組別: s.group_number,
