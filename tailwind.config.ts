@@ -14,7 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        serif: ['Crimson Pro', 'serif'],
+        serif: ['Oswald', 'sans-serif'],
+        display: ['Oswald', 'sans-serif'],
         sans: ['Inter', 'sans-serif'],
       },
       colors: {

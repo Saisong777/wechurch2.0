@@ -11,7 +11,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Users, BookOpen } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Dumbbell, Flame, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchParticipants, fetchSubmissions } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
@@ -121,8 +121,8 @@ export const AdminPage: React.FC = () => {
           <div className="px-4 py-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold">聚會管理</h2>
+                <Dumbbell className="w-5 h-5 text-secondary" />
+                <h2 className="text-xl font-semibold">課程管理</h2>
               </div>
               <Button 
                 variant="default" 
@@ -194,7 +194,10 @@ export const AdminPage: React.FC = () => {
                 </Button>
               </Link>
             )}
-            <span className="text-sm opacity-80">管理後台 Admin Dashboard</span>
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-secondary" />
+              <span className="text-sm opacity-80">教練控制台 Coach Dashboard</span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {user && (
@@ -224,8 +227,8 @@ export const AdminPage: React.FC = () => {
 
       <Header 
         variant="compact" 
-        title="健身房管理後台"
-        subtitle=""
+        title="教練控制台"
+        subtitle="Coach Dashboard"
       />
 
       <main className="container mx-auto">
