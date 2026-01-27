@@ -86,26 +86,26 @@ function parseReportContent(content: string): GroupReport[] {
       section.verse = cleanMarkdown(verseMatch[1]);
     }
     
-    // Extract themes
-    const themesMatch = groupReport.match(/(?:📖\s*)?(?:\*\*)?主題.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🔍|💡|🎯|---|\*\*事實|\*\*獨特|\*\*如何|$))/i);
+    // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題 Themes："
+    const themesMatch = groupReport.match(/(?:\*\*)?📖?\s*主題[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🔍|(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
     if (themesMatch) {
       section.themes = cleanMarkdown(themesMatch[1]);
     }
     
-    // Extract observations
-    const obsMatch = groupReport.match(/(?:🔍\s*)?(?:\*\*)?事實發現.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:💡|🎯|---|\*\*獨特|\*\*如何|$))/i);
+    // Extract observations - handle formats like "**🔍 事實發現（Observations）：**"
+    const obsMatch = groupReport.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
     if (obsMatch) {
       section.observations = cleanMarkdown(obsMatch[1]);
     }
     
-    // Extract insights
-    const insightsMatch = groupReport.match(/(?:💡\s*)?(?:\*\*)?獨特亮光.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🎯|---|\*\*如何|$))/i);
+    // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**"
+    const insightsMatch = groupReport.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🎯|---|ℹ️|$)/i);
     if (insightsMatch) {
       section.insights = cleanMarkdown(insightsMatch[1]);
     }
     
-    // Extract applications
-    const appMatch = groupReport.match(/(?:🎯\s*)?(?:\*\*)?如何應用.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:---|$))/i);
+    // Extract applications - handle formats like "**🎯 如何應用（Applications）：**"
+    const appMatch = groupReport.match(/(?:\*\*)?🎯?\s*如何應用[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=---|ℹ️|$)/i);
     if (appMatch) {
       section.applications = cleanMarkdown(appMatch[1]);
     }
