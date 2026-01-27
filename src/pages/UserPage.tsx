@@ -5,7 +5,7 @@ import { JoinForm } from '@/components/user/JoinForm';
 import { WaitingRoom } from '@/components/user/WaitingRoom';
 import { GroupReveal } from '@/components/user/GroupReveal';
 import { GroupVerification } from '@/components/user/GroupVerification';
-import { StudyForm } from '@/components/user/StudyForm';
+import { SpiritualFitnessForm } from '@/components/user/SpiritualFitnessForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
 import { QRCodeScanner } from '@/components/user/QRCodeScanner';
 import { useSession } from '@/contexts/SessionContext';
@@ -389,7 +389,7 @@ export const UserPage: React.FC = () => {
       case 'study':
         return (
           <div className="px-4 py-8">
-            <StudyForm onSubmitted={() => setStep('review')} />
+            <SpiritualFitnessForm onSubmitted={() => setStep('review')} />
           </div>
         );
 

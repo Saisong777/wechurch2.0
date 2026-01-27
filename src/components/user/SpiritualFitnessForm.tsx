@@ -23,9 +23,11 @@ import { cn } from '@/lib/utils';
 
 interface SpiritualFitnessFormProps {
   onComplete?: () => void;
+  onSubmitted?: () => void;
 }
 
-export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onComplete }) => {
+export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onComplete, onSubmitted }) => {
+  const handleComplete = onComplete || onSubmitted;
   const { currentUser, currentSession } = useSession();
   
   const {
@@ -277,14 +279,14 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
       </Card>
 
       {/* Complete button (optional) */}
-      {onComplete && (
+      {handleComplete && (
         <div className="pt-4 sticky bottom-0 bg-background pb-4 -mx-1 px-1 md:static md:mx-0 md:px-0 md:pb-0">
           <Button
             type="button"
             variant="gold"
             size="xl"
             className="w-full lg:w-auto lg:min-w-[240px] text-base md:text-lg"
-            onClick={onComplete}
+            onClick={handleComplete}
           >
             <Sparkles className="w-5 h-5" />
             完成查經 Complete Study
