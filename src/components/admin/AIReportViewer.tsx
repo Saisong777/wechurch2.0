@@ -523,7 +523,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden">
+      <DialogContent className="max-w-5xl max-h-[90vh] p-0 flex flex-col">
         <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-primary/10 to-secondary/10">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2 text-lg">
@@ -592,25 +592,25 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         
         {/* Content Area */}
         {hasMultipleGroups ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <div className="px-6 pt-2 border-b">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+            <div className="px-6 pt-2 border-b flex-shrink-0">
               <TabsList className="h-auto p-1 bg-muted/50 flex-wrap">
                 <TabsTrigger value="all" className="px-4">
                   全部 ({parsedSections.length} 組)
                 </TabsTrigger>
                 {parsedSections.filter(s => s.groupNumber > 0).map(section => (
-                  <TabsTrigger key={section.groupNumber} value={`group-${section.groupNumber}`}>
+                  <TabsTrigger key={`tab-${section.groupNumber}`} value={`group-${section.groupNumber}`}>
                     第 {section.groupNumber} 組
                   </TabsTrigger>
                 ))}
               </TabsList>
             </div>
             
-            <ScrollArea className="flex-1 h-[55vh]">
-              <TabsContent value="all" className="mt-0 p-6 space-y-8">
+            <div className="flex-1 min-h-0 overflow-auto p-6">
+              <TabsContent value="all" className="mt-0 space-y-8">
                 <div ref={printRef}>
                   {parsedSections.map((section, index) => (
-                    <React.Fragment key={section.groupNumber}>
+                    <React.Fragment key={`all-${section.groupNumber}`}>
                       {renderGroupSection(section)}
                       {index < parsedSections.length - 1 && (
                         <Separator className="my-8" />
@@ -621,17 +621,17 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               </TabsContent>
               
               {parsedSections.filter(s => s.groupNumber > 0).map(section => (
-                <TabsContent key={section.groupNumber} value={`group-${section.groupNumber}`} className="mt-0 p-6">
+                <TabsContent key={`content-${section.groupNumber}`} value={`group-${section.groupNumber}`} className="mt-0">
                   {renderGroupSection(section)}
                 </TabsContent>
               ))}
-            </ScrollArea>
+            </div>
           </Tabs>
         ) : (
-          <ScrollArea className="h-[60vh]">
-            <div className="p-6 space-y-6" ref={printRef}>
+          <div className="flex-1 min-h-0 overflow-auto p-6" ref={printRef}>
+            <div className="space-y-6">
               {parsedSections.map((section, index) => (
-                <React.Fragment key={index}>
+                <React.Fragment key={`single-${index}`}>
                   {renderGroupSection(section, false)}
                   {index < parsedSections.length - 1 && (
                     <Separator className="my-6" />
@@ -639,7 +639,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                 </React.Fragment>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         )}
         
         {/* Footer */}
