@@ -281,55 +281,55 @@ export const UserPage: React.FC = () => {
 
       case 'enter-session':
         return (
-          <div className="w-full max-w-md mx-auto px-4 py-8 animate-fade-in">
+          <div className="w-full max-w-md mx-auto px-3 sm:px-4 py-4 sm:py-8 animate-fade-in">
             <Card variant="highlight" className="border-2">
-              <CardHeader className="text-center">
-                <div className="mx-auto w-16 h-16 rounded-full gradient-gold flex items-center justify-center mb-4 glow-gold">
-                  <Dumbbell className="w-8 h-8 text-secondary-foreground" />
+              <CardHeader className="text-center px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+                <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold flex items-center justify-center mb-4 sm:mb-4 glow-gold">
+                  <Dumbbell className="w-10 h-10 sm:w-8 sm:h-8 text-secondary-foreground" />
                 </div>
-                <CardTitle className="text-2xl">輸入課程代碼</CardTitle>
-                <CardDescription className="text-base">
+                <CardTitle className="text-2xl sm:text-2xl">輸入課程代碼</CardTitle>
+                <CardDescription className="text-base mt-1">
                   Enter Session ID from your coach
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6 pb-6 sm:pb-8">
                 <div className="space-y-2">
-                  <Label htmlFor="sessionId" className="text-base">
+                  <Label htmlFor="sessionId" className="text-base font-medium">
                     Session ID
                   </Label>
                   <Input
                     id="sessionId"
                     value={sessionId}
                     onChange={(e) => setSessionId(e.target.value)}
-                    placeholder="輸入主持人提供的 Session ID"
-                    className="h-12 text-base font-mono"
+                    placeholder="輸入教練提供的 Session ID"
+                    className="h-14 sm:h-12 text-lg sm:text-base font-mono"
                   />
                   <p className="text-sm text-muted-foreground">
-                    請向主持人索取聚會代碼
+                    請向教練索取訓練代碼
                   </p>
                 </div>
 
                 <Button
                   variant="gold"
                   size="xl"
-                  className="w-full"
+                  className="w-full h-14 sm:h-12 text-lg sm:text-base"
                   onClick={handleEnterSession}
                   disabled={isLoading || !sessionId.trim()}
                 >
                   {isLoading ? '驗證中...' : (
                     <>
                       繼續 Continue
-                      <ArrowRight className="w-5 h-5" />
+                      <ArrowRight className="w-5 h-5 ml-2" />
                     </>
                   )}
                 </Button>
 
-                <div className="relative">
+                <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center">
                     <Separator className="w-full" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
+                    <span className="bg-card px-3 text-muted-foreground">
                       或者 OR
                     </span>
                   </div>
@@ -338,10 +338,10 @@ export const UserPage: React.FC = () => {
                 <Button
                   variant="outline"
                   size="xl"
-                  className="w-full"
+                  className="w-full h-14 sm:h-12 text-lg sm:text-base"
                   onClick={() => setShowScanner(true)}
                 >
-                  <QrCode className="w-5 h-5 mr-2" />
+                  <QrCode className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                   掃描 QR Code
                 </Button>
               </CardContent>
