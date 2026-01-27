@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
-import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudyResponse } from '@/hooks/useStudyResponse';
@@ -9,7 +9,11 @@ import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
 import { GroupReportViewer } from './GroupReportViewer';
 import { toast } from 'sonner';
 
-export const SubmissionReview: React.FC = () => {
+interface SubmissionReviewProps {
+  onEdit?: () => void;
+}
+
+export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) => {
   const { currentUser, currentSession } = useSession();
   const { response } = useStudyResponse({
     sessionId: currentSession?.id,
@@ -119,10 +123,18 @@ export const SubmissionReview: React.FC = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl">您的 Spiritual Fitness 筆記</CardTitle>
-                <Button variant="outline" size="sm" onClick={handleSharePersonal}>
-                  <Share2 className="w-4 h-4 mr-2" />
-                  分享
-                </Button>
+                <div className="flex gap-2">
+                  {onEdit && (
+                    <Button variant="outline" size="sm" onClick={onEdit}>
+                      <Pencil className="w-4 h-4 mr-2" />
+                      繼續編輯
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleSharePersonal}>
+                    <Share2 className="w-4 h-4 mr-2" />
+                    分享
+                  </Button>
+                </div>
               </div>
               <div className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">{currentSession?.verseReference}</span>
