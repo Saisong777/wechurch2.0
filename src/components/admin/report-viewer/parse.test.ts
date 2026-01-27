@@ -326,7 +326,40 @@ describe('parseReportContent', () => {
       expect(result[0].applications).toContain('重新思考信仰');
       expect(result[0].contributions).toContain('郭小萱');
     });
-  });
+    });
+
+    it('should parse large overall report with many insights', () => {
+      // This format matches actual database content
+      const content = `**組別：** 第 1 組、第 2 組
+**組員：** 周婷婷、黃建華
+**已分析筆記數：** 2/2
+**查經經文：** 太 7:7-17
+---
+**📖 主題：**
+*   恩典無限供應
+*   信心的飛躍
+
+**🔍 事實發現：**
+*   看到群眾的反應和耶穌形成對比
+*   發現神的信實貫穿整個故事
+
+**💡 獨特亮光：**
+*   👤 周婷婷：Feeling the burn on this verse! 💪
+*   👤 黃建華：原來神的心意是這樣的
+
+**🎯 如何應用：**
+*   周婷婷：每天禱告
+*   黃建華：更多讀經`;
+
+      const result = parseReportContent(content);
+      
+      expect(result).toHaveLength(1);
+      // Should correctly parse insights with the * list format
+      expect(result[0].insights).toContain('周婷婷');
+      expect(result[0].insights).toContain('Feeling the burn');
+      expect(result[0].insights).toContain('黃建華');
+      expect(result[0].insights).toContain('原來神的心意');
+    });
 
   describe('markdown cleaning in parsed fields', () => {
     it('should clean bold syntax from all fields', () => {
