@@ -9,13 +9,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Copy, Download, ChevronDown, Users, FileText, FileDown, Printer, User } from 'lucide-react';
+import { Copy, Download, ChevronDown, Users, FileText, FileDown, Printer, User, BarChart3 } from 'lucide-react';
 import { EnhancedSection } from '../report-elements';
 import { GroupReport } from './parse';
+import { cn } from '@/lib/utils';
 
 interface GroupSectionProps {
   section: GroupReport;
   showHeader?: boolean;
+  variant?: 'default' | 'overall';
   onCopy: (groupNumber: number) => void;
   onDownloadMarkdown: (groupNumber: number) => void;
   onDownloadPDF: (groupNumber: number) => void;
@@ -25,28 +27,50 @@ interface GroupSectionProps {
 export const GroupSection: React.FC<GroupSectionProps> = ({
   section,
   showHeader = true,
+  variant = 'default',
   onCopy,
   onDownloadMarkdown,
   onDownloadPDF,
   onPrint,
 }) => {
   const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications;
+  const isOverall = variant === 'overall' || section.groupNumber === 0;
   
   return (
-    <div className="group-section space-y-3 sm:space-y-4">
+    <div className={cn(
+      "group-section space-y-3 sm:space-y-4",
+      isOverall && "ring-1 ring-accent/30 rounded-xl p-1"
+    )}>
       {/* Group Header */}
       {showHeader && section.groupInfo && (
-        <div className="rounded-t-lg gradient-navy text-primary-foreground px-3 sm:px-5 py-3 sm:py-4">
+        <div className={cn(
+          "rounded-t-lg px-3 sm:px-5 py-3 sm:py-4",
+          isOverall 
+            ? "bg-gradient-to-r from-accent/20 via-accent/10 to-secondary/10 text-foreground border border-b-0 border-accent/20" 
+            : "gradient-navy text-primary-foreground"
+        )}>
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-base sm:text-lg flex items-center gap-2">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+            <h2 className={cn(
+              "font-bold text-base sm:text-lg flex items-center gap-2",
+              isOverall && "text-accent"
+            )}>
+              {isOverall ? (
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
+              ) : (
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              )}
               {section.groupInfo}
             </h2>
             <div className="flex items-center gap-1 sm:gap-2">
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-primary-foreground hover:bg-white/20 h-8 w-8 p-0 sm:px-2 sm:w-auto"
+                className={cn(
+                  "h-8 w-8 p-0 sm:px-2 sm:w-auto",
+                  isOverall 
+                    ? "text-accent hover:bg-accent/20" 
+                    : "text-primary-foreground hover:bg-white/20"
+                )}
                 onClick={() => onCopy(section.groupNumber)}
               >
                 <Copy className="w-4 h-4" />
@@ -56,7 +80,12 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-primary-foreground hover:bg-white/20 h-8 px-2"
+                    className={cn(
+                      "h-8 px-2",
+                      isOverall 
+                        ? "text-accent hover:bg-accent/20" 
+                        : "text-primary-foreground hover:bg-white/20"
+                    )}
                   >
                     <Download className="w-4 h-4" />
                     <ChevronDown className="w-3 h-3 ml-1" />
@@ -74,7 +103,7 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onPrint(section.groupNumber)}>
                     <Printer className="w-4 h-4 mr-2" />
-                    列印此組
+                    {isOverall ? '列印總結' : '列印此組'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -85,7 +114,12 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
       
       {/* Group Meta Info */}
       {(section.members || section.verse) && (
-        <div className="bg-gradient-to-r from-muted/60 to-muted/30 px-3 sm:px-5 py-3 sm:py-4 border border-t-0 border-border rounded-b-lg">
+        <div className={cn(
+          "px-3 sm:px-5 py-3 sm:py-4 border border-t-0 rounded-b-lg",
+          isOverall 
+            ? "bg-gradient-to-r from-accent/5 to-secondary/5 border-accent/20" 
+            : "bg-gradient-to-r from-muted/60 to-muted/30 border-border"
+        )}>
           {section.members && (
             <p className="text-xs sm:text-sm flex flex-wrap items-start gap-1 sm:gap-2">
               <span className="font-medium text-foreground shrink-0">👥 組員：</span>
@@ -133,7 +167,10 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
           )}
         </div>
       ) : (
-        <div className="p-3 sm:p-5 bg-card border border-border rounded-lg shadow-sm">
+        <div className={cn(
+          "p-3 sm:p-5 border rounded-lg shadow-sm",
+          isOverall ? "bg-accent/5 border-accent/20" : "bg-card border-border"
+        )}>
           <div className="text-xs sm:text-sm text-foreground whitespace-pre-wrap leading-6 sm:leading-7">
             {section.raw}
           </div>
