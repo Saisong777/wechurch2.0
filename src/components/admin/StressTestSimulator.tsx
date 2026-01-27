@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useSession } from '@/contexts/SessionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { FlaskConical, Trash2, Users, Loader2 } from 'lucide-react';
+import { FlaskConical, Trash2, Users, Loader2, FileText, Wand2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,72 @@ const LAST_NAMES = [
 
 const REMOTE_LOCATIONS = ['Taoyuan Church', 'Taichung Group', 'Online Taipei'];
 
+// Mock study content for AI report testing
+const MOCK_THEMES = [
+  '神的信實與恩典',
+  '信心的力量',
+  '愛與饒恕的功課',
+  '順服帶來祝福',
+  '在患難中仍有盼望',
+  '神的主權與計畫',
+  '謙卑服事的榜樣',
+  '生命的更新與改變',
+];
+
+const MOCK_MOVING_VERSES = [
+  '第5節讓我感動，因為看到神的大能',
+  '第8節提醒我神永不離棄我們',
+  '第12節是我今年最需要的經文',
+  '第3節讓我重新思考信仰的意義',
+  '第15節給我極大的安慰',
+  '第7節挑戰了我對順服的理解',
+];
+
+const MOCK_FACTS = [
+  '觀察到主角面對困難時仍選擇相信神',
+  '發現經文中有三個重複的關鍵詞',
+  '注意到時間順序的安排很有意義',
+  '看到人物之間的對話反映當時的文化背景',
+  '經文結構呈現「問題-轉折-解決」的模式',
+  '發現這段經文與前一章有呼應的關係',
+];
+
+const MOCK_EXEGESIS = [
+  '根據希臘文原意，這個詞有「完全信靠」的含義',
+  '當時的歷史背景是羅馬統治時期，這影響了經文的理解',
+  '注釋書指出這段經文常被用於教導禱告的重要性',
+  '學者認為這是一個交叉結構的典型範例',
+  '希伯來文化中，這個動作代表立約的承諾',
+  '這段經文在猶太傳統中有特殊的地位',
+];
+
+const MOCK_INSPIRATIONS = [
+  '神在提醒我：祂的時間表與我的不同，但祂的計畫永遠是最好的',
+  '感受到神在對我說：「不要害怕，我與你同在」',
+  '這段經文光照了我最近面對的掙扎，讓我看見神的帶領',
+  '聖靈感動我要更多饒恕那些傷害過我的人',
+  '我感覺神在邀請我進入更深的禱告生活',
+  '這是神對我長久禱告的回應，祂沒有忘記我！',
+];
+
+const MOCK_APPLICATIONS = [
+  '這週要每天花15分鐘安靜等候神',
+  '決定打電話給那位需要和好的朋友',
+  '開始建立每日讀經的習慣',
+  '要更主動關心身邊正在受苦的弟兄姊妹',
+  '在工作上實踐誠實和正直的原則',
+  '為教會的復興禱告30天',
+];
+
+const MOCK_OTHERS = [
+  '感謝小組成員的分享，讓我收穫很多！',
+  '下週想繼續研究相關的經文',
+  '這次查經讓我對這卷書有全新的認識',
+  '想要推薦這段經文給正在經歷困難的朋友',
+  '',
+  '',
+];
+
 // Generate a random email
 const generateEmail = (name: string, index: number): string => {
   const domains = ['gmail.com', 'yahoo.com.tw', 'hotmail.com', 'outlook.com'];
@@ -53,6 +120,10 @@ const generateName = (gender: 'male' | 'female'): string => {
   return `${lastName}${firstName}`;
 };
 
+const getRandomItem = <T,>(arr: T[]): T => {
+  return arr[Math.floor(Math.random() * arr.length)];
+};
+
 interface StressTestSimulatorProps {
   onParticipantsGenerated?: () => void;
   onParticipantsCleared?: () => void;
@@ -66,6 +137,89 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
   const [userCount, setUserCount] = useState(50);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isGeneratingSubmissions, setIsGeneratingSubmissions] = useState(false);
+  const [autoGenerateSubmissions, setAutoGenerateSubmissions] = useState(true);
+
+  const generateMockSubmissions = async (participants: Array<{ id: string; name: string; email: string; group_number: number | null }>, verseReference: string) => {
+    const submissions = participants
+      .filter(p => p.group_number !== null)
+      .map(p => ({
+        session_id: currentSession!.id,
+        participant_id: p.id,
+        group_number: p.group_number!,
+        name: p.name,
+        email: p.email,
+        bible_verse: verseReference,
+        theme: getRandomItem(MOCK_THEMES),
+        moving_verse: getRandomItem(MOCK_MOVING_VERSES),
+        facts_discovered: getRandomItem(MOCK_FACTS),
+        traditional_exegesis: getRandomItem(MOCK_EXEGESIS),
+        inspiration_from_god: getRandomItem(MOCK_INSPIRATIONS),
+        application_in_life: getRandomItem(MOCK_APPLICATIONS),
+        others: getRandomItem(MOCK_OTHERS) || null,
+      }));
+
+    if (submissions.length === 0) {
+      return 0;
+    }
+
+    // Insert in chunks
+    const chunkSize = 50;
+    let insertedCount = 0;
+    for (let i = 0; i < submissions.length; i += chunkSize) {
+      const chunk = submissions.slice(i, i + chunkSize);
+      const { error } = await supabase.from('submissions').insert(chunk);
+      if (!error) {
+        insertedCount += chunk.length;
+      } else {
+        console.error('Submission insert error:', error);
+      }
+    }
+
+    return insertedCount;
+  };
+
+  const handleGenerateSubmissionsOnly = async () => {
+    if (!currentSession?.id) {
+      toast.error('請先建立一個查經聚會！');
+      return;
+    }
+
+    setIsGeneratingSubmissions(true);
+
+    try {
+      // Get current participants with group assignments
+      const { data: participants, error: pError } = await supabase
+        .from('participants')
+        .select('id, name, email, group_number')
+        .eq('session_id', currentSession.id);
+
+      if (pError) throw pError;
+
+      if (!participants || participants.length === 0) {
+        toast.error('沒有參與者可以生成查經資料');
+        return;
+      }
+
+      const withGroups = participants.filter(p => p.group_number !== null);
+      if (withGroups.length === 0) {
+        toast.error('請先進行分組，才能生成查經資料');
+        return;
+      }
+
+      const count = await generateMockSubmissions(
+        participants as Array<{ id: string; name: string; email: string; group_number: number | null }>,
+        currentSession.verseReference || '約翰福音 3:16'
+      );
+
+      toast.success(`已生成 ${count} 筆模擬查經資料！`);
+    } catch (error: any) {
+      console.error('Error generating submissions:', error);
+      toast.error(`生成查經資料失敗: ${error.message}`);
+    } finally {
+      setIsGeneratingSubmissions(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!currentSession?.id) {
@@ -158,6 +312,12 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
     setIsClearing(true);
 
     try {
+      // Also clear submissions for this session
+      await supabase
+        .from('submissions')
+        .delete()
+        .eq('session_id', currentSession.id);
+
       const { error } = await supabase
         .from('participants')
         .delete()
@@ -166,7 +326,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
       if (error) throw error;
 
       setUsers([]);
-      toast.success('已清除所有參與者！');
+      toast.success('已清除所有參與者和查經資料！');
       onParticipantsCleared?.();
     } catch (error: any) {
       console.error('Error clearing participants:', error);
@@ -176,6 +336,8 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
     }
   };
 
+  const hasGroupedParticipants = users.some(u => u.groupNumber !== undefined);
+
   return (
     <Card className="border-dashed border-2 border-muted-foreground/30 bg-muted/20">
       <CardHeader className="pb-3">
@@ -184,7 +346,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
           壓力測試模擬器 Stress Test Simulator
         </CardTitle>
         <CardDescription>
-          產生模擬使用者以測試分組演算法效能
+          產生模擬使用者和查經資料以測試 AI 報告功能
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -244,7 +406,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
               <AlertDialogHeader>
                 <AlertDialogTitle>確定要清除所有參與者？</AlertDialogTitle>
                 <AlertDialogDescription>
-                  這將會刪除本次聚會的所有 {users.length} 位參與者。此操作無法復原。
+                  這將會刪除本次聚會的所有 {users.length} 位參與者及其查經資料。此操作無法復原。
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -257,9 +419,37 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
           </AlertDialog>
         </div>
 
+        {/* Generate Submissions Button */}
+        {hasGroupedParticipants && (
+          <div className="pt-3 border-t border-border">
+            <Button
+              variant="gold"
+              onClick={handleGenerateSubmissionsOnly}
+              disabled={isGeneratingSubmissions}
+              className="w-full gap-2"
+            >
+              {isGeneratingSubmissions ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  生成查經資料中...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  生成模擬查經資料 (供 AI 報告測試)
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              為已分組的參與者生成假查經筆記，用於測試 AI 分析報告
+            </p>
+          </div>
+        )}
+
         {users.length > 0 && (
           <p className="text-xs text-muted-foreground text-center">
             目前共 {users.length} 位參與者
+            {hasGroupedParticipants && ' (已分組)'}
           </p>
         )}
       </CardContent>
