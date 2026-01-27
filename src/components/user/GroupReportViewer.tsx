@@ -5,11 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkles, Users, BookOpen, Share2, Download } from 'lucide-react';
 import { fetchAIReports } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
-import { 
-  EnhancedSection, 
-  extractKeywords,
-  KeywordTagCloud 
-} from '@/components/admin/report-elements';
+import { EnhancedSection } from '@/components/admin/report-elements';
 import {
   parseReportContent as parseReportContentFull,
   generateSectionMarkdown,
@@ -169,10 +165,6 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   const parsed = parseReportContent(report);
   const hasStructuredContent = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
 
-  // Extract unique keywords - deduplicate
-  const themeKeywords = extractKeywords(parsed.themes || '');
-  const observationKeywords = extractKeywords(parsed.observations || '');
-  const combinedKeywords = [...new Set([...themeKeywords, ...observationKeywords])].slice(0, 5);
 
   return (
     <Card>
@@ -198,12 +190,6 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           </p>
         )}
         
-        {/* Summary keyword cloud at top - deduplicated */}
-        {combinedKeywords.length > 0 && (
-          <div className="mt-3">
-            <KeywordTagCloud keywords={combinedKeywords} variant="themes" />
-          </div>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Group Meta Info */}

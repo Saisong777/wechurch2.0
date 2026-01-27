@@ -103,15 +103,15 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
       {hasStructuredContent ? (
         <div className="space-y-4">
           {section.themes && (
-            <EnhancedSection type="themes" content={section.themes} />
+            <EnhancedSection type="themes" content={section.themes} showKeywords={false} />
           )}
           
           {section.observations && (
-            <EnhancedSection type="observations" content={section.observations} />
+            <EnhancedSection type="observations" content={section.observations} showKeywords={false} />
           )}
           
           {section.insights && (
-            <EnhancedSection type="insights" content={section.insights} showQuotes={true} />
+            <EnhancedSection type="insights" content={section.insights} showQuotes={true} showKeywords={false} />
           )}
           
           {section.applications && (
