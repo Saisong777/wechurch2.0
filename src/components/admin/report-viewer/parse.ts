@@ -58,14 +58,14 @@ export function parseReportContent(content: string): GroupReport[] {
       section.groupInfo = `第 ${groupMatch[1]} 組`;
     }
     
-    // Extract members
-    const membersMatch = groupReport.match(/(?:\*\*)?組員(?:\*\*)?[：:]\s*([^\n]+)/);
+    // Extract members - handle bold syntax in value
+    const membersMatch = groupReport.match(/(?:\*\*)?組員(?:\*\*)?[：:]\s*(?:\*\*)?\s*([^\n]+)/);
     if (membersMatch) {
       section.members = cleanMarkdown(membersMatch[1]);
     }
     
-    // Extract verse
-    const verseMatch = groupReport.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*([^\n]+)/);
+    // Extract verse - handle bold syntax in value
+    const verseMatch = groupReport.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*(?:\*\*)?\s*([^\n]+)/);
     if (verseMatch) {
       section.verse = cleanMarkdown(verseMatch[1]);
     }
