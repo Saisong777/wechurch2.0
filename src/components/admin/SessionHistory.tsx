@@ -50,11 +50,12 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
     const loadSessions = async () => {
       if (!user) return;
 
-      // First get sessions
+      // First get sessions - exclude completed ones (they're in history browser)
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
         .select('id, short_code, verse_reference, status, created_at')
         .eq('owner_id', user.id)
+        .neq('status', 'completed')  // Hide completed sessions
         .order('created_at', { ascending: false });
 
       if (sessionsError || !sessionsData) {

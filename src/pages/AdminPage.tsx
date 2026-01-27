@@ -63,6 +63,8 @@ export const AdminPage: React.FC = () => {
         status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
         createdAt: new Date(sessionData.created_at),
         groups: [],
+        allowLatecomers: sessionData.allow_latecomers,
+        icebreakerEnabled: sessionData.icebreaker_enabled,
       });
       setIsAdmin(true);
 
@@ -93,6 +95,8 @@ export const AdminPage: React.FC = () => {
           status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
           createdAt: new Date(sessionData.created_at),
           groups,
+          allowLatecomers: sessionData.allow_latecomers,
+          icebreakerEnabled: sessionData.icebreaker_enabled,
         };
         setCurrentSession(updatedSession);
         setStep('monitor');

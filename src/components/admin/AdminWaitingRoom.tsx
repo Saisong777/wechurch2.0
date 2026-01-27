@@ -59,9 +59,10 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
   const locationCount = Object.keys(locationGroups).length;
 
   const handleCopySessionId = () => {
-    if (currentSession?.id) {
-      navigator.clipboard.writeText(currentSession.id);
-      toast.success('Session ID 已複製！');
+    const codeToCopy = currentSession?.shortCode || currentSession?.id;
+    if (codeToCopy) {
+      navigator.clipboard.writeText(codeToCopy);
+      toast.success('課程代碼已複製！');
     }
   };
 
@@ -111,10 +112,14 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                 </p>
               </div>
               <div className="flex items-center gap-3 sm:gap-4">
-                <Button variant="outline" size="default" onClick={handleCopySessionId} className="h-10 sm:h-9 text-sm">
-                  <Copy className="w-4 h-4 mr-2" />
-                  複製 ID
-                </Button>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
+                  <span className="font-mono font-bold text-lg">
+                    {currentSession?.shortCode || currentSession?.id?.slice(0, 8)}
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopySessionId}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
                 <div className="flex items-center gap-2 text-accent">
                   <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
                   <span className="font-medium text-sm">等待中</span>
