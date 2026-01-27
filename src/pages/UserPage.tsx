@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, ArrowRight, QrCode } from 'lucide-react';
+import { Dumbbell, ArrowRight, QrCode } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -140,7 +140,7 @@ export const UserPage: React.FC = () => {
         sessionStatus: sessionData.status,
       });
       
-      toast.success('已恢復您的查經進度 Session restored!');
+      toast.success('已恢復您的課程進度 Session restored!');
       setIsRestoring(false);
       return true;
     } catch (error) {
@@ -254,18 +254,18 @@ export const UserPage: React.FC = () => {
             <div className="relative mb-8">
               <div className="absolute inset-0 bg-secondary/30 rounded-full blur-3xl animate-pulse-soft" />
               <div className="relative w-32 h-32 rounded-full gradient-gold flex items-center justify-center glow-gold animate-float">
-                <BookOpen className="w-16 h-16 text-secondary-foreground" />
+                <Dumbbell className="w-16 h-16 text-secondary-foreground" />
               </div>
             </div>
             
             <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground text-center mb-4">
-              共同查經
+              靈魂健身房
             </h1>
             <p className="text-lg text-muted-foreground text-center mb-2">
-              Bible Study Together
+              Soul Gym
             </p>
             <p className="text-muted-foreground text-center max-w-md mb-12">
-              一起探索神的話語，在小組中分享和學習
+              一起，活出耶穌的豐盛生命
             </p>
 
             <Button
@@ -274,7 +274,7 @@ export const UserPage: React.FC = () => {
               onClick={() => setStep('enter-session')}
               className="min-w-64"
             >
-              加入查經 Join Bible Study
+              開始健身 Join Session
             </Button>
           </div>
         );
@@ -285,11 +285,11 @@ export const UserPage: React.FC = () => {
             <Card variant="highlight" className="border-2">
               <CardHeader className="text-center">
                 <div className="mx-auto w-16 h-16 rounded-full gradient-gold flex items-center justify-center mb-4 glow-gold">
-                  <BookOpen className="w-8 h-8 text-secondary-foreground" />
+                  <Dumbbell className="w-8 h-8 text-secondary-foreground" />
                 </div>
-                <CardTitle className="text-2xl">輸入聚會代碼</CardTitle>
+                <CardTitle className="text-2xl">輸入課程代碼</CardTitle>
                 <CardDescription className="text-base">
-                  Enter Session ID from your host
+                  Enter Session ID from your coach
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -411,9 +411,9 @@ export const UserPage: React.FC = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto rounded-full gradient-gold flex items-center justify-center animate-pulse">
-            <BookOpen className="w-8 h-8 text-secondary-foreground" />
+            <Dumbbell className="w-8 h-8 text-secondary-foreground" />
           </div>
-          <p className="text-muted-foreground">正在載入您的查經進度...</p>
+          <p className="text-muted-foreground">正在載入您的課程進度...</p>
           <p className="text-sm text-muted-foreground">Loading your session...</p>
         </div>
       </div>

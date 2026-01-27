@@ -252,7 +252,7 @@ export const ParticipantAuth: React.FC<ParticipantAuthProps> = ({ onSuccess, onG
               size="lg"
               className="w-full"
             >
-              加入查經 Join Now
+              加入課程 Join Now
             </Button>
           </form>
 
@@ -279,10 +279,10 @@ export const ParticipantAuth: React.FC<ParticipantAuthProps> = ({ onSuccess, onG
         </div>
         <div>
           <CardTitle className="text-2xl font-serif">
-            {mode === 'login' ? '登入加入查經' : '註冊新帳號'}
+            {mode === 'login' ? '登入開始健身' : '註冊新帳號'}
           </CardTitle>
           <CardDescription className="text-base mt-2">
-            {mode === 'login' ? 'Sign in to join Bible Study' : 'Create account to join'}
+            {mode === 'login' ? 'Sign in to join Soul Gym' : 'Create account to join'}
           </CardDescription>
           {verseReference && (
             <p className="text-sm text-primary font-medium mt-2">

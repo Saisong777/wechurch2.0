@@ -182,7 +182,7 @@ export const StudyForm: React.FC<StudyFormProps> = ({ onSubmitted }) => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg md:text-2xl">
               <BookOpen className="w-5 h-5 md:w-7 md:h-7 text-secondary" />
-              查經筆記 Study Notes
+              健身筆記 Study Notes
             </CardTitle>
             {/* Auto-save indicator */}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

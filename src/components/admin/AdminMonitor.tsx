@@ -80,7 +80,7 @@ export const AdminMonitor: React.FC = () => {
     if (allReady && isVerificationPhase) {
       await updateSessionStatus(currentSession.id, 'studying');
       setCurrentSession({ ...currentSession, status: 'studying' });
-      toast.success('所有組員已確認，開始查經！', {
+      toast.success('所有組員已確認，開始健身！', {
         description: 'All members verified! Study phase started.',
       });
     }
@@ -300,7 +300,7 @@ export const AdminMonitor: React.FC = () => {
             </div>
             <div className="flex items-center gap-4">
               <Badge variant={isVerificationPhase ? 'secondary' : isStudyingPhase ? 'default' : 'outline'}>
-                {isVerificationPhase ? '驗證階段 Verification' : isStudyingPhase ? '查經中 Studying' : currentSession?.status}
+                {isVerificationPhase ? '驗證階段 Verification' : isStudyingPhase ? '健身中 Training' : currentSession?.status}
               </Badge>
               <div className="text-center">
                 <p className="text-2xl font-bold text-primary">

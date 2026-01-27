@@ -382,7 +382,7 @@ const CRMPage = () => {
               <div className="text-center py-8 text-muted-foreground">
                 <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>尚無會員資料</p>
-                <p className="text-sm">參與者加入查經後會自動出現在這裡</p>
+                <p className="text-sm">參與者加入課程後會自動出現在這裡</p>
               </div>
             ) : isMobile ? (
               <div className="space-y-3">

@@ -1,6 +1,5 @@
 import React from 'react';
-import { BookIcon } from '@/components/icons/BookIcon';
-import { CrossIcon } from '@/components/icons/CrossIcon';
+import { SoulGymLogo } from '@/components/icons/SoulGymLogo';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
@@ -29,9 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
           {showLogo && (
             <div className="relative">
               <div className="absolute inset-0 bg-secondary/20 rounded-full blur-xl animate-pulse-soft" />
-              <div className="relative flex items-center justify-center w-12 h-12 rounded-full gradient-navy">
-                <CrossIcon className="text-secondary" size={24} />
-              </div>
+              <SoulGymLogo size={48} className="relative" />
             </div>
           )}
           <div className="text-center">

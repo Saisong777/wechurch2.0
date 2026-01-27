@@ -129,7 +129,7 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              {selectedParticipant?.participantName} 的查經筆記
+              {selectedParticipant?.participantName} 的健身筆記
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">

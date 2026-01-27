@@ -62,7 +62,7 @@ export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, verseRe
         </div>
         
         <p className="text-center text-sm text-muted-foreground">
-          掃描 QR Code 加入查經
+          掃描 QR Code 加入課程
         </p>
         
         <div className="flex gap-2">

@@ -168,7 +168,7 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          為所有參與者隨機生成查經筆記，用於測試進度監控功能。
+          為所有參與者隨機生成健身筆記，用於測試進度監控功能。
         </p>
 
         <div className="flex flex-wrap gap-2">

@@ -119,7 +119,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
       localStorage.setItem('bible_study_participant_id', joinedUser.id);
       // Save email for RPC verification (critical for set_participant_ready)
       localStorage.setItem('user_email', email);
-      toast.success('成功加入查經！');
+      toast.success('成功加入健身課程！');
       onJoined(isLatecomer && !!joinedUser.groupNumber);
     } else {
       toast.error('加入失敗，請重試');
@@ -129,15 +129,15 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto animate-fade-in">
-      <Card variant="highlight" className="border-2">
-        <CardHeader className="text-center pb-2">
+    <div className="w-full max-w-lg mx-auto animate-fade-in">
+      <Card variant="highlight">
+        <CardHeader className="text-center">
           <div className="mx-auto w-16 h-16 rounded-full gradient-gold flex items-center justify-center mb-4 glow-gold">
             <Users className="w-8 h-8 text-secondary-foreground" />
           </div>
-          <CardTitle className="text-2xl">加入查經小組</CardTitle>
+          <CardTitle className="text-2xl">加入靈魂健身房</CardTitle>
           <CardDescription className="text-base">
-            Join Bible Study Session
+            Join Soul Gym Session
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -297,7 +297,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
               className="w-full"
               disabled={isLoading || !name || !email || (isRemote && !locationName.trim())}
             >
-              {isLoading ? '加入中...' : '加入查經 Join Now'}
+              {isLoading ? '加入中...' : '加入課程 Join Now'}
             </Button>
           </form>
         </CardContent>
