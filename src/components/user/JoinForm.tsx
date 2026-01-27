@@ -30,24 +30,33 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
 
   // Load saved info from localStorage or from logged-in user
   useEffect(() => {
+    // First, check localStorage for saved guest data (works for both returning guests and post-OAuth)
+    const savedName = localStorage.getItem('bible_study_guest_name');
+    const savedEmail = localStorage.getItem('bible_study_guest_email');
+    const savedGender = localStorage.getItem('bible_study_guest_gender');
+    const savedLocation = localStorage.getItem('bible_study_guest_location');
+    
+    // Pre-fill from saved data first
+    if (savedName) setName(savedName);
+    if (savedEmail) setEmail(savedEmail);
+    if (savedGender === 'male' || savedGender === 'female') setGender(savedGender);
+    if (savedLocation && savedLocation !== 'On-site') {
+      setIsRemote(true);
+      setLocationName(savedLocation);
+    }
+    
+    // If user is logged in via Google, override with their Google profile data
     if (user) {
-      // Pre-fill from Google account
       const displayName = user.user_metadata?.full_name || user.user_metadata?.name || '';
       const userEmail = user.email || '';
-      if (displayName) setName(displayName);
-      if (userEmail) setEmail(userEmail);
-    } else {
-      // Load from localStorage for returning guests
-      const savedName = localStorage.getItem('bible_study_guest_name');
-      const savedEmail = localStorage.getItem('bible_study_guest_email');
-      const savedGender = localStorage.getItem('bible_study_guest_gender');
-      const savedLocation = localStorage.getItem('bible_study_guest_location');
-      if (savedName) setName(savedName);
-      if (savedEmail) setEmail(savedEmail);
-      if (savedGender === 'male' || savedGender === 'female') setGender(savedGender);
-      if (savedLocation && savedLocation !== 'On-site') {
-        setIsRemote(true);
-        setLocationName(savedLocation);
+      if (displayName) {
+        setName(displayName);
+        // Also save to localStorage for consistency
+        localStorage.setItem('bible_study_guest_name', displayName);
+      }
+      if (userEmail) {
+        setEmail(userEmail);
+        localStorage.setItem('bible_study_guest_email', userEmail);
       }
     }
   }, [user]);
