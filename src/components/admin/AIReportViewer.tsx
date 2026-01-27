@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List } from 'lucide-react';
+import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +29,7 @@ import {
   GroupSection,
   GroupReport,
   OverallReportCharts,
+  ReportComparison,
 } from './report-viewer';
 
 interface AIReportViewerProps {
@@ -45,7 +46,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   verseReference,
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'overall' | number>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'overall' | 'compare' | number>('all');
   
   const parsedSections = reportContent ? parseReportContent(reportContent) : [];
   
@@ -117,16 +118,18 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   // Get current content based on active tab
   const getCurrentContent = () => {
     if (activeTab === 'all') {
-      return { overallReports, groupReports, showAll: true };
+      return { overallReports, groupReports, showAll: true, showCompare: false };
     } else if (activeTab === 'overall') {
-      return { overallReports, groupReports: [], showAll: false };
+      return { overallReports, groupReports: [], showAll: false, showCompare: false };
+    } else if (activeTab === 'compare') {
+      return { overallReports: [], groupReports: [], showAll: false, showCompare: true };
     } else {
       const group = groupReports.find(s => s.groupNumber === activeTab);
-      return { overallReports: [], groupReports: group ? [group] : [], showAll: false };
+      return { overallReports: [], groupReports: group ? [group] : [], showAll: false, showCompare: false };
     }
   };
 
-  const { overallReports: visibleOverall, groupReports: visibleGroups, showAll } = getCurrentContent();
+  const { overallReports: visibleOverall, groupReports: visibleGroups, showAll, showCompare } = getCurrentContent();
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,6 +177,23 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                   {parsedSections.length}
                 </Badge>
               </Button>
+
+              {/* Compare Button - Only when 2+ groups */}
+              {groupReports.length >= 2 && (
+                <Button
+                  variant={activeTab === 'compare' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveTab('compare')}
+                  className={cn(
+                    "gap-1.5 h-9 px-3 text-xs sm:text-sm whitespace-nowrap shrink-0 transition-all",
+                    activeTab === 'compare' && "shadow-md bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                  )}
+                >
+                  <Columns className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">報告比對</span>
+                  <span className="sm:hidden">比對</span>
+                </Button>
+              )}
 
               {/* Separator */}
               <div className="h-6 w-px bg-border shrink-0" />
@@ -284,8 +304,17 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6" ref={printRef}>
           <div className="space-y-6 sm:space-y-8">
+            {/* Comparison View */}
+            {showCompare && groupReports.length >= 2 && (
+              <ReportComparison 
+                groupReports={groupReports}
+                overallReport={overallReports[0]}
+                onClose={() => setActiveTab('all')}
+              />
+            )}
+
             {/* Visualization Charts for Overall View */}
-            {(activeTab === 'all' || activeTab === 'overall') && groupReports.length > 1 && (
+            {!showCompare && (activeTab === 'all' || activeTab === 'overall') && groupReports.length > 1 && (
               <OverallReportCharts 
                 groupReports={groupReports} 
                 overallReport={overallReports[0]}
@@ -294,7 +323,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             )}
 
             {/* Overall Reports */}
-            {visibleOverall.map((section, index) => (
+            {!showCompare && visibleOverall.map((section, index) => (
               <React.Fragment key={`overall-${index}`}>
                 <GroupSection
                   section={{ ...section, groupInfo: '📊 全會眾綜合分析' }}
@@ -316,7 +345,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             ))}
 
             {/* Group Reports */}
-            {visibleGroups.map((section, index) => (
+            {!showCompare && visibleGroups.map((section, index) => (
               <React.Fragment key={`group-${section.groupNumber}`}>
                 <GroupSection
                   section={section}
@@ -332,7 +361,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             ))}
 
             {/* Empty State */}
-            {visibleOverall.length === 0 && visibleGroups.length === 0 && (
+            {!showCompare && visibleOverall.length === 0 && visibleGroups.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>尚無報告內容</p>
