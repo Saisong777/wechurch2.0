@@ -23,21 +23,21 @@ const levelConfig: Record<CardLevel, {
   glowClass: string;
 }> = {
   L1: {
-    label: '破冰卡',
+    label: '破冰',
     labelEn: 'Warm-Up',
     bgClass: 'bg-gradient-to-br from-emerald-400 to-emerald-600',
     borderClass: 'border-emerald-300',
     glowClass: 'shadow-emerald-500/50',
   },
   L2: {
-    label: '連結卡',
+    label: '連結',
     labelEn: 'Connection',
     bgClass: 'bg-gradient-to-br from-amber-400 to-amber-600',
     borderClass: 'border-amber-300',
     glowClass: 'shadow-amber-500/50',
   },
   L3: {
-    label: '深度卡',
+    label: '深度',
     labelEn: 'Deep',
     bgClass: 'bg-gradient-to-br from-rose-400 to-rose-600',
     borderClass: 'border-rose-300',

@@ -194,10 +194,10 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
   const validCount = parsedQuestions.filter(q => q.isValid).length;
   const invalidCount = parsedQuestions.filter(q => !q.isValid).length;
 
-  const levelColors: Record<CardLevel, string> = {
-    L1: 'bg-emerald-500',
-    L2: 'bg-amber-500',
-    L3: 'bg-rose-500',
+  const levelConfig: Record<CardLevel, { color: string; label: string }> = {
+    L1: { color: 'bg-emerald-500', label: '破冰' },
+    L2: { color: 'bg-amber-500', label: '連結' },
+    L3: { color: 'bg-rose-500', label: '深度' },
   };
 
   return (
@@ -289,8 +289,8 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                     q.isValid ? 'bg-muted/50' : 'bg-destructive/10'
                   )}
                 >
-                  <Badge className={cn('text-white text-xs', levelColors[q.level])}>
-                    {q.level}
+                  <Badge className={cn('text-white text-xs', levelConfig[q.level].color)}>
+                    {levelConfig[q.level].label}
                   </Badge>
                   <div className="flex-1 min-w-0">
                     {q.isValid ? (
