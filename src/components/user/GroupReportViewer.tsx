@@ -218,19 +218,6 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
         {/* Structured Sections */}
         {hasStructuredContent ? (
           <div className="space-y-4">
-            {/* Personal Contributions Section */}
-            {parsed.contributions && (
-              <div className="p-5 border-l-4 rounded-r-lg bg-accent/10 border-accent">
-                <h3 className="flex items-center gap-2 font-semibold mb-3 text-accent">
-                  <User className="w-5 h-5" />
-                  👤 個人貢獻摘要 Personal Contributions
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
-                  {parsed.contributions}
-                </div>
-              </div>
-            )}
-            
             {parsed.themes && (
               <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
             )}
@@ -245,6 +232,19 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             
             {parsed.applications && (
               <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
+            )}
+            
+            {/* Personal Contributions Section - at the bottom */}
+            {parsed.contributions && (
+              <div className="p-5 border-l-4 rounded-r-lg bg-accent/10 border-accent">
+                <h3 className="flex items-center gap-2 font-semibold mb-3 text-accent">
+                  <User className="w-5 h-5" />
+                  👤 個人貢獻摘要 Personal Contributions
+                </h3>
+                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
+                  {parsed.contributions}
+                </div>
+              </div>
             )}
           </div>
         ) : (
