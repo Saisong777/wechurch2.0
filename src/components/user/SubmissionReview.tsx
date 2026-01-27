@@ -76,9 +76,9 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
       title: '🟢 暖身 Warm-up',
       color: 'border-green-500 bg-green-50/10',
       fields: [
-        { key: 'title_phrase', label: '定標題', icon: Sparkles, value: response.title_phrase },
-        { key: 'heartbeat_verse', label: '抓心跳', icon: Heart, value: response.heartbeat_verse },
-        { key: 'observation', label: '看現場', icon: Eye, value: response.observation },
+        { key: 'title_phrase', label: '1. 定標題', icon: Sparkles, value: response.title_phrase },
+        { key: 'heartbeat_verse', label: '2. 心跳的時刻', icon: Heart, value: response.heartbeat_verse },
+        { key: 'observation', label: '3. 查看聖經的資訊', icon: Eye, value: response.observation },
       ],
     },
     {
@@ -87,19 +87,19 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
       fields: [
         { 
           key: 'core_insight', 
-          label: `練核心 ${selectedCategory ? `(${selectedCategory.emoji} ${selectedCategory.label})` : ''}`, 
+          label: `4. 思想神的話 ${selectedCategory ? `(${selectedCategory.emoji} ${selectedCategory.label})` : ''}`, 
           icon: Dumbbell, 
           value: response.core_insight_note 
         },
-        { key: 'scholars_note', label: '學長姐的話', icon: BookOpen, value: response.scholars_note },
+        { key: 'scholars_note', label: '5. 學長姐的話', icon: BookOpen, value: response.scholars_note },
       ],
     },
     {
       title: '🔵 伸展 Stretch',
       color: 'border-blue-500 bg-blue-50/10',
       fields: [
-        { key: 'action_plan', label: '帶一招', icon: Target, value: response.action_plan },
-        { key: 'cool_down_note', label: '自由發揮', icon: MessageCircle, value: response.cool_down_note },
+        { key: 'action_plan', label: '6. 我決定要這樣做', icon: Target, value: response.action_plan },
+        { key: 'cool_down_note', label: '7. 自由發揮', icon: MessageCircle, value: response.cool_down_note },
       ],
     },
   ];
