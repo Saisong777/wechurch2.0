@@ -11,3 +11,4 @@ export {
 } from './export';
 
 export { GroupSection } from './GroupSection';
+export { OverallReportCharts } from './OverallReportCharts';

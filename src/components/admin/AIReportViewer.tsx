@@ -28,6 +28,7 @@ import {
   openPrintWindow,
   GroupSection,
   GroupReport,
+  OverallReportCharts,
 } from './report-viewer';
 
 interface AIReportViewerProps {
@@ -283,11 +284,20 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6" ref={printRef}>
           <div className="space-y-6 sm:space-y-8">
+            {/* Visualization Charts for Overall View */}
+            {(activeTab === 'all' || activeTab === 'overall') && groupReports.length > 1 && (
+              <OverallReportCharts 
+                groupReports={groupReports} 
+                overallReport={overallReports[0]}
+                className="mb-6"
+              />
+            )}
+
             {/* Overall Reports */}
             {visibleOverall.map((section, index) => (
               <React.Fragment key={`overall-${index}`}>
                 <GroupSection
-                  section={{ ...section, groupInfo: '📊 全組總結' }}
+                  section={{ ...section, groupInfo: '📊 全會眾綜合分析' }}
                   onCopy={handleCopyGroup}
                   onDownloadMarkdown={handleDownloadMarkdownGroup}
                   onDownloadPDF={handleDownloadPDF}
