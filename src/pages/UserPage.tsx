@@ -210,7 +210,8 @@ export const UserPage: React.FC = () => {
         sessionStatus: sessionData.status,
       });
       
-      toast.success('已恢復您的課程進度 Session restored!');
+      // Silent restoration - no toast to avoid notification spam during transitions
+      console.log('[UserPage] Session restored successfully (silent)');
       setIsRestoring(false);
       return true;
     } catch (error) {
