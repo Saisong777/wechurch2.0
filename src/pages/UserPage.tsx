@@ -30,7 +30,7 @@ const STORAGE_KEYS = {
 export const UserPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { currentUser, currentSession, setCurrentSession, setCurrentUser } = useSession();
-  const [step, setStep] = useState<UserStep>('landing');
+  const [step, setStep] = useState<UserStep>('enter-session');
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);

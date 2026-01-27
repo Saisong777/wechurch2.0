@@ -6,86 +6,87 @@
 
 @layer base {
   :root {
-    /* Soul Gym - Energetic Fitness Palette */
-    --background: 0 0% 98%;
-    --foreground: 0 0% 8%;
+    /* Soul Gym - Calm Energy Palette (Teal + Charcoal) */
+    --background: 180 15% 98%;
+    --foreground: 200 25% 12%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 8%;
+    --card: 180 10% 100%;
+    --card-foreground: 200 25% 12%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 8%;
+    --popover: 180 10% 100%;
+    --popover-foreground: 200 25% 12%;
 
-    /* Deep charcoal - strength, power */
-    --primary: 0 0% 12%;
-    --primary-foreground: 0 0% 98%;
+    /* Deep charcoal - strength, grounding */
+    --primary: 200 20% 15%;
+    --primary-foreground: 180 15% 98%;
 
-    /* Energetic orange - energy, motivation */
-    --secondary: 25 95% 53%;
+    /* Vibrant teal - energy, vitality, calming */
+    --secondary: 172 66% 45%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 180 10% 94%;
+    --muted-foreground: 200 15% 45%;
 
-    /* Electric orange - action, call-to-action */
-    --accent: 16 100% 50%;
+    /* Bright teal accent */
+    --accent: 168 76% 42%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 65% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 25 95% 53%;
+    --border: 180 10% 88%;
+    --input: 180 10% 88%;
+    --ring: 172 66% 45%;
 
     --radius: 0.75rem;
 
-    /* Custom tokens - Soul Gym style */
-    --orange-gradient: linear-gradient(135deg, hsl(25, 95%, 53%) 0%, hsl(16, 100%, 50%) 100%);
-    --dark-gradient: linear-gradient(135deg, hsl(0, 0%, 12%) 0%, hsl(0, 0%, 20%) 100%);
-    --fire-gradient: linear-gradient(135deg, hsl(25, 95%, 53%) 0%, hsl(0, 85%, 55%) 100%);
-    --card-shadow: 0 4px 24px -4px hsla(0, 0%, 0%, 0.1);
-    --card-shadow-hover: 0 8px 32px -4px hsla(0, 0%, 0%, 0.15);
-    --glow-orange: 0 0 40px hsla(25, 95%, 53%, 0.4);
+    /* Custom tokens - Soul Gym teal style */
+    --teal-gradient: linear-gradient(135deg, hsl(172, 66%, 45%) 0%, hsl(168, 76%, 42%) 100%);
+    --orange-gradient: linear-gradient(135deg, hsl(172, 66%, 45%) 0%, hsl(168, 76%, 42%) 100%);
+    --dark-gradient: linear-gradient(135deg, hsl(200, 20%, 15%) 0%, hsl(200, 25%, 22%) 100%);
+    --energy-gradient: linear-gradient(135deg, hsl(172, 66%, 45%) 0%, hsl(185, 60%, 50%) 100%);
+    --card-shadow: 0 4px 24px -4px hsla(200, 25%, 12%, 0.08);
+    --card-shadow-hover: 0 8px 32px -4px hsla(200, 25%, 12%, 0.12);
+    --glow-teal: 0 0 40px hsla(172, 66%, 45%, 0.3);
 
-    --sidebar-background: 0 0% 12%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 25 95% 53%;
+    --sidebar-background: 200 20% 15%;
+    --sidebar-foreground: 180 15% 98%;
+    --sidebar-primary: 172 66% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 20%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 22%;
-    --sidebar-ring: 25 95% 53%;
+    --sidebar-accent: 200 20% 22%;
+    --sidebar-accent-foreground: 180 15% 98%;
+    --sidebar-border: 200 15% 25%;
+    --sidebar-ring: 172 66% 45%;
   }
 
   .dark {
-    --background: 0 0% 6%;
-    --foreground: 0 0% 98%;
+    --background: 200 25% 6%;
+    --foreground: 180 15% 98%;
 
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 98%;
+    --card: 200 20% 10%;
+    --card-foreground: 180 15% 98%;
 
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 200 20% 10%;
+    --popover-foreground: 180 15% 98%;
 
-    --primary: 25 95% 53%;
+    --primary: 172 66% 45%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 18%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 200 20% 18%;
+    --secondary-foreground: 180 15% 98%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
+    --muted: 200 15% 15%;
+    --muted-foreground: 180 10% 65%;
 
-    --accent: 16 100% 50%;
+    --accent: 168 76% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 25 95% 53%;
+    --border: 200 15% 20%;
+    --input: 200 15% 20%;
+    --ring: 172 66% 45%;
   }
 }
 
@@ -108,12 +109,16 @@
 }
 
 @layer components {
+  .gradient-teal {
+    background: var(--teal-gradient);
+  }
+
   .gradient-orange {
-    background: var(--orange-gradient);
+    background: var(--teal-gradient);
   }
 
   .gradient-gold {
-    background: var(--orange-gradient);
+    background: var(--teal-gradient);
   }
 
   .gradient-dark {
@@ -124,8 +129,8 @@
     background: var(--dark-gradient);
   }
 
-  .gradient-fire {
-    background: var(--fire-gradient);
+  .gradient-energy {
+    background: var(--energy-gradient);
   }
 
   .card-elevated {
@@ -137,23 +142,34 @@
     box-shadow: var(--card-shadow-hover);
   }
 
+  .glow-teal {
+    box-shadow: var(--glow-teal);
+  }
+
   .glow-orange {
-    box-shadow: var(--glow-orange);
+    box-shadow: var(--glow-teal);
   }
 
   .glow-gold {
-    box-shadow: var(--glow-orange);
+    box-shadow: var(--glow-teal);
+  }
+
+  .text-gradient-teal {
+    background: var(--teal-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .text-gradient-orange {
-    background: var(--orange-gradient);
+    background: var(--teal-gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .text-gradient-gold {
-    background: var(--orange-gradient);
+    background: var(--teal-gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
