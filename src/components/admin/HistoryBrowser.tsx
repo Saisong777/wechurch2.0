@@ -34,12 +34,22 @@ import {
   Eye,
   Dumbbell,
   Target,
-  MessageCircle
+  MessageCircle,
+  Brain,
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { INSIGHT_CATEGORIES, InsightCategory } from '@/types/spiritual-fitness';
 import { useAuth } from '@/contexts/AuthContext';
+
+interface AIReport {
+  id: string;
+  report_type: 'group' | 'overall';
+  group_number: number | null;
+  content: string;
+  created_at: string;
+}
 
 interface SessionWithResponses {
   id: string;
@@ -49,6 +59,7 @@ interface SessionWithResponses {
   created_at: string;
   participant_count: number;
   responses: StudyResponseWithParticipant[];
+  aiReports: AIReport[];
 }
 
 interface StudyResponseWithParticipant {
@@ -88,26 +99,35 @@ export const HistoryBrowser: React.FC = () => {
       if (sessionsError) throw sessionsError;
       if (!sessionsData) return [];
 
-      // Get participant counts and responses for each session
+      // Get participant counts, responses, and AI reports for each session
       const sessionsWithData = await Promise.all(
         sessionsData.map(async (session) => {
-          // Get participant count
-          const { count } = await supabase
-            .from('participants')
-            .select('*', { count: 'exact', head: true })
-            .eq('session_id', session.id);
-
-          // Get study responses with participant info
-          const { data: responses } = await supabase
-            .from('study_responses_public')
-            .select('*')
-            .eq('session_id', session.id)
-            .order('group_number', { ascending: true });
+          // Parallel fetch for performance
+          const [countResult, responsesResult, reportsResult] = await Promise.all([
+            // Get participant count
+            supabase
+              .from('participants')
+              .select('*', { count: 'exact', head: true })
+              .eq('session_id', session.id),
+            // Get study responses with participant info
+            supabase
+              .from('study_responses_public')
+              .select('*')
+              .eq('session_id', session.id)
+              .order('group_number', { ascending: true }),
+            // Get AI reports
+            supabase
+              .from('ai_reports')
+              .select('id, report_type, group_number, content, created_at')
+              .eq('session_id', session.id)
+              .eq('status', 'COMPLETED')
+              .order('group_number', { ascending: true, nullsFirst: false }),
+          ]);
 
           return {
             ...session,
-            participant_count: count || 0,
-            responses: (responses || []).map(r => ({
+            participant_count: countResult.count || 0,
+            responses: (responsesResult.data || []).map(r => ({
               id: r.id || '',
               participant_name: r.participant_name || 'Unknown',
               group_number: r.group_number,
@@ -120,6 +140,13 @@ export const HistoryBrowser: React.FC = () => {
               action_plan: r.action_plan,
               cool_down_note: r.cool_down_note,
               created_at: r.created_at || '',
+            })),
+            aiReports: (reportsResult.data || []).map(r => ({
+              id: r.id,
+              report_type: r.report_type as 'group' | 'overall',
+              group_number: r.group_number,
+              content: r.content,
+              created_at: r.created_at,
             })),
           };
         })
@@ -154,20 +181,41 @@ export const HistoryBrowser: React.FC = () => {
     content += `參與人數：${session.participant_count}\n`;
     content += `${'='.repeat(50)}\n\n`;
 
-    session.responses.forEach((response, index) => {
+    // Individual responses
+    content += `【個人筆記】\n${'─'.repeat(25)}\n\n`;
+    session.responses.forEach((response) => {
       content += `【${response.participant_name}】${response.group_number ? ` (第 ${response.group_number} 組)` : ''}\n`;
-      if (response.title_phrase) content += `📌 定標題：${response.title_phrase}\n`;
-      if (response.heartbeat_verse) content += `💓 抓心跳：${response.heartbeat_verse}\n`;
-      if (response.observation) content += `👁 看現場：${response.observation}\n`;
+      if (response.title_phrase) content += `📌 1. 定標題：${response.title_phrase}\n`;
+      if (response.heartbeat_verse) content += `💓 2. 心跳的時刻：${response.heartbeat_verse}\n`;
+      if (response.observation) content += `👁 3. 查看聖經的資訊：${response.observation}\n`;
       if (response.core_insight_note) {
         const cat = INSIGHT_CATEGORIES.find(c => c.value === response.core_insight_category);
-        content += `💪 練核心${cat ? ` (${cat.emoji} ${cat.label})` : ''}：${response.core_insight_note}\n`;
+        content += `💪 4. 思想神的話${cat ? ` (${cat.emoji} ${cat.label})` : ''}：${response.core_insight_note}\n`;
       }
-      if (response.scholars_note) content += `📖 學長姐的話：${response.scholars_note}\n`;
-      if (response.action_plan) content += `🎯 帶一招：${response.action_plan}\n`;
-      if (response.cool_down_note) content += `💬 自由發揮：${response.cool_down_note}\n`;
+      if (response.scholars_note) content += `📖 5. 學長姐的話：${response.scholars_note}\n`;
+      if (response.action_plan) content += `🎯 6. 我決定要這樣做：${response.action_plan}\n`;
+      if (response.cool_down_note) content += `💬 7. 自由發揮：${response.cool_down_note}\n`;
       content += '\n';
     });
+
+    // AI Reports
+    if (session.aiReports.length > 0) {
+      content += `\n【AI 整合分析】\n${'─'.repeat(25)}\n\n`;
+      
+      // Group reports
+      const groupReports = session.aiReports.filter(r => r.report_type === 'group');
+      groupReports.forEach(report => {
+        content += `🤖 第 ${report.group_number} 組 AI 摘要\n`;
+        content += `${report.content}\n\n`;
+      });
+      
+      // Overall report
+      const overallReport = session.aiReports.find(r => r.report_type === 'overall');
+      if (overallReport) {
+        content += `🌟 全體整合報告\n`;
+        content += `${overallReport.content}\n\n`;
+      }
+    }
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -276,6 +324,12 @@ export const HistoryBrowser: React.FC = () => {
                           <Sparkles className="w-3 h-3" />
                           {session.responses.length} 篇筆記
                         </span>
+                        {session.aiReports.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Brain className="w-3 h-3" />
+                            {session.aiReports.length} 份 AI 報告
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -369,6 +423,59 @@ export const HistoryBrowser: React.FC = () => {
                             </Card>
                           );
                         })}
+                      </div>
+                    )}
+
+                    {/* AI Reports Section */}
+                    {session.aiReports.length > 0 && (
+                      <div className="mt-6 space-y-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <Brain className="w-4 h-4" />
+                          <span>AI 整合分析</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {session.aiReports.length} 份報告
+                          </Badge>
+                        </div>
+                        
+                        {/* Group Reports */}
+                        {session.aiReports.filter(r => r.report_type === 'group').map(report => (
+                          <Card key={report.id} className="border-secondary/30 bg-secondary/5">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-secondary" />
+                                <span className="font-medium">第 {report.group_number} 組 AI 摘要</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(report.created_at), 'MM/dd HH:mm')}
+                                </span>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="text-sm whitespace-pre-wrap bg-background/50 rounded p-3 max-h-48 overflow-y-auto">
+                                {report.content}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        
+                        {/* Overall Report */}
+                        {session.aiReports.filter(r => r.report_type === 'overall').map(report => (
+                          <Card key={report.id} className="border-primary/30 bg-primary/5">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-primary" />
+                                <span className="font-medium">全體整合報告</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(report.created_at), 'MM/dd HH:mm')}
+                                </span>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="text-sm whitespace-pre-wrap bg-background/50 rounded p-3 max-h-48 overflow-y-auto">
+                                {report.content}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
                     )}
                   </div>
