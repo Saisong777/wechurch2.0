@@ -27,13 +27,13 @@ interface ParsedReport {
   raw: string;
 }
 
-// Clean markdown formatting
+// Clean markdown formatting - remove ** and handle list items
 function cleanMarkdown(text: string): string {
   if (!text) return '';
   return text
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/^\s*[\*\-]\s+/gm, '• ')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')       // Remove bold **text**
+    .replace(/(?<!\*)\*(?!\*)([^*\n]+)\*(?!\*)/g, '$1') // Remove italic *text* but not ** or list items
+    .replace(/^\s*[\*\-•]\s+/gm, '• ')       // Normalize bullets: * or - or • at line start → •
     .trim();
 }
 
