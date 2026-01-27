@@ -111,9 +111,9 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
           <div className="mx-auto w-16 h-16 rounded-full gradient-navy flex items-center justify-center mb-4">
             <BookOpen className="w-8 h-8 text-secondary" />
           </div>
-          <CardTitle className="text-2xl">建立新的查經聚會</CardTitle>
+          <CardTitle className="text-2xl">建立新的健身課程</CardTitle>
           <CardDescription className="text-base">
-            Create a new Bible study session
+            Create a new Soul Gym session
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
