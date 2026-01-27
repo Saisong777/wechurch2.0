@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
 type CardLevel = Database['public']['Enums']['card_level'];
+type GameMode = Database['public']['Enums']['game_mode'];
 
 interface GameState {
   gameId: string | null;
@@ -19,11 +20,21 @@ interface GameState {
   isFlipped: boolean;
   isLoading: boolean;
   isDrawing: boolean;
+  mode: GameMode;
+  isHost: boolean;
+  sessionId: string | null;
+  groupNumber: number | null;
 }
 
 const MAX_PASSES = 2;
 
-export function useIcebreakerGame() {
+interface UseIcebreakerGameOptions {
+  sessionId?: string;
+  groupNumber?: number;
+  roomCode?: string; // For joining existing game
+}
+
+export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
   const [state, setState] = useState<GameState>({
     gameId: null,
     roomCode: null,
@@ -34,18 +45,86 @@ export function useIcebreakerGame() {
     isFlipped: false,
     isLoading: false,
     isDrawing: false,
+    mode: 'standalone',
+    isHost: true,
+    sessionId: options.sessionId || null,
+    groupNumber: options.groupNumber || null,
   });
 
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Subscribe to real-time updates for group mode
+  useEffect(() => {
+    if (!state.gameId || state.mode === 'standalone') return;
+
+    const channel = supabase
+      .channel(`icebreaker-game-${state.gameId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'icebreaker_games',
+          filter: `id=eq.${state.gameId}`,
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          
+          // Only update if we're not the one who triggered the change
+          if (updated.current_card_id && updated.current_card_id !== state.currentCard?.id) {
+            // Fetch the card content
+            fetchCardContent(updated.current_card_id).then((cardContent) => {
+              if (cardContent) {
+                setState(prev => ({
+                  ...prev,
+                  currentCard: {
+                    id: updated.current_card_id,
+                    content: cardContent,
+                    level: updated.current_level,
+                  },
+                  currentLevel: updated.current_level,
+                  passCount: updated.pass_count || 0,
+                  isFlipped: true,
+                  isDrawing: false,
+                }));
+              }
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [state.gameId, state.mode, state.currentCard?.id]);
+
+  // Fetch card content by ID
+  const fetchCardContent = async (cardId: string): Promise<string | null> => {
+    const { data, error } = await supabase
+      .from('card_questions')
+      .select('content_text')
+      .eq('id', cardId)
+      .single();
+
+    if (error || !data) return null;
+    return data.content_text;
+  };
+
   // Create a new game
-  const createGame = useCallback(async () => {
+  const createGame = useCallback(async (mode: GameMode = 'standalone') => {
     setState(prev => ({ ...prev, isLoading: true }));
     
     try {
       const { data, error } = await supabase
         .from('icebreaker_games')
         .insert({
-          mode: 'standalone',
+          mode,
           current_level: 'L1',
+          bible_study_session_id: options.sessionId || null,
+          group_number: options.groupNumber || null,
         })
         .select('id, room_code')
         .single();
@@ -61,6 +140,8 @@ export function useIcebreakerGame() {
         passCount: 0,
         currentCard: null,
         isFlipped: false,
+        mode,
+        isHost: true,
       }));
 
       return data;
@@ -70,7 +151,118 @@ export function useIcebreakerGame() {
       setState(prev => ({ ...prev, isLoading: false }));
       return null;
     }
+  }, [options.sessionId, options.groupNumber]);
+
+  // Join an existing game by room code
+  const joinGame = useCallback(async (roomCode: string) => {
+    setState(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      const { data, error } = await supabase
+        .from('icebreaker_games')
+        .select('*')
+        .eq('room_code', roomCode.toUpperCase())
+        .single();
+
+      if (error || !data) {
+        toast.error('找不到此遊戲房間');
+        setState(prev => ({ ...prev, isLoading: false }));
+        return null;
+      }
+
+      // Fetch current card content if exists
+      let currentCard = null;
+      if (data.current_card_id) {
+        const content = await fetchCardContent(data.current_card_id);
+        if (content) {
+          currentCard = {
+            id: data.current_card_id,
+            content,
+            level: data.current_level as CardLevel,
+          };
+        }
+      }
+
+      setState(prev => ({
+        ...prev,
+        gameId: data.id,
+        roomCode: data.room_code,
+        isLoading: false,
+        currentLevel: (data.current_level as CardLevel) || 'L1',
+        passCount: data.pass_count || 0,
+        currentCard,
+        isFlipped: !!currentCard,
+        mode: data.mode as GameMode,
+        isHost: false,
+        sessionId: data.bible_study_session_id,
+        groupNumber: data.group_number,
+      }));
+
+      toast.success('已加入遊戲！');
+      return data;
+    } catch (error) {
+      console.error('Failed to join game:', error);
+      toast.error('加入遊戲失敗');
+      setState(prev => ({ ...prev, isLoading: false }));
+      return null;
+    }
   }, []);
+
+  // Find existing game for session/group
+  const findSessionGame = useCallback(async () => {
+    if (!options.sessionId || !options.groupNumber) return null;
+
+    setState(prev => ({ ...prev, isLoading: true }));
+
+    try {
+      const { data, error } = await supabase
+        .from('icebreaker_games')
+        .select('*')
+        .eq('bible_study_session_id', options.sessionId)
+        .eq('group_number', options.groupNumber)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        // Found existing game - join it
+        let currentCard = null;
+        if (data.current_card_id) {
+          const content = await fetchCardContent(data.current_card_id);
+          if (content) {
+            currentCard = {
+              id: data.current_card_id,
+              content,
+              level: data.current_level as CardLevel,
+            };
+          }
+        }
+
+        setState(prev => ({
+          ...prev,
+          gameId: data.id,
+          roomCode: data.room_code,
+          isLoading: false,
+          currentLevel: (data.current_level as CardLevel) || 'L1',
+          passCount: data.pass_count || 0,
+          currentCard,
+          isFlipped: !!currentCard,
+          mode: 'session',
+          isHost: false,
+        }));
+
+        return data;
+      }
+
+      setState(prev => ({ ...prev, isLoading: false }));
+      return null;
+    } catch (error) {
+      console.error('Failed to find session game:', error);
+      setState(prev => ({ ...prev, isLoading: false }));
+      return null;
+    }
+  }, [options.sessionId, options.groupNumber]);
 
   // Draw a card
   const drawCard = useCallback(async (level?: CardLevel) => {
@@ -158,7 +350,7 @@ export function useIcebreakerGame() {
     if (!state.gameId) return;
 
     try {
-      const { data, error } = await supabase.rpc('reset_icebreaker_deck', {
+      const { error } = await supabase.rpc('reset_icebreaker_deck', {
         p_game_id: state.gameId,
       });
 
@@ -186,6 +378,8 @@ export function useIcebreakerGame() {
     remainingPasses,
     maxPasses: MAX_PASSES,
     createGame,
+    joinGame,
+    findSessionGame,
     drawCard,
     passCard,
     changeLevel,
