@@ -34,6 +34,7 @@ export const AdminMonitor: React.FC = () => {
   const [isGeneratingOverall, setIsGeneratingOverall] = useState(false);
   const [reportContent, setReportContent] = useState<string | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [isForceVerifying, setIsForceVerifying] = useState(false);
   const [isResettingReady, setIsResettingReady] = useState(false);
   const [isClearingGroups, setIsClearingGroups] = useState(false);
@@ -210,25 +211,41 @@ export const AdminMonitor: React.FC = () => {
     if (!currentSession?.id || groups.length === 0) return;
     
     setIsGeneratingGroup(true);
-    let allReports = '';
+    setGenerationProgress({ current: 0, total: groups.length });
     
-    for (const group of groups) {
-      toast.info(`正在生成第 ${group.number} 組摘要...`);
+    toast.info(`開始並行生成 ${groups.length} 個小組報告...`);
+    
+    // Generate all reports in parallel for speed
+    const reportPromises = groups.map(async (group) => {
       const result = await generateAIReport(currentSession.id, 'group', group.number);
-      
+      setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
+      return { groupNumber: group.number, result };
+    });
+    
+    const results = await Promise.all(reportPromises);
+    
+    // Sort by group number and combine
+    results.sort((a, b) => a.groupNumber - b.groupNumber);
+    
+    let allReports = '';
+    let successCount = 0;
+    
+    for (const { groupNumber, result } of results) {
       if (result.success && result.report) {
-        allReports += `\n\n${'='.repeat(50)}\n第 ${group.number} 組報告\n${'='.repeat(50)}\n\n${result.report}`;
+        allReports += `\n\n${'='.repeat(50)}\n第 ${groupNumber} 組報告\n${'='.repeat(50)}\n\n${result.report}`;
+        successCount++;
       } else {
-        toast.error(`第 ${group.number} 組生成失敗: ${result.error}`);
+        toast.error(`第 ${groupNumber} 組生成失敗: ${result.error}`);
       }
     }
     
     if (allReports) {
       setReportContent(allReports);
       setShowReportDialog(true);
-      toast.success('所有小組摘要已生成！');
+      toast.success(`成功生成 ${successCount}/${groups.length} 個小組報告！`);
     }
     
+    setGenerationProgress({ current: 0, total: 0 });
     setIsGeneratingGroup(false);
   };
 
@@ -662,7 +679,26 @@ export const AdminMonitor: React.FC = () => {
               AI 分析 Analysis
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Progress indicator during generation */}
+            {generationProgress.total > 0 && (
+              <div className="space-y-2 p-4 bg-muted/50 rounded-lg border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    正在並行生成報告...
+                  </span>
+                  <span className="font-medium text-primary">
+                    {generationProgress.current}/{generationProgress.total}
+                  </span>
+                </div>
+                <Progress 
+                  value={(generationProgress.current / generationProgress.total) * 100} 
+                  className="h-2"
+                />
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button
                 variant="navy"
@@ -672,11 +708,16 @@ export const AdminMonitor: React.FC = () => {
                 disabled={isGeneratingGroup || submissions.length === 0}
               >
                 {isGeneratingGroup ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    生成中 ({generationProgress.current}/{generationProgress.total})
+                  </>
                 ) : (
-                  <FileText className="w-5 h-5" />
+                  <>
+                    <FileText className="w-5 h-5" />
+                    生成小組摘要
+                  </>
                 )}
-                生成小組摘要
               </Button>
               <Button
                 variant="gold"
