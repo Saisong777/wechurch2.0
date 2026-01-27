@@ -15,6 +15,8 @@ const RequestSchema = z.object({
     errorMap: () => ({ message: 'reportType must be "group" or "overall"' }),
   }),
   groupNumber: z.number().int().positive().optional(),
+  fastMode: z.boolean().optional().default(false),
+  filledOnly: z.boolean().optional().default(false),
 });
 
 // NOTE: keep prompt concise to reduce token count (faster) while preserving strict constraints.
@@ -52,25 +54,30 @@ function pickNonEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
 }
 
 function formatCompactEntries(allData: any[]): string {
-  // Convert to compact, low-token text. Avoid pretty JSON and avoid repeating empty fields.
   return allData
     .map((d, idx) => {
       const cleaned = pickNonEmpty(d);
       const name = (cleaned as any).姓名 ?? "未知";
       const src = (cleaned as any).來源 ?? "";
       const group = (cleaned as any).組別 ?? "";
-      // Remove noisy keys already surfaced in header
       delete (cleaned as any).姓名;
       delete (cleaned as any).來源;
       delete (cleaned as any).組別;
-
       const details = Object.entries(cleaned)
         .map(([k, v]) => `${k}:${String(v)}`)
         .join(" | ");
-
       return `(${idx + 1}) ${name} [${src}${group ? ` / 組${group}` : ""}] ${details}`.trim();
     })
     .join("\n");
+}
+
+function hasContent(entry: any): boolean {
+  const contentFields = ['主題', '感動經節', '事實發現', '傳統解經', '神的啟示', '生活應用', '其他',
+    '標題短語', '心跳經節', '經文觀察', '核心洞察類型', '核心洞察筆記', '學者筆記', '行動計劃', '冷卻反思'];
+  return contentFields.some(field => {
+    const val = entry[field];
+    return val && typeof val === 'string' && val.trim().length > 0;
+  });
 }
 
 serve(async (req) => {
@@ -125,7 +132,7 @@ serve(async (req) => {
       );
     }
     
-    const { sessionId, reportType, groupNumber } = validationResult.data;
+    const { sessionId, reportType, groupNumber, fastMode, filledOnly } = validationResult.data;
     
     // Additional validation: groupNumber required for group reports
     if (reportType === "group" && groupNumber === undefined) {
@@ -266,7 +273,16 @@ serve(async (req) => {
     }));
 
     // Combine all data
-    const allData = [...formattedNotes, ...formattedSubmissions];
+    let allData = [...formattedNotes, ...formattedSubmissions];
+    
+    // Track unfilled members for filledOnly mode
+    let unfilledNames: string[] = [];
+    if (filledOnly) {
+      const filledData = allData.filter(hasContent);
+      unfilledNames = allData.filter(d => !hasContent(d)).map(d => d.姓名).filter(Boolean);
+      allData = filledData;
+    }
+    
     const totalMembers = allData.length;
     const memberNames = allData.map(d => d.姓名).filter(Boolean).join("、");
 
@@ -275,13 +291,17 @@ serve(async (req) => {
       : "整體健身報告 (Overall Assembly Report)";
 
     const compactEntries = formatCompactEntries(allData);
+    
+    const unfilledNote = unfilledNames.length > 0
+      ? `\n⚠️ 以下成員尚未填寫內容（不納入分析）：${unfilledNames.join("、")}`
+      : "";
 
     const userPrompt = `請根據以下資料，生成一份${reportTypeLabel}。
 
 ⚠️ 重要提醒：
 - 共有 ${totalMembers} 位成員的筆記需要分析
 - 成員名單：${memberNames}
-- 請確保每一位成員的內容都被納入分析，不可遺漏任何人
+- 請確保每一位成員的內容都被納入分析，不可遺漏任何人${unfilledNote}
 
 經文：${session.verse_reference || "未指定"}
 
@@ -292,6 +312,11 @@ ${compactEntries}
 
     const tPrompt = Date.now();
 
+    // Model selection: fast mode uses lighter model for group reports
+    const model = (fastMode && reportType === "group") 
+      ? "google/gemini-2.5-flash" 
+      : "google/gemini-2.5-pro";
+
     // Call Lovable AI
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -300,7 +325,7 @@ ${compactEntries}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model,
         temperature: 0.2,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },

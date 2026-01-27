@@ -42,6 +42,10 @@ export const AdminMonitor: React.FC = () => {
   const [isRegrouping, setIsRegrouping] = useState(false);
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
   const [allowLatecomers, setAllowLatecomers] = useState(currentSession?.allowLatecomers || false);
+  
+  // AI generation options
+  const [fastMode, setFastMode] = useState(true);  // Default to fast mode
+  const [filledOnly, setFilledOnly] = useState(false);
 
   // Fetch study responses to check if we have data for AI analysis
   const { data: studyResponses } = useAdminStudyResponses({ 
@@ -229,13 +233,14 @@ export const AdminMonitor: React.FC = () => {
     setIsGeneratingGroup(true);
     setGenerationProgress({ current: 0, total: groups.length });
     
-    toast.info(`開始並行生成 ${groups.length} 個小組報告...`, {
-      description: 'AI 正在分析每組的讀經筆記...',
+    const modeLabel = fastMode ? '快速模式' : '高品質模式';
+    toast.info(`開始並行生成 ${groups.length} 個小組報告 (${modeLabel})...`, {
+      description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
     });
     
     // Generate all reports in parallel for speed
     const reportPromises = groups.map(async (group) => {
-      const result = await generateAIReport(currentSession.id, 'group', group.number);
+      const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
       setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
       return { groupNumber: group.number, result };
     });
@@ -273,9 +278,12 @@ export const AdminMonitor: React.FC = () => {
     if (!currentSession?.id) return;
     
     setIsGeneratingOverall(true);
-    toast.info('正在生成整體洞察報告...');
+    toast.info('正在生成整體洞察報告 (高品質模式)...', {
+      description: filledOnly ? '僅分析有填寫內容的成員' : undefined,
+    });
     
-    const result = await generateAIReport(currentSession.id, 'overall');
+    // Overall always uses high-quality model (fastMode=false)
+    const result = await generateAIReport(currentSession.id, 'overall', undefined, { fastMode: false, filledOnly });
     
     if (result.success && result.report) {
       setReportContent(result.report);
@@ -714,6 +722,34 @@ export const AdminMonitor: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* AI Options */}
+            <div className="flex flex-wrap gap-4 p-3 bg-muted/30 rounded-lg border border-dashed">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="fast-mode"
+                  checked={fastMode}
+                  onCheckedChange={setFastMode}
+                />
+                <Label htmlFor="fast-mode" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                  <Zap className="w-4 h-4 text-yellow-500" />
+                  快速模式
+                  <span className="text-xs text-muted-foreground">(小組用較快模型)</span>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="filled-only"
+                  checked={filledOnly}
+                  onCheckedChange={setFilledOnly}
+                />
+                <Label htmlFor="filled-only" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                  <Users className="w-4 h-4 text-blue-500" />
+                  僅分析有填寫者
+                  <span className="text-xs text-muted-foreground">(降低 token 量)</span>
+                </Label>
+              </div>
+            </div>
+
             {/* Progress indicator during generation */}
             {generationProgress.total > 0 && (
               <div className="space-y-2 p-4 bg-muted/50 rounded-lg border">
