@@ -165,11 +165,11 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
       <div className="w-full max-w-2xl mx-auto space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-2xl font-bold text-foreground">
-            我的查經聚會
+            我的健身課程
           </h2>
           <Button variant="gold" onClick={onCreateNew}>
             <Plus className="w-5 h-5" />
-            建立新聚會
+            建立新課程
           </Button>
         </div>
 
@@ -184,14 +184,14 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                 <BookOpen className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="font-serif text-xl font-semibold mb-2">
-                還沒有查經聚會
+                還沒有健身課程
               </h3>
               <p className="text-muted-foreground mb-6">
-                建立您的第一個查經聚會
+                建立您的第一個健身課程
               </p>
               <Button variant="gold" onClick={onCreateNew}>
                 <Plus className="w-5 h-5" />
-                建立新聚會
+                建立新課程
               </Button>
             </CardContent>
           </Card>

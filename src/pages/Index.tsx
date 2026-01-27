@@ -3,9 +3,10 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { BookOpen, Settings, Users, Sparkles, Loader2 } from 'lucide-react';
+import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { SoulGymLogo } from '@/components/icons/SoulGymLogo';
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -34,7 +35,7 @@ const Index = () => {
             <div className="relative inline-block mb-8">
               <div className="absolute inset-0 bg-secondary/30 rounded-full blur-3xl animate-pulse-soft" />
               <div className="relative w-32 h-32 rounded-full gradient-gold flex items-center justify-center glow-gold animate-float">
-                <BookOpen className="w-16 h-16 text-secondary-foreground" />
+                <Dumbbell className="w-16 h-16 text-secondary-foreground" />
               </div>
             </div>
             
@@ -55,7 +56,7 @@ const Index = () => {
               <Link to="/user">
                 <CardContent className="py-12 text-center">
                   <div className="mx-auto w-20 h-20 rounded-full gradient-gold flex items-center justify-center mb-6 group-hover:glow-gold transition-shadow">
-                    <Users className="w-10 h-10 text-secondary-foreground" />
+                    <Dumbbell className="w-10 h-10 text-secondary-foreground" />
                   </div>
                   <h2 className="font-serif text-2xl font-bold text-foreground mb-2">
                     參加者入口
@@ -64,7 +65,7 @@ const Index = () => {
                     Participant Entry
                   </p>
                   <Button variant="gold" size="lg">
-                    加入查經 Join Study
+                    開始健身 Join Session
                   </Button>
                 </CardContent>
               </Link>
@@ -112,11 +113,11 @@ const Index = () => {
             </div>
             <div className="text-center p-6">
               <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="w-6 h-6 text-secondary" />
+                <Heart className="w-6 h-6 text-secondary" />
               </div>
-              <h3 className="font-serif text-lg font-semibold mb-2">結構化筆記</h3>
+              <h3 className="font-serif text-lg font-semibold mb-2">靈魂健身</h3>
               <p className="text-sm text-muted-foreground">
-                引導式的查經筆記表單，即時同步
+                七步驟靈魂健身系統，即時同步
               </p>
             </div>
             <div className="text-center p-6">

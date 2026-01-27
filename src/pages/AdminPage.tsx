@@ -224,7 +224,7 @@ export const AdminPage: React.FC = () => {
 
       <Header 
         variant="compact" 
-        title="查經管理後台"
+        title="健身房管理後台"
         subtitle=""
       />
 

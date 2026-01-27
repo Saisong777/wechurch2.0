@@ -320,7 +320,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             onClick={handleComplete}
           >
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-            完成查經 Complete
+            完成健身 Complete
           </Button>
         </div>
       )}

@@ -193,13 +193,13 @@ serve(async (req) => {
 
     const reportTypeLabel = reportType === "group" 
       ? `第 ${groupNumber} 組小組報告 (Group ${groupNumber} Report)`
-      : "整體查經報告 (Overall Assembly Report)";
+      : "整體健身報告 (Overall Assembly Report)";
 
-    const userPrompt = `請根據以下查經筆記資料，生成一份${reportTypeLabel}：
+    const userPrompt = `請根據以下靈魂健身筆記資料，生成一份${reportTypeLabel}：
 
 經文：${submissions[0]?.bible_verse || "未指定"}
 
-查經筆記資料：
+健身筆記資料：
 ${JSON.stringify(formattedData, null, 2)}
 
 請依照指定格式生成報告。`;
