@@ -125,15 +125,16 @@ export function parseInsightsWithQuotes(text: string): { quote: string; author?:
     });
   }
   
-  // If no attributed quotes found, split by bullet points or newlines
+  // If no attributed quotes found, split by bullet points or newlines and show ALL as quotes
   if (quotes.length === 0) {
     const lines = text.split(/[\n•\-\*]/).filter(l => l.trim().length > 10);
-    for (const line of lines.slice(0, 3)) {
+    for (const line of lines) {
       quotes.push({ quote: line.trim() });
     }
   }
   
-  return quotes.slice(0, 4);
+  // Return ALL quotes - no limit
+  return quotes;
 }
 
 // Extract action items from application text

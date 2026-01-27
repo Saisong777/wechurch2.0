@@ -82,23 +82,12 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
         <KeywordTagCloud keywords={keywords} variant={type as TagVariant} />
       )}
       
-      {/* For insights, show quote blocks if available */}
+      {/* For insights, show quote blocks for all items */}
       {type === 'insights' && quotes.length > 0 ? (
         <div className="space-y-2">
           {quotes.map((q, idx) => (
             <QuoteBlock key={`quote-${idx}`} quote={q.quote.replace(/\*\*/g, '')} author={q.author} />
           ))}
-          {/* Show remaining content not captured in quotes */}
-          {(() => {
-            const remainingLines = cleanContent.split(/\n/).filter(line => 
-              !quotes.some(q => line.includes(q.quote.substring(0, 20)))
-            ).join('\n').trim();
-            return remainingLines ? (
-              <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1 mt-3">
-                {remainingLines}
-              </div>
-            ) : null;
-          })()}
         </div>
       ) : (
         <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
