@@ -151,7 +151,7 @@ serve(async (req) => {
   }
 
   try {
-    // Verify authentication using getClaims() for secure JWT validation
+    // Verify authentication
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
@@ -211,7 +211,7 @@ serve(async (req) => {
     
     const { data: session, error: sessionError } = await supabase
       .from("sessions")
-      .select("owner_id")
+      .select("owner_id, verse_reference")
       .eq("id", sessionId)
       .single();
     
@@ -234,50 +234,89 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Fetch submissions (traditional form)
+    // Create PENDING record first for optimistic UI
+    const { data: pendingReport, error: pendingError } = await supabase
+      .from("ai_reports")
+      .insert({
+        session_id: sessionId,
+        report_type: reportType,
+        group_number: reportType === "group" ? groupNumber : null,
+        content: "生成中...",
+        status: "PENDING",
+      })
+      .select()
+      .single();
+
+    if (pendingError) {
+      throw new Error(`Failed to create pending report: ${pendingError.message}`);
+    }
+
+    const reportId = pendingReport.id;
+
+    // Fetch notes from secure view (no emails exposed!)
+    let notesQuery = supabase
+      .from("v_ai_notes_feed")
+      .select("*")
+      .eq("session_id", sessionId);
+    
+    if (reportType === "group" && groupNumber) {
+      notesQuery = notesQuery.eq("group_number", groupNumber);
+    }
+
+    const { data: notes, error: notesError } = await notesQuery;
+    
+    if (notesError) {
+      // Update status to FAILED
+      await supabase
+        .from("ai_reports")
+        .update({ status: "FAILED", content: `Error fetching notes: ${notesError.message}` })
+        .eq("id", reportId);
+      throw new Error(`Failed to fetch notes: ${notesError.message}`);
+    }
+
+    // Also fetch traditional submissions
     let submissionsQuery = supabase
       .from("submissions")
-      .select("*")
+      .select("name, group_number, theme, moving_verse, facts_discovered, traditional_exegesis, inspiration_from_god, application_in_life, others")
       .eq("session_id", sessionId);
     
     if (reportType === "group" && groupNumber) {
       submissionsQuery = submissionsQuery.eq("group_number", groupNumber);
     }
 
-    const { data: submissions, error: submissionsError } = await submissionsQuery;
-    
-    if (submissionsError) {
-      throw new Error(`Failed to fetch submissions: ${submissionsError.message}`);
-    }
+    const { data: submissions } = await submissionsQuery;
 
-    // Fetch study responses (spiritual fitness form) with participant info
-    let studyQuery = supabase
-      .from("study_responses_public")
-      .select("*")
-      .eq("session_id", sessionId);
-    
-    if (reportType === "group" && groupNumber) {
-      studyQuery = studyQuery.eq("group_number", groupNumber);
-    }
-
-    const { data: studyResponses, error: studyError } = await studyQuery;
-    
-    if (studyError) {
-      throw new Error(`Failed to fetch study responses: ${studyError.message}`);
-    }
-
-    // Combine both data sources
+    const hasNotes = notes && notes.length > 0;
     const hasSubmissions = submissions && submissions.length > 0;
-    const hasStudyResponses = studyResponses && studyResponses.length > 0;
 
-    if (!hasSubmissions && !hasStudyResponses) {
+    if (!hasNotes && !hasSubmissions) {
+      // Update status to FAILED
+      await supabase
+        .from("ai_reports")
+        .update({ status: "FAILED", content: "沒有找到筆記資料" })
+        .eq("id", reportId);
       return new Response(
-        JSON.stringify({ error: "No submissions found" }),
+        JSON.stringify({ error: "No notes found", reportId }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Format traditional submissions
+    // Format notes from secure view (privacy-safe: only first_name, no email)
+    const formattedNotes = (notes || []).map((n) => ({
+      來源: "靈魂健身筆記",
+      姓名: n.first_name || "未知",
+      組別: n.group_number,
+      標題短語: n.title_phrase || "",
+      心跳經節: n.heartbeat_verse || "",
+      經文觀察: n.observation || "",
+      核心洞察類型: n.core_insight_category || "",
+      核心洞察筆記: n.core_insight_note || "",
+      學者筆記: n.scholars_note || "",
+      行動計劃: n.action_plan || "",
+      冷卻反思: n.cool_down_note || "",
+    }));
+
+    // Format traditional submissions (also privacy-safe: only name)
     const formattedSubmissions = (submissions || []).map((s) => ({
       來源: "傳統查經表",
       姓名: s.name,
@@ -291,30 +330,10 @@ serve(async (req) => {
       其他: s.others || "",
     }));
 
-    // Format spiritual fitness responses
-    const formattedStudyResponses = (studyResponses || []).map((s) => ({
-      來源: "靈魂健身筆記",
-      姓名: s.participant_name || "未知",
-      組別: s.group_number,
-      標題短語: s.title_phrase || "",
-      心跳經節: s.heartbeat_verse || "",
-      經文觀察: s.observation || "",
-      核心洞察類型: s.core_insight_category || "",
-      核心洞察筆記: s.core_insight_note || "",
-      學者筆記: s.scholars_note || "",
-      行動計劃: s.action_plan || "",
-      冷卻反思: s.cool_down_note || "",
-    }));
-
     // Combine all data
-    const allData = [...formattedSubmissions, ...formattedStudyResponses];
+    const allData = [...formattedNotes, ...formattedSubmissions];
     const totalMembers = allData.length;
     const memberNames = allData.map(d => d.姓名).filter(Boolean).join("、");
-
-    // Get verse reference
-    const verseRef = submissions?.[0]?.bible_verse || 
-      (await supabase.from("sessions").select("verse_reference").eq("id", sessionId).single()).data?.verse_reference ||
-      "未指定";
 
     const reportTypeLabel = reportType === "group" 
       ? `第 ${groupNumber} 組小組報告 (Group ${groupNumber} Report)`
@@ -327,7 +346,7 @@ serve(async (req) => {
 - 成員名單：${memberNames}
 - 請確保每一位成員的內容都被納入分析，不可遺漏任何人
 
-經文：${verseRef}
+經文：${session.verse_reference || "未指定"}
 
 查經筆記資料（共 ${totalMembers} 份）：
 ${JSON.stringify(allData, null, 2)}
@@ -342,7 +361,7 @@ ${JSON.stringify(allData, null, 2)}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite", // Fastest and cheapest model
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
@@ -351,53 +370,52 @@ ${JSON.stringify(allData, null, 2)}
     });
 
     if (!response.ok) {
+      let errorMessage = "AI generation failed";
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        errorMessage = "Rate limit exceeded. Please try again later.";
+      } else if (response.status === 402) {
+        errorMessage = "AI credits exhausted. Please add credits to continue.";
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      // Log error server-side without exposing details
-      await response.text(); // Consume response body
-      throw new Error("Failed to generate report. Please try again.");
+      
+      // Update status to FAILED
+      await supabase
+        .from("ai_reports")
+        .update({ status: "FAILED", content: errorMessage })
+        .eq("id", reportId);
+      
+      return new Response(
+        JSON.stringify({ error: errorMessage, reportId }),
+        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const aiResponse = await response.json();
     const reportContent = aiResponse.choices?.[0]?.message?.content || "無法生成報告";
 
-    // Save report to database
-    const { data: savedReport, error: saveError } = await supabase
+    // Update report with completed content
+    const { error: updateError } = await supabase
       .from("ai_reports")
-      .insert({
-        session_id: sessionId,
-        report_type: reportType,
-        group_number: reportType === "group" ? groupNumber : null,
+      .update({ 
         content: reportContent,
+        status: "COMPLETED" 
       })
-      .select()
-      .single();
+      .eq("id", reportId);
 
-    if (saveError) {
-      // Report generated but not saved - continue with response
+    if (updateError) {
+      console.error("Failed to update report:", updateError);
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         report: reportContent,
-        reportId: savedReport?.id 
+        reportId,
+        status: "COMPLETED"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error: unknown) {
-    // Return generic error message to client - no details exposed
     const errorMessage = error instanceof Error ? error.message : "An error occurred. Please try again.";
     return new Response(
       JSON.stringify({ error: errorMessage }),

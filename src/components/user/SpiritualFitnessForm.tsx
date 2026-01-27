@@ -30,18 +30,46 @@ interface SpiritualFitnessFormProps {
 export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onComplete, onSubmitted }) => {
   const handleComplete = onComplete || onSubmitted;
   const { currentUser, currentSession } = useSession();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   const {
     formData,
     isLoading,
     isSaving,
+    isDirty,
     updateField,
     saveNow,
   } = useStudyResponse({
     sessionId: currentSession?.id,
     userId: currentUser?.id,
+    userEmail: currentUser?.email,
     enabled: !!currentSession?.id && !!currentUser?.id,
   });
+
+  // Handle completion with save verification
+  const handleSubmit = React.useCallback(async () => {
+    if (!handleComplete) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Save any pending changes first
+      if (isDirty) {
+        await saveNow();
+        // Small delay to ensure state updates
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Navigate to review
+      handleComplete();
+    } catch (error) {
+      console.error('[SpiritualFitnessForm] Error during submission:', error);
+      // Still navigate even if save failed - data is already in localStorage
+      handleComplete();
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [handleComplete, isDirty, saveNow]);
 
   if (isLoading) {
     return (
@@ -317,10 +345,20 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             variant="gold"
             size="lg"
             className="w-full text-sm sm:text-base py-3 sm:py-4 md:max-w-xs md:mx-auto md:flex touch-manipulation active:scale-[0.98]"
-            onClick={handleComplete}
+            onClick={handleSubmit}
+            disabled={isSubmitting || isSaving}
           >
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-            完成健身 Complete
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                儲存中...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                完成健身 Complete
+              </>
+            )}
           </Button>
         </div>
       )}

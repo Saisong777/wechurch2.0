@@ -92,15 +92,26 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
         return;
       }
 
-      // Generate mock responses for each participant
-      let count = 0;
+      // Build all mock responses in memory first (fast)
+      const mockResponses: Array<{
+        session_id: string;
+        user_id: string;
+        title_phrase?: string;
+        heartbeat_verse?: string;
+        observation?: string;
+        core_insight_category?: 'PROMISE' | 'COMMAND' | 'WARNING' | 'GOD_ATTRIBUTE';
+        core_insight_note?: string;
+        scholars_note?: string;
+        action_plan?: string;
+        cool_down_note?: string;
+      }> = [];
+
       for (const participant of participants) {
-        // Randomly decide how much progress this participant has made
         const progressLevel = Math.random();
         
-        const mockResponse: Record<string, unknown> = {
+        const mockResponse: typeof mockResponses[number] = {
           session_id: sessionId,
-          user_id: participant.id, // Using participant ID as user_id for mock
+          user_id: participant.id,
         };
 
         // Phase 1 (Green) - 70% chance
@@ -123,33 +134,26 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
           mockResponse.cool_down_note = getRandomItem(MOCK_COOL_DOWN_NOTES);
         }
 
-        // Only insert if there's at least some content
+        // Only include if there's at least some content
         if (Object.keys(mockResponse).length > 2) {
-          const { error } = await supabase
-            .from('study_responses')
-            .upsert(mockResponse as {
-              session_id: string;
-              user_id: string;
-              title_phrase?: string;
-              heartbeat_verse?: string;
-              observation?: string;
-              core_insight_category?: 'PROMISE' | 'COMMAND' | 'WARNING' | 'GOD_ATTRIBUTE';
-              core_insight_note?: string;
-              scholars_note?: string;
-              action_plan?: string;
-              cool_down_note?: string;
-            }, {
-              onConflict: 'session_id,user_id',
-            });
-
-          if (!error) {
-            count++;
-            setGeneratedCount(count);
-          }
+          mockResponses.push(mockResponse);
         }
       }
 
-      toast.success(`成功生成 ${count} 筆模擬資料！`);
+      if (mockResponses.length === 0) {
+        toast.info('沒有生成任何資料');
+        return;
+      }
+
+      // Batch upsert all at once - much faster and atomic
+      const { error } = await supabase
+        .from('study_responses')
+        .upsert(mockResponses, { onConflict: 'session_id,user_id' });
+
+      if (error) throw error;
+
+      setGeneratedCount(mockResponses.length);
+      toast.success(`成功生成 ${mockResponses.length} 筆模擬資料！`);
     } catch (error) {
       console.error('Error generating mock data:', error);
       toast.error('生成失敗 Generation failed');

@@ -5,6 +5,7 @@ export interface GroupReport {
   groupInfo?: string;
   members?: string;
   verse?: string;
+  contributions?: string;  // Personal contributions summary
   themes?: string;
   observations?: string;
   insights?: string;
@@ -27,6 +28,7 @@ function getScore(s: Partial<GroupReport>): number {
   const len = (v?: string) => (v ? v.trim().length : 0);
   // Prefer structured sections heavily; raw-only headers will score low.
   return (
+    len(s.contributions) +
     len(s.themes) +
     len(s.observations) +
     len(s.insights) +
@@ -71,25 +73,34 @@ export function parseReportContent(content: string): GroupReport[] {
     }
     
     // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題 Themes："
-    const themesMatch = groupReport.match(/(?:\*\*)?📖?\s*主題[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🔍|(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
+    const themesMatch = groupReport.match(/(?:\*\*)?📖?\s*主題[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🔍|(?:\*\*)?💡|(?:\*\*)?🎯|(?:\*\*)?👤|---|ℹ️|$)/i);
     if (themesMatch) {
       section.themes = cleanMarkdown(themesMatch[1]);
     }
     
     // Extract observations - handle formats like "**🔍 事實發現（Observations）：**"
-    const obsMatch = groupReport.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
+    const obsMatch = groupReport.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?💡|(?:\*\*)?🎯|(?:\*\*)?👤|---|ℹ️|$)/i);
     if (obsMatch) {
       section.observations = cleanMarkdown(obsMatch[1]);
     }
     
     // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**"
-    const insightsMatch = groupReport.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🎯|---|ℹ️|$)/i);
+    const insightsMatch = groupReport.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🎯|(?:\*\*)?👤|---|ℹ️|$)/i);
     if (insightsMatch) {
       section.insights = cleanMarkdown(insightsMatch[1]);
     }
     
     // Extract applications - handle formats like "**🎯 如何應用（Applications）：**"
-    const appMatch = groupReport.match(/(?:\*\*)?🎯?\s*如何應用[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=---|ℹ️|$)/i);
+    const appMatch = groupReport.match(/(?:\*\*)?🎯?\s*如何應用[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?👤|---|ℹ️|$)/i);
+    if (appMatch) {
+      section.applications = cleanMarkdown(appMatch[1]);
+    }
+    
+    // Extract personal contributions (at the end) - handle formats like "**👤 個人貢獻摘要（Personal Contributions）：**"
+    const contribMatch = groupReport.match(/(?:\*\*)?👤?\s*個人貢獻[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=---|$)/i);
+    if (contribMatch) {
+      section.contributions = cleanMarkdown(contribMatch[1]);
+    }
     if (appMatch) {
       section.applications = cleanMarkdown(appMatch[1]);
     }

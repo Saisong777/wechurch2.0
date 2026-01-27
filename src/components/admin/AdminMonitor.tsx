@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StudyProgressMonitor } from './StudyProgressMonitor';
 import { MockDataGenerator } from './MockDataGenerator';
 import { AIReportViewer } from './AIReportViewer';
+// AnalysisDashboard removed per user request - using original AI Analysis card instead
 
 export const AdminMonitor: React.FC = () => {
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
@@ -758,11 +759,11 @@ export const AdminMonitor: React.FC = () => {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="progress" className="gap-2">
               <Dumbbell className="w-4 h-4" />
-              靈命健身進度
+              進度監控
             </TabsTrigger>
             <TabsTrigger value="tools" className="gap-2">
-              <Sparkles className="w-4 h-4" />
-              模擬工具
+              <Zap className="w-4 h-4" />
+              開發工具
             </TabsTrigger>
           </TabsList>
           <TabsContent value="progress" className="mt-4">

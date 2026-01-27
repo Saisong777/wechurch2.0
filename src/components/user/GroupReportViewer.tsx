@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Users, BookOpen, Share2, Download } from 'lucide-react';
-import { fetchAIReports } from '@/lib/supabase-helpers';
+import { Sparkles, Users, BookOpen, Share2, Download, User, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EnhancedSection } from '@/components/admin/report-elements';
 import {
@@ -12,6 +11,7 @@ import {
   downloadBlob,
   GroupReport,
 } from '@/components/admin/report-viewer';
+import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
 
 interface GroupReportViewerProps {
   sessionId: string;
@@ -23,6 +23,7 @@ interface GroupReportViewerProps {
 interface ParsedReport {
   members?: string;
   verse?: string;
+  contributions?: string;
   themes?: string;
   observations?: string;
   insights?: string;
@@ -42,6 +43,7 @@ function parseReportContent(content: string): ParsedReport {
   return {
     members: section.members,
     verse: section.verse,
+    contributions: section.contributions,
     themes: section.themes,
     observations: section.observations,
     insights: section.insights,
@@ -58,6 +60,7 @@ function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verse
     groupInfo: `第 ${groupNumber} 組`,
     members: parsed.members,
     verse: parsed.verse,
+    contributions: parsed.contributions,
     themes: parsed.themes,
     observations: parsed.observations,
     insights: parsed.insights,
@@ -73,26 +76,20 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   groupNumber,
   verseReference,
 }) => {
-  const [report, setReport] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [reportDate, setReportDate] = useState<Date | null>(null);
+  // Use the shared hook with polling support
+  const { 
+    latestAnalysis, 
+    isLoading, 
+    isPending, 
+    isCompleted 
+  } = useSessionAnalysis({
+    sessionId,
+    groupNumber,
+    reportType: 'group',
+  });
 
-  useEffect(() => {
-    const loadReport = async () => {
-      setLoading(true);
-      const reports = await fetchAIReports(sessionId, groupNumber);
-      
-      if (reports.length > 0) {
-        setReport(reports[0].content);
-        setReportDate(reports[0].createdAt);
-      } else {
-        setReport(null);
-      }
-      setLoading(false);
-    };
-    
-    loadReport();
-  }, [sessionId, groupNumber]);
+  const report = isCompleted && latestAnalysis ? latestAnalysis.content : null;
+  const reportDate = latestAnalysis?.createdAt || null;
 
   const handleShare = async () => {
     if (!report) return;
@@ -131,7 +128,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
     toast.success('已下載！');
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
@@ -141,6 +138,23 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show pending state with spinner when report is being generated
+  if (isPending) {
+    return (
+      <Card className="border-muted">
+        <CardContent className="py-8 text-center">
+          <Loader2 className="w-10 h-10 text-secondary mx-auto mb-3 animate-spin" />
+          <p className="text-foreground font-medium">
+            正在生成小組報告...
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            AI 正在整合組員的 insights，請稍候
+          </p>
         </CardContent>
       </Card>
     );
@@ -163,7 +177,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   }
 
   const parsed = parseReportContent(report);
-  const hasStructuredContent = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
+  const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications;
 
 
   return (
@@ -191,30 +205,37 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
         )}
         
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* Group Meta Info */}
         {(parsed.members || parsed.verse) && (
-          <div className="bg-muted/50 p-4 rounded-lg">
+          <div className="bg-gradient-to-r from-muted/60 to-muted/30 p-4 rounded-lg">
             {parsed.members && (
-              <p className="text-sm flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" />
-                <span className="font-medium">組員：</span> 
-                <span className="text-muted-foreground">{parsed.members}</span>
+              <p className="text-sm flex items-start gap-2">
+                <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <span className="font-medium shrink-0">組員：</span> 
+                <span>
+                  {parsed.members.split(/[,，、]/).map((name, idx, arr) => (
+                    <span key={idx}>
+                      <span className="font-medium text-primary">{name.trim()}</span>
+                      {idx < arr.length - 1 && <span className="text-muted-foreground">、</span>}
+                    </span>
+                  ))}
+                </span>
               </p>
             )}
             {parsed.verse && (
-              <p className="text-sm flex items-center gap-2 mt-1">
-                <BookOpen className="w-4 h-4 text-primary" />
-                <span className="font-medium">經文：</span>
-                <span className="text-muted-foreground">{parsed.verse}</span>
+              <p className="text-sm flex items-start gap-2 mt-2">
+                <BookOpen className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <span className="font-medium shrink-0">經文：</span>
+                <span className="text-muted-foreground italic">{parsed.verse}</span>
               </p>
             )}
           </div>
         )}
 
-        {/* Structured Sections - don't show keywords again since we have summary at top */}
+        {/* Structured Sections */}
         {hasStructuredContent ? (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {parsed.themes && (
               <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
             )}
@@ -230,15 +251,69 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             {parsed.applications && (
               <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
             )}
+            
+            {/* Personal Contributions Section - at the bottom */}
+            {parsed.contributions && (
+              <ContributionsSectionUser contributions={parsed.contributions} />
+            )}
           </div>
         ) : (
-          <div className="p-4 bg-card border border-border rounded-lg">
-            <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+          <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
+            <div className="text-sm text-foreground whitespace-pre-wrap leading-7">
               {parsed.raw}
             </div>
           </div>
         )}
       </CardContent>
     </Card>
+  );
+};
+
+// Separate component for contributions with name highlighting
+const ContributionsSectionUser: React.FC<{ contributions: string }> = ({ contributions }) => {
+  const formatContributions = (text: string): React.ReactNode => {
+    const lines = text.split('\n').filter(l => l.trim());
+    
+    return lines.map((line, idx) => {
+      const nameMatch = line.match(/^[-•]?\s*([^\s：:]+(?:弟兄|姊妹|姐妹|同學|老師|[A-Za-z]+))[\s]*[：:]\s*(.+)/);
+      
+      if (nameMatch) {
+        return (
+          <div key={idx} className="flex gap-2 py-2 border-b border-accent/20 last:border-0">
+            <span className="font-bold text-primary shrink-0 min-w-[5rem]">
+              {nameMatch[1]}
+            </span>
+            <span className="text-foreground/90">{nameMatch[2]}</span>
+          </div>
+        );
+      }
+      
+      const namePattern = /([^\s，。、：:]+(?:弟兄|姊妹|姐妹|同學|老師))/g;
+      const parts = line.replace(/^[-•]\s*/, '').split(namePattern);
+      
+      return (
+        <div key={idx} className="py-1.5">
+          {parts.map((part, pIdx) => {
+            if (namePattern.test(part)) {
+              namePattern.lastIndex = 0;
+              return <span key={pIdx} className="font-semibold text-primary">{part}</span>;
+            }
+            return part;
+          })}
+        </div>
+      );
+    });
+  };
+  
+  return (
+    <div className="p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent shadow-sm">
+      <h3 className="flex items-center gap-2 font-bold text-base mb-4 text-accent">
+        <User className="w-5 h-5" />
+        👤 個人貢獻摘要 Personal Contributions
+      </h3>
+      <div className="text-sm leading-relaxed pl-1">
+        {formatContributions(contributions)}
+      </div>
+    </div>
   );
 };

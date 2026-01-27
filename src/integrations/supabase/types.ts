@@ -22,6 +22,7 @@ export type Database = {
           id: string
           report_type: string
           session_id: string
+          status: string
         }
         Insert: {
           content: string
@@ -30,6 +31,7 @@ export type Database = {
           id?: string
           report_type: string
           session_id: string
+          status?: string
         }
         Update: {
           content?: string
@@ -38,6 +40,7 @@ export type Database = {
           id?: string
           report_type?: string
           session_id?: string
+          status?: string
         }
         Relationships: [
           {
@@ -589,6 +592,40 @@ export type Database = {
           },
           {
             foreignKeyName: "submissions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_ai_notes_feed: {
+        Row: {
+          action_plan: string | null
+          cool_down_note: string | null
+          core_insight_category:
+            | Database["public"]["Enums"]["insight_category_type"]
+            | null
+          core_insight_note: string | null
+          created_at: string | null
+          first_name: string | null
+          group_number: number | null
+          heartbeat_verse: string | null
+          observation: string | null
+          scholars_note: string | null
+          session_id: string | null
+          title_phrase: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_responses_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions_public"

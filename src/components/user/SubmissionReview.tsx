@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
-import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, Pencil, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudyResponse } from '@/hooks/useStudyResponse';
@@ -9,17 +9,64 @@ import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
 import { GroupReportViewer } from './GroupReportViewer';
 import { toast } from 'sonner';
 
-export const SubmissionReview: React.FC = () => {
+interface SubmissionReviewProps {
+  onEdit?: () => void;
+}
+
+export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) => {
   const { currentUser, currentSession } = useSession();
-  const { response } = useStudyResponse({
+  const { response, isLoading } = useStudyResponse({
     sessionId: currentSession?.id,
     userId: currentUser?.id,
     enabled: !!currentSession?.id && !!currentUser?.id,
   });
   const [activeTab, setActiveTab] = useState<'personal' | 'group'>('personal');
 
+  // Show loading only briefly - if data never arrives, show recovery UI
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-2xl mx-auto space-y-6 animate-fade-in">
+        <Card variant="highlight" className="text-center">
+          <CardContent className="py-10 space-y-4">
+            <div className="w-16 h-16 rounded-full gradient-gold mx-auto flex items-center justify-center glow-gold">
+              <Loader2 className="w-8 h-8 text-secondary-foreground animate-spin" />
+            </div>
+            <h2 className="font-serif text-2xl font-bold text-foreground">正在載入你的筆記…</h2>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // If not loading but no response, show recovery UI
   if (!response) {
-    return null;
+    return (
+      <div className="w-full max-w-2xl mx-auto space-y-6 animate-fade-in">
+        <Card variant="highlight" className="text-center">
+          <CardContent className="py-10 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-muted mx-auto flex items-center justify-center">
+              <Pencil className="w-8 h-8 text-muted-foreground" />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="font-serif text-2xl font-bold text-foreground">找不到筆記資料</h2>
+              <p className="text-muted-foreground">
+                可能是資料尚未同步完成，請返回修改再按一次「完成」。
+              </p>
+            </div>
+
+            {onEdit && (
+              <div className="flex justify-center pt-2">
+                <Button variant="gold" onClick={onEdit} className="gap-2">
+                  <Pencil className="w-4 h-4" />
+                  返回修改
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const selectedCategory = INSIGHT_CATEGORIES.find(c => c.value === response.core_insight_category);
@@ -119,10 +166,18 @@ export const SubmissionReview: React.FC = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl">您的 Spiritual Fitness 筆記</CardTitle>
-                <Button variant="outline" size="sm" onClick={handleSharePersonal}>
-                  <Share2 className="w-4 h-4 mr-2" />
-                  分享
-                </Button>
+                <div className="flex gap-2">
+                  {onEdit && (
+                    <Button variant="outline" size="sm" onClick={onEdit}>
+                      <Pencil className="w-4 h-4 mr-2" />
+                      繼續編輯
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleSharePersonal}>
+                    <Share2 className="w-4 h-4 mr-2" />
+                    分享
+                  </Button>
+                </div>
               </div>
               <div className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">{currentSession?.verseReference}</span>
