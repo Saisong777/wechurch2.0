@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/supabase-helpers';
-import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2 } from 'lucide-react';
+import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants, endStudySession } from '@/lib/admin-helpers';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -40,6 +40,7 @@ export const AdminMonitor: React.FC = () => {
   const [isResettingReady, setIsResettingReady] = useState(false);
   const [isClearingGroups, setIsClearingGroups] = useState(false);
   const [isRegrouping, setIsRegrouping] = useState(false);
+  const [isEndingSession, setIsEndingSession] = useState(false);
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
   const [allowLatecomers, setAllowLatecomers] = useState(currentSession?.allowLatecomers || false);
   const [icebreakerEnabled, setIcebreakerEnabled] = useState(currentSession?.icebreakerEnabled || false);
@@ -277,6 +278,25 @@ export const AdminMonitor: React.FC = () => {
     setIsRegrouping(false);
   };
 
+  const handleEndSession = async () => {
+    if (!currentSession?.id) return;
+
+    setIsEndingSession(true);
+    const result = await endStudySession(currentSession.id);
+
+    if (result.success) {
+      toast.success('🎉 查經已結束！', {
+        description: '所有資料已封存，可在歷史資料中查看',
+        duration: 5000,
+      });
+      setCurrentSession({ ...currentSession, status: 'completed' });
+    } else {
+      toast.error(`操作失敗: ${result.error}`);
+    }
+
+    setIsEndingSession(false);
+  };
+
   const handleGenerateGroupSummary = async () => {
     if (!currentSession?.id || groups.length === 0) return;
     
@@ -493,6 +513,49 @@ export const AdminMonitor: React.FC = () => {
                 {allowLatecomers ? '已啟用' : '未啟用'}
               </span>
             </div>
+            
+            {/* End Study Session Button - only show during studying phase */}
+            {isStudyingPhase && (
+              <div className="pt-3 mt-3 border-t border-border">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="default"
+                      className="w-full h-11 gap-2"
+                      disabled={isEndingSession}
+                    >
+                      {isEndingSession ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <LogOut className="w-4 h-4" />
+                      )}
+                      結束查經
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-lg">確定要結束查經嗎？</AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-2">
+                        <p>此操作將：</p>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          <li>解散所有 {users.length} 位參與者</li>
+                          <li>封存所有查經筆記和報告</li>
+                          <li>管理員可在「歷史資料」中查看封存資料</li>
+                        </ul>
+                        <p className="text-destructive font-medium mt-2">此操作無法復原！</p>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                      <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleEndSession} className="bg-destructive hover:bg-destructive/90 h-11 sm:h-10">
+                        確定結束
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

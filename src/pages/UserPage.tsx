@@ -60,6 +60,16 @@ export const UserPage: React.FC = () => {
     setStep('enter-session');
   }, [setCurrentSession, setCurrentUser]);
 
+  // Handle session ended - show notification and return to landing
+  const handleSessionEnded = useCallback(() => {
+    toast.info('查經已結束', {
+      description: '感謝您的參與！您可以在「我的筆記」中查看您的筆記',
+    });
+    // Clear session storage
+    resetLocalState();
+    setStep('landing');
+  }, [resetLocalState]);
+
   // Restore user session on page load/refresh
   const restoreUserSession = useCallback(async () => {
     const storedSessionId = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
@@ -193,6 +203,12 @@ export const UserPage: React.FC = () => {
         } else {
           restoredStep = 'waiting';
         }
+      } else if (sessionData.status === 'completed') {
+        // Session has ended, show review page if they submitted, otherwise landing
+        restoredStep = storedStep === 'review' ? 'review' : 'landing';
+        toast.info('查經已結束', {
+          description: '感謝您的參與！您可以在「我的筆記」中查看您的筆記',
+        });
       }
 
       // If stored step is 'review', keep it (user already submitted)
@@ -272,6 +288,34 @@ export const UserPage: React.FC = () => {
       localStorage.setItem(STORAGE_KEYS.PARTICIPANT_ID, currentUser.id);
     }
   }, [currentUser?.id]);
+
+  // Listen for session completion globally
+  useEffect(() => {
+    if (!currentSession?.id) return;
+    
+    const channel = supabase
+      .channel(`user-session-status-${currentSession.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'sessions',
+          filter: `id=eq.${currentSession.id}`,
+        },
+        (payload) => {
+          const newStatus = (payload.new as any).status;
+          if (newStatus === 'completed') {
+            handleSessionEnded();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentSession?.id, handleSessionEnded]);
 
   const loadSessionAndCheckAuth = async (idOrCode: string) => {
     setIsLoading(true);
@@ -511,7 +555,10 @@ export const UserPage: React.FC = () => {
       case 'waiting':
         return (
           <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <WaitingRoom onGroupingStarted={() => setStep('group-reveal')} />
+            <WaitingRoom 
+              onGroupingStarted={() => setStep('group-reveal')} 
+              onSessionEnded={handleSessionEnded}
+            />
           </div>
         );
 
@@ -525,14 +572,17 @@ export const UserPage: React.FC = () => {
       case 'verification':
         return (
           <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <GroupVerification onAllReady={() => {
-              // Check if icebreaker is enabled for this session
-              if (currentSession?.icebreakerEnabled && currentUser?.groupNumber) {
-                setStep('icebreaker');
-              } else {
-                setStep('study');
-              }
-            }} />
+            <GroupVerification 
+              onAllReady={() => {
+                // Check if icebreaker is enabled for this session
+                if (currentSession?.icebreakerEnabled && currentUser?.groupNumber) {
+                  setStep('icebreaker');
+                } else {
+                  setStep('study');
+                }
+              }} 
+              onSessionEnded={handleSessionEnded}
+            />
           </div>
         );
 

@@ -12,9 +12,10 @@ import { toast } from 'sonner';
 
 interface GroupVerificationProps {
   onAllReady: () => void;
+  onSessionEnded?: () => void;
 }
 
-export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady }) => {
+export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady, onSessionEnded }) => {
   const { currentUser, currentSession, setCurrentUser } = useSession();
   const [groupMembers, setGroupMembers] = useState<User[]>([]);
   const [checkedMembers, setCheckedMembers] = useState<Set<string>>(new Set());
@@ -161,6 +162,22 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
           await fetchMembers();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'sessions',
+          filter: `id=eq.${currentSession.id}`,
+        },
+        (payload) => {
+          console.log('[GroupVerification] Session update received:', payload);
+          const newStatus = (payload.new as any).status;
+          if (newStatus === 'completed' && onSessionEnded) {
+            onSessionEnded();
+          }
+        }
+      )
       .subscribe((status) => {
         console.log('[GroupVerification] Realtime subscription status:', status);
         // Silent subscription - no toast to avoid notification spam during transitions
@@ -175,7 +192,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       supabase.removeChannel(channel);
       clearInterval(pollInterval);
     };
-  }, [currentSession?.id, globalGroupNumber, fetchMembers]);
+  }, [currentSession?.id, globalGroupNumber, fetchMembers, onSessionEnded]);
 
   const handleCheckMember = (memberId: string, checked: boolean) => {
     const newChecked = new Set(checkedMembers);

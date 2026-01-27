@@ -9,9 +9,10 @@ import { toast } from '@/hooks/use-toast';
 
 interface WaitingRoomProps {
   onGroupingStarted: () => void;
+  onSessionEnded?: () => void;
 }
 
-export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) => {
+export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onSessionEnded }) => {
   const { currentUser, users, currentSession, setCurrentSession, updateUser, setCurrentUser } = useSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const prevConnectionStateRef = useRef<ConnectionState | null>(null);
@@ -40,6 +41,10 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted }) =
     onSessionUpdated: (sessionUpdate) => {
       if ((sessionUpdate.status === 'studying' || sessionUpdate.status === 'grouping' || sessionUpdate.status === 'verification') && currentSession) {
         setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
+      }
+      // Handle session ending
+      if (sessionUpdate.status === 'completed' && onSessionEnded) {
+        onSessionEnded();
       }
     },
     onParticipantUpdated: (user) => {
