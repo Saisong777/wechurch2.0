@@ -162,35 +162,35 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
 
   return (
     <>
-      <div className="w-full max-w-2xl mx-auto space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <h2 className="font-serif text-2xl font-bold text-foreground">
+      <div className="w-full max-w-3xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <h2 className="font-serif text-xl sm:text-2xl font-bold text-foreground">
             我的健身課程
           </h2>
-          <Button variant="gold" onClick={onCreateNew}>
-            <Plus className="w-5 h-5" />
+          <Button variant="gold" onClick={onCreateNew} className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm">
+            <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
             建立新課程
           </Button>
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="text-center py-12 text-muted-foreground text-base sm:text-sm">
             載入中...
           </div>
         ) : sessions.length === 0 ? (
           <Card variant="highlight" className="text-center">
-            <CardContent className="py-12">
-              <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <BookOpen className="w-8 h-8 text-muted-foreground" />
+            <CardContent className="py-10 sm:py-12">
+              <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-serif text-xl font-semibold mb-2">
+              <h3 className="font-serif text-lg sm:text-xl font-semibold mb-2">
                 還沒有健身課程
               </h3>
-              <p className="text-muted-foreground mb-6">
+              <p className="text-muted-foreground text-base sm:text-sm mb-6">
                 建立您的第一個健身課程
               </p>
-              <Button variant="gold" onClick={onCreateNew}>
-                <Plus className="w-5 h-5" />
+              <Button variant="gold" onClick={onCreateNew} className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm">
+                <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
                 建立新課程
               </Button>
             </CardContent>
@@ -200,19 +200,19 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
             {sessions.map((session) => (
               <Card 
                 key={session.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow"
+                className="cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
                 onClick={() => onSelectSession(session.id)}
               >
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
+                <CardContent className="py-4 sm:py-5 px-4 sm:px-6">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <p className="font-serif text-lg font-semibold truncate">
+                      <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
+                        <p className="font-serif text-base sm:text-lg font-semibold truncate">
                           {session.verse_reference}
                         </p>
                         {getStatusBadge(session.status)}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-3 sm:gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           {format(new Date(session.created_at), 'yyyy/MM/dd')}
@@ -223,39 +223,39 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       {/* QR Code Button */}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-muted-foreground hover:text-primary"
+                        className="text-muted-foreground hover:text-primary h-10 w-10 sm:h-9 sm:w-9"
                         onClick={(e) => handleShowQR(session, e)}
                         title="顯示 QR Code"
                       >
-                        <QrCode className="w-4 h-4" />
+                        <QrCode className="w-5 h-5 sm:w-4 sm:h-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground hover:text-destructive"
+                            className="text-muted-foreground hover:text-destructive h-10 w-10 sm:h-9 sm:w-9"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                           <AlertDialogHeader>
-                            <AlertDialogTitle>確定刪除此聚會？</AlertDialogTitle>
-                            <AlertDialogDescription>
+                            <AlertDialogTitle className="text-lg sm:text-xl">確定刪除此聚會？</AlertDialogTitle>
+                            <AlertDialogDescription className="text-base sm:text-sm">
                               刪除後將無法恢復，包括所有參與者資料和筆記都會被刪除。
                             </AlertDialogDescription>
                           </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>取消</AlertDialogCancel>
+                          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                            <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
                             <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-11 sm:h-10"
                               onClick={(e) => handleDeleteSession(session.id, e)}
                             >
                               刪除
@@ -263,7 +263,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground hidden sm:block" />
                     </div>
                   </div>
                 </CardContent>

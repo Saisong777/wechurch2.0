@@ -107,16 +107,16 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
   return (
     <>
       <Card variant="highlight" className="w-full max-w-xl mx-auto">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 rounded-full gradient-orange flex items-center justify-center mb-4 glow-orange">
-            <Dumbbell className="w-8 h-8 text-white" />
+        <CardHeader className="text-center px-4 sm:px-6">
+          <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full gradient-orange flex items-center justify-center mb-4 glow-orange">
+            <Dumbbell className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl">開始新的健身課程</CardTitle>
-          <CardDescription className="text-base">
+          <CardTitle className="text-xl sm:text-2xl">開始新的健身課程</CardTitle>
+          <CardDescription className="text-base sm:text-sm">
             Start a new Soul Gym training session
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6">
           <div className="space-y-2">
             <Label htmlFor="verse" className="text-base font-semibold">
               訓練經文 Training Scripture
@@ -126,7 +126,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
               value={verseReference}
               onChange={(e) => setVerseReference(e.target.value)}
               placeholder="例如: 約翰福音 3:1-21 / John 3:1-21"
-              className="h-12 text-base"
+              className="h-12 sm:h-14 text-base sm:text-lg"
             />
             <p className="text-sm text-muted-foreground">
               輸入今天訓練使用的經文章節
@@ -136,7 +136,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
           <Button
             variant="default"
             size="xl"
-            className="w-full bg-secondary hover:bg-secondary/90 text-white"
+            className="w-full bg-secondary hover:bg-secondary/90 text-white h-14 sm:h-12 text-base sm:text-lg"
             onClick={handleCreate}
             disabled={!verseReference || isCreating}
           >
@@ -144,7 +144,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
               '準備中...'
             ) : (
               <>
-                <Flame className="w-5 h-5" />
+                <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
                 開始訓練 Start Training
               </>
             )}
