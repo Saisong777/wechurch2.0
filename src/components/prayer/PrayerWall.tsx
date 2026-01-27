@@ -7,6 +7,7 @@ import { usePrayerWall, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePraye
 import { PrayerCard } from './PrayerCard';
 import { CreatePrayerDialog } from './CreatePrayerDialog';
 import { MockPrayerGenerator } from './MockPrayerGenerator';
+import { PrayerNotifications } from './PrayerNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,11 +26,19 @@ export const PrayerWall: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
   };
 
-  // Filter prayers by category
+  // Filter and sort prayers: pinned first, then by date
   const filteredPrayers = useMemo(() => {
     if (!prayers) return [];
-    if (filterCategory === 'all') return prayers;
-    return prayers.filter((p) => p.category === filterCategory);
+    let filtered = prayers;
+    if (filterCategory !== 'all') {
+      filtered = prayers.filter((p) => p.category === filterCategory);
+    }
+    // Sort: pinned first, then by created_at descending
+    return [...filtered].sort((a, b) => {
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
   }, [prayers, filterCategory]);
 
   if (!user) {
@@ -63,7 +72,10 @@ export const PrayerWall: React.FC = () => {
             彼此代禱，互相扶持
           </p>
         </div>
-        <CreatePrayerDialog />
+        <div className="flex items-center gap-2">
+          <PrayerNotifications />
+          <CreatePrayerDialog />
+        </div>
       </div>
 
       {/* Admin: Mock Data Generator */}

@@ -351,6 +351,51 @@ export type Database = {
           },
         ]
       }
+      prayer_notifications: {
+        Row: {
+          actor_name: string
+          created_at: string
+          id: string
+          is_read: boolean
+          prayer_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_name: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          prayer_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          actor_name?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          prayer_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prayer_notifications_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "prayers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prayer_notifications_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "v_prayer_wall"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prayers: {
         Row: {
           category: Database["public"]["Enums"]["prayer_category"]
@@ -358,6 +403,7 @@ export type Database = {
           created_at: string
           id: string
           is_anonymous: boolean
+          is_pinned: boolean
           user_id: string
         }
         Insert: {
@@ -366,6 +412,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_anonymous?: boolean
+          is_pinned?: boolean
           user_id: string
         }
         Update: {
@@ -374,6 +421,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_anonymous?: boolean
+          is_pinned?: boolean
           user_id?: string
         }
         Relationships: []
@@ -908,6 +956,7 @@ export type Database = {
           id: string | null
           is_anonymous: boolean | null
           is_owner: boolean | null
+          is_pinned: boolean | null
           user_id: string | null
         }
         Relationships: []
