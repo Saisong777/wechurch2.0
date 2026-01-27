@@ -156,50 +156,50 @@ export function parseReportContent(content: string): GroupReport[] {
     // Section markers to look for (order matters for proper boundary detection)
     const SECTION_MARKERS = ['**📖', '📖', '**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤'];
     
-    // Extract themes
+    // Extract themes - handle both **📖 主題：** and **📖 主題：**\n formats
     const themesContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?📖?\s*主題[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      /\*\*?📖\s*主題[：:]?\s*\*\*\s*/i,
       ['**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤']
     );
     if (themesContent) {
       section.themes = cleanMarkdown(themesContent);
     }
     
-    // Extract observations
+    // Extract observations - handle **🔍 事實發現：** format
     const obsContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?🔍?\s*事實發現[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      /\*\*?🔍\s*事實發現[：:]?\s*\*\*\s*/i,
       ['**💡', '💡', '**🎯', '🎯', '**👤', '👤']
     );
     if (obsContent) {
       section.observations = cleanMarkdown(obsContent);
     }
     
-    // Extract insights (獨特亮光)
+    // Extract insights (獨特亮光) - handle **💡 獨特亮光：** format
     const insightsContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?💡?\s*獨特亮光[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      /\*\*?💡\s*獨特亮光[：:]?\s*\*\*\s*/i,
       ['**🎯', '🎯', '**👤', '👤']
     );
     if (insightsContent) {
       section.insights = cleanMarkdown(insightsContent);
     }
     
-    // Extract applications
+    // Extract applications - handle **🎯 如何應用：** format
     const appContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?🎯?\s*(?:如何)?應用[^：:\n]*?[：:]\s*(?:\*\*)?/i,
+      /\*\*?🎯\s*(?:如何)?應用[：:]?\s*\*\*\s*/i,
       ['**👤', '👤']
     );
     if (appContent) {
       section.applications = cleanMarkdown(appContent);
     }
     
-    // Extract personal contributions (at the end)
+    // Extract personal contributions (at the end) - handle **👤 個人貢獻摘要：** format
     const contribContent = extractSectionContent(
       groupReport,
-      /(?:\*\*)?👤?\s*個人貢獻[^：:\n]*[：:]\s*(?:\*\*)?/i,
+      /\*\*?👤\s*個人貢獻[^：:\n]*[：:]?\s*\*\*\s*/i,
       [] // Last section, no end markers
     );
     if (contribContent) {
