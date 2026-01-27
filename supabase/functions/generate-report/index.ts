@@ -342,7 +342,7 @@ ${JSON.stringify(allData, null, 2)}
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite", // Fastest and cheapest model
+        model: "google/gemini-2.5-pro", // High-end model for analysis
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
