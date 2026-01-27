@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -36,13 +37,17 @@ import {
   Clock,
   CheckCircle2,
   CalendarDays,
-  FolderOpen
+  FolderOpen,
+  Copy
 } from 'lucide-react';
 import { format, startOfMonth, isThisMonth, subMonths, isSameMonth } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { INSIGHT_CATEGORIES, InsightCategory } from '@/types/spiritual-fitness';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { parseReportContent, GroupReport } from './report-viewer/parse';
+import { EnhancedSection } from './report-elements';
 
 interface AIReport {
   id: string;
@@ -387,62 +392,39 @@ export const HistoryBrowser: React.FC = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-4 pr-4">
-                  {/* Overall Report First */}
+                <div className="space-y-6 pr-4">
+                  {/* Overall Report First - with enhanced formatting */}
                   {selectedSession.aiReports
-                    .filter(r => r.report_type === 'overall')
+                    .filter(r => r.report_type === 'overall' || r.group_number === 0)
                     .map(report => (
-                      <Card key={report.id} className="border-accent/30 bg-gradient-to-br from-accent/10 to-secondary/5">
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <BarChart3 className="w-5 h-5 text-accent" />
-                              <span className="font-semibold">全體整合報告</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(report.created_at), 'MM/dd HH:mm')}
-                            </span>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-sm whitespace-pre-wrap bg-background/60 rounded-lg p-4">
-                            {report.content}
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <HistoryReportSection 
+                        key={report.id}
+                        report={report}
+                        variant="overall"
+                      />
                     ))}
 
-                  {/* Group Reports */}
-                  {selectedSession.aiReports.filter(r => r.report_type === 'group').length > 0 && (
-                    <>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
-                        <Users className="w-4 h-4" />
-                        <span>各組報告</span>
-                      </div>
-                      {selectedSession.aiReports
-                        .filter(r => r.report_type === 'group')
-                        .map(report => (
-                          <Card key={report.id} className="border-secondary/20">
-                            <CardHeader className="pb-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="w-4 h-4 text-secondary" />
-                                  <span className="font-medium">第 {report.group_number} 組</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(report.created_at), 'MM/dd HH:mm')}
-                                </span>
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-lg p-4 max-h-64 overflow-y-auto">
-                                {report.content}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                    </>
+                  {/* Separator if both overall and group reports exist */}
+                  {selectedSession.aiReports.some(r => r.report_type === 'overall' || r.group_number === 0) &&
+                   selectedSession.aiReports.some(r => r.report_type === 'group' && r.group_number !== 0) && (
+                    <div className="relative py-2">
+                      <Separator />
+                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
+                        各組報告
+                      </span>
+                    </div>
                   )}
+
+                  {/* Group Reports - with enhanced formatting */}
+                  {selectedSession.aiReports
+                    .filter(r => r.report_type === 'group' && r.group_number !== 0)
+                    .map(report => (
+                      <HistoryReportSection 
+                        key={report.id}
+                        report={report}
+                        variant="group"
+                      />
+                    ))}
                 </div>
               )}
             </ScrollArea>
@@ -743,5 +725,141 @@ const ResponseCard: React.FC<{
         )}
       </CardContent>
     </Card>
+  );
+};
+
+// Enhanced AI Report Section for History Browser
+interface HistoryReportSectionProps {
+  report: AIReport;
+  variant: 'overall' | 'group';
+}
+
+const HistoryReportSection: React.FC<HistoryReportSectionProps> = ({ report, variant }) => {
+  const isOverall = variant === 'overall';
+  
+  // Parse the report content to extract structured sections
+  const parsedSections = parseReportContent(report.content);
+  const section = parsedSections[0]; // Use first parsed section
+  
+  const handleCopy = () => {
+    navigator.clipboard.writeText(report.content);
+    toast.success(isOverall ? '全體報告已複製！' : `第 ${report.group_number} 組報告已複製！`);
+  };
+  
+  const hasStructuredContent = section && (section.themes || section.observations || section.insights || section.applications);
+  
+  return (
+    <div className={cn(
+      "rounded-xl overflow-hidden",
+      isOverall 
+        ? "ring-1 ring-accent/30 bg-gradient-to-br from-accent/5 to-secondary/5" 
+        : "border border-secondary/20"
+    )}>
+      {/* Header */}
+      <div className={cn(
+        "px-4 py-3 flex items-center justify-between",
+        isOverall 
+          ? "bg-gradient-to-r from-accent/20 via-accent/10 to-secondary/10 border-b border-accent/20" 
+          : "gradient-navy text-primary-foreground"
+      )}>
+        <div className="flex items-center gap-2">
+          {isOverall ? (
+            <BarChart3 className="w-5 h-5 text-accent" />
+          ) : (
+            <Users className="w-4 h-4" />
+          )}
+          <span className={cn(
+            "font-semibold",
+            isOverall && "text-accent"
+          )}>
+            {isOverall ? '📊 全會眾綜合分析' : `第 ${report.group_number} 組`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={cn(
+            "text-xs",
+            isOverall ? "text-muted-foreground" : "text-primary-foreground/70"
+          )}>
+            {format(new Date(report.created_at), 'MM/dd HH:mm')}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-7 w-7 p-0",
+              isOverall 
+                ? "text-accent hover:bg-accent/20" 
+                : "text-primary-foreground hover:bg-white/20"
+            )}
+            onClick={handleCopy}
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+      
+      {/* Meta Info - Members & Verse */}
+      {section && (section.members || section.verse) && (
+        <div className={cn(
+          "px-4 py-3 border-b",
+          isOverall ? "bg-accent/5 border-accent/10" : "bg-muted/30 border-border/50"
+        )}>
+          {section.members && (
+            <p className="text-sm flex flex-wrap items-start gap-2">
+              <span className="font-medium shrink-0">👥 組員：</span>
+              <span className="text-muted-foreground">
+                {section.members.split(/[,，、]/).map((name, idx, arr) => (
+                  <span key={idx}>
+                    <span className="font-medium text-primary">{name.trim()}</span>
+                    {idx < arr.length - 1 && <span className="text-muted-foreground">、</span>}
+                  </span>
+                ))}
+              </span>
+            </p>
+          )}
+          {section.verse && (
+            <p className="text-sm text-muted-foreground mt-2 flex items-start gap-2">
+              <span className="font-medium text-foreground shrink-0">📖 經文：</span>
+              <span className="italic">{section.verse}</span>
+            </p>
+          )}
+        </div>
+      )}
+      
+      {/* Content */}
+      <div className="p-4">
+        {hasStructuredContent ? (
+          <div className="space-y-4">
+            {section.themes && (
+              <EnhancedSection type="themes" content={section.themes} showKeywords={false} />
+            )}
+            {section.observations && (
+              <EnhancedSection type="observations" content={section.observations} showKeywords={false} />
+            )}
+            {section.insights && (
+              <EnhancedSection type="insights" content={section.insights} showQuotes={true} showKeywords={false} />
+            )}
+            {section.applications && (
+              <EnhancedSection type="applications" content={section.applications} showKeywords={false} />
+            )}
+            {section.contributions && (
+              <div className="p-4 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent">
+                <h3 className="flex items-center gap-2 font-bold text-sm mb-3 text-accent">
+                  <User className="w-4 h-4" />
+                  👤 個人貢獻摘要
+                </h3>
+                <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                  {section.contributions}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm whitespace-pre-wrap leading-relaxed">
+            {report.content}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
