@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   BookOpen, 
   Calendar, 
@@ -101,7 +100,7 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-secondary" />
@@ -110,8 +109,8 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
         <Badge variant="secondary">{entries.length} 篇筆記</Badge>
       </div>
 
-      <ScrollArea className="h-[calc(100vh-300px)]">
-        <div className="space-y-3 pr-4">
+      {/* Removed fixed-height ScrollArea - use natural document flow for mobile */}
+      <div className="space-y-3">
           {entries.map((entry) => {
             const isExpanded = expandedIds.has(entry.id);
             const selectedCategory = INSIGHT_CATEGORIES.find(
@@ -244,10 +243,9 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
                   </CardContent>
                 )}
               </Card>
-            );
-          })}
-        </div>
-      </ScrollArea>
+          );
+        })}
+      </div>
     </div>
   );
 };
