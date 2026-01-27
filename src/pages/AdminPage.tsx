@@ -6,17 +6,18 @@ import { SessionHistory } from '@/components/admin/SessionHistory';
 import { CreateSession } from '@/components/admin/CreateSession';
 import { AdminWaitingRoom } from '@/components/admin/AdminWaitingRoom';
 import { AdminMonitor } from '@/components/admin/AdminMonitor';
+import { HistoryBrowser } from '@/components/admin/HistoryBrowser';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Dumbbell, Flame, Users } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Dumbbell, Flame, Users, History } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchParticipants, fetchSubmissions } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
 
-type AdminStep = 'auth' | 'dashboard' | 'create' | 'waiting' | 'monitor';
+type AdminStep = 'auth' | 'dashboard' | 'history' | 'create' | 'waiting' | 'monitor';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -126,20 +127,37 @@ export const AdminPage: React.FC = () => {
                 <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-secondary" />
                 <h2 className="text-xl sm:text-2xl font-semibold">課程管理</h2>
               </div>
-              <Button 
-                variant="default" 
-                size="default"
-                onClick={() => navigate('/admin/crm')}
-                className="gap-2 w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm"
-              >
-                <Users className="w-5 h-5 sm:w-4 sm:h-4" />
-                會員管理系統
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button 
+                  variant="outline" 
+                  size="default"
+                  onClick={() => setStep('history')}
+                  className="gap-2 w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm"
+                >
+                  <History className="w-5 h-5 sm:w-4 sm:h-4" />
+                  歷史資料
+                </Button>
+                <Button 
+                  variant="default" 
+                  size="default"
+                  onClick={() => navigate('/admin/crm')}
+                  className="gap-2 w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm"
+                >
+                  <Users className="w-5 h-5 sm:w-4 sm:h-4" />
+                  會員管理系統
+                </Button>
+              </div>
             </div>
             <SessionHistory 
               onCreateNew={() => setStep('create')} 
               onSelectSession={handleSelectSession}
             />
+          </div>
+        );
+      case 'history':
+        return (
+          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+            <HistoryBrowser />
           </div>
         );
       case 'create':
