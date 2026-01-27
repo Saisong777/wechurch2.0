@@ -460,55 +460,40 @@ export const AdminMonitor: React.FC = () => {
             </div>
           )}
 
-          {/* Icebreaker Toggle - show during verification or studying phase */}
-          <div className="mt-4 pt-4 border-t border-border">
+          {/* Session Settings Status - Read-only indicators */}
+          <div className="mt-4 pt-4 border-t border-border space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">課程設定</p>
+            
+            {/* Icebreaker Status */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Gamepad2 className="w-4 h-4 text-muted-foreground" />
-                <Label htmlFor="enable-icebreaker" className="text-sm cursor-pointer">
-                  啟用破冰卡牌
-                </Label>
+                <span className="text-sm">破冰卡牌</span>
               </div>
-              <Switch
-                id="enable-icebreaker"
-                checked={icebreakerEnabled}
-                onCheckedChange={handleToggleIcebreaker}
-              />
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                icebreakerEnabled 
+                  ? 'bg-accent/20 text-accent' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {icebreakerEnabled ? '已啟用' : '未啟用'}
+              </span>
             </div>
-            {icebreakerEnabled && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {isVerificationPhase 
-                  ? '🎮 分組確認後會進入破冰卡牌環節'
-                  : isStudyingPhase
-                    ? '🎮 破冰卡牌已開啟，參與者可在健身前進行破冰'
-                    : '🎮 分組後將進入破冰卡牌環節'}
-              </p>
-            )}
+            
+            {/* Latecomer Status */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm">遲到加入</span>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                allowLatecomers 
+                  ? 'bg-accent/20 text-accent' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {allowLatecomers ? '已啟用' : '未啟用'}
+              </span>
+            </div>
           </div>
-
-          {/* Allow Latecomers Toggle */}
-          {(isVerificationPhase || isStudyingPhase) && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="w-4 h-4 text-muted-foreground" />
-                  <Label htmlFor="allow-latecomers" className="text-sm cursor-pointer">
-                    允許遲到者加入
-                  </Label>
-                </div>
-                <Switch
-                  id="allow-latecomers"
-                  checked={allowLatecomers}
-                  onCheckedChange={handleToggleLatecomers}
-                />
-              </div>
-              {allowLatecomers && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  ✅ 遲到者可以加入，將自動分配到人數最少的小組
-                </p>
-              )}
-            </div>
-          )}
         </CardContent>
       </Card>
 
