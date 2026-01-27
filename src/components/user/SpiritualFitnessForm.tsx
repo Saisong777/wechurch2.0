@@ -40,6 +40,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
   } = useStudyResponse({
     sessionId: currentSession?.id,
     userId: currentUser?.id,
+    userEmail: currentUser?.email,
     enabled: !!currentSession?.id && !!currentUser?.id,
   });
 

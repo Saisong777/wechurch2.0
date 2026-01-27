@@ -90,38 +90,64 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
     localStorage.setItem('bible_study_guest_gender', gender);
     localStorage.setItem('bible_study_guest_location', location);
 
-    const joinedUser = await joinSession(currentSession.id, name, email, gender, location);
-
-    if (joinedUser) {
-      // Check if this is a latecomer joining during grouping/studying phase
-      // If so, auto-assign them to the smallest group
-      const sessionStatus = currentSession.status;
-      const isLatecomer = ['grouping', 'verification', 'studying'].includes(sessionStatus) && !joinedUser.groupNumber;
-
-      if (isLatecomer) {
-        const smallestGroup = await findSmallestGroup(currentSession.id);
-        if (smallestGroup) {
-          const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup);
-          if (assigned) {
-            joinedUser.groupNumber = smallestGroup;
-            toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`, {
-              description: 'You have been assigned to the smallest group.',
-            });
+    try {
+      // If user is not already authenticated, sign in anonymously and attach email
+      // This is critical for RLS policies that check auth.jwt() ->> 'email'
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData.session) {
+        // Sign in anonymously first
+        const { error: anonError } = await supabase.auth.signInAnonymously();
+        if (anonError) {
+          console.error('[JoinForm] Anonymous sign-in failed:', anonError);
+          // Continue anyway - some features may not work
+        } else {
+          // Attach email to the anonymous user's JWT
+          const { error: updateError } = await supabase.auth.updateUser({ 
+            email: email 
+          });
+          if (updateError) {
+            console.error('[JoinForm] Failed to attach email to anonymous user:', updateError);
           }
         }
       }
 
-      setCurrentUser(joinedUser);
-      addUser(joinedUser);
-      // Clear pending session from localStorage after successful join
-      localStorage.removeItem('pending_session_id');
-      // Save participant ID for session restoration
-      localStorage.setItem('bible_study_participant_id', joinedUser.id);
-      // Save email for RPC verification (critical for set_participant_ready)
-      localStorage.setItem('user_email', email);
-      toast.success('成功加入健身課程！');
-      onJoined(isLatecomer && !!joinedUser.groupNumber);
-    } else {
+      const joinedUser = await joinSession(currentSession.id, name, email, gender, location);
+
+      if (joinedUser) {
+        // Check if this is a latecomer joining during grouping/studying phase
+        // If so, auto-assign them to the smallest group
+        const sessionStatus = currentSession.status;
+        const isLatecomer = ['grouping', 'verification', 'studying'].includes(sessionStatus) && !joinedUser.groupNumber;
+
+        if (isLatecomer) {
+          const smallestGroup = await findSmallestGroup(currentSession.id);
+          if (smallestGroup) {
+            const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup);
+            if (assigned) {
+              joinedUser.groupNumber = smallestGroup;
+              toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`, {
+                description: 'You have been assigned to the smallest group.',
+              });
+            }
+          }
+        }
+
+        setCurrentUser(joinedUser);
+        addUser(joinedUser);
+        // Clear pending session from localStorage after successful join
+        localStorage.removeItem('pending_session_id');
+        // Save participant ID for session restoration
+        localStorage.setItem('bible_study_participant_id', joinedUser.id);
+        // Save email for RPC verification (critical for set_participant_ready)
+        localStorage.setItem('user_email', email);
+        toast.success('成功加入健身課程！');
+        onJoined(isLatecomer && !!joinedUser.groupNumber);
+      } else {
+        toast.error('加入失敗，請重試');
+      }
+    } catch (error) {
+      console.error('[JoinForm] Error during join:', error);
       toast.error('加入失敗，請重試');
     }
     
