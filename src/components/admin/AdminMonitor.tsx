@@ -46,6 +46,7 @@ export const AdminMonitor: React.FC = () => {
   // AI generation options
   const [fastMode, setFastMode] = useState(true);  // Default to fast mode
   const [filledOnly, setFilledOnly] = useState(false);
+  const [allSubmittedNotified, setAllSubmittedNotified] = useState(false);
 
   // Fetch study responses to check if we have data for AI analysis
   const { data: studyResponses } = useAdminStudyResponses({ 
@@ -59,6 +60,40 @@ export const AdminMonitor: React.FC = () => {
   
   // Check if we have any data for AI analysis (either submissions or study responses)
   const hasDataForAnalysis = submissions.length > 0 || (studyResponses && studyResponses.length > 0);
+  
+  // Calculate study progress - how many have started/completed
+  const studyProgressStats = React.useMemo(() => {
+    if (!studyResponses) return { notStarted: 0, inProgress: 0, completed: 0, total: 0 };
+    
+    const notStarted = studyResponses.filter(r => r.progressStatus === 'not_started').length;
+    const inProgress = studyResponses.filter(r => 
+      r.progressStatus === 'warming_up' || r.progressStatus === 'heavy_lifting'
+    ).length;
+    const completed = studyResponses.filter(r => r.progressStatus === 'stretching').length;
+    
+    return { notStarted, inProgress, completed, total: studyResponses.length };
+  }, [studyResponses]);
+  
+  // Check if everyone has completed and show notification
+  useEffect(() => {
+    if (
+      isStudyingPhase && 
+      studyProgressStats.total > 0 && 
+      studyProgressStats.completed === studyProgressStats.total &&
+      !allSubmittedNotified
+    ) {
+      setAllSubmittedNotified(true);
+      toast.success('🎉 全員交卷完成！', {
+        description: `所有 ${studyProgressStats.total} 位參與者都已完成健身筆記`,
+        duration: 10000,
+      });
+    }
+  }, [isStudyingPhase, studyProgressStats, allSubmittedNotified]);
+
+  // Reset notification flag when session changes
+  useEffect(() => {
+    setAllSubmittedNotified(false);
+  }, [currentSession?.id]);
   
   // Sync allowLatecomers with session
   useEffect(() => {
@@ -340,6 +375,11 @@ export const AdminMonitor: React.FC = () => {
   const totalMemberCount = groupReadyStatus.reduce((acc, g) => acc + g.totalMembers, 0);
   const readyPercentage = totalMemberCount > 0 ? (totalReadyCount / totalMemberCount) * 100 : 0;
 
+  // Calculate study phase submission progress
+  const studySubmissionPercentage = studyProgressStats.total > 0 
+    ? (studyProgressStats.completed / studyProgressStats.total) * 100 
+    : 0;
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       {/* Session Header */}
@@ -358,10 +398,15 @@ export const AdminMonitor: React.FC = () => {
               </Badge>
               <div className="text-center">
                 <p className="text-xl sm:text-2xl font-bold text-primary">
-                  {isVerificationPhase ? `${totalReadyCount}/${totalMemberCount}` : `${submittedCount}/${totalCount}`}
+                  {isVerificationPhase 
+                    ? `${totalReadyCount}/${totalMemberCount}` 
+                    : isStudyingPhase 
+                      ? `${studyProgressStats.completed}/${studyProgressStats.total}`
+                      : `${submittedCount}/${totalCount}`
+                  }
                 </p>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  {isVerificationPhase ? '已確認' : '已提交'}
+                  {isVerificationPhase ? '已確認' : isStudyingPhase ? '已交卷' : '參與者'}
                 </p>
               </div>
             </div>
@@ -374,6 +419,29 @@ export const AdminMonitor: React.FC = () => {
               <p className="text-xs text-muted-foreground text-center">
                 {readyPercentage.toFixed(0)}% 的參與者已確認
               </p>
+            </div>
+          )}
+
+          {/* Progress bar for study phase - show submission progress */}
+          {isStudyingPhase && studyProgressStats.total > 0 && (
+            <div className="mt-4 space-y-2">
+              <Progress 
+                value={studySubmissionPercentage} 
+                className={`h-2 ${studyProgressStats.completed === studyProgressStats.total ? 'bg-accent/20' : ''}`}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>
+                  🔴 尚未開始: {studyProgressStats.notStarted} | 
+                  🟡 進行中: {studyProgressStats.inProgress} | 
+                  🟢 已完成: {studyProgressStats.completed}
+                </span>
+                <span>{studySubmissionPercentage.toFixed(0)}%</span>
+              </div>
+              {studyProgressStats.completed === studyProgressStats.total && (
+                <div className="text-center py-2 px-4 bg-accent/10 rounded-lg border border-accent/30">
+                  <p className="text-sm font-medium text-accent">🎉 全員交卷完成！</p>
+                </div>
+              )}
             </div>
           )}
 

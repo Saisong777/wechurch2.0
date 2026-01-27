@@ -196,6 +196,7 @@ export type Database = {
           grouping_method: string | null
           id: string
           owner_id: string | null
+          short_code: string | null
           status: string
           verse_reference: string
         }
@@ -206,6 +207,7 @@ export type Database = {
           grouping_method?: string | null
           id?: string
           owner_id?: string | null
+          short_code?: string | null
           status?: string
           verse_reference: string
         }
@@ -216,6 +218,7 @@ export type Database = {
           grouping_method?: string | null
           id?: string
           owner_id?: string | null
+          short_code?: string | null
           status?: string
           verse_reference?: string
         }
@@ -457,6 +460,7 @@ export type Database = {
           group_size: number | null
           grouping_method: string | null
           id: string | null
+          short_code: string | null
           status: string | null
           verse_reference: string | null
         }
@@ -466,6 +470,7 @@ export type Database = {
           group_size?: number | null
           grouping_method?: string | null
           id?: string | null
+          short_code?: string | null
           status?: string | null
           verse_reference?: string | null
         }
@@ -475,6 +480,7 @@ export type Database = {
           group_size?: number | null
           grouping_method?: string | null
           id?: string | null
+          short_code?: string | null
           status?: string | null
           verse_reference?: string | null
         }
@@ -640,6 +646,7 @@ export type Database = {
         Args: { p_email: string; p_session_id: string }
         Returns: boolean
       }
+      generate_short_code: { Args: never; Returns: string }
       get_participant_for_reentry: {
         Args: { p_email: string; p_session_id: string }
         Returns: {

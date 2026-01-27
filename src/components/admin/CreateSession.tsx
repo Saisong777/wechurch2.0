@@ -23,10 +23,11 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdSessionId, setCreatedSessionId] = useState('');
+  const [createdShortCode, setCreatedShortCode] = useState('');
   const [createdVerseRef, setCreatedVerseRef] = useState('');
 
-  // Build the join URL dynamically
-  const joinUrl = createdSessionId ? getSessionJoinUrl(createdSessionId) : '';
+  // Build the join URL dynamically using short code
+  const joinUrl = createdShortCode ? getSessionJoinUrl(createdShortCode) : '';
 
   const handleCreate = async () => {
     if (!user) {
@@ -55,6 +56,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
 
     setCurrentSession({
       id: data.id,
+      shortCode: data.short_code,
       bibleVerse: '',
       verseReference: data.verse_reference,
       status: data.status as 'waiting' | 'grouping' | 'studying' | 'completed',
@@ -65,15 +67,16 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
     
     // Show success modal with QR code
     setCreatedSessionId(data.id);
+    setCreatedShortCode(data.short_code || data.id.slice(0, 8));
     setCreatedVerseRef(data.verse_reference);
     setShowSuccessModal(true);
     
     setIsCreating(false);
   };
 
-  const handleCopyId = () => {
-    navigator.clipboard.writeText(createdSessionId);
-    toast.success('Session ID 已複製！');
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(createdShortCode);
+    toast.success('課程代碼已複製！');
   };
 
   const handleDownloadQR = () => {
@@ -91,7 +94,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
       ctx?.drawImage(img, 0, 0);
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
-      downloadLink.download = `bible-study-${createdSessionId.slice(0, 8)}.png`;
+      downloadLink.download = `soul-gym-${createdShortCode}.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -179,18 +182,18 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
               />
             </div>
             
-            {/* Session ID with copy */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
-              <span className="text-sm font-mono text-muted-foreground">
-                ID: {createdSessionId.slice(0, 8)}...
+            {/* Short Code with copy */}
+            <div className="flex items-center gap-3 px-5 py-3 bg-muted rounded-xl">
+              <span className="text-2xl font-mono font-bold tracking-widest text-foreground">
+                {createdShortCode}
               </span>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyId}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopyCode}>
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
             
             <p className="text-sm text-muted-foreground text-center">
-              掃描 QR Code 或輸入 Session ID 加入聚會
+              掃描 QR Code 或輸入 4 碼代碼加入課程
             </p>
             
             {/* Action buttons */}

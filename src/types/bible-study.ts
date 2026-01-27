@@ -11,6 +11,7 @@ export interface User {
 
 export interface Session {
   id: string;
+  shortCode?: string;
   bibleVerse: string;
   verseReference: string;
   status: 'waiting' | 'grouping' | 'verification' | 'studying' | 'completed';

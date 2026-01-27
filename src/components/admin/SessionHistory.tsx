@@ -23,6 +23,7 @@ import { getSessionJoinUrl } from '@/lib/url-helpers';
 
 interface PastSession {
   id: string;
+  short_code: string | null;
   verse_reference: string;
   status: string;
   created_at: string;
@@ -52,7 +53,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
       // First get sessions
       const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
-        .select('id, verse_reference, status, created_at')
+        .select('id, short_code, verse_reference, status, created_at')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -114,8 +115,9 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
 
   const handleCopyId = () => {
     if (!selectedSession) return;
-    navigator.clipboard.writeText(selectedSession.id);
-    toast.success('Session ID 已複製！');
+    const codeToCopy = selectedSession.short_code || selectedSession.id;
+    navigator.clipboard.writeText(codeToCopy);
+    toast.success('課程代碼已複製！');
   };
 
   const handleDownloadQR = () => {
@@ -134,7 +136,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
       ctx?.drawImage(img, 0, 0);
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
-      downloadLink.download = `bible-study-${selectedSession.id.slice(0, 8)}.png`;
+      downloadLink.download = `soul-gym-${selectedSession.short_code || selectedSession.id.slice(0, 8)}.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -290,7 +292,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               >
                 <QRCodeSVG
                   id="session-history-qr"
-                  value={getSessionJoinUrl(selectedSession.id)}
+                  value={getSessionJoinUrl(selectedSession.short_code || selectedSession.id)}
                   size={isExpanded ? 350 : 200}
                   level="H"
                   includeMargin
@@ -299,14 +301,22 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                 />
               </div>
               
+              {/* Short Code prominently displayed */}
+              {selectedSession.short_code && (
+                <div className="text-center">
+                  <p className="text-3xl font-mono font-bold tracking-[0.3em]">{selectedSession.short_code}</p>
+                  <p className="text-xs text-muted-foreground mt-1">課程代碼</p>
+                </div>
+              )}
+              
               <p className="text-sm text-muted-foreground text-center">
                 {isExpanded ? '點擊縮小' : '點擊放大 QR Code'}
               </p>
               
-              {/* Session ID with copy */}
+              {/* Short Code with copy */}
               <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
-                <span className="text-sm font-mono text-muted-foreground">
-                  ID: {selectedSession.id.slice(0, 8)}...
+                <span className="text-lg font-mono font-bold">
+                  {selectedSession.short_code || selectedSession.id.slice(0, 8)}
                 </span>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyId}>
                   <Copy className="w-4 h-4" />
