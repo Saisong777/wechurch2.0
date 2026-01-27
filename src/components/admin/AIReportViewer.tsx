@@ -52,7 +52,21 @@ function cleanMarkdown(text: string): string {
 // Parse report content into structured sections
 function parseReportContent(content: string): GroupReport[] {
   const sections: GroupReport[] = [];
-  const seenGroups = new Set<number>();
+  const groupIndex = new Map<number, number>();
+
+  const getScore = (s: Partial<GroupReport>) => {
+    const len = (v?: string) => (v ? v.trim().length : 0);
+    // Prefer structured sections heavily; raw-only headers will score low.
+    return (
+      len(s.themes) +
+      len(s.observations) +
+      len(s.insights) +
+      len(s.applications) +
+      Math.min(len(s.raw), 400) +
+      (s.members ? 50 : 0) +
+      (s.verse ? 20 : 0)
+    );
+  };
 
   // Split by group separators if multiple groups
   const groupReports = content.split(/={40,}/);
@@ -66,10 +80,6 @@ function parseReportContent(content: string): GroupReport[] {
     const groupMatch = groupReport.match(/第\s*(\d+)\s*組(?:報告)?/);
     if (groupMatch) {
       const groupNum = parseInt(groupMatch[1], 10);
-      // Skip if we've already seen this group number
-      if (seenGroups.has(groupNum)) continue;
-      seenGroups.add(groupNum);
-      
       section.groupNumber = groupNum;
       section.groupInfo = `第 ${groupMatch[1]} 組`;
     }
@@ -112,9 +122,20 @@ function parseReportContent(content: string): GroupReport[] {
     
     // Store raw content as fallback - also cleaned
     section.raw = cleanMarkdown(groupReport);
-    
-    if (section.groupNumber) {
-      sections.push(section as GroupReport);
+
+    // If this chunk is just the injected header (e.g. "第 4 組報告") it will have a very low score.
+    // We still allow it in temporarily, but will replace it with a richer chunk if we later parse one.
+    if (section.groupNumber && section.groupNumber > 0) {
+      const idx = groupIndex.get(section.groupNumber);
+      if (idx === undefined) {
+        groupIndex.set(section.groupNumber, sections.length);
+        sections.push(section as GroupReport);
+      } else {
+        const existing = sections[idx];
+        if (getScore(section) > getScore(existing)) {
+          sections[idx] = section as GroupReport;
+        }
+      }
     } else if (section.raw && section.raw.length > 50) {
       // For overall reports or ungrouped content - only if substantial
       sections.push({ groupNumber: 0, raw: section.raw, ...section });
