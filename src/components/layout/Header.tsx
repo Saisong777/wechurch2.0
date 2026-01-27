@@ -12,7 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogIn, LogOut, BookMarked, User } from 'lucide-react';
+import { LogOut, BookMarked, User, Settings } from 'lucide-react';
+import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 
 interface HeaderProps {
   title?: string;
@@ -31,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -114,7 +116,10 @@ export const Header: React.FC<HeaderProps> = ({
                       我的筆記本
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowProfileSettings(true)} className="cursor-pointer">
+                    <Settings className="w-4 h-4 mr-2" />
+                    個人設定
+                  </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={handleSignOut}
                     className="text-destructive focus:text-destructive cursor-pointer"
@@ -137,6 +142,11 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+      
+      <ProfileSettingsDialog 
+        open={showProfileSettings} 
+        onOpenChange={setShowProfileSettings} 
+      />
     </header>
   );
 };
