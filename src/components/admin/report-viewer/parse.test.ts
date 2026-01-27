@@ -85,11 +85,13 @@ describe('parseReportContent', () => {
       const content = `
 第 3 組報告
 
+**組員：** 王弟兄、李姊妹
+
 **📖 主題（Themes）：**
-恩典與真理
+恩典與真理是我們今天學習的重點
 
 **🔍 事實發現（Observations）：**
-耶穌是道路
+耶穌是道路、真理、生命
       `;
 
       const result = parseReportContent(content);
@@ -239,8 +241,10 @@ describe('parseReportContent', () => {
       const content = `
 第 6 組報告
 
-這是一份沒有標準格式的報告內容
-只有純文字
+**組員：** 王弟兄、李姊妹、張弟兄
+
+這是一份沒有標準格式的報告內容，但是有足夠的長度讓解析器認為它是有意義的內容
+只有純文字沒有特別的結構化欄位
       `;
 
       const result = parseReportContent(content);
@@ -250,17 +254,43 @@ describe('parseReportContent', () => {
     });
 
     it('should handle group numbers with various spacing', () => {
+      // Each variant needs enough content to pass the score threshold
       const contentVariants = [
-        '第1組報告',
-        '第 1 組報告',
-        '第  1  組報告',
-        '第1組',
+        '第1組報告\n\n**組員：** 王弟兄、李姊妹\n\n**📖 主題：**\n主題內容',
+        '第 1 組報告\n\n**組員：** 王弟兄、李姊妹\n\n**📖 主題：**\n主題內容',
+        '第  1  組報告\n\n**組員：** 王弟兄、李姊妹\n\n**📖 主題：**\n主題內容',
+        '第1組\n\n**組員：** 王弟兄、李姊妹\n\n**📖 主題：**\n主題內容',
       ];
 
       contentVariants.forEach(content => {
         const result = parseReportContent(content);
         expect(result[0].groupNumber).toBe(1);
       });
+    });
+
+    it('should handle Chinese numeral group numbers', () => {
+      const content = `
+**組別：** 第一組
+**組員：** 松小貓、陳俊傑
+**已分析筆記數：** 2/2
+**查經經文：** 太 3:1-4
+
+---
+
+**📖 主題：**
+• 松小貓：test
+• 陳俊傑：信心的飛躍
+
+**🔍 事實發現：**
+• 陳俊傑：發現神的信實貫穿整個故事
+      `;
+
+      const result = parseReportContent(content);
+      
+      expect(result).toHaveLength(1);
+      expect(result[0].groupNumber).toBe(1);
+      expect(result[0].groupInfo).toBe('第 1 組');
+      expect(result[0].members).toBe('松小貓、陳俊傑');
     });
   });
 
