@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Copy, Download, ChevronDown, Users, FileText, FileDown, Printer } from 'lucide-react';
-import { EnhancedSection } from '../ReportVisualElements';
+import { EnhancedSection } from '../report-elements';
 import { GroupReport } from './parse';
 
 interface GroupSectionProps {

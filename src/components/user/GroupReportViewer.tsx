@@ -9,7 +9,7 @@ import {
   EnhancedSection, 
   extractKeywords,
   KeywordTagCloud 
-} from '@/components/admin/ReportVisualElements';
+} from '@/components/admin/report-elements';
 import {
   parseReportContent as parseReportContentFull,
   generateSectionMarkdown,
