@@ -48,6 +48,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { parseReportContent, GroupReport } from './report-viewer/parse';
 import { EnhancedSection } from './report-elements';
+import { OverallReportCharts } from './report-viewer/OverallReportCharts';
 
 interface AIReport {
   id: string;
@@ -392,40 +393,7 @@ export const HistoryBrowser: React.FC = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-6 pr-4">
-                  {/* Overall Report First - with enhanced formatting */}
-                  {selectedSession.aiReports
-                    .filter(r => r.report_type === 'overall' || r.group_number === 0)
-                    .map(report => (
-                      <HistoryReportSection 
-                        key={report.id}
-                        report={report}
-                        variant="overall"
-                      />
-                    ))}
-
-                  {/* Separator if both overall and group reports exist */}
-                  {selectedSession.aiReports.some(r => r.report_type === 'overall' || r.group_number === 0) &&
-                   selectedSession.aiReports.some(r => r.report_type === 'group' && r.group_number !== 0) && (
-                    <div className="relative py-2">
-                      <Separator />
-                      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
-                        各組報告
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Group Reports - with enhanced formatting */}
-                  {selectedSession.aiReports
-                    .filter(r => r.report_type === 'group' && r.group_number !== 0)
-                    .map(report => (
-                      <HistoryReportSection 
-                        key={report.id}
-                        report={report}
-                        variant="group"
-                      />
-                    ))}
-                </div>
+                <HistoryReportsWithCharts reports={selectedSession.aiReports} />
               )}
             </ScrollArea>
           </TabsContent>
@@ -725,6 +693,106 @@ const ResponseCard: React.FC<{
         )}
       </CardContent>
     </Card>
+  );
+};
+
+// History Reports with Charts Wrapper
+interface HistoryReportsWithChartsProps {
+  reports: AIReport[];
+}
+
+const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ reports }) => {
+  const groupReports = reports.filter(r => r.report_type === 'group' && r.group_number !== 0);
+  const overallReport = reports.find(r => r.report_type === 'overall' || r.group_number === 0);
+  
+  // Parse group reports for chart visualization
+  const parsedGroupReports: GroupReport[] = useMemo(() => {
+    return groupReports.map(r => {
+      const parsed = parseReportContent(r.content);
+      const section: GroupReport = parsed[0] || {
+        groupNumber: 0, members: '', verse: '', themes: '',
+        observations: '', insights: '', applications: '', contributions: '', raw: ''
+      };
+      return {
+        groupNumber: r.group_number || 0,
+        members: section.members || '',
+        verse: section.verse || '',
+        themes: section.themes || '',
+        observations: section.observations || '',
+        insights: section.insights || '',
+        applications: section.applications || '',
+        contributions: section.contributions || '',
+        raw: r.content,
+      };
+    });
+  }, [groupReports]);
+  
+  // Parse overall report for chart
+  const parsedOverallReport: GroupReport | undefined = useMemo(() => {
+    if (!overallReport) return undefined;
+    const parsed = parseReportContent(overallReport.content);
+    const section: GroupReport = parsed[0] || {
+      groupNumber: 0, members: '', verse: '', themes: '',
+      observations: '', insights: '', applications: '', contributions: '', raw: ''
+    };
+    return {
+      groupNumber: 0,
+      members: section.members || '',
+      verse: section.verse || '',
+      themes: section.themes || '',
+      observations: section.observations || '',
+      insights: section.insights || '',
+      applications: section.applications || '',
+      contributions: section.contributions || '',
+      raw: overallReport.content,
+    };
+  }, [overallReport]);
+  
+  const hasMultipleGroups = groupReports.length >= 2;
+  
+  return (
+    <div className="space-y-6 pr-4">
+      {/* Visualization Charts - only show if multiple groups exist */}
+      {hasMultipleGroups && (
+        <OverallReportCharts 
+          groupReports={parsedGroupReports}
+          overallReport={parsedOverallReport}
+        />
+      )}
+      
+      {/* Overall Report First - with enhanced formatting */}
+      {reports
+        .filter(r => r.report_type === 'overall' || r.group_number === 0)
+        .map(report => (
+          <HistoryReportSection 
+            key={report.id}
+            report={report}
+            variant="overall"
+          />
+        ))}
+
+      {/* Separator if both overall and group reports exist */}
+      {reports.some(r => r.report_type === 'overall' || r.group_number === 0) &&
+       reports.some(r => r.report_type === 'group' && r.group_number !== 0) && (
+        <div className="relative py-2">
+          <Separator />
+          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
+            各組報告
+          </span>
+        </div>
+      )}
+
+      {/* Group Reports - with enhanced formatting */}
+      {reports
+        .filter(r => r.report_type === 'group' && r.group_number !== 0)
+        .map(report => (
+          <HistoryReportSection 
+            key={report.id}
+            report={report}
+            variant="group"
+          />
+        ))}
+    </div>
   );
 };
 
