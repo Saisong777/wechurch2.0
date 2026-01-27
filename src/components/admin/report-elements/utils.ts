@@ -114,8 +114,8 @@ export function parseInsightsWithQuotes(text: string): { quote: string; author?:
   
   const quotes: { quote: string; author?: string }[] = [];
   
-  // Pattern: Name + 提到/分享/說/認為 + content
-  const attributionPattern = /([^\n。，]+?(?:弟兄|姊妹|姐妹|同學|老師))(?:提到|分享|說|認為|指出|表示)[：:「「]?\s*([^」」\n]+)/g;
+  // Pattern: Name + 提到/分享/說/認為 + content (more flexible matching)
+  const attributionPattern = /([^\n。，\s]+?(?:弟兄|姊妹|姐妹|同學|老師))(?:提到|分享|說|認為|指出|表示|強調|觀察到|注意到|發現)?[：:「「]?\s*([^」」\n]+)/g;
   
   let match;
   while ((match = attributionPattern.exec(text)) !== null) {
