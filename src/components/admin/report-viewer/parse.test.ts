@@ -314,17 +314,6 @@ describe('parseReportContent', () => {
 * 郭小萱：觀察到群眾反應與耶穌的對比，並因第五節而重新思考信仰。
 * 周俊宏：觀察到勇敢的人面對困難，並對經文有深刻的觸動。`;
 
-      // Debug: Test the regex directly
-      const insightRegex = /\*{0,2}💡?\s*獨特亮光(?:（Unique Insights）)?[：:\s]*\*{0,2}\s*/i;
-      const match = content.match(insightRegex);
-      console.log('Regex match:', match);
-      if (match) {
-        const startIdx = match.index! + match[0].length;
-        const endIdx = content.indexOf('**🎯', startIdx);
-        console.log('Start idx:', startIdx, 'End idx:', endIdx);
-        console.log('Extracted:', content.slice(startIdx, endIdx));
-      }
-
       const result = parseReportContent(content);
       
       expect(result).toHaveLength(1);

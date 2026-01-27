@@ -137,17 +137,32 @@ export function parseReportContent(content: string): GroupReport[] {
       let endIdx = text.length;
       
       // Find the earliest next section marker
+      // Section headers must start at the beginning of a line (after newline)
+      // and be formatted as **emoji** or emoji at line start
       for (const marker of endMarkers) {
-        const markerIdx = text.indexOf(marker, startIdx);
-        if (markerIdx !== -1 && markerIdx < endIdx) {
-          endIdx = markerIdx;
+        // Create patterns for section headers that:
+        // 1. Start at beginning of line (after \n)
+        // 2. Have the marker at line start, not as part of list content
+        const emojiChar = marker.replace(/\*\*/g, '');
+        // Match: newline followed by optional ** and the emoji
+        const headerPattern = new RegExp(`\\n\\*{0,2}${emojiChar}[^\\n]*[：:]`, 'i');
+        const markerMatch = text.slice(startIdx).match(headerPattern);
+        if (markerMatch && markerMatch.index !== undefined) {
+          // +1 to not include the newline in the content
+          const absoluteIdx = startIdx + markerMatch.index + 1;
+          if (absoluteIdx < endIdx) {
+            endIdx = absoluteIdx;
+          }
         }
       }
       
-      // Also look for "---" separator
-      const dashIdx = text.indexOf('---', startIdx);
-      if (dashIdx !== -1 && dashIdx < endIdx) {
-        endIdx = dashIdx;
+      // Also look for "---" separator on its own line
+      const dashMatch = text.slice(startIdx).match(/\n---(?:\n|$)/);
+      if (dashMatch && dashMatch.index !== undefined) {
+        const absoluteDashIdx = startIdx + dashMatch.index;
+        if (absoluteDashIdx < endIdx) {
+          endIdx = absoluteDashIdx;
+        }
       }
       
       return text.slice(startIdx, endIdx).trim();
