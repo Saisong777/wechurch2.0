@@ -39,13 +39,13 @@ const Index = () => {
             </div>
             
             <h1 className="font-serif text-4xl md:text-6xl font-bold text-foreground mb-4">
-              即時互動查經平台
+              靈魂健身房
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Real-time Interactive Bible Study Platform
+              Soul Gym
             </p>
             <p className="text-muted-foreground mt-4 max-w-lg mx-auto">
-              透過智慧分組和 AI 分析，讓查經小組更有效率、更有收穫
+              一起，活出耶穌一樣的豐盛生命
             </p>
           </div>
 
