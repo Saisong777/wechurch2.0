@@ -10,12 +10,6 @@ import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculate
 import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -32,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StudyProgressMonitor } from './StudyProgressMonitor';
 import { MockDataGenerator } from './MockDataGenerator';
+import { AIReportViewer } from './AIReportViewer';
 
 export const AdminMonitor: React.FC = () => {
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
@@ -734,30 +729,13 @@ export const AdminMonitor: React.FC = () => {
         </Tabs>
       )}
 
-      {/* Report Dialog */}
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-secondary" />
-              AI 分析報告
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="h-[60vh] pr-4">
-            <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-              {reportContent}
-            </div>
-          </ScrollArea>
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={handleCopyReport}>
-              複製報告
-            </Button>
-            <Button variant="gold" onClick={() => setShowReportDialog(false)}>
-              關閉
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* AI Report Viewer */}
+      <AIReportViewer
+        open={showReportDialog}
+        onOpenChange={setShowReportDialog}
+        reportContent={reportContent}
+        verseReference={currentSession?.verseReference}
+      />
     </div>
   );
 };
