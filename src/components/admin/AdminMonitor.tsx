@@ -460,29 +460,31 @@ export const AdminMonitor: React.FC = () => {
             </div>
           )}
 
-          {/* Icebreaker Toggle - show before grouping or during verification */}
-          {(!isStudyingPhase || isVerificationPhase) && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Gamepad2 className="w-4 h-4 text-muted-foreground" />
-                  <Label htmlFor="enable-icebreaker" className="text-sm cursor-pointer">
-                    啟用破冰遊戲
-                  </Label>
-                </div>
-                <Switch
-                  id="enable-icebreaker"
-                  checked={icebreakerEnabled}
-                  onCheckedChange={handleToggleIcebreaker}
-                />
+          {/* Icebreaker Toggle - show during verification or studying phase */}
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Gamepad2 className="w-4 h-4 text-muted-foreground" />
+                <Label htmlFor="enable-icebreaker" className="text-sm cursor-pointer">
+                  啟用破冰卡牌
+                </Label>
               </div>
-              {icebreakerEnabled && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  🎮 分組確認後會進入破冰遊戲環節
-                </p>
-              )}
+              <Switch
+                id="enable-icebreaker"
+                checked={icebreakerEnabled}
+                onCheckedChange={handleToggleIcebreaker}
+              />
             </div>
-          )}
+            {icebreakerEnabled && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {isVerificationPhase 
+                  ? '🎮 分組確認後會進入破冰卡牌環節'
+                  : isStudyingPhase
+                    ? '🎮 破冰卡牌已開啟，參與者可在健身前進行破冰'
+                    : '🎮 分組後將進入破冰卡牌環節'}
+              </p>
+            )}
+          </div>
 
           {/* Allow Latecomers Toggle */}
           {(isVerificationPhase || isStudyingPhase) && (
