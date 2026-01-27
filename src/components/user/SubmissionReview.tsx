@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
-import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, Pencil } from 'lucide-react';
+import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, Pencil, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudyResponse } from '@/hooks/useStudyResponse';
@@ -22,8 +22,35 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
   });
   const [activeTab, setActiveTab] = useState<'personal' | 'group'>('personal');
 
+  // Avoid blank screen: show a visible loading/empty state while the response is being fetched
   if (!response) {
-    return null;
+    return (
+      <div className="w-full max-w-2xl mx-auto space-y-6 animate-fade-in">
+        <Card variant="highlight" className="text-center">
+          <CardContent className="py-10 space-y-4">
+            <div className="w-16 h-16 rounded-full gradient-gold mx-auto flex items-center justify-center glow-gold">
+              <Loader2 className="w-8 h-8 text-secondary-foreground animate-spin" />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="font-serif text-2xl font-bold text-foreground">正在載入你的筆記…</h2>
+              <p className="text-muted-foreground">
+                若一直沒有出現，請先點「返回修改」再按一次完成。
+              </p>
+            </div>
+
+            {onEdit && (
+              <div className="flex justify-center pt-2">
+                <Button variant="outline" onClick={onEdit} className="gap-2">
+                  <Pencil className="w-4 h-4" />
+                  返回修改
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const selectedCategory = INSIGHT_CATEGORIES.find(c => c.value === response.core_insight_category);
