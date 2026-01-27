@@ -11,6 +11,7 @@ import { AdminPage } from "./pages/AdminPage";
 import CRMPage from "./pages/CRMPage";
 import NotebookPage from "./pages/NotebookPage";
 import { IcebreakerPage } from "./pages/IcebreakerPage";
+import PrayerWallPage from "./pages/PrayerWallPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/admin/crm" element={<CRMPage />} />
               <Route path="/notebook" element={<NotebookPage />} />
               <Route path="/icebreaker" element={<IcebreakerPage />} />
+              <Route path="/prayer-wall" element={<PrayerWallPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

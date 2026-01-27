@@ -279,6 +279,63 @@ export type Database = {
         }
         Relationships: []
       }
+      prayer_amens: {
+        Row: {
+          created_at: string
+          prayer_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          prayer_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          prayer_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prayer_amens_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "prayers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prayer_amens_prayer_id_fkey"
+            columns: ["prayer_id"]
+            isOneToOne: false
+            referencedRelation: "v_prayer_wall"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prayers: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_anonymous: boolean
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_anonymous?: boolean
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_anonymous?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -768,6 +825,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_prayer_wall: {
+        Row: {
+          amen_count: number | null
+          author_avatar: string | null
+          author_name: string | null
+          content: string | null
+          created_at: string | null
+          has_amened: boolean | null
+          id: string | null
+          is_anonymous: boolean | null
+          is_owner: boolean | null
+          user_id: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
