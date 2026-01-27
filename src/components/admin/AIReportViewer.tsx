@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -8,8 +8,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Sparkles, Copy, Printer, Download, X, BookOpen, Lightbulb, Target, Search } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sparkles, Copy, Printer, Download, BookOpen, Lightbulb, Target, Search, FileText, ChevronDown, Users, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface GroupReport {
+  groupNumber: number;
+  groupInfo?: string;
+  members?: string;
+  verse?: string;
+  themes?: string;
+  observations?: string;
+  insights?: string;
+  applications?: string;
+  raw: string;
+}
 
 interface AIReportViewerProps {
   open: boolean;
@@ -19,17 +40,8 @@ interface AIReportViewerProps {
 }
 
 // Parse report content into structured sections
-function parseReportContent(content: string) {
-  const sections: {
-    groupInfo?: string;
-    members?: string;
-    verse?: string;
-    themes?: string;
-    observations?: string;
-    insights?: string;
-    applications?: string;
-    raw?: string;
-  }[] = [];
+function parseReportContent(content: string): GroupReport[] {
+  const sections: GroupReport[] = [];
 
   // Split by group separators if multiple groups
   const groupReports = content.split(/={40,}/);
@@ -37,11 +49,12 @@ function parseReportContent(content: string) {
   for (const groupReport of groupReports) {
     if (!groupReport.trim()) continue;
     
-    const section: typeof sections[0] = {};
+    const section: Partial<GroupReport> = {};
     
-    // Extract group info
-    const groupMatch = groupReport.match(/第\s*(\d+)\s*組報告/);
+    // Extract group number
+    const groupMatch = groupReport.match(/第\s*(\d+)\s*組(?:報告)?/);
     if (groupMatch) {
+      section.groupNumber = parseInt(groupMatch[1], 10);
       section.groupInfo = `第 ${groupMatch[1]} 組`;
     }
     
@@ -84,10 +97,232 @@ function parseReportContent(content: string) {
     // Store raw content as fallback
     section.raw = groupReport.trim();
     
-    sections.push(section);
+    if (section.groupNumber) {
+      sections.push(section as GroupReport);
+    } else if (section.raw) {
+      // For overall reports or ungrouped content
+      sections.push({ groupNumber: 0, raw: section.raw, ...section });
+    }
   }
   
-  return sections.length > 0 ? sections : [{ raw: content }];
+  return sections.length > 0 ? sections : [{ groupNumber: 0, raw: content }];
+}
+
+// Generate print-ready HTML for a single group or all groups
+function generatePrintHTML(sections: GroupReport[], verseReference?: string, singleGroup?: number): string {
+  const filteredSections = singleGroup !== undefined 
+    ? sections.filter(s => s.groupNumber === singleGroup)
+    : sections;
+
+  const styles = `
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&display=swap');
+      
+      * { box-sizing: border-box; }
+      
+      body {
+        font-family: 'Noto Serif TC', serif;
+        line-height: 1.9;
+        color: #1a1a2e;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px;
+        background: #fff;
+      }
+      
+      .print-header {
+        text-align: center;
+        margin-bottom: 36px;
+        padding-bottom: 28px;
+        border-bottom: 3px solid #16a085;
+      }
+      
+      .print-header h1 {
+        font-size: 26px;
+        color: #16a085;
+        margin: 0 0 12px 0;
+        letter-spacing: 2px;
+      }
+      
+      .print-header p {
+        font-size: 15px;
+        color: #666;
+        margin: 0;
+      }
+      
+      .group-section {
+        margin-bottom: 48px;
+        page-break-inside: avoid;
+      }
+      
+      .group-header {
+        background: linear-gradient(135deg, #16a085 0%, #1abc9c 100%);
+        color: white;
+        padding: 18px 28px;
+        border-radius: 10px 10px 0 0;
+        margin-bottom: 0;
+      }
+      
+      .group-header h2 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 1px;
+      }
+      
+      .group-meta {
+        background: #f0fdf4;
+        padding: 18px 28px;
+        border: 1px solid #e0f2f1;
+        border-top: none;
+        border-radius: 0 0 0 0;
+      }
+      
+      .group-meta p {
+        margin: 6px 0;
+        font-size: 14px;
+        color: #555;
+      }
+      
+      .section {
+        margin: 24px 0;
+        padding: 22px 28px;
+        background: #fafafa;
+        border-left: 5px solid #16a085;
+        border-radius: 0 10px 10px 0;
+      }
+      
+      .section h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 14px 0;
+        font-size: 17px;
+        color: #16a085;
+        font-weight: 600;
+      }
+      
+      .section-content {
+        font-size: 15px;
+        color: #333;
+        white-space: pre-wrap;
+        line-height: 1.9;
+      }
+      
+      .section.themes { border-left-color: #22c55e; }
+      .section.themes h3 { color: #16a34a; }
+      
+      .section.observations { border-left-color: #16a085; }
+      .section.observations h3 { color: #0d9488; }
+      
+      .section.insights {
+        background: #fffbeb;
+        border-left-color: #f59e0b;
+      }
+      .section.insights h3 { color: #d97706; }
+      
+      .section.applications {
+        background: #eff6ff;
+        border-left-color: #3b82f6;
+      }
+      .section.applications h3 { color: #2563eb; }
+      
+      .footer {
+        margin-top: 48px;
+        padding-top: 24px;
+        border-top: 2px solid #e0e0e0;
+        text-align: center;
+        font-size: 13px;
+        color: #999;
+      }
+      
+      @media print {
+        body { padding: 24px; }
+        .group-section { page-break-inside: avoid; }
+        .print-header { page-break-after: avoid; }
+      }
+    </style>
+  `;
+  
+  const groupsHTML = filteredSections.map(section => {
+    const hasStructuredContent = section.themes || section.observations || section.insights || section.applications;
+    
+    return `
+      <div class="group-section">
+        ${section.groupInfo ? `
+          <div class="group-header">
+            <h2>📚 ${section.groupInfo}</h2>
+          </div>
+        ` : ''}
+        
+        ${(section.members || section.verse) ? `
+          <div class="group-meta">
+            ${section.members ? `<p><strong>👥 組員：</strong>${section.members}</p>` : ''}
+            ${section.verse ? `<p><strong>📖 經文：</strong>${section.verse}</p>` : ''}
+          </div>
+        ` : ''}
+        
+        ${hasStructuredContent ? `
+          ${section.themes ? `
+            <div class="section themes">
+              <h3>📖 主題 Themes</h3>
+              <div class="section-content">${section.themes}</div>
+            </div>
+          ` : ''}
+          
+          ${section.observations ? `
+            <div class="section observations">
+              <h3>🔍 事實發現 Observations</h3>
+              <div class="section-content">${section.observations}</div>
+            </div>
+          ` : ''}
+          
+          ${section.insights ? `
+            <div class="section insights">
+              <h3>💡 獨特亮光 Unique Insights</h3>
+              <div class="section-content">${section.insights}</div>
+            </div>
+          ` : ''}
+          
+          ${section.applications ? `
+            <div class="section applications">
+              <h3>🎯 如何應用 Applications</h3>
+              <div class="section-content">${section.applications}</div>
+            </div>
+          ` : ''}
+        ` : `
+          <div class="section">
+            <div class="section-content">${section.raw}</div>
+          </div>
+        `}
+      </div>
+    `;
+  }).join('');
+  
+  const title = singleGroup !== undefined 
+    ? `第 ${singleGroup} 組查經報告`
+    : '共同查經分析報告';
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${title} - ${verseReference || '靈魂健身房'}</title>
+        ${styles}
+      </head>
+      <body>
+        <div class="print-header">
+          <h1>🧠 ${title}</h1>
+          <p>${verseReference || ''} | ${new Date().toLocaleDateString('zh-TW')}</p>
+        </div>
+        ${groupsHTML}
+        <div class="footer">
+          <p>此報告由 靈魂健身房 AI 分析助理 生成</p>
+          <p>${new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</p>
+        </div>
+      </body>
+    </html>
+  `;
 }
 
 export const AIReportViewer: React.FC<AIReportViewerProps> = ({
@@ -97,173 +332,32 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   verseReference,
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState('all');
   
-  const handleCopy = () => {
+  const parsedSections = reportContent ? parseReportContent(reportContent) : [];
+  const hasMultipleGroups = parsedSections.length > 1 && parsedSections[0].groupNumber > 0;
+  
+  const handleCopyAll = () => {
     if (reportContent) {
       navigator.clipboard.writeText(reportContent);
       toast.success('報告已複製到剪貼簿！');
     }
   };
+
+  const handleCopyGroup = (groupNumber: number) => {
+    const section = parsedSections.find(s => s.groupNumber === groupNumber);
+    if (section) {
+      navigator.clipboard.writeText(section.raw);
+      toast.success(`第 ${groupNumber} 組報告已複製！`);
+    }
+  };
   
-  const handlePrint = () => {
+  const handlePrint = (groupNumber?: number) => {
     const printWindow = window.open('', '_blank');
-    if (!printWindow || !printRef.current) return;
+    if (!printWindow) return;
     
-    const styles = `
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&display=swap');
-        
-        * {
-          box-sizing: border-box;
-        }
-        
-        body {
-          font-family: 'Noto Serif TC', serif;
-          line-height: 1.8;
-          color: #1a1a2e;
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 40px;
-          background: #fff;
-        }
-        
-        .print-header {
-          text-align: center;
-          margin-bottom: 32px;
-          padding-bottom: 24px;
-          border-bottom: 2px solid #16a085;
-        }
-        
-        .print-header h1 {
-          font-size: 24px;
-          color: #16a085;
-          margin: 0 0 8px 0;
-        }
-        
-        .print-header p {
-          font-size: 14px;
-          color: #666;
-          margin: 0;
-        }
-        
-        .group-section {
-          margin-bottom: 40px;
-          page-break-inside: avoid;
-        }
-        
-        .group-header {
-          background: linear-gradient(135deg, #16a085 0%, #1abc9c 100%);
-          color: white;
-          padding: 16px 24px;
-          border-radius: 8px 8px 0 0;
-          margin-bottom: 0;
-        }
-        
-        .group-header h2 {
-          margin: 0;
-          font-size: 18px;
-        }
-        
-        .group-meta {
-          background: #f8fffe;
-          padding: 16px 24px;
-          border: 1px solid #e0f2f1;
-          border-top: none;
-        }
-        
-        .group-meta p {
-          margin: 4px 0;
-          font-size: 14px;
-          color: #555;
-        }
-        
-        .section {
-          margin: 24px 0;
-          padding: 20px 24px;
-          background: #fafafa;
-          border-left: 4px solid #16a085;
-          border-radius: 0 8px 8px 0;
-        }
-        
-        .section h3 {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin: 0 0 12px 0;
-          font-size: 16px;
-          color: #16a085;
-        }
-        
-        .section-icon {
-          font-size: 18px;
-        }
-        
-        .section-content {
-          font-size: 14px;
-          color: #333;
-          white-space: pre-wrap;
-        }
-        
-        .section.insights {
-          background: #fffbeb;
-          border-left-color: #f59e0b;
-        }
-        
-        .section.insights h3 {
-          color: #d97706;
-        }
-        
-        .section.applications {
-          background: #eff6ff;
-          border-left-color: #3b82f6;
-        }
-        
-        .section.applications h3 {
-          color: #2563eb;
-        }
-        
-        .footer {
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #e0e0e0;
-          text-align: center;
-          font-size: 12px;
-          color: #999;
-        }
-        
-        @media print {
-          body {
-            padding: 20px;
-          }
-          .group-section {
-            page-break-inside: avoid;
-          }
-        }
-      </style>
-    `;
-    
-    const content = printRef.current.innerHTML;
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>查經分析報告 - ${verseReference || '靈魂健身房'}</title>
-          ${styles}
-        </head>
-        <body>
-          <div class="print-header">
-            <h1>🧠 共同查經分析報告</h1>
-            <p>${verseReference || ''} | ${new Date().toLocaleDateString('zh-TW')}</p>
-          </div>
-          ${content}
-          <div class="footer">
-            <p>此報告由 靈魂健身房 AI 分析助理 生成</p>
-          </div>
-        </body>
-      </html>
-    `);
-    
+    const html = generatePrintHTML(parsedSections, verseReference, groupNumber);
+    printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
     
@@ -272,8 +366,29 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
       printWindow.print();
     }, 500);
   };
+
+  const handleDownloadPDF = (groupNumber?: number) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const html = generatePrintHTML(parsedSections, verseReference, groupNumber);
+    printWindow.document.write(html);
+    printWindow.document.close();
+    
+    const title = groupNumber !== undefined 
+      ? `第${groupNumber}組報告`
+      : '全部報告';
+    
+    toast.info(`正在開啟 PDF 預覽...`, {
+      description: '請使用瀏覽器的「列印」→「另存為 PDF」功能',
+    });
+    
+    setTimeout(() => {
+      printWindow.print();
+    }, 600);
+  };
   
-  const handleDownloadMarkdown = () => {
+  const handleDownloadMarkdownAll = () => {
     if (!reportContent) return;
     
     const blob = new Blob([reportContent], { type: 'text/markdown;charset=utf-8;' });
@@ -286,12 +401,158 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     
     toast.success('Markdown 已下載！');
   };
-  
-  const parsedSections = reportContent ? parseReportContent(reportContent) : [];
+
+  const handleDownloadMarkdownGroup = (groupNumber: number) => {
+    const section = parsedSections.find(s => s.groupNumber === groupNumber);
+    if (!section) return;
+    
+    const blob = new Blob([section.raw], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `第${groupNumber}組報告-${verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast.success(`第 ${groupNumber} 組 Markdown 已下載！`);
+  };
+
+  // Render a single group section
+  const renderGroupSection = (section: GroupReport, showHeader = true) => {
+    const hasStructuredContent = section.themes || section.observations || section.insights || section.applications;
+    
+    return (
+      <div key={section.groupNumber} className="group-section space-y-4">
+        {/* Group Header */}
+        {showHeader && section.groupInfo && (
+          <div className="rounded-t-lg gradient-navy text-primary-foreground px-5 py-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                {section.groupInfo}
+              </h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary-foreground hover:bg-white/20 h-8 px-2"
+                  onClick={() => handleCopyGroup(section.groupNumber)}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary-foreground hover:bg-white/20 h-8 px-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      <ChevronDown className="w-3 h-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleDownloadMarkdownGroup(section.groupNumber)}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      下載 Markdown
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadPDF(section.groupNumber)}>
+                      <FileDown className="w-4 h-4 mr-2" />
+                      下載 PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handlePrint(section.groupNumber)}>
+                      <Printer className="w-4 h-4 mr-2" />
+                      列印此組
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Group Meta Info */}
+        {(section.members || section.verse) && (
+          <div className="bg-muted/50 px-5 py-3 border border-t-0 border-border rounded-b-lg">
+            {section.members && (
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">👥 組員：</span> {section.members}
+              </p>
+            )}
+            {section.verse && (
+              <p className="text-sm text-muted-foreground mt-1">
+                <span className="font-medium text-foreground">📖 經文：</span> {section.verse}
+              </p>
+            )}
+          </div>
+        )}
+        
+        {/* Structured Sections with Spiritual Fitness colors */}
+        {hasStructuredContent ? (
+          <div className="space-y-4">
+            {section.themes && (
+              <div className="p-5 bg-green-50/50 dark:bg-green-950/20 border-l-4 border-green-500 rounded-r-lg">
+                <h3 className="flex items-center gap-2 font-semibold text-green-700 dark:text-green-400 mb-3">
+                  <BookOpen className="w-5 h-5" />
+                  📖 主題 Themes
+                </h3>
+                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
+                  {section.themes}
+                </div>
+              </div>
+            )}
+            
+            {section.observations && (
+              <div className="p-5 bg-teal-50/50 dark:bg-teal-950/20 border-l-4 border-teal-500 rounded-r-lg">
+                <h3 className="flex items-center gap-2 font-semibold text-teal-700 dark:text-teal-400 mb-3">
+                  <Search className="w-5 h-5" />
+                  🔍 事實發現 Observations
+                </h3>
+                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
+                  {section.observations}
+                </div>
+              </div>
+            )}
+            
+            {section.insights && (
+              <div className="p-5 bg-yellow-50/50 dark:bg-yellow-950/20 border-l-4 border-yellow-500 rounded-r-lg">
+                <h3 className="flex items-center gap-2 font-semibold text-yellow-700 dark:text-yellow-400 mb-3">
+                  <Lightbulb className="w-5 h-5" />
+                  💡 獨特亮光 Unique Insights
+                </h3>
+                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
+                  {section.insights}
+                </div>
+              </div>
+            )}
+            
+            {section.applications && (
+              <div className="p-5 bg-blue-50/50 dark:bg-blue-950/20 border-l-4 border-blue-500 rounded-r-lg">
+                <h3 className="flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-400 mb-3">
+                  <Target className="w-5 h-5" />
+                  🎯 如何應用 Applications
+                </h3>
+                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
+                  {section.applications}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-5 bg-card border border-border rounded-lg">
+            <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed font-serif">
+              {section.raw}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+      <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-primary/10 to-secondary/10">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2 text-lg">
@@ -307,121 +568,114 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         </DialogHeader>
         
         {/* Toolbar */}
-        <div className="px-6 py-3 border-b bg-muted/30 flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
-            <Copy className="w-4 h-4" />
-            複製
-          </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
-            <Printer className="w-4 h-4" />
-            列印
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadMarkdown} className="gap-2">
-            <Download className="w-4 h-4" />
-            下載 Markdown
-          </Button>
+        <div className="px-6 py-3 border-b bg-muted/30 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleCopyAll} className="gap-2">
+              <Copy className="w-4 h-4" />
+              複製全部
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handlePrint()} className="gap-2">
+              <Printer className="w-4 h-4" />
+              列印全部
+            </Button>
+          </div>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="default" size="sm" className="gap-2">
+                <Download className="w-4 h-4" />
+                下載報告
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={handleDownloadMarkdownAll}>
+                <FileText className="w-4 h-4 mr-2" />
+                全部報告 (Markdown)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownloadPDF()}>
+                <FileDown className="w-4 h-4 mr-2" />
+                全部報告 (PDF)
+              </DropdownMenuItem>
+              
+              {hasMultipleGroups && (
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    個別小組
+                  </div>
+                  {parsedSections.filter(s => s.groupNumber > 0).map(section => (
+                    <DropdownMenuItem 
+                      key={section.groupNumber}
+                      onClick={() => handleDownloadMarkdownGroup(section.groupNumber)}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      第 {section.groupNumber} 組 (Markdown)
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         
-        {/* Report Content */}
-        <ScrollArea className="h-[60vh]">
-          <div className="p-6 space-y-6" ref={printRef}>
-            {parsedSections.map((section, index) => (
-              <div key={index} className="group-section">
-                {/* Group Header */}
-                {section.groupInfo && (
-                  <div className="rounded-t-lg gradient-navy text-primary-foreground px-5 py-3">
-                    <h2 className="font-bold text-lg">{section.groupInfo}</h2>
-                  </div>
-                )}
-                
-                {/* Group Meta Info */}
-                {(section.members || section.verse) && (
-                  <div className="bg-muted/50 px-5 py-3 border border-t-0 border-border">
-                    {section.members && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">組員：</span> {section.members}
-                      </p>
-                    )}
-                    {section.verse && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        <span className="font-medium text-foreground">經文：</span> {section.verse}
-                      </p>
-                    )}
-                  </div>
-                )}
-                
-                {/* Structured Sections */}
-                <div className="space-y-4 mt-4">
-                  {section.themes && (
-                    <div className="p-4 bg-card border border-border rounded-lg">
-                      <h3 className="flex items-center gap-2 font-semibold text-primary mb-2">
-                        <BookOpen className="w-4 h-4" />
-                        📖 主題 Themes
-                      </h3>
-                      <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                        {section.themes}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {section.observations && (
-                    <div className="p-4 bg-card border border-border rounded-lg">
-                      <h3 className="flex items-center gap-2 font-semibold text-primary mb-2">
-                        <Search className="w-4 h-4" />
-                        🔍 事實發現 Observations
-                      </h3>
-                      <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                        {section.observations}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {section.insights && (
-                    <div className="p-4 bg-secondary/10 border border-secondary/30 rounded-lg">
-                      <h3 className="flex items-center gap-2 font-semibold text-secondary mb-2">
-                        <Lightbulb className="w-4 h-4" />
-                        💡 獨特亮光 Unique Insights
-                      </h3>
-                      <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                        {section.insights}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {section.applications && (
-                    <div className="p-4 bg-accent/20 border border-accent/40 rounded-lg">
-                      <h3 className="flex items-center gap-2 font-semibold text-accent-foreground mb-2">
-                        <Target className="w-4 h-4" />
-                        🎯 如何應用 Applications
-                      </h3>
-                      <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                        {section.applications}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Fallback: show raw content if no sections parsed */}
-                  {!section.themes && !section.observations && !section.insights && !section.applications && section.raw && (
-                    <div className="p-4 bg-card border border-border rounded-lg">
-                      <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed font-serif">
-                        {section.raw}
-                      </div>
-                    </div>
-                  )}
+        {/* Content Area */}
+        {hasMultipleGroups ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-6 pt-2 border-b">
+              <TabsList className="h-auto p-1 bg-muted/50 flex-wrap">
+                <TabsTrigger value="all" className="px-4">
+                  全部 ({parsedSections.length} 組)
+                </TabsTrigger>
+                {parsedSections.filter(s => s.groupNumber > 0).map(section => (
+                  <TabsTrigger key={section.groupNumber} value={`group-${section.groupNumber}`}>
+                    第 {section.groupNumber} 組
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+            
+            <ScrollArea className="flex-1 h-[55vh]">
+              <TabsContent value="all" className="mt-0 p-6 space-y-8">
+                <div ref={printRef}>
+                  {parsedSections.map((section, index) => (
+                    <React.Fragment key={section.groupNumber}>
+                      {renderGroupSection(section)}
+                      {index < parsedSections.length - 1 && (
+                        <Separator className="my-8" />
+                      )}
+                    </React.Fragment>
+                  ))}
                 </div>
-                
-                {index < parsedSections.length - 1 && (
-                  <Separator className="mt-6" />
-                )}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+              </TabsContent>
+              
+              {parsedSections.filter(s => s.groupNumber > 0).map(section => (
+                <TabsContent key={section.groupNumber} value={`group-${section.groupNumber}`} className="mt-0 p-6">
+                  {renderGroupSection(section)}
+                </TabsContent>
+              ))}
+            </ScrollArea>
+          </Tabs>
+        ) : (
+          <ScrollArea className="h-[60vh]">
+            <div className="p-6 space-y-6" ref={printRef}>
+              {parsedSections.map((section, index) => (
+                <React.Fragment key={index}>
+                  {renderGroupSection(section, false)}
+                  {index < parsedSections.length - 1 && (
+                    <Separator className="my-6" />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
         
         {/* Footer */}
         <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
             報告由 AI 分析助理生成 • {new Date().toLocaleDateString('zh-TW')}
+            {hasMultipleGroups && ` • 共 ${parsedSections.length} 組`}
           </p>
           <Button variant="gold" onClick={() => onOpenChange(false)}>
             關閉
