@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { BookOpen, Play, Download, CheckCircle, Copy } from 'lucide-react';
+import { Dumbbell, Play, Download, CheckCircle, Copy, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import { getSessionJoinUrl } from '@/lib/url-helpers';
@@ -108,18 +108,18 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
     <>
       <Card variant="highlight" className="w-full max-w-xl mx-auto">
         <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 rounded-full gradient-navy flex items-center justify-center mb-4">
-            <BookOpen className="w-8 h-8 text-secondary" />
+          <div className="mx-auto w-16 h-16 rounded-full gradient-orange flex items-center justify-center mb-4 glow-orange">
+            <Dumbbell className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl">建立新的健身課程</CardTitle>
+          <CardTitle className="text-2xl">開始新的健身課程</CardTitle>
           <CardDescription className="text-base">
-            Create a new Soul Gym session
+            Start a new Soul Gym training session
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="verse" className="text-base">
-              經文章節 Bible Verse Reference
+            <Label htmlFor="verse" className="text-base font-semibold">
+              訓練經文 Training Scripture
             </Label>
             <Input
               id="verse"
@@ -129,23 +129,23 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
               className="h-12 text-base"
             />
             <p className="text-sm text-muted-foreground">
-              輸入今天要查考的經文章節
+              輸入今天訓練使用的經文章節
             </p>
           </div>
 
           <Button
-            variant="navy"
+            variant="default"
             size="xl"
-            className="w-full"
+            className="w-full bg-secondary hover:bg-secondary/90 text-white"
             onClick={handleCreate}
             disabled={!verseReference || isCreating}
           >
             {isCreating ? (
-              '建立中...'
+              '準備中...'
             ) : (
               <>
-                <Play className="w-5 h-5" />
-                開始聚會 Start Session
+                <Flame className="w-5 h-5" />
+                開始訓練 Start Training
               </>
             )}
           </Button>
