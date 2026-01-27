@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Users, BookOpen, Search, Lightbulb, Target, Share2, Download } from 'lucide-react';
+import { Sparkles, Users, BookOpen, Share2, Download } from 'lucide-react';
 import { fetchAIReports } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
 import { 
@@ -10,6 +10,12 @@ import {
   extractKeywords,
   KeywordTagCloud 
 } from '@/components/admin/ReportVisualElements';
+import {
+  parseReportContent as parseReportContentFull,
+  generateSectionMarkdown,
+  downloadBlob,
+  GroupReport,
+} from '@/components/admin/report-viewer';
 
 interface GroupReportViewerProps {
   sessionId: string;
@@ -17,6 +23,7 @@ interface GroupReportViewerProps {
   verseReference?: string;
 }
 
+// Simplified parsed report for single group (compatible with existing UI)
 interface ParsedReport {
   members?: string;
   verse?: string;
@@ -27,86 +34,42 @@ interface ParsedReport {
   raw: string;
 }
 
-// Clean markdown formatting - remove ** and handle list items
-function cleanMarkdown(text: string): string {
-  if (!text) return '';
-  return text
-    .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove bold **text**
-    .replace(/^\s*\*\s+/gm, '• ')        // Replace * at line start with bullet
-    .replace(/^\s*-\s+/gm, '• ')         // Replace - at line start with bullet
-    .trim();
-}
-
+// Convert full GroupReport to simplified ParsedReport for UI compatibility
 function parseReportContent(content: string): ParsedReport {
-  const result: ParsedReport = { raw: cleanMarkdown(content) };
+  const sections = parseReportContentFull(content);
+  const section = sections[0];
   
-  // Extract members
-  const membersMatch = content.match(/(?:\*\*)?組員(?:\*\*)?[：:]\s*([^\n]+)/);
-  if (membersMatch) result.members = cleanMarkdown(membersMatch[1]);
+  if (!section) {
+    return { raw: content };
+  }
   
-  // Extract verse
-  const verseMatch = content.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*([^\n]+)/);
-  if (verseMatch) result.verse = cleanMarkdown(verseMatch[1]);
-  
-  // Extract themes - handle formats like "**📖 主題（Themes）：**" or "📖 主題 Themes："
-  const themesMatch = content.match(/(?:\*\*)?📖?\s*主題[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🔍|(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
-  if (themesMatch) result.themes = cleanMarkdown(themesMatch[1]);
-  
-  // Extract observations - handle formats like "**🔍 事實發現（Observations）：**"
-  const obsMatch = content.match(/(?:\*\*)?🔍?\s*事實發現[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?💡|(?:\*\*)?🎯|---|ℹ️|$)/i);
-  if (obsMatch) result.observations = cleanMarkdown(obsMatch[1]);
-  
-  // Extract insights - handle formats like "**💡 獨特亮光（Unique Insights）：**"
-  const insightsMatch = content.match(/(?:\*\*)?💡?\s*獨特亮光[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=(?:\*\*)?🎯|---|ℹ️|$)/i);
-  if (insightsMatch) result.insights = cleanMarkdown(insightsMatch[1]);
-  
-  // Extract applications - handle formats like "**🎯 如何應用（Applications）：**"
-  const appMatch = content.match(/(?:\*\*)?🎯?\s*如何應用[^：:\n]*[：:]\s*(?:\*\*)?\s*([\s\S]*?)(?=---|ℹ️|$)/i);
-  if (appMatch) result.applications = cleanMarkdown(appMatch[1]);
-  
-  return result;
+  return {
+    members: section.members,
+    verse: section.verse,
+    themes: section.themes,
+    observations: section.observations,
+    insights: section.insights,
+    applications: section.applications,
+    raw: section.raw,
+  };
 }
 
 // Generate structured Markdown from a parsed report (for downloads)
 function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verseReference?: string): string {
-  const lines: string[] = [];
+  // Convert ParsedReport to GroupReport format for the shared generator
+  const section: GroupReport = {
+    groupNumber,
+    groupInfo: `第 ${groupNumber} 組`,
+    members: parsed.members,
+    verse: parsed.verse,
+    themes: parsed.themes,
+    observations: parsed.observations,
+    insights: parsed.insights,
+    applications: parsed.applications,
+    raw: parsed.raw,
+  };
   
-  lines.push('### 小組查經整合文件\n');
-  lines.push(`**組別：** 第 ${groupNumber} 組\n`);
-  
-  if (parsed.members) {
-    lines.push(`**組員：** ${parsed.members}\n`);
-  }
-  
-  if (parsed.verse || verseReference) {
-    lines.push(`**查經經文：** ${parsed.verse || verseReference}\n`);
-  }
-  
-  lines.push('---\n');
-  
-  if (parsed.themes) {
-    lines.push(`**📖 主題（Themes）：**\n${parsed.themes}\n`);
-  }
-  
-  if (parsed.observations) {
-    lines.push(`**🔍 事實發現（Observations）：**\n${parsed.observations}\n`);
-  }
-  
-  if (parsed.insights) {
-    lines.push(`**💡 獨特亮光（Unique Insights）：**\n${parsed.insights}\n`);
-  }
-  
-  if (parsed.applications) {
-    lines.push(`**🎯 如何應用（Applications）：**\n${parsed.applications}\n`);
-  }
-  
-  // If no structured content, fall back to raw
-  const hasStructured = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
-  if (!hasStructured && parsed.raw) {
-    lines.push(parsed.raw);
-  }
-  
-  return lines.join('\n');
+  return generateSectionMarkdown(section, verseReference);
 }
 
 export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
@@ -166,12 +129,8 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
     const markdown = generateReportMarkdown(parsed, groupNumber, verseReference);
     
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `第${groupNumber}組報告-${verseReference || 'export'}.md`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const filename = `第${groupNumber}組報告-${verseReference || 'export'}.md`;
+    downloadBlob(blob, filename);
     
     toast.success('已下載！');
   };
