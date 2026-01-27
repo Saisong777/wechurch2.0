@@ -1,15 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IcebreakerCard } from './IcebreakerCard';
 import { LevelSelector } from './LevelSelector';
 import { GameLobby } from './GameLobby';
+import { GameTimer } from './GameTimer';
 import { useIcebreakerGame } from '@/hooks/useIcebreakerGame';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check, Languages } from 'lucide-react';
+import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check, Languages, Volume2, VolumeX, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -49,6 +51,10 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
   const [showLobby, setShowLobby] = useState(!autoStart);
   const [copied, setCopied] = useState(false);
   const [showEnglish, setShowEnglish] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showTimer, setShowTimer] = useState(false);
+
+  const { playFlipSound, playDrawSound } = useSoundEffects({ enabled: soundEnabled });
 
   // Auto-start for session mode
   useEffect(() => {
@@ -80,16 +86,28 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
     }
   };
 
-  const handleCardTap = () => {
+  const handleCardTap = useCallback(() => {
     // In group mode, only host can draw
     if (mode === 'session' && !isHost) {
       toast.info('等待主持人抽牌...');
       return;
     }
     if (!isFlipped && !isDrawing) {
+      playFlipSound();
       drawCard();
     }
-  };
+  }, [mode, isHost, isFlipped, isDrawing, playFlipSound, drawCard]);
+
+  // Play sound when card is successfully drawn
+  useEffect(() => {
+    if (isFlipped && currentCard) {
+      playDrawSound();
+    }
+  }, [isFlipped, currentCard?.id, playDrawSound]);
+
+  const handleTimerEnd = useCallback(() => {
+    toast.info(showEnglish ? "Time's up! Move to the next question." : '時間到！請進入下一題。');
+  }, [showEnglish]);
 
   const copyRoomCode = () => {
     if (roomCode) {
@@ -167,21 +185,60 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
         )}
       </div>
 
-      {/* Language Toggle */}
-      <div className="flex items-center justify-center gap-2">
-        <Languages className="w-4 h-4 text-muted-foreground" />
-        <Label htmlFor="language-toggle" className="text-sm text-muted-foreground cursor-pointer">
-          中文
-        </Label>
-        <Switch
-          id="language-toggle"
-          checked={showEnglish}
-          onCheckedChange={setShowEnglish}
-        />
-        <Label htmlFor="language-toggle" className="text-sm text-muted-foreground cursor-pointer">
-          English
-        </Label>
+      {/* Language & Sound Toggles */}
+      <div className="flex items-center justify-center gap-4 flex-wrap">
+        {/* Language Toggle */}
+        <div className="flex items-center gap-2">
+          <Languages className="w-4 h-4 text-muted-foreground" />
+          <Label htmlFor="language-toggle" className="text-sm text-muted-foreground cursor-pointer">
+            中文
+          </Label>
+          <Switch
+            id="language-toggle"
+            checked={showEnglish}
+            onCheckedChange={setShowEnglish}
+          />
+          <Label htmlFor="language-toggle" className="text-sm text-muted-foreground cursor-pointer">
+            English
+          </Label>
+        </div>
+
+        {/* Sound Toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          className="text-muted-foreground"
+        >
+          {soundEnabled ? (
+            <Volume2 className="w-4 h-4" />
+          ) : (
+            <VolumeX className="w-4 h-4" />
+          )}
+        </Button>
+
+        {/* Timer Toggle - only for host */}
+        {(mode === 'standalone' || isHost) && (
+          <Button
+            variant={showTimer ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setShowTimer(!showTimer)}
+            className="text-muted-foreground"
+          >
+            <Timer className="w-4 h-4 mr-1" />
+            {showEnglish ? 'Timer' : '計時'}
+          </Button>
+        )}
       </div>
+
+      {/* Timer - show when enabled */}
+      {showTimer && (
+        <GameTimer
+          isHost={mode === 'standalone' || isHost}
+          showEnglish={showEnglish}
+          onTimerEnd={handleTimerEnd}
+        />
+      )}
 
       {/* Level Selector - only for host in group mode */}
       {(mode === 'standalone' || isHost) && (
