@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { Loader2, User, Camera, X } from 'lucide-react';
+import { AvatarCropDialog } from './AvatarCropDialog';
 
 interface ProfileSettingsDialogProps {
   open: boolean;
@@ -30,6 +31,10 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Crop dialog state
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && user) {
@@ -74,23 +79,42 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
       return;
     }
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('圖片大小不能超過 2MB');
+    // Validate file size (max 5MB for cropping source)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('圖片大小不能超過 5MB');
       return;
     }
+
+    // Convert file to data URL for cropping
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedImageSrc(reader.result as string);
+      setCropDialogOpen(true);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!user) return;
 
     setIsUploading(true);
     try {
       // Create a unique file path
-      const fileExt = file.name.split('.').pop();
-      const fileName = `avatar.${fileExt}`;
+      const fileName = `avatar.jpg`;
       const filePath = `${user.id}/${fileName}`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, croppedBlob, { 
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
 
       if (uploadError) throw uploadError;
 
@@ -108,10 +132,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
       toast.error(error.message || '上傳失敗，請重試');
     } finally {
       setIsUploading(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setSelectedImageSrc(null);
     }
   };
 
@@ -189,115 +210,130 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            個人設定
-          </DialogTitle>
-          <DialogDescription>
-            修改您的個人資料
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              個人設定
+            </DialogTitle>
+            <DialogDescription>
+              修改您的個人資料
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Avatar Section */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative">
-              <Avatar className="w-24 h-24 cursor-pointer" onClick={handleAvatarClick}>
-                <AvatarImage src={avatarUrl || undefined} />
-                <AvatarFallback className="bg-secondary/20 text-secondary text-2xl font-medium">
-                  {getInitials(user?.email)}
-                </AvatarFallback>
-              </Avatar>
-              
-              {/* Upload overlay */}
-              <button
-                type="button"
-                onClick={handleAvatarClick}
-                disabled={isUploading}
-                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
-              >
-                {isUploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Camera className="w-4 h-4" />
-                )}
-              </button>
-
-              {/* Remove button */}
-              {avatarUrl && !isUploading && (
+          <div className="space-y-6 py-4">
+            {/* Avatar Section */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <Avatar className="w-24 h-24 cursor-pointer" onClick={handleAvatarClick}>
+                  <AvatarImage src={avatarUrl || undefined} />
+                  <AvatarFallback className="bg-secondary/20 text-secondary text-2xl font-medium">
+                    {getInitials(user?.email)}
+                  </AvatarFallback>
+                </Avatar>
+                
+                {/* Upload overlay */}
                 <button
                   type="button"
-                  onClick={handleRemoveAvatar}
-                  className="absolute top-0 right-0 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg hover:bg-destructive/90 transition-colors"
+                  onClick={handleAvatarClick}
+                  disabled={isUploading}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
                 >
-                  <X className="w-3 h-3" />
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
                 </button>
-              )}
+
+                {/* Remove button */}
+                {avatarUrl && !isUploading && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    className="absolute top-0 right-0 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg hover:bg-destructive/90 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              
+              <p className="text-xs text-muted-foreground">點擊更換頭像（支援裁剪）</p>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
             </div>
-            
-            <p className="text-xs text-muted-foreground">點擊更換頭像（最大 2MB）</p>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
+
+            {/* Email (readonly) */}
+            <div className="space-y-2">
+              <Label htmlFor="email">電子郵件</Label>
+              <Input
+                id="email"
+                value={user?.email || ''}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">電子郵件無法修改</p>
+            </div>
+
+            {/* Display Name */}
+            <div className="space-y-2">
+              <Label htmlFor="displayName">顯示名稱</Label>
+              <Input
+                id="displayName"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="輸入您的顯示名稱"
+                maxLength={50}
+              />
+            </div>
           </div>
 
-          {/* Email (readonly) */}
-          <div className="space-y-2">
-            <Label htmlFor="email">電子郵件</Label>
-            <Input
-              id="email"
-              value={user?.email || ''}
-              disabled
-              className="bg-muted"
-            />
-            <p className="text-xs text-muted-foreground">電子郵件無法修改</p>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading || isUploading}
+            >
+              取消
+            </Button>
+            <Button
+              variant="gold"
+              onClick={handleSave}
+              disabled={isLoading || isUploading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  儲存中...
+                </>
+              ) : (
+                '儲存'
+              )}
+            </Button>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Display Name */}
-          <div className="space-y-2">
-            <Label htmlFor="displayName">顯示名稱</Label>
-            <Input
-              id="displayName"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="輸入您的顯示名稱"
-              maxLength={50}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading || isUploading}
-          >
-            取消
-          </Button>
-          <Button
-            variant="gold"
-            onClick={handleSave}
-            disabled={isLoading || isUploading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                儲存中...
-              </>
-            ) : (
-              '儲存'
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Crop Dialog */}
+      {selectedImageSrc && (
+        <AvatarCropDialog
+          open={cropDialogOpen}
+          onOpenChange={(open) => {
+            setCropDialogOpen(open);
+            if (!open) setSelectedImageSrc(null);
+          }}
+          imageSrc={selectedImageSrc}
+          onCropComplete={handleCropComplete}
+        />
+      )}
+    </>
   );
 };
