@@ -108,10 +108,9 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
         setErrorState('none');
         setGroupMembers(members);
 
-        // Check if all members are ready - auto redirect
+        // Check if all members are ready - auto redirect (silent, no toast)
         const allReady = members.every(m => m.readyConfirmed);
         if (allReady) {
-          toast.success('所有組員都已準備好！開始查經！');
           onAllReady();
         }
       }
@@ -164,9 +163,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       )
       .subscribe((status) => {
         console.log('[GroupVerification] Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          toast.success('已連線即時同步', { id: 'realtime-connected', duration: 2000 });
-        }
+        // Silent subscription - no toast to avoid notification spam during transitions
       });
 
     // Fallback polling every 5 seconds (reduced from 2s since we have realtime now)
