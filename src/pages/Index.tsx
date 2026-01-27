@@ -51,49 +51,55 @@ const Index = () => {
           </div>
 
           {/* Entry Points */}
-          <div className={`grid gap-6 mb-16 ${loading || canCreateSession ? 'md:grid-cols-2' : ''}`}>
-            <Card variant="highlight" className="group hover:scale-[1.02] transition-transform cursor-pointer">
+          <div className="flex flex-col gap-8 mb-16">
+            {/* Main Participant Entry - Hero Card */}
+            <Card variant="highlight" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer border-2 border-primary/30 shadow-xl hover:shadow-2xl hover:border-primary/50 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
               <Link to="/user">
-                <CardContent className="py-12 text-center">
-                  <div className="mx-auto w-20 h-20 rounded-full gradient-gold flex items-center justify-center mb-6 group-hover:glow-gold transition-shadow">
-                    <Dumbbell className="w-10 h-10 text-secondary-foreground" />
+                <CardContent className="py-16 md:py-20 text-center relative">
+                  <div className="mx-auto w-28 h-28 md:w-32 md:h-32 rounded-full gradient-gold flex items-center justify-center mb-8 group-hover:glow-gold transition-all duration-300 shadow-lg group-hover:scale-105">
+                    <Dumbbell className="w-14 h-14 md:w-16 md:h-16 text-secondary-foreground" />
                   </div>
-                  <h2 className="font-serif text-2xl font-bold text-foreground mb-2">
+                  <h2 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-3">
                     參加者入口
                   </h2>
-                  <p className="text-muted-foreground mb-6">
+                  <p className="text-lg text-muted-foreground mb-8">
                     Participant Entry
                   </p>
-                  <Button variant="gold" size="lg">
+                  <Button variant="gold" size="xl" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl">
                     開始健身 Join Session
                   </Button>
                 </CardContent>
               </Link>
             </Card>
 
-            {/* Show Admin card only if loading or user can create sessions */}
+            {/* Secondary Admin Entry - Compact Card */}
             {loading ? (
               <Card variant="default" className="group">
-                <CardContent className="py-12 text-center flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                <CardContent className="py-8 text-center flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </CardContent>
               </Card>
             ) : canCreateSession ? (
-              <Card variant="default" className="group hover:scale-[1.02] transition-transform cursor-pointer">
+              <Card variant="default" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer opacity-80 hover:opacity-100">
                 <Link to="/admin">
-                  <CardContent className="py-12 text-center">
-                    <div className="mx-auto w-20 h-20 rounded-full gradient-navy flex items-center justify-center mb-6">
-                      <Settings className="w-10 h-10 text-secondary" />
+                  <CardContent className="py-8 text-center">
+                    <div className="flex items-center justify-center gap-6">
+                      <div className="w-14 h-14 rounded-full gradient-navy flex items-center justify-center shrink-0">
+                        <Settings className="w-7 h-7 text-secondary" />
+                      </div>
+                      <div className="text-left">
+                        <h2 className="font-serif text-xl font-bold text-foreground">
+                          教練入口
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          Coach / Admin Entry
+                        </p>
+                      </div>
+                      <Button variant="navy" size="default" className="ml-auto">
+                        管理訓練
+                      </Button>
                     </div>
-                    <h2 className="font-serif text-2xl font-bold text-foreground mb-2">
-                      主持人入口
-                    </h2>
-                    <p className="text-muted-foreground mb-6">
-                      Host / Admin Entry
-                    </p>
-                    <Button variant="navy" size="lg">
-                      管理聚會 Manage Session
-                    </Button>
                   </CardContent>
                 </Link>
               </Card>
