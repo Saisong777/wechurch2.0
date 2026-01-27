@@ -90,10 +90,11 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
   };
   
   return (
-    <div className={`p-5 border-l-4 rounded-r-lg shadow-sm ${config.bgClass}`}>
-      <h3 className={`flex items-center gap-2 font-bold text-base mb-4 ${config.textClass}`}>
-        <Icon className="w-5 h-5" />
-        {config.emoji} {config.title}
+    <div className={`p-3 sm:p-5 border-l-4 rounded-r-lg shadow-sm ${config.bgClass}`}>
+      <h3 className={`flex items-center gap-2 font-bold text-sm sm:text-base mb-3 sm:mb-4 ${config.textClass}`}>
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+        <span className="hidden sm:inline">{config.emoji} {config.title}</span>
+        <span className="sm:hidden">{config.emoji} {config.title.split(' ')[0]}</span>
       </h3>
       
       {/* Keyword tag cloud - only show if we have keywords */}
@@ -103,13 +104,13 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
       
       {/* For insights, show quote blocks for all items */}
       {type === 'insights' && quotes.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {quotes.map((q, idx) => (
             <QuoteBlock key={`quote-${idx}`} quote={q.quote.replace(/\*\*/g, '')} author={q.author} />
           ))}
         </div>
       ) : (
-        <div className="text-sm text-foreground/90 whitespace-pre-wrap leading-7 pl-1">
+        <div className="text-xs sm:text-sm text-foreground/90 whitespace-pre-wrap leading-6 sm:leading-7 pl-1">
           {formatContent(content)}
         </div>
       )}

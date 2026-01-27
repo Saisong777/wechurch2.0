@@ -33,20 +33,20 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
   const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications;
   
   return (
-    <div className="group-section space-y-4">
+    <div className="group-section space-y-3 sm:space-y-4">
       {/* Group Header */}
       {showHeader && section.groupInfo && (
-        <div className="rounded-t-lg gradient-navy text-primary-foreground px-5 py-4">
+        <div className="rounded-t-lg gradient-navy text-primary-foreground px-3 sm:px-5 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-lg flex items-center gap-2">
-              <Users className="w-5 h-5" />
+            <h2 className="font-bold text-base sm:text-lg flex items-center gap-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
               {section.groupInfo}
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-primary-foreground hover:bg-white/20 h-8 px-2"
+                className="text-primary-foreground hover:bg-white/20 h-8 w-8 p-0 sm:px-2 sm:w-auto"
                 onClick={() => onCopy(section.groupNumber)}
               >
                 <Copy className="w-4 h-4" />
@@ -62,7 +62,7 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
                     <ChevronDown className="w-3 h-3 ml-1" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="z-50 bg-popover">
                   <DropdownMenuItem onClick={() => onDownloadMarkdown(section.groupNumber)}>
                     <FileText className="w-4 h-4 mr-2" />
                     下載 Markdown
@@ -85,9 +85,9 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
       
       {/* Group Meta Info */}
       {(section.members || section.verse) && (
-        <div className="bg-gradient-to-r from-muted/60 to-muted/30 px-5 py-4 border border-t-0 border-border rounded-b-lg">
+        <div className="bg-gradient-to-r from-muted/60 to-muted/30 px-3 sm:px-5 py-3 sm:py-4 border border-t-0 border-border rounded-b-lg">
           {section.members && (
-            <p className="text-sm flex items-start gap-2">
+            <p className="text-xs sm:text-sm flex flex-wrap items-start gap-1 sm:gap-2">
               <span className="font-medium text-foreground shrink-0">👥 組員：</span>
               <span className="text-muted-foreground">
                 {section.members.split(/[,，、]/).map((name, idx, arr) => (
@@ -100,7 +100,7 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
             </p>
           )}
           {section.verse && (
-            <p className="text-sm text-muted-foreground mt-2 flex items-start gap-2">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-2 flex items-start gap-1 sm:gap-2">
               <span className="font-medium text-foreground shrink-0">📖 經文：</span>
               <span className="italic">{section.verse}</span>
             </p>
@@ -110,7 +110,7 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
       
       {/* Structured Sections with Enhanced Visual Elements */}
       {hasStructuredContent ? (
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-5">
           {section.themes && (
             <EnhancedSection type="themes" content={section.themes} showKeywords={false} />
           )}
@@ -133,8 +133,8 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
           )}
         </div>
       ) : (
-        <div className="p-5 bg-card border border-border rounded-lg shadow-sm">
-          <div className="text-sm text-foreground whitespace-pre-wrap leading-7">
+        <div className="p-3 sm:p-5 bg-card border border-border rounded-lg shadow-sm">
+          <div className="text-xs sm:text-sm text-foreground whitespace-pre-wrap leading-6 sm:leading-7">
             {section.raw}
           </div>
         </div>
@@ -155,11 +155,11 @@ const ContributionsSection: React.FC<{ contributions: string }> = ({ contributio
       
       if (nameMatch) {
         return (
-          <div key={idx} className="flex gap-2 py-2 border-b border-accent/20 last:border-0">
-            <span className="font-bold text-primary shrink-0 min-w-[5rem]">
+          <div key={idx} className="flex flex-col sm:flex-row gap-1 sm:gap-2 py-2 border-b border-accent/20 last:border-0">
+            <span className="font-bold text-primary shrink-0 sm:min-w-[5rem]">
               {nameMatch[1]}
             </span>
-            <span className="text-foreground/90">{nameMatch[2]}</span>
+            <span className="text-foreground/90 text-xs sm:text-sm">{nameMatch[2]}</span>
           </div>
         );
       }
@@ -169,7 +169,7 @@ const ContributionsSection: React.FC<{ contributions: string }> = ({ contributio
       const parts = line.replace(/^[-•]\s*/, '').split(namePattern);
       
       return (
-        <div key={idx} className="py-1.5">
+        <div key={idx} className="py-1.5 text-xs sm:text-sm">
           {parts.map((part, pIdx) => {
             if (namePattern.test(part)) {
               namePattern.lastIndex = 0;
@@ -183,12 +183,13 @@ const ContributionsSection: React.FC<{ contributions: string }> = ({ contributio
   };
   
   return (
-    <div className="p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent shadow-sm">
-      <h3 className="flex items-center gap-2 font-bold text-base mb-4 text-accent">
-        <User className="w-5 h-5" />
-        👤 個人貢獻摘要 Personal Contributions
+    <div className="p-3 sm:p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent shadow-sm">
+      <h3 className="flex items-center gap-2 font-bold text-sm sm:text-base mb-3 sm:mb-4 text-accent">
+        <User className="w-4 h-4 sm:w-5 sm:h-5" />
+        <span className="hidden sm:inline">👤 個人貢獻摘要 Personal Contributions</span>
+        <span className="sm:hidden">👤 個人貢獻</span>
       </h3>
-      <div className="text-sm leading-relaxed pl-1">
+      <div className="text-xs sm:text-sm leading-relaxed pl-1">
         {formatContributions(contributions)}
       </div>
     </div>
