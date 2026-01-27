@@ -10,3 +10,6 @@ verify_jwt = false
 
 [functions.save-study-response]
 verify_jwt = false
+
+[functions.get-study-response]
+verify_jwt = false

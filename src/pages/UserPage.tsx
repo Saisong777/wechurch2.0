@@ -67,8 +67,16 @@ export const UserPage: React.FC = () => {
       : null;
     const storedEmail = localStorage.getItem('bible_study_guest_email');
 
+    console.log('[UserPage] Attempting session restore:', {
+      storedSessionId,
+      storedParticipantId,
+      storedStep,
+      storedEmail: storedEmail ? '***' : null,
+    });
+
     // If no session or participant info stored, nothing to restore
     if (!storedSessionId || !storedParticipantId || !storedEmail) {
+      console.log('[UserPage] Missing required data for restore');
       setIsRestoring(false);
       return false;
     }
@@ -90,10 +98,17 @@ export const UserPage: React.FC = () => {
       }
 
       // Try to get the participant data using the RPC function
-      const { data: participantData } = await supabase.rpc('get_participant_for_reentry', {
+      // This RPC function is SECURITY DEFINER and doesn't require auth
+      const { data: participantData, error: participantError } = await supabase.rpc('get_participant_for_reentry', {
         p_session_id: storedSessionId,
         p_email: storedEmail,
       });
+
+      if (participantError) {
+        console.error('[UserPage] RPC error:', participantError);
+        setIsRestoring(false);
+        return false;
+      }
 
       if (!participantData || participantData.length === 0) {
         console.log('[UserPage] Participant not found, clearing stored data');
@@ -104,6 +119,21 @@ export const UserPage: React.FC = () => {
       }
 
       const participant = participantData[0];
+
+      // For guest users returning, ensure they have a valid anonymous session
+      // This is needed for RLS policies and realtime subscriptions
+      const { data: authSession } = await supabase.auth.getSession();
+      if (!authSession.session) {
+        console.log('[UserPage] No auth session, signing in anonymously for guest user');
+        const { error: anonError } = await supabase.auth.signInAnonymously();
+        if (anonError) {
+          console.warn('[UserPage] Anonymous sign-in failed:', anonError);
+          // Continue anyway - participant data is already verified
+        } else {
+          // Attach email to anonymous user for RLS
+          await supabase.auth.updateUser({ email: storedEmail });
+        }
+      }
 
       // Restore session state
       setCurrentSession({
