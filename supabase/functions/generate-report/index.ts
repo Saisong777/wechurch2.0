@@ -359,12 +359,13 @@ ${compactEntries}
     const reportContent = aiResponse.choices?.[0]?.message?.content || "無法生成報告";
 
     // Save report to database
+    // Note: overall reports use group_number = 0 for consistent parsing
     const { data: savedReport, error: saveError } = await supabase
       .from("ai_reports")
       .insert({
         session_id: sessionId,
         report_type: reportType,
-        group_number: reportType === "group" ? groupNumber : null,
+        group_number: reportType === "group" ? groupNumber : 0,
         content: reportContent,
       })
       .select()
