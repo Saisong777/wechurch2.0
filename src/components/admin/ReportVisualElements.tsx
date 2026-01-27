@@ -1,8 +1,43 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Search, Lightbulb, Target, Quote, User } from 'lucide-react';
+import { BookOpen, Search, Lightbulb, Target, Quote, User, Star, Circle } from 'lucide-react';
 
-// Extract keywords from text for tag cloud
+// Format markdown text - remove ** and replace with styled spans
+export function formatMarkdownText(text: string): React.ReactNode[] {
+  if (!text) return [text];
+  
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let keyIndex = 0;
+  
+  // Pattern for **bold** text
+  const boldPattern = /\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = boldPattern.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    // Add the bold text as a styled span
+    parts.push(
+      <span key={`bold-${keyIndex++}`} className="font-semibold text-foreground">
+        {match[1]}
+      </span>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : [text];
+}
+
+// Extract keywords from text for tag cloud - deduplicated
 export function extractKeywords(text: string): string[] {
   if (!text) return [];
   
@@ -44,28 +79,35 @@ export function extractKeywords(text: string): string[] {
     /天國|神國/g,
   ];
   
-  const foundKeywords = new Set<string>();
+  // Use Map to track keywords and avoid duplicates
+  const foundKeywords = new Map<string, boolean>();
   
   // Find important patterns
   for (const pattern of importantPatterns) {
     const matches = text.match(pattern);
     if (matches) {
-      matches.forEach(m => foundKeywords.add(m));
+      matches.forEach(m => {
+        // Normalize and dedupe
+        const normalized = m.trim();
+        if (!foundKeywords.has(normalized)) {
+          foundKeywords.set(normalized, true);
+        }
+      });
     }
   }
   
   // Extract Chinese phrases (2-4 characters that appear meaningful)
   const chinesePhrases = text.match(/[\u4e00-\u9fff]{2,4}/g) || [];
   for (const phrase of chinesePhrases) {
-    if (!stopWords.has(phrase) && phrase.length >= 2) {
+    if (!stopWords.has(phrase) && phrase.length >= 2 && !foundKeywords.has(phrase)) {
       // Only add if it seems meaningful (not too common)
-      if (foundKeywords.size < 8) {
-        foundKeywords.add(phrase);
+      if (foundKeywords.size < 6) {
+        foundKeywords.set(phrase, true);
       }
     }
   }
   
-  return Array.from(foundKeywords).slice(0, 8);
+  return Array.from(foundKeywords.keys()).slice(0, 6);
 }
 
 // Parse insights to extract quoted attributions (e.g., "王弟兄提到...")
@@ -200,6 +242,9 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
   const keywords = showKeywords ? extractKeywords(content) : [];
   const quotes = type === 'insights' && showQuotes ? parseInsightsWithQuotes(content) : [];
   
+  // Clean markdown formatting from content
+  const cleanContent = content.replace(/\*\*/g, '');
+  
   return (
     <div className={`p-5 border-l-4 rounded-r-lg ${config.bgClass}`}>
       <h3 className={`flex items-center gap-2 font-semibold mb-3 ${config.textClass}`}>
@@ -207,7 +252,7 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
         {config.emoji} {config.title}
       </h3>
       
-      {/* Keyword tag cloud */}
+      {/* Keyword tag cloud - only show if we have keywords */}
       {keywords.length > 0 && (
         <KeywordTagCloud keywords={keywords} variant={type} />
       )}
@@ -216,18 +261,23 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
       {type === 'insights' && quotes.length > 0 ? (
         <div className="space-y-2">
           {quotes.map((q, idx) => (
-            <QuoteBlock key={idx} quote={q.quote} author={q.author} />
+            <QuoteBlock key={`quote-${idx}`} quote={q.quote.replace(/\*\*/g, '')} author={q.author} />
           ))}
           {/* Show remaining content not captured in quotes */}
-          <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1 mt-3">
-            {content.split(/\n/).filter(line => 
+          {(() => {
+            const remainingLines = cleanContent.split(/\n/).filter(line => 
               !quotes.some(q => line.includes(q.quote.substring(0, 20)))
-            ).join('\n').trim()}
-          </div>
+            ).join('\n').trim();
+            return remainingLines ? (
+              <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1 mt-3">
+                {remainingLines}
+              </div>
+            ) : null;
+          })()}
         </div>
       ) : (
         <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
-          {content}
+          {cleanContent}
         </div>
       )}
     </div>
