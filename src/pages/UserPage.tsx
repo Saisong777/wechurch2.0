@@ -396,7 +396,7 @@ export const UserPage: React.FC = () => {
       case 'review':
         return (
           <div className="px-4 py-8">
-            <SubmissionReview />
+            <SubmissionReview onEdit={() => setStep('study')} />
           </div>
         );
 
