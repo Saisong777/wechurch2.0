@@ -30,11 +30,13 @@ interface SpiritualFitnessFormProps {
 export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onComplete, onSubmitted }) => {
   const handleComplete = onComplete || onSubmitted;
   const { currentUser, currentSession } = useSession();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   
   const {
     formData,
     isLoading,
     isSaving,
+    isDirty,
     updateField,
     saveNow,
   } = useStudyResponse({
@@ -43,6 +45,23 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
     userEmail: currentUser?.email,
     enabled: !!currentSession?.id && !!currentUser?.id,
   });
+
+  // Handle completion with save verification
+  const handleSubmit = React.useCallback(async () => {
+    if (!handleComplete) return;
+    
+    setIsSubmitting(true);
+    
+    // Save any pending changes first
+    if (isDirty) {
+      saveNow();
+      // Wait a moment for the save to complete
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    
+    setIsSubmitting(false);
+    handleComplete();
+  }, [handleComplete, isDirty, saveNow]);
 
   if (isLoading) {
     return (
@@ -318,10 +337,20 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             variant="gold"
             size="lg"
             className="w-full text-sm sm:text-base py-3 sm:py-4 md:max-w-xs md:mx-auto md:flex touch-manipulation active:scale-[0.98]"
-            onClick={handleComplete}
+            onClick={handleSubmit}
+            disabled={isSubmitting || isSaving}
           >
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-            完成健身 Complete
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                儲存中...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                完成健身 Complete
+              </>
+            )}
           </Button>
         </div>
       )}
