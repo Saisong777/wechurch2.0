@@ -179,3 +179,24 @@ export const regroupParticipants = async (sessionId: string): Promise<{
 
   return { success: true, count: data?.length || 0 };
 };
+
+/**
+ * End the study session by setting status to 'completed'.
+ * This archives the session data for later viewing by admins.
+ */
+export const endStudySession = async (sessionId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> => {
+  const { error } = await supabase
+    .from("sessions")
+    .update({ status: "completed" })
+    .eq("id", sessionId);
+
+  if (error) {
+    console.error("End study session error:", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+};
