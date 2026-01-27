@@ -108,16 +108,31 @@ export function extractKeywords(text: string): string[] {
   return Array.from(foundKeywords.keys()).slice(0, 6);
 }
 
-// Parse insights to extract quoted attributions (e.g., "王弟兄提到...")
+// Parse insights to extract quoted attributions (e.g., "👤 王弟兄：內容" or "王弟兄提到...")
 export function parseInsightsWithQuotes(text: string): { quote: string; author?: string }[] {
   if (!text) return [];
   
   const quotes: { quote: string; author?: string }[] = [];
   
-  // Pattern: Name + 提到/分享/說/認為 + content (more flexible matching)
+  // Pattern 1: 👤 Name：content (new format from AI)
+  // Matches: "👤 賴彥廷：這個發現讓我重新思考信仰"
+  const emojiPattern = /👤\s*([^：:\n]+)[：:]\s*([^\n]+)/g;
+  let match;
+  while ((match = emojiPattern.exec(text)) !== null) {
+    quotes.push({
+      author: match[1].trim(),
+      quote: match[2].trim(),
+    });
+  }
+  
+  // If emoji pattern found matches, return them
+  if (quotes.length > 0) {
+    return quotes;
+  }
+  
+  // Pattern 2: Name + 提到/分享/說/認為 + content (traditional format)
   const attributionPattern = /([^\n。，\s]+?(?:弟兄|姊妹|姐妹|同學|老師))(?:提到|分享|說|認為|指出|表示|強調|觀察到|注意到|發現)?[：:「「]?\s*([^」」\n]+)/g;
   
-  let match;
   while ((match = attributionPattern.exec(text)) !== null) {
     quotes.push({
       author: match[1].trim(),
