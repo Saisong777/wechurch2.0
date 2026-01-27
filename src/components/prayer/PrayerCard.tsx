@@ -2,10 +2,11 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Heart, Trash2, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { Prayer, useDeletePrayer, useToggleAmen } from '@/hooks/usePrayerWall';
+import { Prayer, useDeletePrayer, useToggleAmen, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { useUserRole } from '@/hooks/useUserRole';
 import { cn } from '@/lib/utils';
 import {
@@ -69,15 +70,18 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
                 )}
               </AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex items-center gap-2">
               <p className={cn(
                 "font-medium text-sm",
                 prayer.is_anonymous && "text-muted-foreground italic"
               )}>
                 {prayer.author_name}
               </p>
-              <p className="text-xs text-muted-foreground">{timeAgo}</p>
+              <Badge variant="secondary" className="text-xs font-normal">
+                {CATEGORY_LABELS[prayer.category]}
+              </Badge>
             </div>
+            <p className="text-xs text-muted-foreground">{timeAgo}</p>
           </div>
 
           {canDelete && (

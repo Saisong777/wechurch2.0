@@ -3,12 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+export type PrayerCategory = 'thanksgiving' | 'supplication' | 'praise' | 'other';
+
+export const CATEGORY_LABELS: Record<PrayerCategory, string> = {
+  thanksgiving: '感恩',
+  supplication: '代求',
+  praise: '讚美',
+  other: '其他',
+};
+
 export interface Prayer {
   id: string;
   content: string;
   is_anonymous: boolean;
   created_at: string;
   user_id: string;
+  category: PrayerCategory;
   author_name: string;
   author_avatar: string | null;
   amen_count: number;
@@ -41,7 +51,7 @@ export const useCreatePrayer = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ content, isAnonymous }: { content: string; isAnonymous: boolean }) => {
+    mutationFn: async ({ content, isAnonymous, category }: { content: string; isAnonymous: boolean; category: PrayerCategory }) => {
       if (!user) throw new Error('Not authenticated');
       
       const { error } = await supabase
@@ -50,6 +60,7 @@ export const useCreatePrayer = () => {
           user_id: user.id,
           content: content.trim(),
           is_anonymous: isAnonymous,
+          category,
         });
 
       if (error) throw error;
