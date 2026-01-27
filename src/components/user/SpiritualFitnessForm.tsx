@@ -56,8 +56,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
       // Save any pending changes first
       if (isDirty) {
         await saveNow();
-        // Small delay to ensure state updates
-        await new Promise(resolve => setTimeout(resolve, 500));
       }
       
       // Navigate to review

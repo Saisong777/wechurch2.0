@@ -22,12 +22,14 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialized = useRef(false);
 
+  const queryKey = ['study_response', sessionId, userId] as const;
+
   // Get email from localStorage if not provided
   const participantEmail = userEmail || localStorage.getItem('bible_study_guest_email') || '';
 
   // Query for existing response (use edge function for reliability)
   const { data: response, isLoading, error } = useQuery({
-    queryKey: ['study_response', sessionId, userId],
+    queryKey,
     queryFn: async () => {
       if (!sessionId || !userId) return null;
       
@@ -43,7 +45,26 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       if (error) {
         console.log('[useStudyResponse] Direct query failed, may need edge function:', error.message);
       }
-      return data as StudyResponse | null;
+
+      // If direct query succeeded, we're done.
+      if (data) return data as StudyResponse;
+
+      // Fallback for guests (or when table is not directly readable due to RLS)
+      // NOTE: this is required so a refresh on the review page still works.
+      if (!participantEmail) return null;
+
+      const { data: result, error: fnError } = await supabase.functions.invoke('get-study-response', {
+        body: {
+          sessionId,
+          participantId: userId,
+          participantEmail,
+        },
+      });
+
+      if (fnError) throw fnError;
+      if (result?.error) throw new Error(result.error);
+
+      return (result?.data ?? null) as StudyResponse | null;
     },
     enabled: enabled && !!sessionId && !!userId,
     refetchInterval: POLLING_INTERVAL,
@@ -88,10 +109,13 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       
       return result.data;
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       setIsDirty(false);
       setIsSaving(false);
-      queryClient.invalidateQueries({ queryKey: ['study_response', sessionId, userId] });
+
+      // Immediately hydrate cache so the review screen can render without waiting for polling.
+      queryClient.setQueryData(queryKey, saved);
+      queryClient.invalidateQueries({ queryKey });
     },
     onError: (error) => {
       console.error('Failed to save study response:', error);
@@ -126,13 +150,17 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
   }, [debouncedSave]);
 
   // Immediate save (for blur events)
-  const saveNow = useCallback(() => {
+  const saveNow = useCallback(async () => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     if (isDirty) {
       setIsSaving(true);
-      upsertMutation.mutate(localFormData);
+      try {
+        await upsertMutation.mutateAsync(localFormData);
+      } catch {
+        // Error handling is centralized in onError
+      }
     }
   }, [isDirty, localFormData, upsertMutation]);
 
