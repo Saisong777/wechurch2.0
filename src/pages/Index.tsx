@@ -1,27 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart, BookMarked } from 'lucide-react';
+import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { SoulGymLogo } from '@/components/icons/SoulGymLogo';
 
 const Index = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { canCreateSession, loading: roleLoading } = useUserRole();
-  const [hasEmail, setHasEmail] = useState(false);
   
   const loading = authLoading || (user && roleLoading);
-
-  // Check if user has saved email (returning user)
-  useEffect(() => {
-    const storedEmail = localStorage.getItem('bible_study_guest_email');
-    setHasEmail(!!storedEmail);
-  }, []);
   
   // If session ID is in URL, redirect to user page with that session
   useEffect(() => {
@@ -70,64 +62,23 @@ const Index = () => {
               </Link>
             </Card>
 
-            {/* Secondary Admin Entry - Compact Card */}
+            {/* Secondary Admin Entry - Subtle text link */}
             {loading ? (
-              <Card variant="default" className="group">
-                <CardContent className="py-8 text-center flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </CardContent>
-              </Card>
+              <div className="flex justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
             ) : canCreateSession ? (
-              <Card variant="default" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer opacity-80 hover:opacity-100">
-                <Link to="/admin">
-                  <CardContent className="py-8 text-center">
-                    <div className="flex items-center justify-center gap-6">
-                      <div className="w-14 h-14 rounded-full gradient-navy flex items-center justify-center shrink-0">
-                        <Settings className="w-7 h-7 text-secondary" />
-                      </div>
-                      <div className="text-left">
-                        <h2 className="font-serif text-xl font-bold text-foreground">
-                          教練入口
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                          Coach / Admin Entry
-                        </p>
-                      </div>
-                      <Button variant="navy" size="default" className="ml-auto">
-                        管理訓練
-                      </Button>
-                    </div>
-                  </CardContent>
+              <div className="flex justify-center">
+                <Link 
+                  to="/admin" 
+                  className="group inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
+                  <span className="text-sm">教練入口 Coach Entry</span>
                 </Link>
-              </Card>
+              </div>
             ) : null}
-
-            {/* My Notebook Entry - for returning users */}
-            {hasEmail && (
-              <Card variant="default" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer border-secondary/30 hover:border-secondary/50">
-                <Link to="/notebook">
-                  <CardContent className="py-6 text-center">
-                    <div className="flex items-center justify-center gap-6">
-                      <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
-                        <BookMarked className="w-6 h-6 text-secondary" />
-                      </div>
-                      <div className="text-left">
-                        <h2 className="font-serif text-lg font-bold text-foreground">
-                          我的筆記本
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                          查看歷史查經筆記
-                        </p>
-                      </div>
-                      <Button variant="outline" size="default" className="ml-auto">
-                        查看 View
-                      </Button>
-                    </div>
-                  </CardContent>
-              </Link>
-            </Card>
-)}
-        </div>
+          </div>
 
           {/* Features Preview */}
           <div className="grid md:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
