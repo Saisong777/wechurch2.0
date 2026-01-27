@@ -39,6 +39,9 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
     maxPasses,
     mode,
     isHost,
+    timerDuration,
+    timerStartedAt,
+    timerRunning,
     createGame,
     joinGame,
     findSessionGame,
@@ -46,6 +49,7 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
     passCard,
     changeLevel,
     resetDeck,
+    syncTimer,
   } = useIcebreakerGame({ sessionId, groupNumber });
 
   const [showLobby, setShowLobby] = useState(!autoStart);
@@ -53,8 +57,12 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
   const [showEnglish, setShowEnglish] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showTimer, setShowTimer] = useState(false);
+  const [autoPassEnabled, setAutoPassEnabled] = useState(true);
 
   const { playFlipSound, playDrawSound } = useSoundEffects({ enabled: soundEnabled });
+
+  // Determine if we're in sync mode (group mode)
+  const isSyncMode = mode === 'session';
 
   // Auto-start for session mode
   useEffect(() => {
@@ -107,7 +115,15 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
 
   const handleTimerEnd = useCallback(() => {
     toast.info(showEnglish ? "Time's up! Move to the next question." : '時間到！請進入下一題。');
-  }, [showEnglish]);
+    
+    // Auto-pass: draw next card when timer ends (only for host)
+    if (autoPassEnabled && (mode === 'standalone' || isHost) && isFlipped) {
+      // Small delay before auto-drawing next card
+      setTimeout(() => {
+        drawCard();
+      }, 1500);
+    }
+  }, [showEnglish, autoPassEnabled, mode, isHost, isFlipped, drawCard]);
 
   const copyRoomCode = () => {
     if (roomCode) {
@@ -233,11 +249,31 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
 
       {/* Timer - show when enabled */}
       {showTimer && (
-        <GameTimer
-          isHost={mode === 'standalone' || isHost}
-          showEnglish={showEnglish}
-          onTimerEnd={handleTimerEnd}
-        />
+        <div className="space-y-2">
+          <GameTimer
+            isHost={mode === 'standalone' || isHost}
+            showEnglish={showEnglish}
+            onTimerEnd={handleTimerEnd}
+            syncedDuration={isSyncMode ? timerDuration : undefined}
+            syncedStartedAt={isSyncMode ? timerStartedAt : undefined}
+            syncedRunning={isSyncMode ? timerRunning : undefined}
+            onTimerSync={isSyncMode ? syncTimer : undefined}
+          />
+          
+          {/* Auto-pass toggle - only for host */}
+          {(mode === 'standalone' || isHost) && (
+            <div className="flex items-center justify-center gap-2">
+              <Switch
+                id="auto-pass-toggle"
+                checked={autoPassEnabled}
+                onCheckedChange={setAutoPassEnabled}
+              />
+              <Label htmlFor="auto-pass-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                {showEnglish ? 'Auto next on timeout' : '時間到自動下一題'}
+              </Label>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Level Selector - only for host in group mode */}

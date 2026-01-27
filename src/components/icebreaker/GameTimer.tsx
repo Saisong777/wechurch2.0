@@ -25,6 +25,11 @@ interface GameTimerProps {
   isHost: boolean;
   showEnglish?: boolean;
   onTimerEnd?: () => void;
+  // Sync props for group mode
+  syncedDuration?: number;
+  syncedStartedAt?: string | null;
+  syncedRunning?: boolean;
+  onTimerSync?: (duration: number, startedAt: string | null, running: boolean) => void;
 }
 
 const TIMER_PRESETS = [30, 60, 90, 120]; // seconds
@@ -33,70 +38,139 @@ export const GameTimer: React.FC<GameTimerProps> = ({
   isHost,
   showEnglish = false,
   onTimerEnd,
+  syncedDuration,
+  syncedStartedAt,
+  syncedRunning,
+  onTimerSync,
 }) => {
-  const [duration, setDuration] = useState(60); // default 60 seconds
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [isRunning, setIsRunning] = useState(false);
+  const isSyncMode = syncedDuration !== undefined;
+  
+  // Local state for standalone mode
+  const [localDuration, setLocalDuration] = useState(60);
+  const [localTimeLeft, setLocalTimeLeft] = useState(60);
+  const [localRunning, setLocalRunning] = useState(false);
+  
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [hasPlayedEndSound, setHasPlayedEndSound] = useState(false);
   
   const { playTickSound, playWarningSound, playTimerEndSound } = useSoundEffects({
     enabled: soundEnabled,
   });
 
-  // Reset timer when duration changes
-  useEffect(() => {
-    if (!isRunning) {
-      setTimeLeft(duration);
+  // Derive values based on sync mode
+  const duration = isSyncMode ? (syncedDuration ?? 60) : localDuration;
+  const isRunning = isSyncMode ? (syncedRunning ?? false) : localRunning;
+
+  // Calculate time left for sync mode
+  const calculateSyncedTimeLeft = useCallback(() => {
+    if (!syncedStartedAt || !syncedRunning) {
+      return syncedDuration ?? 60;
     }
-  }, [duration, isRunning]);
+    const startTime = new Date(syncedStartedAt).getTime();
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    return Math.max(0, (syncedDuration ?? 60) - elapsed);
+  }, [syncedStartedAt, syncedRunning, syncedDuration]);
+
+  const timeLeft = isSyncMode ? calculateSyncedTimeLeft() : localTimeLeft;
 
   // Timer countdown logic
   useEffect(() => {
-    if (!isRunning || timeLeft <= 0) return;
+    if (!isRunning) return;
 
     const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        const newTime = prev - 1;
+      if (isSyncMode) {
+        const newTime = calculateSyncedTimeLeft();
         
         // Play sounds at certain points
         if (newTime === 10 || newTime === 5) {
           playWarningSound();
         } else if (newTime <= 3 && newTime > 0) {
           playTickSound();
-        } else if (newTime === 0) {
+        } else if (newTime === 0 && !hasPlayedEndSound) {
           playTimerEndSound();
+          setHasPlayedEndSound(true);
           onTimerEnd?.();
         }
-        
-        return newTime;
-      });
+      } else {
+        setLocalTimeLeft((prev) => {
+          const newTime = prev - 1;
+          
+          if (newTime === 10 || newTime === 5) {
+            playWarningSound();
+          } else if (newTime <= 3 && newTime > 0) {
+            playTickSound();
+          } else if (newTime === 0) {
+            playTimerEndSound();
+            onTimerEnd?.();
+          }
+          
+          return newTime;
+        });
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, playTickSound, playWarningSound, playTimerEndSound, onTimerEnd]);
+  }, [isRunning, isSyncMode, calculateSyncedTimeLeft, playTickSound, playWarningSound, playTimerEndSound, onTimerEnd, hasPlayedEndSound]);
 
-  // Auto-stop when time runs out
+  // Auto-stop when time runs out (local mode only)
   useEffect(() => {
-    if (timeLeft <= 0 && isRunning) {
-      setIsRunning(false);
+    if (!isSyncMode && localTimeLeft <= 0 && localRunning) {
+      setLocalRunning(false);
     }
-  }, [timeLeft, isRunning]);
+  }, [isSyncMode, localTimeLeft, localRunning]);
+
+  // Reset end sound flag when timer restarts
+  useEffect(() => {
+    if (isRunning) {
+      setHasPlayedEndSound(false);
+    }
+  }, [isRunning, syncedStartedAt]);
+
+  // Reset local time when duration changes
+  useEffect(() => {
+    if (!isSyncMode && !localRunning) {
+      setLocalTimeLeft(localDuration);
+    }
+  }, [isSyncMode, localDuration, localRunning]);
 
   const handleStart = useCallback(() => {
-    if (timeLeft <= 0) {
-      setTimeLeft(duration);
+    if (isSyncMode && onTimerSync) {
+      // Start synced timer
+      onTimerSync(duration, new Date().toISOString(), true);
+    } else {
+      if (localTimeLeft <= 0) {
+        setLocalTimeLeft(localDuration);
+      }
+      setLocalRunning(true);
     }
-    setIsRunning(true);
-  }, [timeLeft, duration]);
+  }, [isSyncMode, onTimerSync, duration, localTimeLeft, localDuration]);
 
   const handlePause = useCallback(() => {
-    setIsRunning(false);
-  }, []);
+    if (isSyncMode && onTimerSync) {
+      // Pause synced timer - calculate remaining and stop
+      const remaining = calculateSyncedTimeLeft();
+      onTimerSync(remaining, null, false);
+    } else {
+      setLocalRunning(false);
+    }
+  }, [isSyncMode, onTimerSync, calculateSyncedTimeLeft]);
 
   const handleReset = useCallback(() => {
-    setIsRunning(false);
-    setTimeLeft(duration);
-  }, [duration]);
+    if (isSyncMode && onTimerSync) {
+      onTimerSync(syncedDuration ?? 60, null, false);
+    } else {
+      setLocalRunning(false);
+      setLocalTimeLeft(localDuration);
+    }
+  }, [isSyncMode, onTimerSync, syncedDuration, localDuration]);
+
+  const handleDurationChange = useCallback((newDuration: number) => {
+    if (isSyncMode && onTimerSync) {
+      onTimerSync(newDuration, null, false);
+    } else {
+      setLocalDuration(newDuration);
+    }
+  }, [isSyncMode, onTimerSync]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -117,7 +191,7 @@ export const GameTimer: React.FC<GameTimerProps> = ({
             'w-24 h-24 rounded-full flex items-center justify-center',
             'border-4 transition-colors duration-300',
             isEnded ? 'border-destructive bg-destructive/10' :
-            isWarning ? 'border-amber-500 bg-amber-500/10' :
+            isWarning ? 'border-warning bg-warning/10' :
             isRunning ? 'border-primary bg-primary/10' :
             'border-muted bg-muted/50'
           )}
@@ -136,7 +210,7 @@ export const GameTimer: React.FC<GameTimerProps> = ({
               className={cn(
                 'transition-colors duration-300',
                 isEnded ? 'text-destructive' :
-                isWarning ? 'text-amber-500' :
+                isWarning ? 'text-warning' :
                 'text-primary'
               )}
               strokeDasharray={`${2 * Math.PI * 44}`}
@@ -148,13 +222,20 @@ export const GameTimer: React.FC<GameTimerProps> = ({
           <span className={cn(
             'text-2xl font-bold z-10',
             isEnded ? 'text-destructive' :
-            isWarning ? 'text-amber-500' :
+            isWarning ? 'text-warning' :
             'text-foreground'
           )}>
             {formatTime(timeLeft)}
           </span>
         </motion.div>
       </div>
+
+      {/* Sync indicator for group mode */}
+      {isSyncMode && !isHost && (
+        <Badge variant="outline" className="text-xs">
+          {showEnglish ? 'Synced with host' : '與主持人同步'}
+        </Badge>
+      )}
 
       {/* Controls - only for host */}
       {isHost && (
@@ -207,7 +288,7 @@ export const GameTimer: React.FC<GameTimerProps> = ({
                         key={preset}
                         variant={duration === preset ? 'default' : 'outline'}
                         className="cursor-pointer"
-                        onClick={() => setDuration(preset)}
+                        onClick={() => handleDurationChange(preset)}
                       >
                         {preset}s
                       </Badge>
@@ -215,7 +296,7 @@ export const GameTimer: React.FC<GameTimerProps> = ({
                   </div>
                   <Slider
                     value={[duration]}
-                    onValueChange={([val]) => setDuration(val)}
+                    onValueChange={([val]) => handleDurationChange(val)}
                     min={15}
                     max={180}
                     step={15}

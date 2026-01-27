@@ -101,6 +101,9 @@ export type Database = {
           pass_count: number | null
           room_code: string
           status: string
+          timer_duration: number | null
+          timer_running: boolean | null
+          timer_started_at: string | null
           updated_at: string | null
           used_card_ids: string[] | null
         }
@@ -115,6 +118,9 @@ export type Database = {
           pass_count?: number | null
           room_code?: string
           status?: string
+          timer_duration?: number | null
+          timer_running?: boolean | null
+          timer_started_at?: string | null
           updated_at?: string | null
           used_card_ids?: string[] | null
         }
@@ -129,6 +135,9 @@ export type Database = {
           pass_count?: number | null
           room_code?: string
           status?: string
+          timer_duration?: number | null
+          timer_running?: boolean | null
+          timer_started_at?: string | null
           updated_at?: string | null
           used_card_ids?: string[] | null
         }

@@ -25,6 +25,10 @@ interface GameState {
   isHost: boolean;
   sessionId: string | null;
   groupNumber: number | null;
+  // Timer sync state
+  timerDuration: number;
+  timerStartedAt: string | null;
+  timerRunning: boolean;
 }
 
 const MAX_PASSES = 2;
@@ -50,6 +54,9 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     isHost: true,
     sessionId: options.sessionId || null,
     groupNumber: options.groupNumber || null,
+    timerDuration: 60,
+    timerStartedAt: null,
+    timerRunning: false,
   });
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -71,7 +78,15 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
         (payload) => {
           const updated = payload.new as any;
           
-          // Only update if we're not the one who triggered the change
+          // Sync timer state for all participants
+          setState(prev => ({
+            ...prev,
+            timerDuration: updated.timer_duration ?? prev.timerDuration,
+            timerStartedAt: updated.timer_started_at,
+            timerRunning: updated.timer_running ?? false,
+          }));
+          
+          // Only update card if we're not the one who triggered the change
           if (updated.current_card_id && updated.current_card_id !== state.currentCard?.id) {
             // Fetch the card content
             fetchCardContent(updated.current_card_id).then((cardData) => {
@@ -378,6 +393,33 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, [state.gameId]);
 
+  // Sync timer state to database
+  const syncTimer = useCallback(async (duration: number, startedAt: string | null, running: boolean) => {
+    if (!state.gameId) return;
+
+    // Update local state immediately
+    setState(prev => ({
+      ...prev,
+      timerDuration: duration,
+      timerStartedAt: startedAt,
+      timerRunning: running,
+    }));
+
+    // Sync to database for other participants
+    try {
+      await supabase
+        .from('icebreaker_games')
+        .update({
+          timer_duration: duration,
+          timer_started_at: startedAt,
+          timer_running: running,
+        })
+        .eq('id', state.gameId);
+    } catch (error) {
+      console.error('Failed to sync timer:', error);
+    }
+  }, [state.gameId]);
+
   // Get remaining passes
   const remainingPasses = MAX_PASSES - state.passCount;
 
@@ -392,5 +434,6 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     passCard,
     changeLevel,
     resetDeck,
+    syncTimer,
   };
 }
