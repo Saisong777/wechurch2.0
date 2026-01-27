@@ -95,9 +95,17 @@
     @apply border-border;
   }
 
+  /* Prevent mobile overscroll bounce showing white background */
+  html {
+    background-color: hsl(var(--background));
+    overscroll-behavior: none;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', sans-serif;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   h1, h2, h3, h4, h5, h6 {
