@@ -55,6 +55,7 @@ export const AdminPage: React.FC = () => {
     if (sessionData) {
       setCurrentSession({
         id: sessionData.id,
+        shortCode: sessionData.short_code,
         bibleVerse: '',
         verseReference: sessionData.verse_reference,
         status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
@@ -84,6 +85,7 @@ export const AdminPage: React.FC = () => {
         
         const updatedSession = {
           id: sessionData.id,
+          shortCode: sessionData.short_code,
           bibleVerse: '',
           verseReference: sessionData.verse_reference,
           status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',

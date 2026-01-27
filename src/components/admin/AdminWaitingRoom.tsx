@@ -127,7 +127,8 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
         {/* QR Code */}
         {currentSession?.id && (
           <SessionQRCode 
-            sessionId={currentSession.id} 
+            sessionId={currentSession.id}
+            shortCode={currentSession.shortCode}
             verseReference={currentSession.verseReference}
           />
         )}

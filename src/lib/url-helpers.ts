@@ -8,8 +8,15 @@ export const getPublicBaseUrl = (): string => {
 };
 
 /**
- * Generate a join URL for a session.
+ * Generate a join URL for a session using short code.
  */
-export const getSessionJoinUrl = (sessionId: string): string => {
-  return `${getPublicBaseUrl()}/user?session_id=${sessionId}`;
+export const getSessionJoinUrl = (sessionIdOrShortCode: string): string => {
+  return `${getPublicBaseUrl()}/user?session=${sessionIdOrShortCode}`;
+};
+
+/**
+ * Check if a string looks like a short code (4 alphanumeric chars) vs UUID
+ */
+export const isShortCode = (input: string): boolean => {
+  return /^[A-Z0-9]{4}$/i.test(input.trim());
 };

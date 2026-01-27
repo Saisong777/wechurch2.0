@@ -8,14 +8,16 @@ import { getSessionJoinUrl } from '@/lib/url-helpers';
 
 interface SessionQRCodeProps {
   sessionId: string;
+  shortCode?: string;
   verseReference?: string;
 }
 
-export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, verseReference }) => {
+export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, shortCode, verseReference }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Build the join URL dynamically
-  const joinUrl = getSessionJoinUrl(sessionId);
+  // Use short code for the URL if available, otherwise fall back to sessionId
+  const codeForUrl = shortCode || sessionId;
+  const joinUrl = getSessionJoinUrl(codeForUrl);
 
   const handleDownload = () => {
     const svg = document.getElementById('session-qr-code');
@@ -32,7 +34,7 @@ export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, verseRe
       ctx?.drawImage(img, 0, 0);
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
-      downloadLink.download = `bible-study-${sessionId.slice(0, 8)}.png`;
+      downloadLink.download = `soul-gym-${shortCode || sessionId.slice(0, 8)}.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -61,8 +63,16 @@ export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, verseRe
           />
         </div>
         
+        {/* Show short code prominently */}
+        {shortCode && (
+          <div className="text-center">
+            <p className="text-2xl font-mono font-bold tracking-[0.3em]">{shortCode}</p>
+            <p className="text-xs text-muted-foreground mt-1">課程代碼</p>
+          </div>
+        )}
+        
         <p className="text-center text-sm text-muted-foreground">
-          掃描 QR Code 加入課程
+          掃描 QR Code 或輸入代碼加入
         </p>
         
         <div className="flex gap-2">
@@ -90,8 +100,11 @@ export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, verseRe
                     fgColor="#1a1a2e"
                   />
                 </div>
+                {shortCode && (
+                  <p className="text-3xl font-mono font-bold tracking-[0.4em]">{shortCode}</p>
+                )}
                 <p className="text-center text-muted-foreground">
-                  掃描加入 Scan to Join
+                  掃描或輸入代碼加入
                 </p>
                 <p className="text-xs text-muted-foreground text-center break-all px-4">
                   {joinUrl}

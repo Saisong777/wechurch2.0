@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dumbbell, ArrowRight, QrCode } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { isShortCode } from '@/lib/url-helpers';
 
 type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'study' | 'review';
 
@@ -212,12 +213,12 @@ export const UserPage: React.FC = () => {
   // Initial session restoration on mount
   useEffect(() => {
     const initializeSession = async () => {
-      const sessionFromUrl = searchParams.get('session_id') || searchParams.get('session');
+      // Support both ?session= (new short code) and ?session_id= (legacy UUID)
+      const sessionFromUrl = searchParams.get('session') || searchParams.get('session_id');
       
-      // If URL has a session ID, use that (new session join)
+      // If URL has a session code/ID, use that (new session join)
       if (sessionFromUrl) {
         setSessionId(sessionFromUrl);
-        localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionFromUrl);
         await loadSessionAndCheckAuth(sessionFromUrl);
         setIsRestoring(false);
       } else if (!currentSession) {
@@ -253,21 +254,44 @@ export const UserPage: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  const loadSessionAndCheckAuth = async (id: string) => {
+  const loadSessionAndCheckAuth = async (idOrCode: string) => {
     setIsLoading(true);
     
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('sessions_public')
-      .select('*')
-      .eq('id', id.trim())
-      .maybeSingle();
+    const trimmedInput = idOrCode.trim().toUpperCase();
+    
+    // Determine if input is a short code or UUID
+    let sessionData;
+    let sessionError;
+    
+    if (isShortCode(trimmedInput)) {
+      // Query by short_code
+      const result = await supabase
+        .from('sessions_public')
+        .select('*')
+        .eq('short_code', trimmedInput)
+        .maybeSingle();
+      sessionData = result.data;
+      sessionError = result.error;
+    } else {
+      // Query by UUID (for backwards compatibility and QR code deep links)
+      const result = await supabase
+        .from('sessions_public')
+        .select('*')
+        .eq('id', trimmedInput)
+        .maybeSingle();
+      sessionData = result.data;
+      sessionError = result.error;
+    }
 
     if (sessionError || !sessionData) {
-      toast.error('找不到此 Session，請確認 ID 是否正確');
+      toast.error('找不到此課程，請確認代碼是否正確');
       setIsLoading(false);
       setStep('enter-session');
       return;
     }
+
+    // Store the actual session UUID for internal use
+    localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionData.id);
 
     setCurrentSession({
       id: sessionData.id,
@@ -293,7 +317,7 @@ export const UserPage: React.FC = () => {
 
   const handleEnterSession = async () => {
     if (!sessionId.trim()) {
-      toast.error('請輸入 Session ID');
+      toast.error('請輸入課程代碼');
       return;
     }
     await loadSessionAndCheckAuth(sessionId);
@@ -348,23 +372,24 @@ export const UserPage: React.FC = () => {
                 </div>
                 <CardTitle className="text-2xl sm:text-2xl">輸入課程代碼</CardTitle>
                 <CardDescription className="text-base sm:text-base mt-2">
-                  Enter Session ID from your coach
+                  Enter 4-digit code from your coach
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6 pb-8 sm:pb-8">
                 <div className="space-y-3">
                   <Label htmlFor="sessionId" className="text-base sm:text-sm font-medium">
-                    Session ID
+                    課程代碼 Session Code
                   </Label>
                   <Input
                     id="sessionId"
                     value={sessionId}
-                    onChange={(e) => setSessionId(e.target.value)}
-                    placeholder="輸入教練提供的 Session ID"
-                    className="h-14 sm:h-12 text-lg sm:text-base font-mono"
+                    onChange={(e) => setSessionId(e.target.value.toUpperCase())}
+                    placeholder="例如: AB12"
+                    className="h-16 sm:h-14 text-2xl sm:text-xl font-mono text-center tracking-[0.3em] uppercase"
+                    maxLength={4}
                   />
-                  <p className="text-sm text-muted-foreground">
-                    請向教練索取訓練代碼
+                  <p className="text-sm text-muted-foreground text-center">
+                    輸入教練提供的 4 碼代碼
                   </p>
                 </div>
 
