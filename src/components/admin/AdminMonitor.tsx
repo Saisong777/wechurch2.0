@@ -7,7 +7,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers } from '@/lib/supabase-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus } from 'lucide-react';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -29,6 +29,9 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StudyProgressMonitor } from './StudyProgressMonitor';
+import { MockDataGenerator } from './MockDataGenerator';
 
 export const AdminMonitor: React.FC = () => {
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
@@ -707,6 +710,28 @@ export const AdminMonitor: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Spiritual Fitness Monitoring Section */}
+      {isStudyingPhase && currentSession?.id && (
+        <Tabs defaultValue="progress" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="progress" className="gap-2">
+              <Dumbbell className="w-4 h-4" />
+              靈命健身進度
+            </TabsTrigger>
+            <TabsTrigger value="tools" className="gap-2">
+              <Sparkles className="w-4 h-4" />
+              模擬工具
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="progress" className="mt-4">
+            <StudyProgressMonitor sessionId={currentSession.id} />
+          </TabsContent>
+          <TabsContent value="tools" className="mt-4">
+            <MockDataGenerator sessionId={currentSession.id} />
+          </TabsContent>
+        </Tabs>
       )}
 
       {/* Report Dialog */}
