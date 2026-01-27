@@ -130,15 +130,21 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
         const isLatecomer = ['grouping', 'verification', 'studying'].includes(sessionStatus) && !joinedUser.groupNumber;
 
         if (isLatecomer) {
-          const smallestGroup = await findSmallestGroup(currentSession.id);
+          // Pass location to find smallest group within the same site
+          const smallestGroup = await findSmallestGroup(currentSession.id, location);
           if (smallestGroup) {
             const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup);
             if (assigned) {
               joinedUser.groupNumber = smallestGroup;
+              console.log("[JoinForm] Latecomer assigned to group:", smallestGroup, "at location:", location);
               toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`, {
                 description: 'You have been assigned to the smallest group.',
               });
+            } else {
+              console.error("[JoinForm] Failed to assign latecomer to group");
             }
+          } else {
+            console.warn("[JoinForm] No groups found for latecomer at location:", location);
           }
         }
 

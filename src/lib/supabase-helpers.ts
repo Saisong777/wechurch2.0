@@ -88,15 +88,17 @@ export const updateSessionAllowLatecomers = async (
   return !error;
 };
 
-// Find the group number with the fewest members
-export const findSmallestGroup = async (sessionId: string): Promise<number | null> => {
+// Find the group number with the fewest members (filtered by location for site isolation)
+export const findSmallestGroup = async (sessionId: string, location: string = "On-site"): Promise<number | null> => {
   const { data, error } = await supabase
     .from("participants")
     .select("group_number")
     .eq("session_id", sessionId)
+    .eq("location", location)
     .not("group_number", "is", null);
 
   if (error || !data || data.length === 0) {
+    console.log("[findSmallestGroup] No groups found for location:", location);
     return null;
   }
 
@@ -117,6 +119,7 @@ export const findSmallestGroup = async (sessionId: string): Promise<number | nul
     }
   }
 
+  console.log("[findSmallestGroup] Found smallest group:", minGroup, "with", minCount, "members at", location);
   return minGroup;
 };
 
