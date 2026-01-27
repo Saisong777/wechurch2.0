@@ -395,18 +395,19 @@ export const AdminMonitor: React.FC = () => {
     
     let combinedContent = '';
     
-    // Add group reports first (sorted by group number)
+    // Add overall reports FIRST (so they appear at the top of the viewer)
+    for (const report of overallReports) {
+      // Use a recognizable format that parse.ts can handle: "第 0 組" pattern for overall
+      combinedContent += `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n${'='.repeat(50)}\n\n${report.content}`;
+    }
+    
+    // Add group reports (sorted by group number)
     const sortedGroupReports = [...groupReports].sort((a, b) => 
       (a.groupNumber || 0) - (b.groupNumber || 0)
     );
     
     for (const report of sortedGroupReports) {
       combinedContent += `\n\n${'='.repeat(50)}\n第 ${report.groupNumber} 組報告\n${'='.repeat(50)}\n\n${report.content}`;
-    }
-    
-    // Add overall reports
-    for (const report of overallReports) {
-      combinedContent += `\n\n${'='.repeat(50)}\n整體洞察報告\n${'='.repeat(50)}\n\n${report.content}`;
     }
     
     if (combinedContent) {
