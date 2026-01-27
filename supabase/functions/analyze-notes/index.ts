@@ -20,7 +20,7 @@ const RequestSchema = z.object({
 });
 
 // Strict prompt: NO hallucination, personal attribution, real content only
-const SYSTEM_PROMPT = `你是「共同查經小組分析助理」。你的工作是**忠實整理**使用者提供的筆記，**絕對禁止**添加任何內容。
+const GROUP_SYSTEM_PROMPT = `你是「共同查經小組分析助理」。你的工作是**忠實整理**使用者提供的筆記，**絕對禁止**添加任何內容。
 
 🚨 嚴格禁止事項（違反將導致報告無效）：
 - ❌ 禁止添加筆記中沒有的神學解釋、經文引用、靈修感想
@@ -52,6 +52,52 @@ const SYSTEM_PROMPT = `你是「共同查經小組分析助理」。你的工作
 **👤 個人貢獻摘要（Personal Contributions）：**
 - [姓名]：[1-2句總結該成員寫了什麼]
 - [姓名]：未填寫內容
+
+一律使用繁體中文。`;
+
+// Overall synthesis prompt: Cross-group analysis and holistic insights
+const OVERALL_SYSTEM_PROMPT = `你是「全會眾查經綜合分析助理」。你的工作是對**所有小組的筆記**進行**跨組綜合分析**，找出共同主題、對比差異、提煉精華洞察。
+
+🎯 你的目標：
+- 綜合分析所有小組的筆記，而非簡單合併
+- 找出跨組共同的主題和觀點
+- 對比不同組的獨特視角和差異
+- 提煉出最精華的亮光和應用
+
+🚨 嚴格禁止事項：
+- ❌ 禁止添加筆記中沒有的神學解釋或靈修感想
+- ❌ 禁止編造任何人沒說過的內容
+- ❌ 禁止使用空洞形容詞美化內容
+
+✅ 必須遵守：
+1) 所有內容必須來自使用者提供的筆記
+2) 引用觀點時標註來源（組別或姓名）
+3) 進行真正的綜合分析，不是簡單羅列
+
+輸出格式（嚴格遵守）：
+**📊 全會眾查經綜合分析報告**
+**查經經文：**
+**參與統計：** X 組 / Y 人參與
+
+---
+
+**🔗 跨組共識（Cross-Group Consensus）：**
+（多個小組不約而同提到的共同主題或觀點，標註有多少組提及）
+
+**🌈 多元視角對比（Diverse Perspectives）：**
+（不同小組對同一經文的不同切入角度，展現多元性）
+- 第 X 組強調：...
+- 第 Y 組側重：...
+
+**💎 精選亮光（Highlighted Insights）：**
+（從所有筆記中精選最具啟發性的 3-5 條洞察，標註來源）
+- 👤 [姓名/第X組]：[精選亮光]
+
+**🎯 共同應用方向（Common Applications）：**
+（綜合各組提出的應用，歸納共同的行動方向）
+
+**📈 參與度摘要（Participation Summary）：**
+（簡述各組的參與情況和筆記品質）
 
 一律使用繁體中文。`;
 
@@ -324,17 +370,19 @@ serve(async (req) => {
     const totalMembers = allData.length;
     const memberNames = allData.map(d => d.姓名).filter(Boolean).join("、");
 
-    const reportTypeLabel = reportType === "group" 
-      ? `第 ${groupNumber} 組小組報告 (Group ${groupNumber} Report)`
-      : "整體健身報告 (Overall Assembly Report)";
-
     const compactEntries = formatCompactEntries(allData);
     
     const unfilledNote = unfilledNames.length > 0
       ? `\n⚠️ 以下成員尚未填寫內容（不納入分析）：${unfilledNames.join("、")}`
       : "";
 
-    const userPrompt = `請根據以下資料，生成一份${reportTypeLabel}。
+    // Build user prompt based on report type
+    let userPrompt: string;
+    let systemPrompt: string;
+    
+    if (reportType === "group") {
+      systemPrompt = GROUP_SYSTEM_PROMPT;
+      userPrompt = `請根據以下資料，生成一份第 ${groupNumber} 組小組報告 (Group ${groupNumber} Report)。
 
 ⚠️ 重要提醒：
 - 共有 ${totalMembers} 位成員的筆記需要分析
@@ -347,6 +395,43 @@ serve(async (req) => {
 ${compactEntries}
 
 請依照指定格式生成完整報告，確保涵蓋所有 ${totalMembers} 位成員的貢獻。`;
+    } else {
+      // Overall report: Cross-group synthesis
+      systemPrompt = OVERALL_SYSTEM_PROMPT;
+      
+      // Group data by group number for better analysis
+      const groupedData = new Map<number, typeof allData>();
+      allData.forEach(d => {
+        const gn = d.組別 || 0;
+        if (!groupedData.has(gn)) groupedData.set(gn, []);
+        groupedData.get(gn)!.push(d);
+      });
+      
+      const groupCount = groupedData.size;
+      const groupSummaries = Array.from(groupedData.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([gn, data]) => {
+          const names = data.map(d => d.姓名).filter(Boolean).join("、");
+          const entries = formatCompactEntries(data);
+          return `### 第 ${gn} 組（${data.length} 人：${names}）\n${entries}`;
+        })
+        .join("\n\n");
+      
+      userPrompt = `請對以下所有小組的查經筆記進行**綜合分析**，生成一份全會眾查經綜合分析報告。
+
+⚠️ 重要提醒：
+- 這是跨組綜合分析，不是簡單合併！
+- 請找出共同主題、對比差異、提煉精華
+- 共有 ${groupCount} 個小組、${totalMembers} 位成員參與${unfilledNote}
+
+經文：${session.verse_reference || "未指定"}
+
+各小組查經筆記資料：
+
+${groupSummaries}
+
+請進行深度跨組分析，依照指定格式生成綜合報告。`;
+    }
 
     const tPrompt = Date.now();
 
@@ -366,7 +451,7 @@ ${compactEntries}
         model,
         temperature: 0.2,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
       }),
