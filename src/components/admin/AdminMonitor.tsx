@@ -341,27 +341,27 @@ export const AdminMonitor: React.FC = () => {
   const readyPercentage = totalMemberCount > 0 ? (totalReadyCount / totalMemberCount) * 100 : 0;
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       {/* Session Header */}
       <Card variant="highlight">
-        <CardContent className="py-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
+        <CardContent className="py-4 sm:py-6 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div>
               <p className="text-sm text-muted-foreground">今日經文</p>
-              <p className="font-serif text-xl font-bold text-foreground">
+              <p className="font-serif text-lg sm:text-xl font-bold text-foreground">
                 {currentSession?.verseReference}
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <Badge variant={isVerificationPhase ? 'secondary' : isStudyingPhase ? 'default' : 'outline'}>
-                {isVerificationPhase ? '驗證階段 Verification' : isStudyingPhase ? '健身中 Training' : currentSession?.status}
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Badge variant={isVerificationPhase ? 'secondary' : isStudyingPhase ? 'default' : 'outline'} className="text-xs sm:text-sm">
+                {isVerificationPhase ? '驗證中' : isStudyingPhase ? '健身中' : currentSession?.status}
               </Badge>
               <div className="text-center">
-                <p className="text-2xl font-bold text-primary">
+                <p className="text-xl sm:text-2xl font-bold text-primary">
                   {isVerificationPhase ? `${totalReadyCount}/${totalMemberCount}` : `${submittedCount}/${totalCount}`}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {isVerificationPhase ? '已確認 Ready' : '已提交 Submitted'}
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {isVerificationPhase ? '已確認' : '已提交'}
                 </p>
               </div>
             </div>
@@ -384,7 +384,7 @@ export const AdminMonitor: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <UserPlus className="w-4 h-4 text-muted-foreground" />
                   <Label htmlFor="allow-latecomers" className="text-sm cursor-pointer">
-                    允許遲到者加入 Allow Latecomers
+                    允許遲到者加入
                   </Label>
                 </div>
                 <Switch
@@ -406,46 +406,47 @@ export const AdminMonitor: React.FC = () => {
       {/* Admin Rescue Tools */}
       {(isVerificationPhase || (!isStudyingPhase && groups.length > 0)) && (
         <Card className="border-accent/50 bg-accent/5">
-          <CardContent className="py-4 space-y-4">
+          <CardContent className="py-4 px-4 sm:px-6 space-y-4">
             {/* Header */}
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-accent" />
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-foreground">管理員救援工具 Admin Rescue Tools</p>
-                <p className="text-sm text-muted-foreground">
-                  現場出狀況時可快速救援，請謹慎使用
+                <p className="font-medium text-foreground text-sm sm:text-base">管理員救援工具</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  現場出狀況時可快速救援
                 </p>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
+            {/* Action Buttons - horizontal scroll on mobile */}
+            <div className="flex flex-nowrap sm:flex-wrap gap-2 sm:gap-3 overflow-x-auto pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
               {/* Force Verify All */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
                     variant="outline" 
-                    className="border-accent text-accent hover:bg-accent/10"
+                    size="sm"
+                    className="border-accent text-accent hover:bg-accent/10 flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm"
                     disabled={isForceVerifying}
                   >
                     {isForceVerifying ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
                     ) : (
-                      <Zap className="w-4 h-4 mr-2" />
+                      <Zap className="w-4 h-4 mr-1.5" />
                     )}
-                    強制全員確認
+                    強制確認
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>確定要強制確認所有參與者嗎？</AlertDialogTitle>
+                    <AlertDialogTitle className="text-lg">確定要強制確認所有參與者嗎？</AlertDialogTitle>
                     <AlertDialogDescription>
                       此操作會將所有 {totalMemberCount} 位參與者標記為「已確認」，並自動進入查經階段。
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleForceVerifyAll}>
+                  <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                    <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleForceVerifyAll} className="h-11 sm:h-10">
                       確定執行
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -456,28 +457,29 @@ export const AdminMonitor: React.FC = () => {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
-                    variant="outline" 
-                    className="border-orange-500 text-orange-600 hover:bg-orange-500/10"
+                    variant="outline"
+                    size="sm" 
+                    className="border-destructive/70 text-destructive hover:bg-destructive/10 flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm"
                     disabled={isResettingReady}
                   >
                     {isResettingReady ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
                     ) : (
-                      <RotateCcw className="w-4 h-4 mr-2" />
+                      <RotateCcw className="w-4 h-4 mr-1.5" />
                     )}
-                    重置確認狀態
+                    重置確認
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>確定要重置所有參與者的確認狀態嗎？</AlertDialogTitle>
+                    <AlertDialogTitle className="text-lg">確定要重置所有參與者的確認狀態嗎？</AlertDialogTitle>
                     <AlertDialogDescription>
                       此操作會將所有 {totalMemberCount} 位參與者的「已確認」狀態重置為「未確認」，讓他們需要重新進行組員確認。
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleResetAllReady} className="bg-orange-600 hover:bg-orange-700">
+                  <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                    <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleResetAllReady} className="bg-destructive hover:bg-destructive/90 h-11 sm:h-10">
                       確定重置
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -488,30 +490,31 @@ export const AdminMonitor: React.FC = () => {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
-                    variant="outline" 
-                    className="border-blue-500 text-blue-600 hover:bg-blue-500/10"
+                    variant="outline"
+                    size="sm" 
+                    className="border-secondary text-secondary hover:bg-secondary/10 flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm"
                     disabled={isRegrouping}
                   >
                     {isRegrouping ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
                     ) : (
-                      <Shuffle className="w-4 h-4 mr-2" />
+                      <Shuffle className="w-4 h-4 mr-1.5" />
                     )}
-                    僅重新分組
+                    重新分組
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>確定要重新分組嗎？</AlertDialogTitle>
+                    <AlertDialogTitle className="text-lg">確定要重新分組嗎？</AlertDialogTitle>
                     <AlertDialogDescription>
                       此操作會清除所有 {totalMemberCount} 位參與者的小組分配，但<strong>保留所有參與者</strong>。
                       <br /><br />
                       您可以使用新的分組設定重新分配小組，或讓新加入的人一起參與分組。
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleRegroupOnly} className="bg-blue-600 hover:bg-blue-700">
+                  <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                    <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRegroupOnly} className="bg-secondary hover:bg-secondary/90 h-11 sm:h-10">
                       確定重新分組
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -522,30 +525,31 @@ export const AdminMonitor: React.FC = () => {
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
-                    variant="outline" 
-                    className="border-destructive text-destructive hover:bg-destructive/10"
+                    variant="outline"
+                    size="sm" 
+                    className="border-destructive text-destructive hover:bg-destructive/10 flex-shrink-0 h-9 sm:h-10 text-xs sm:text-sm"
                     disabled={isClearingGroups}
                   >
                     {isClearingGroups ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
                     ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
+                      <RefreshCw className="w-4 h-4 mr-1.5" />
                     )}
-                    清除分組重新來過
+                    清除重來
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>⚠️ 確定要清除所有分組嗎？</AlertDialogTitle>
+                    <AlertDialogTitle className="text-lg">⚠️ 確定要清除所有分組嗎？</AlertDialogTitle>
                     <AlertDialogDescription>
                       此操作會清除所有 {totalMemberCount} 位參與者的小組分配，並將 Session 狀態重置為「等待中」，讓您可以重新分組。
                       <br /><br />
                       <strong className="text-destructive">注意：此操作無法復原！</strong>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearAllGroups} className="bg-destructive hover:bg-destructive/90">
+                  <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                    <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearAllGroups} className="bg-destructive hover:bg-destructive/90 h-11 sm:h-10">
                       確定清除
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -598,20 +602,20 @@ export const AdminMonitor: React.FC = () => {
           const theme = locationThemes[locIndex % locationThemes.length];
           
           return (
-            <div key={location} className="space-y-4">
+            <div key={location} className="space-y-3 sm:space-y-4">
               {/* Location Header */}
-              <div className={`flex items-center gap-3 p-3 rounded-lg ${theme.header}`}>
-                <div className="flex items-center gap-2 text-lg font-semibold">
-                  <MapPin className={`w-5 h-5 ${theme.icon}`} />
+              <div className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg ${theme.header}`}>
+                <div className="flex items-center gap-2 text-base sm:text-lg font-semibold flex-wrap">
+                  <MapPin className={`w-4 h-4 sm:w-5 sm:h-5 ${theme.icon}`} />
                   {location === 'On-site' ? '📍 現場' : `📍 ${location}`}
-                  <span className="text-muted-foreground font-normal">
+                  <span className="text-muted-foreground font-normal text-sm">
                     ({locationUserCount} 人，{locationGroups.length} 組)
                   </span>
                 </div>
               </div>
               
-              {/* Groups Grid - Local numbering starts from 1 for each location */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Groups Grid - responsive columns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {locationGroups.map((group, localIndex) => {
                   const isGroupReady = 'allReady' in group ? group.allReady : false;
                   const members = 'members' in group ? group.members : (group as any).members || [];
@@ -629,32 +633,32 @@ export const AdminMonitor: React.FC = () => {
                       key={globalGroupNumber} 
                       className={`${theme.bg} ${theme.border} border-2 ${isGroupReady || allSubmitted ? 'ring-2 ring-accent' : ''}`}
                     >
-                      <CardHeader className="pb-3">
+                      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            <Users className={`w-5 h-5 ${theme.icon}`} />
+                          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                            <Users className={`w-4 h-4 sm:w-5 sm:h-5 ${theme.icon}`} />
                             第 {localGroupNumber} 組
                           </CardTitle>
                           {isVerificationPhase ? (
                             isGroupReady ? (
-                              <span className="flex items-center gap-1 text-sm text-accent">
+                              <span className="flex items-center gap-1 text-xs sm:text-sm text-accent">
                                 <CheckCircle className="w-4 h-4" />
-                                已就緒
+                                就緒
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                                 <Clock className="w-4 h-4" />
-                                {readyCount}/{totalMembers} 確認
+                                {readyCount}/{totalMembers}
                               </span>
                             )
                           ) : (
                             allSubmitted ? (
-                              <span className="flex items-center gap-1 text-sm text-accent">
+                              <span className="flex items-center gap-1 text-xs sm:text-sm text-accent">
                                 <CheckCircle className="w-4 h-4" />
-                                已完成
+                                完成
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                                 <Clock className="w-4 h-4" />
                                 {groupSubmissions.length}/{members.length}
                               </span>
@@ -670,8 +674,8 @@ export const AdminMonitor: React.FC = () => {
                           />
                         )}
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
+                      <CardContent className="px-3 sm:px-4">
+                        <div className="space-y-1.5 sm:space-y-2">
                           {members.map((member: any) => {
                             const memberReady = 'readyConfirmed' in member ? member.readyConfirmed : false;
                             const hasSubmitted = !isVerificationPhase && submissions.some(s => s.userId === member.id);
@@ -680,18 +684,18 @@ export const AdminMonitor: React.FC = () => {
                             return (
                               <div
                                 key={member.id}
-                                className="flex items-center justify-between py-2 border-b last:border-0 border-muted/50"
+                                className="flex items-center justify-between py-1.5 sm:py-2 border-b last:border-0 border-muted/50"
                               >
                                 <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground text-sm font-bold">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground text-xs sm:text-sm font-bold">
                                     {member.name.charAt(0)}
                                   </div>
                                   <span className="text-sm font-medium">{member.name}</span>
                                 </div>
                                 {isComplete ? (
-                                  <CheckCircle className="w-5 h-5 text-accent" />
+                                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                                 ) : (
-                                  <Clock className="w-5 h-5 text-muted-foreground" />
+                                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                                 )}
                               </div>
                             );
@@ -705,7 +709,7 @@ export const AdminMonitor: React.FC = () => {
               
               {/* Separator between locations */}
               {locIndex < sortedLocations.length - 1 && (
-                <div className="border-t-2 border-dashed border-muted-foreground/20 my-8" />
+                <div className="border-t-2 border-dashed border-muted-foreground/20 my-6 sm:my-8" />
               )}
             </div>
           );
@@ -715,15 +719,15 @@ export const AdminMonitor: React.FC = () => {
       {/* AI Analysis Actions (Show only in study phase) */}
       {isStudyingPhase && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 sm:px-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Sparkles className="w-5 h-5 text-secondary" />
-              AI 分析 Analysis
+              AI 分析
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* AI Options */}
-            <div className="flex flex-wrap gap-4 p-3 bg-muted/30 rounded-lg border border-dashed">
+          <CardContent className="space-y-4 px-4 sm:px-6">
+            {/* AI Options - stacked on mobile */}
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 p-3 bg-muted/30 rounded-lg border border-dashed">
               <div className="flex items-center gap-2">
                 <Switch
                   id="fast-mode"
@@ -731,9 +735,9 @@ export const AdminMonitor: React.FC = () => {
                   onCheckedChange={setFastMode}
                 />
                 <Label htmlFor="fast-mode" className="text-sm flex items-center gap-1.5 cursor-pointer">
-                  <Zap className="w-4 h-4 text-yellow-500" />
+                  <Zap className="w-4 h-4 text-accent" />
                   快速模式
-                  <span className="text-xs text-muted-foreground">(小組用較快模型)</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">(較快模型)</span>
                 </Label>
               </div>
               <div className="flex items-center gap-2">
@@ -743,20 +747,20 @@ export const AdminMonitor: React.FC = () => {
                   onCheckedChange={setFilledOnly}
                 />
                 <Label htmlFor="filled-only" className="text-sm flex items-center gap-1.5 cursor-pointer">
-                  <Users className="w-4 h-4 text-blue-500" />
+                  <Users className="w-4 h-4 text-secondary" />
                   僅分析有填寫者
-                  <span className="text-xs text-muted-foreground">(降低 token 量)</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">(降低 token)</span>
                 </Label>
               </div>
             </div>
 
             {/* Progress indicator during generation */}
             {generationProgress.total > 0 && (
-              <div className="space-y-2 p-4 bg-muted/50 rounded-lg border">
+              <div className="space-y-2 p-3 sm:p-4 bg-muted/50 rounded-lg border">
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                    正在並行生成報告...
+                    生成報告中...
                   </span>
                   <span className="font-medium text-primary">
                     {generationProgress.current}/{generationProgress.total}
@@ -769,11 +773,12 @@ export const AdminMonitor: React.FC = () => {
               </div>
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Action buttons - stack on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <Button
                 variant="navy"
                 size="lg"
-                className="w-full"
+                className="w-full h-12 sm:h-11 text-sm sm:text-base"
                 onClick={handleGenerateGroupSummary}
                 disabled={isGeneratingGroup || !hasDataForAnalysis}
               >
@@ -792,7 +797,7 @@ export const AdminMonitor: React.FC = () => {
               <Button
                 variant="gold"
                 size="lg"
-                className="w-full"
+                className="w-full h-12 sm:h-11 text-sm sm:text-base"
                 onClick={handleGenerateOverallInsight}
                 disabled={isGeneratingOverall || !hasDataForAnalysis}
               >
@@ -806,7 +811,7 @@ export const AdminMonitor: React.FC = () => {
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full"
+                className="w-full h-12 sm:h-11 text-sm sm:text-base"
                 onClick={handleExportCSV}
                 disabled={!hasDataForAnalysis}
               >
@@ -821,12 +826,12 @@ export const AdminMonitor: React.FC = () => {
       {/* Spiritual Fitness Monitoring Section */}
       {isStudyingPhase && currentSession?.id && (
         <Tabs defaultValue="progress" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="progress" className="gap-2">
+          <TabsList className="grid w-full grid-cols-2 h-11 sm:h-10">
+            <TabsTrigger value="progress" className="gap-2 text-sm">
               <Dumbbell className="w-4 h-4" />
               進度監控
             </TabsTrigger>
-            <TabsTrigger value="tools" className="gap-2">
+            <TabsTrigger value="tools" className="gap-2 text-sm">
               <Zap className="w-4 h-4" />
               開發工具
             </TabsTrigger>

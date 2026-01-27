@@ -98,20 +98,20 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       {/* Session Info + QR Code */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         <Card variant="highlight" className="md:col-span-2">
-          <CardContent className="py-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
+          <CardContent className="py-4 sm:py-6 px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">今日經文</p>
-                <p className="font-serif text-xl font-bold text-foreground">
+                <p className="font-serif text-lg sm:text-xl font-bold text-foreground">
                   {currentSession?.verseReference}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
-                <Button variant="outline" size="sm" onClick={handleCopySessionId}>
+              <div className="flex items-center gap-3 sm:gap-4">
+                <Button variant="outline" size="default" onClick={handleCopySessionId} className="h-10 sm:h-9 text-sm">
                   <Copy className="w-4 h-4 mr-2" />
                   複製 ID
                 </Button>
@@ -135,13 +135,13 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
 
       {/* Participants */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Users className="w-5 h-5 text-secondary" />
               已加入成員 Participants
             </CardTitle>
-            <div className="flex items-center gap-4 text-sm flex-wrap">
+            <div className="flex items-center gap-3 sm:gap-4 text-sm flex-wrap">
               <span className="flex items-center gap-1">
                 👨 <strong>{maleCount}</strong> 男
               </span>
@@ -156,15 +156,15 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           {users.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>等待成員加入...</p>
+            <div className="text-center py-10 sm:py-12 text-muted-foreground">
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-base sm:text-lg">等待成員加入...</p>
               <p className="text-sm mt-1">Waiting for participants to join...</p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               {Object.entries(locationGroups).map(([location, locationUsers]) => (
                 <div key={location}>
                   {locationCount > 1 && (
@@ -175,18 +175,18 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                       <span>({locationUsers.length} 人)</span>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
                     {locationUsers.map((user, index) => (
                       <div
                         key={user.id}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 animate-slide-in-right"
+                        className="flex items-center gap-2 sm:gap-3 p-3 sm:p-3 rounded-lg bg-muted/50 animate-slide-in-right"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
-                        <div className="w-10 h-10 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground font-bold">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full gradient-gold flex items-center justify-center text-secondary-foreground font-bold text-sm sm:text-base flex-shrink-0">
                           {user.name.charAt(0)}
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">{user.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm sm:text-base truncate">{user.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {user.gender === 'male' ? '男' : '女'}
                             {locationCount === 1 && user.location !== 'On-site' && ` • ${user.location}`}
@@ -204,26 +204,27 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
 
       {/* Grouping Settings */}
       <Card>
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Settings className="w-5 h-5 text-secondary" />
               分組設定 Grouping Settings
             </CardTitle>
             <Button
               variant="ghost"
-              size="sm"
+              size="default"
               onClick={() => setShowSettings(!showSettings)}
+              className="h-10 sm:h-9"
             >
               {showSettings ? '收起' : '展開'}
             </Button>
           </div>
         </CardHeader>
         {showSettings && (
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="minSize">每組最少人數 Min</Label>
+                <Label htmlFor="minSize" className="text-sm sm:text-base">每組最少人數 Min</Label>
                 <Input
                   id="minSize"
                   type="number"
@@ -235,12 +236,12 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                     setMinSize(val);
                     if (val > maxSize) setMaxSize(val);
                   }}
-                  className="text-center text-lg font-medium"
+                  className="text-center text-lg font-medium h-12 sm:h-11"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="maxSize">每組最多人數 Max</Label>
+                <Label htmlFor="maxSize" className="text-sm sm:text-base">每組最多人數 Max</Label>
                 <Input
                   id="maxSize"
                   type="number"
@@ -252,7 +253,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                     setMaxSize(val);
                     if (val < minSize) setMinSize(val);
                   }}
-                  className="text-center text-lg font-medium"
+                  className="text-center text-lg font-medium h-12 sm:h-11"
                 />
               </div>
             </div>
@@ -266,7 +267,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
               <RadioGroup
                 value={method}
                 onValueChange={(value) => setMethod(value as 'random' | 'gender-balanced' | 'gender-separated')}
-                className="grid grid-cols-1 md:grid-cols-3 gap-3"
+                className="grid grid-cols-1 sm:grid-cols-3 gap-3"
               >
                 <Label
                   htmlFor="random"
@@ -326,7 +327,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
       <Button
         variant="gold"
         size="xl"
-        className="w-full"
+        className="w-full h-14 sm:h-12 text-base sm:text-lg"
         onClick={handleStartGrouping}
         disabled={users.length < 2 || isGrouping}
       >
@@ -334,7 +335,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
           '分組中...'
         ) : (
           <>
-            <UserCheck className="w-5 h-5" />
+            <UserCheck className="w-5 h-5 sm:w-6 sm:h-6" />
             開始分組 Start Grouping ({users.length} 人)
           </>
         )}
