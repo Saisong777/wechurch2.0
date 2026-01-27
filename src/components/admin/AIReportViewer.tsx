@@ -43,9 +43,9 @@ interface AIReportViewerProps {
 function cleanMarkdown(text: string): string {
   if (!text) return '';
   return text
-    .replace(/\*\*([^*]+)\*\*/g, '$1')       // Remove bold **text**
-    .replace(/(?<!\*)\*(?!\*)([^*\n]+)\*(?!\*)/g, '$1') // Remove italic *text* but not ** or list items
-    .replace(/^\s*[\*\-•]\s+/gm, '• ')       // Normalize bullets: * or - or • at line start → •
+    .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove bold **text**
+    .replace(/^\s*\*\s+/gm, '• ')        // Replace * at line start with bullet
+    .replace(/^\s*-\s+/gm, '• ')         // Replace - at line start with bullet
     .trim();
 }
 

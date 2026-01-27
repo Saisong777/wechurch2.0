@@ -244,9 +244,9 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
   
   // Clean markdown formatting from content
   const cleanContent = content
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/(?<!\*)\*(?!\*)([^*\n]+)\*(?!\*)/g, '$1')
-    .replace(/^\s*[\*\-•]\s+/gm, '• ');
+    .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove bold **text**
+    .replace(/^\s*\*\s+/gm, '• ')        // Replace * at line start with bullet
+    .replace(/^\s*-\s+/gm, '• ');        // Replace - at line start with bullet
   
   return (
     <div className={`p-5 border-l-4 rounded-r-lg ${config.bgClass}`}>
