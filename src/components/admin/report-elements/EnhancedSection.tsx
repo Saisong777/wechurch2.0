@@ -72,13 +72,13 @@ export const EnhancedSection: React.FC<EnhancedSectionProps> = ({
       .replace(/^\s*\*\s+/gm, '• ')
       .replace(/^\s*-\s+/gm, '• ');
     
-    // Highlight names (弟兄/姊妹/姐妹 patterns)
+    // Highlight names (弟兄/姊妹/姐妹 patterns) - use non-global for testing
     const namePattern = /([^\s，。、：:]+(?:弟兄|姊妹|姐妹|同學|老師))/g;
+    const nameTestPattern = /^[^\s，。、：:]+(?:弟兄|姊妹|姐妹|同學|老師)$/;
     const parts = cleaned.split(namePattern);
     
     return parts.map((part, idx) => {
-      if (namePattern.test(part)) {
-        namePattern.lastIndex = 0; // Reset regex
+      if (nameTestPattern.test(part)) {
         return (
           <span key={idx} className="font-semibold text-primary">
             {part}
