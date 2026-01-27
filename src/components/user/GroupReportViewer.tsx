@@ -194,22 +194,29 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
         )}
         
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* Group Meta Info */}
         {(parsed.members || parsed.verse) && (
-          <div className="bg-muted/50 p-4 rounded-lg">
+          <div className="bg-gradient-to-r from-muted/60 to-muted/30 p-4 rounded-lg">
             {parsed.members && (
-              <p className="text-sm flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" />
-                <span className="font-medium">組員：</span> 
-                <span className="text-muted-foreground">{parsed.members}</span>
+              <p className="text-sm flex items-start gap-2">
+                <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <span className="font-medium shrink-0">組員：</span> 
+                <span>
+                  {parsed.members.split(/[,，、]/).map((name, idx, arr) => (
+                    <span key={idx}>
+                      <span className="font-medium text-primary">{name.trim()}</span>
+                      {idx < arr.length - 1 && <span className="text-muted-foreground">、</span>}
+                    </span>
+                  ))}
+                </span>
               </p>
             )}
             {parsed.verse && (
-              <p className="text-sm flex items-center gap-2 mt-1">
-                <BookOpen className="w-4 h-4 text-primary" />
-                <span className="font-medium">經文：</span>
-                <span className="text-muted-foreground">{parsed.verse}</span>
+              <p className="text-sm flex items-start gap-2 mt-2">
+                <BookOpen className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <span className="font-medium shrink-0">經文：</span>
+                <span className="text-muted-foreground italic">{parsed.verse}</span>
               </p>
             )}
           </div>
@@ -217,7 +224,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
 
         {/* Structured Sections */}
         {hasStructuredContent ? (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {parsed.themes && (
               <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
             )}
@@ -236,25 +243,66 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             
             {/* Personal Contributions Section - at the bottom */}
             {parsed.contributions && (
-              <div className="p-5 border-l-4 rounded-r-lg bg-accent/10 border-accent">
-                <h3 className="flex items-center gap-2 font-semibold mb-3 text-accent">
-                  <User className="w-5 h-5" />
-                  👤 個人貢獻摘要 Personal Contributions
-                </h3>
-                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-1">
-                  {parsed.contributions}
-                </div>
-              </div>
+              <ContributionsSectionUser contributions={parsed.contributions} />
             )}
           </div>
         ) : (
-          <div className="p-4 bg-card border border-border rounded-lg">
-            <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+          <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
+            <div className="text-sm text-foreground whitespace-pre-wrap leading-7">
               {parsed.raw}
             </div>
           </div>
         )}
       </CardContent>
     </Card>
+  );
+};
+
+// Separate component for contributions with name highlighting
+const ContributionsSectionUser: React.FC<{ contributions: string }> = ({ contributions }) => {
+  const formatContributions = (text: string): React.ReactNode => {
+    const lines = text.split('\n').filter(l => l.trim());
+    
+    return lines.map((line, idx) => {
+      const nameMatch = line.match(/^[-•]?\s*([^\s：:]+(?:弟兄|姊妹|姐妹|同學|老師|[A-Za-z]+))[\s]*[：:]\s*(.+)/);
+      
+      if (nameMatch) {
+        return (
+          <div key={idx} className="flex gap-2 py-2 border-b border-accent/20 last:border-0">
+            <span className="font-bold text-primary shrink-0 min-w-[5rem]">
+              {nameMatch[1]}
+            </span>
+            <span className="text-foreground/90">{nameMatch[2]}</span>
+          </div>
+        );
+      }
+      
+      const namePattern = /([^\s，。、：:]+(?:弟兄|姊妹|姐妹|同學|老師))/g;
+      const parts = line.replace(/^[-•]\s*/, '').split(namePattern);
+      
+      return (
+        <div key={idx} className="py-1.5">
+          {parts.map((part, pIdx) => {
+            if (namePattern.test(part)) {
+              namePattern.lastIndex = 0;
+              return <span key={pIdx} className="font-semibold text-primary">{part}</span>;
+            }
+            return part;
+          })}
+        </div>
+      );
+    });
+  };
+  
+  return (
+    <div className="p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent shadow-sm">
+      <h3 className="flex items-center gap-2 font-bold text-base mb-4 text-accent">
+        <User className="w-5 h-5" />
+        👤 個人貢獻摘要 Personal Contributions
+      </h3>
+      <div className="text-sm leading-relaxed pl-1">
+        {formatContributions(contributions)}
+      </div>
+    </div>
   );
 };
