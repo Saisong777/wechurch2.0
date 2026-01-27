@@ -145,6 +145,51 @@ function parseReportContent(content: string): GroupReport[] {
   return sections.length > 0 ? sections : [{ groupNumber: 0, raw: cleanMarkdown(content) }];
 }
 
+// Generate structured Markdown from a parsed section (for downloads)
+function generateSectionMarkdown(section: GroupReport, verseReference?: string): string {
+  const lines: string[] = [];
+  
+  lines.push('### 小組查經整合文件\n');
+  
+  if (section.groupInfo) {
+    lines.push(`**組別：** ${section.groupInfo}\n`);
+  }
+  
+  if (section.members) {
+    lines.push(`**組員：** ${section.members}\n`);
+  }
+  
+  if (section.verse || verseReference) {
+    lines.push(`**查經經文：** ${section.verse || verseReference}\n`);
+  }
+  
+  lines.push('---\n');
+  
+  if (section.themes) {
+    lines.push(`**📖 主題（Themes）：**\n${section.themes}\n`);
+  }
+  
+  if (section.observations) {
+    lines.push(`**🔍 事實發現（Observations）：**\n${section.observations}\n`);
+  }
+  
+  if (section.insights) {
+    lines.push(`**💡 獨特亮光（Unique Insights）：**\n${section.insights}\n`);
+  }
+  
+  if (section.applications) {
+    lines.push(`**🎯 如何應用（Applications）：**\n${section.applications}\n`);
+  }
+  
+  // If no structured content, fall back to raw
+  const hasStructured = section.themes || section.observations || section.insights || section.applications;
+  if (!hasStructured && section.raw) {
+    lines.push(section.raw);
+  }
+  
+  return lines.join('\n');
+}
+
 // Generate print-ready HTML for a single group or all groups
 function generatePrintHTML(sections: GroupReport[], verseReference?: string, singleGroup?: number): string {
   const filteredSections = singleGroup !== undefined 
@@ -426,9 +471,14 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   };
   
   const handleDownloadMarkdownAll = () => {
-    if (!reportContent) return;
+    if (!parsedSections.length) return;
     
-    const blob = new Blob([reportContent], { type: 'text/markdown;charset=utf-8;' });
+    // Generate structured markdown for all sections
+    const allMarkdown = parsedSections
+      .map(section => generateSectionMarkdown(section, verseReference))
+      .join('\n\n' + '='.repeat(50) + '\n\n');
+    
+    const blob = new Blob([allMarkdown], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -443,7 +493,10 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     const section = parsedSections.find(s => s.groupNumber === groupNumber);
     if (!section) return;
     
-    const blob = new Blob([section.raw], { type: 'text/markdown;charset=utf-8;' });
+    // Use structured markdown generator instead of raw
+    const markdown = generateSectionMarkdown(section, verseReference);
+    
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

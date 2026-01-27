@@ -67,6 +67,48 @@ function parseReportContent(content: string): ParsedReport {
   return result;
 }
 
+// Generate structured Markdown from a parsed report (for downloads)
+function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verseReference?: string): string {
+  const lines: string[] = [];
+  
+  lines.push('### 小組查經整合文件\n');
+  lines.push(`**組別：** 第 ${groupNumber} 組\n`);
+  
+  if (parsed.members) {
+    lines.push(`**組員：** ${parsed.members}\n`);
+  }
+  
+  if (parsed.verse || verseReference) {
+    lines.push(`**查經經文：** ${parsed.verse || verseReference}\n`);
+  }
+  
+  lines.push('---\n');
+  
+  if (parsed.themes) {
+    lines.push(`**📖 主題（Themes）：**\n${parsed.themes}\n`);
+  }
+  
+  if (parsed.observations) {
+    lines.push(`**🔍 事實發現（Observations）：**\n${parsed.observations}\n`);
+  }
+  
+  if (parsed.insights) {
+    lines.push(`**💡 獨特亮光（Unique Insights）：**\n${parsed.insights}\n`);
+  }
+  
+  if (parsed.applications) {
+    lines.push(`**🎯 如何應用（Applications）：**\n${parsed.applications}\n`);
+  }
+  
+  // If no structured content, fall back to raw
+  const hasStructured = parsed.themes || parsed.observations || parsed.insights || parsed.applications;
+  if (!hasStructured && parsed.raw) {
+    lines.push(parsed.raw);
+  }
+  
+  return lines.join('\n');
+}
+
 export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   sessionId,
   groupNumber,
@@ -119,7 +161,11 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   const handleDownload = () => {
     if (!report) return;
     
-    const blob = new Blob([report], { type: 'text/markdown;charset=utf-8;' });
+    // Use structured markdown generator for consistent download
+    const parsed = parseReportContent(report);
+    const markdown = generateReportMarkdown(parsed, groupNumber, verseReference);
+    
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
