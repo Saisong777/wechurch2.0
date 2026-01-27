@@ -7,8 +7,6 @@ import { fetchAIReports } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
 import { 
   EnhancedSection, 
-  extractActionItems, 
-  ActionItemList,
   extractKeywords,
   KeywordTagCloud 
 } from '@/components/admin/ReportVisualElements';
@@ -29,32 +27,42 @@ interface ParsedReport {
   raw: string;
 }
 
+// Clean markdown formatting
+function cleanMarkdown(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/^\s*[\*\-]\s+/gm, '• ')
+    .trim();
+}
+
 function parseReportContent(content: string): ParsedReport {
-  const result: ParsedReport = { raw: content };
+  const result: ParsedReport = { raw: cleanMarkdown(content) };
   
   // Extract members
   const membersMatch = content.match(/(?:\*\*)?組員(?:\*\*)?[：:]\s*([^\n]+)/);
-  if (membersMatch) result.members = membersMatch[1].trim();
+  if (membersMatch) result.members = cleanMarkdown(membersMatch[1]);
   
   // Extract verse
   const verseMatch = content.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*([^\n]+)/);
-  if (verseMatch) result.verse = verseMatch[1].trim();
+  if (verseMatch) result.verse = cleanMarkdown(verseMatch[1]);
   
   // Extract themes
   const themesMatch = content.match(/(?:📖\s*)?(?:\*\*)?主題.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🔍|💡|🎯|---|\*\*事實|\*\*獨特|\*\*如何|$))/i);
-  if (themesMatch) result.themes = themesMatch[1].trim();
+  if (themesMatch) result.themes = cleanMarkdown(themesMatch[1]);
   
   // Extract observations
   const obsMatch = content.match(/(?:🔍\s*)?(?:\*\*)?事實發現.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:💡|🎯|---|\*\*獨特|\*\*如何|$))/i);
-  if (obsMatch) result.observations = obsMatch[1].trim();
+  if (obsMatch) result.observations = cleanMarkdown(obsMatch[1]);
   
   // Extract insights
   const insightsMatch = content.match(/(?:💡\s*)?(?:\*\*)?獨特亮光.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:🎯|---|\*\*如何|$))/i);
-  if (insightsMatch) result.insights = insightsMatch[1].trim();
+  if (insightsMatch) result.insights = cleanMarkdown(insightsMatch[1]);
   
   // Extract applications
   const appMatch = content.match(/(?:🎯\s*)?(?:\*\*)?如何應用.*?(?:\*\*)?[：:]\s*([\s\S]*?)(?=(?:---|$))/i);
-  if (appMatch) result.applications = appMatch[1].trim();
+  if (appMatch) result.applications = cleanMarkdown(appMatch[1]);
   
   return result;
 }
@@ -229,10 +237,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             )}
             
             {parsed.applications && (
-              <div className="space-y-2">
-                <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
-                <ActionItemList items={extractActionItems(parsed.applications)} />
-              </div>
+              <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
             )}
           </div>
         ) : (
