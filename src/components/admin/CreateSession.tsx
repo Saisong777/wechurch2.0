@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Dumbbell, Play, Download, CheckCircle, Copy, Flame } from 'lucide-react';
+import { Dumbbell, Download, CheckCircle, Copy, Flame, Gamepad2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import { getSessionJoinUrl } from '@/lib/url-helpers';
@@ -20,6 +21,8 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
   const { setCurrentSession, setIsAdmin } = useSession();
   const { user } = useAuth();
   const [verseReference, setVerseReference] = useState('');
+  const [icebreakerEnabled, setIcebreakerEnabled] = useState(true);
+  const [allowLatecomers, setAllowLatecomers] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdSessionId, setCreatedSessionId] = useState('');
@@ -42,7 +45,9 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
       .insert({ 
         verse_reference: verseReference, 
         status: 'waiting',
-        owner_id: user.id 
+        owner_id: user.id,
+        icebreaker_enabled: icebreakerEnabled,
+        allow_latecomers: allowLatecomers
       })
       .select()
       .single();
@@ -134,6 +139,51 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
             <p className="text-sm text-muted-foreground">
               輸入今天訓練使用的經文章節
             </p>
+          </div>
+
+          {/* Session Options */}
+          <div className="space-y-4 pt-2 border-t border-border">
+            <p className="text-sm font-medium text-muted-foreground">課程設定</p>
+            
+            {/* Icebreaker Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Gamepad2 className="w-4 h-4 text-secondary" />
+                <Label htmlFor="icebreaker-toggle" className="text-sm cursor-pointer">
+                  啟用破冰卡牌
+                </Label>
+              </div>
+              <Switch
+                id="icebreaker-toggle"
+                checked={icebreakerEnabled}
+                onCheckedChange={setIcebreakerEnabled}
+              />
+            </div>
+            {icebreakerEnabled && (
+              <p className="text-xs text-muted-foreground ml-6">
+                🎮 分組後會先進行破冰卡牌環節
+              </p>
+            )}
+
+            {/* Allow Latecomers Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-accent" />
+                <Label htmlFor="latecomer-toggle" className="text-sm cursor-pointer">
+                  允許遲到者加入
+                </Label>
+              </div>
+              <Switch
+                id="latecomer-toggle"
+                checked={allowLatecomers}
+                onCheckedChange={setAllowLatecomers}
+              />
+            </div>
+            {allowLatecomers && (
+              <p className="text-xs text-muted-foreground ml-6">
+                ⏰ 課程開始後，遲到者仍可加入最小組別
+              </p>
+            )}
           </div>
 
           <Button
