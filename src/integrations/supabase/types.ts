@@ -59,6 +59,103 @@ export type Database = {
           },
         ]
       }
+      card_questions: {
+        Row: {
+          content_text: string
+          content_text_en: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          level: Database["public"]["Enums"]["card_level"]
+          sort_order: number | null
+        }
+        Insert: {
+          content_text: string
+          content_text_en?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          level: Database["public"]["Enums"]["card_level"]
+          sort_order?: number | null
+        }
+        Update: {
+          content_text?: string
+          content_text_en?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          level?: Database["public"]["Enums"]["card_level"]
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      icebreaker_games: {
+        Row: {
+          bible_study_session_id: string | null
+          created_at: string | null
+          current_card_id: string | null
+          current_level: Database["public"]["Enums"]["card_level"] | null
+          group_number: number | null
+          id: string
+          mode: Database["public"]["Enums"]["game_mode"]
+          pass_count: number | null
+          room_code: string
+          status: string
+          updated_at: string | null
+          used_card_ids: string[] | null
+        }
+        Insert: {
+          bible_study_session_id?: string | null
+          created_at?: string | null
+          current_card_id?: string | null
+          current_level?: Database["public"]["Enums"]["card_level"] | null
+          group_number?: number | null
+          id?: string
+          mode?: Database["public"]["Enums"]["game_mode"]
+          pass_count?: number | null
+          room_code?: string
+          status?: string
+          updated_at?: string | null
+          used_card_ids?: string[] | null
+        }
+        Update: {
+          bible_study_session_id?: string | null
+          created_at?: string | null
+          current_card_id?: string | null
+          current_level?: Database["public"]["Enums"]["card_level"] | null
+          group_number?: number | null
+          id?: string
+          mode?: Database["public"]["Enums"]["game_mode"]
+          pass_count?: number | null
+          room_code?: string
+          status?: string
+          updated_at?: string | null
+          used_card_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "icebreaker_games_bible_study_session_id_fkey"
+            columns: ["bible_study_session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "icebreaker_games_bible_study_session_id_fkey"
+            columns: ["bible_study_session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "icebreaker_games_current_card_id_fkey"
+            columns: ["current_card_id"]
+            isOneToOne: false
+            referencedRelation: "card_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       participants: {
         Row: {
           email: string
@@ -646,6 +743,18 @@ export type Database = {
         Args: { p_email: string; p_session_id: string }
         Returns: boolean
       }
+      draw_next_card: {
+        Args: {
+          p_game_id: string
+          p_level?: Database["public"]["Enums"]["card_level"]
+        }
+        Returns: {
+          card_content: string
+          card_id: string
+          card_level: Database["public"]["Enums"]["card_level"]
+          cards_remaining: number
+        }[]
+      }
       generate_short_code: { Args: never; Returns: string }
       get_participant_for_reentry: {
         Args: { p_email: string; p_session_id: string }
@@ -681,6 +790,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      reset_icebreaker_deck: { Args: { p_game_id: string }; Returns: boolean }
       set_participant_ready: {
         Args: {
           p_email: string
@@ -693,6 +803,8 @@ export type Database = {
     }
     Enums: {
       app_role: "member" | "leader" | "future_leader" | "admin"
+      card_level: "L1" | "L2" | "L3"
+      game_mode: "standalone" | "session"
       insight_category_type: "PROMISE" | "COMMAND" | "WARNING" | "GOD_ATTRIBUTE"
     }
     CompositeTypes: {
@@ -822,6 +934,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["member", "leader", "future_leader", "admin"],
+      card_level: ["L1", "L2", "L3"],
+      game_mode: ["standalone", "session"],
       insight_category_type: ["PROMISE", "COMMAND", "WARNING", "GOD_ATTRIBUTE"],
     },
   },
