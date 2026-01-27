@@ -12,3 +12,4 @@ export {
 
 export { GroupSection } from './GroupSection';
 export { OverallReportCharts } from './OverallReportCharts';
+export { ReportComparison } from './ReportComparison';

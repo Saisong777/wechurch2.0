@@ -1,7 +1,8 @@
-// Visualization charts for overall AI report analysis
+// Visualization charts for overall AI report analysis with animations
 
-import React, { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import React, { useMemo, useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, MessageSquare, Lightbulb, TrendingUp } from 'lucide-react';
@@ -19,6 +20,58 @@ const CHART_COLORS = [
   '#ec4899',
   '#06b6d4',
 ];
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1,
+    }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { 
+      type: 'spring', 
+      stiffness: 300, 
+      damping: 24 
+    }
+  }
+};
+
+const statCardVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    x: 0,
+    transition: {
+      delay: i * 0.1,
+      type: 'spring',
+      stiffness: 400,
+      damping: 25
+    }
+  })
+};
+
+const progressVariants = {
+  hidden: { pathLength: 0 },
+  visible: (percentage: number) => ({
+    pathLength: percentage / 100,
+    transition: {
+      duration: 1.2,
+      ease: 'easeOut',
+      delay: 0.3
+    }
+  })
+};
 
 interface OverallReportChartsProps {
   groupReports: GroupReport[];
@@ -133,186 +186,310 @@ export const OverallReportCharts: React.FC<OverallReportChartsProps> = ({
   
   if (groupReports.length === 0) return null;
   
+  // Animated number counter hook
+  const AnimatedNumber: React.FC<{ value: number; suffix?: string }> = ({ value, suffix = '' }) => {
+    const [displayValue, setDisplayValue] = useState(0);
+    
+    useEffect(() => {
+      const duration = 1000;
+      const steps = 30;
+      const increment = value / steps;
+      let current = 0;
+      
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= value) {
+          setDisplayValue(value);
+          clearInterval(timer);
+        } else {
+          setDisplayValue(Math.floor(current));
+        }
+      }, duration / steps);
+      
+      return () => clearInterval(timer);
+    }, [value]);
+    
+    return <>{displayValue}{suffix}</>;
+  };
+
+  // Animated circular progress component
+  const AnimatedCircularProgress: React.FC<{
+    percentage: number;
+    color: string;
+    size?: number;
+  }> = ({ percentage, color, size = 80 }) => {
+    const strokeWidth = 6;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = radius * 2 * Math.PI;
+    
+    return (
+      <motion.svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="transform -rotate-90"
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--muted))"
+          strokeWidth={strokeWidth}
+        />
+        {/* Progress circle */}
+        <motion.circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          initial={{ strokeDasharray: circumference, strokeDashoffset: circumference }}
+          animate={{ 
+            strokeDashoffset: circumference - (percentage / 100) * circumference 
+          }}
+          transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+        />
+      </motion.svg>
+    );
+  };
+  
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Summary Stats */}
+    <motion.div 
+      className={cn("space-y-4", className)}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Summary Stats with staggered animation */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              <div>
-                <p className="text-xs text-muted-foreground">小組數</p>
-                <p className="text-lg sm:text-2xl font-bold text-primary">{groupReports.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-secondary/10 to-secondary/5 border-secondary/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
-              <div>
-                <p className="text-xs text-muted-foreground">參與人數</p>
-                <p className="text-lg sm:text-2xl font-bold text-secondary">{totalMembers}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
-              <div>
-                <p className="text-xs text-muted-foreground">熱門主題</p>
-                <p className="text-sm sm:text-lg font-bold text-accent truncate">
-                  {keywordFrequency[0]?.keyword || '-'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
-              <div>
-                <p className="text-xs text-muted-foreground">平均完成度</p>
-                <p className="text-lg sm:text-2xl font-bold text-green-600">{avgCompleteness}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {[
+          { icon: Users, label: '小組數', value: groupReports.length, color: 'primary', gradient: 'from-primary/10 to-primary/5', border: 'border-primary/20' },
+          { icon: MessageSquare, label: '參與人數', value: totalMembers, color: 'secondary', gradient: 'from-secondary/10 to-secondary/5', border: 'border-secondary/20' },
+          { icon: Lightbulb, label: '熱門主題', value: keywordFrequency[0]?.keyword || '-', color: 'accent', gradient: 'from-accent/10 to-accent/5', border: 'border-accent/20', isText: true },
+          { icon: TrendingUp, label: '平均完成度', value: avgCompleteness, suffix: '%', color: 'emerald', gradient: 'from-emerald-500/10 to-emerald-500/5', border: 'border-emerald-500/20' },
+        ].map((stat, idx) => (
+          <motion.div
+            key={stat.label}
+            custom={idx}
+            variants={statCardVariants}
+          >
+            <Card className={cn(`bg-gradient-to-br ${stat.gradient} ${stat.border}`)}>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: idx * 0.1 + 0.2, type: 'spring', stiffness: 400 }}
+                  >
+                    <stat.icon className={cn("w-4 h-4 sm:w-5 sm:h-5", `text-${stat.color}`)} />
+                  </motion.div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <p className={cn("text-lg sm:text-2xl font-bold", stat.isText ? "text-sm sm:text-lg truncate" : "", `text-${stat.color}`)}>
+                      {stat.isText ? stat.value : <AnimatedNumber value={stat.value as number} suffix={stat.suffix} />}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
       
-      {/* Charts Grid */}
+      {/* Charts Grid with animation */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Group Participation Chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              各組參與度比較
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="h-48 sm:h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={participationStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--popover))', 
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: number, name: string) => {
-                      if (name === 'memberCount') return [value, '人數'];
-                      if (name === 'completeness') return [`${value}%`, '完成度'];
-                      return [value, name];
-                    }}
-                  />
-                  <Bar dataKey="memberCount" name="memberCount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="completeness" name="completeness" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-center gap-4 mt-2 text-xs">
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-primary" /> 人數
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-secondary" /> 完成度(%)
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        <motion.div variants={cardVariants}>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                各組參與度比較
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <motion.div 
+                className="h-48 sm:h-56"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={participationStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--popover))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'memberCount') return [value, '人數'];
+                        if (name === 'completeness') return [`${value}%`, '完成度'];
+                        return [value, name];
+                      }}
+                    />
+                    <Bar 
+                      dataKey="memberCount" 
+                      name="memberCount" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                      animationDuration={1200}
+                      animationBegin={400}
+                    />
+                    <Bar 
+                      dataKey="completeness" 
+                      name="completeness" 
+                      fill="hsl(var(--secondary))" 
+                      radius={[4, 4, 0, 0]}
+                      animationDuration={1200}
+                      animationBegin={600}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </motion.div>
+              <motion.div 
+                className="flex justify-center gap-4 mt-2 text-xs"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+              >
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded bg-primary" /> 人數
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded bg-secondary" /> 完成度(%)
+                </span>
+              </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
         {/* Keyword Word Cloud (as Bar Chart) */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-              <Lightbulb className="w-4 h-4" />
-              主題關鍵詞頻率
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="h-48 sm:h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={keywordFrequency} 
-                  layout="vertical"
-                  margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
-                  <YAxis 
-                    type="category" 
-                    dataKey="keyword" 
-                    tick={{ fontSize: 11 }} 
-                    width={60}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--popover))', 
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: number) => [`${value} 次`, '出現次數']}
-                  />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {keywordFrequency.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Section Completion Pie Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              各項目填寫情況
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              {sectionStats.map((stat, idx) => (
-                <div key={stat.name} className="text-center">
-                  <div 
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg shadow-lg"
-                    style={{ 
-                      background: `conic-gradient(${CHART_COLORS[idx]} ${stat.percentage}%, hsl(var(--muted)) ${stat.percentage}%)`,
-                    }}
+        <motion.div variants={cardVariants}>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                <Lightbulb className="w-4 h-4" />
+                主題關鍵詞頻率
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <motion.div 
+                className="h-48 sm:h-56"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={keywordFrequency} 
+                    layout="vertical"
+                    margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
                   >
-                    <span 
-                      className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-foreground font-bold"
-                      style={{ backgroundColor: 'hsl(var(--background))' }}
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis type="number" tick={{ fontSize: 11 }} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="keyword" 
+                      tick={{ fontSize: 11 }} 
+                      width={60}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--popover))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value: number) => [`${value} 次`, '出現次數']}
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      radius={[0, 4, 4, 0]}
+                      animationDuration={1200}
+                      animationBegin={500}
                     >
-                      {stat.percentage}%
-                    </span>
-                  </div>
-                  <p className="text-xs sm:text-sm mt-2 text-muted-foreground">{stat.name}</p>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {stat.count}/{groupReports.length} 組
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                      {keywordFrequency.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        
+        {/* Section Completion with animated rings */}
+        <motion.div variants={cardVariants} className="lg:col-span-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                各項目填寫情況
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+                {sectionStats.map((stat, idx) => (
+                  <motion.div 
+                    key={stat.name} 
+                    className="text-center"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 + idx * 0.1, type: 'spring', stiffness: 300 }}
+                  >
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto">
+                      <AnimatedCircularProgress 
+                        percentage={stat.percentage} 
+                        color={CHART_COLORS[idx]} 
+                        size={80}
+                      />
+                      <motion.div 
+                        className="absolute inset-0 flex items-center justify-center"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 1 + idx * 0.1, type: 'spring' }}
+                      >
+                        <span className="text-sm sm:text-base font-bold text-foreground">
+                          <AnimatedNumber value={stat.percentage} suffix="%" />
+                        </span>
+                      </motion.div>
+                    </div>
+                    <motion.p 
+                      className="text-xs sm:text-sm mt-2 text-muted-foreground"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 1.2 + idx * 0.1 }}
+                    >
+                      {stat.name}
+                    </motion.p>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 1.3 + idx * 0.1 }}
+                    >
+                      <Badge variant="secondary" className="text-[10px]">
+                        {stat.count}/{groupReports.length} 組
+                      </Badge>
+                    </motion.div>
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 };
