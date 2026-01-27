@@ -305,20 +305,20 @@ export const UserPage: React.FC = () => {
 
       case 'enter-session':
         return (
-          <div className="w-full max-w-md mx-auto px-3 sm:px-4 py-4 sm:py-8 animate-fade-in">
+          <div className="w-full max-w-md mx-auto px-4 sm:px-4 py-6 sm:py-8 animate-fade-in">
             <Card variant="highlight" className="border-2">
-              <CardHeader className="text-center px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
-                <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold flex items-center justify-center mb-4 sm:mb-4 glow-gold">
+              <CardHeader className="text-center px-4 sm:px-6 pt-8 sm:pt-8 pb-4">
+                <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold flex items-center justify-center mb-5 sm:mb-4 glow-gold">
                   <Dumbbell className="w-10 h-10 sm:w-8 sm:h-8 text-secondary-foreground" />
                 </div>
                 <CardTitle className="text-2xl sm:text-2xl">輸入課程代碼</CardTitle>
-                <CardDescription className="text-base mt-1">
+                <CardDescription className="text-base sm:text-base mt-2">
                   Enter Session ID from your coach
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6 pb-6 sm:pb-8">
-                <div className="space-y-2">
-                  <Label htmlFor="sessionId" className="text-base font-medium">
+              <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6 pb-8 sm:pb-8">
+                <div className="space-y-3">
+                  <Label htmlFor="sessionId" className="text-base sm:text-sm font-medium">
                     Session ID
                   </Label>
                   <Input
@@ -336,7 +336,7 @@ export const UserPage: React.FC = () => {
                 <Button
                   variant="gold"
                   size="xl"
-                  className="w-full h-14 sm:h-12 text-lg sm:text-base"
+                  className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
                   onClick={handleEnterSession}
                   disabled={isLoading || !sessionId.trim()}
                 >
@@ -348,7 +348,7 @@ export const UserPage: React.FC = () => {
                   )}
                 </Button>
 
-                <div className="relative py-1">
+                <div className="relative py-2">
                   <div className="absolute inset-0 flex items-center">
                     <Separator className="w-full" />
                   </div>
@@ -362,7 +362,7 @@ export const UserPage: React.FC = () => {
                 <Button
                   variant="outline"
                   size="xl"
-                  className="w-full h-14 sm:h-12 text-lg sm:text-base"
+                  className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
                   onClick={() => setShowScanner(true)}
                 >
                   <QrCode className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
@@ -381,10 +381,9 @@ export const UserPage: React.FC = () => {
 
       case 'join':
         return (
-          <div className="px-4 py-8">
+          <div className="px-3 sm:px-4 py-4 sm:py-8">
             <JoinForm onJoined={(isLatecomer) => {
               if (isLatecomer) {
-                // Latecomers with assigned group go directly to verification
                 setStep('verification');
               } else {
                 setStep('waiting');
@@ -395,31 +394,35 @@ export const UserPage: React.FC = () => {
 
       case 'waiting':
         return (
-          <div className="px-4 py-8">
+          <div className="px-3 sm:px-4 py-4 sm:py-8">
             <WaitingRoom onGroupingStarted={() => setStep('group-reveal')} />
           </div>
         );
 
       case 'group-reveal':
-        return <GroupReveal onContinue={() => setStep('verification')} />;
+        return (
+          <div className="px-3 sm:px-4 py-4 sm:py-8">
+            <GroupReveal onContinue={() => setStep('verification')} />
+          </div>
+        );
 
       case 'verification':
         return (
-          <div className="px-4 py-8">
+          <div className="px-3 sm:px-4 py-4 sm:py-8">
             <GroupVerification onAllReady={() => setStep('study')} />
           </div>
         );
 
       case 'study':
         return (
-          <div className="px-4 py-8">
+          <div className="px-2 sm:px-4 py-3 sm:py-8">
             <SpiritualFitnessForm onSubmitted={() => setStep('review')} />
           </div>
         );
 
       case 'review':
         return (
-          <div className="px-4 py-8">
+          <div className="px-3 sm:px-4 py-4 sm:py-8">
             <SubmissionReview onEdit={() => setStep('study')} />
           </div>
         );

@@ -339,40 +339,40 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   }
 
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
+    <div className="min-h-[60vh] flex flex-col items-center justify-center">
       {/* Large Group/Location Display */}
-      <div className="text-center mb-8 animate-scale-in">
+      <div className="text-center mb-6 sm:mb-8 animate-scale-in">
         {isRemote ? (
           <>
-            <p className="text-muted-foreground text-lg mb-4 flex items-center justify-center gap-2">
+            <p className="text-muted-foreground text-lg sm:text-lg mb-4 flex items-center justify-center gap-2">
               <MapPin className="w-5 h-5" />
               您的聚會地點
             </p>
             <div className="relative inline-block">
               <div className="absolute inset-0 bg-secondary/40 rounded-3xl blur-3xl animate-pulse-soft" />
-              <div className="relative px-12 py-8 rounded-3xl gradient-gold glow-gold">
-                <span className="font-serif text-4xl md:text-5xl font-bold text-secondary-foreground">
+              <div className="relative px-10 sm:px-12 py-6 sm:py-8 rounded-3xl gradient-gold glow-gold">
+                <span className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-secondary-foreground">
                   {location}
                 </span>
               </div>
             </div>
-            <p className="mt-4 text-muted-foreground">第 {localGroupNumber} 組</p>
+            <p className="mt-4 text-lg sm:text-base text-muted-foreground">第 {localGroupNumber} 組</p>
           </>
         ) : (
           <>
-            <p className="text-muted-foreground text-lg mb-4 flex items-center justify-center gap-2">
+            <p className="text-muted-foreground text-lg sm:text-lg mb-4 flex items-center justify-center gap-2">
               <Users className="w-5 h-5" />
               您的小組
             </p>
             <div className="relative inline-block">
               <div className="absolute inset-0 bg-secondary/40 rounded-full blur-3xl animate-pulse-soft" />
-              <div className="relative w-44 h-44 md:w-56 md:h-56 rounded-full gradient-gold flex items-center justify-center glow-gold shadow-2xl">
-                <span className="font-serif text-8xl md:text-9xl font-bold text-secondary-foreground drop-shadow-lg">
+              <div className="relative w-40 h-40 sm:w-44 sm:h-44 md:w-56 md:h-56 rounded-full gradient-gold flex items-center justify-center glow-gold shadow-2xl">
+                <span className="font-serif text-7xl sm:text-8xl md:text-9xl font-bold text-secondary-foreground drop-shadow-lg">
                   {localGroupNumber}
                 </span>
               </div>
             </div>
-            <p className="mt-6 font-serif text-3xl font-bold text-foreground">
+            <p className="mt-5 sm:mt-6 font-serif text-2xl sm:text-3xl font-bold text-foreground">
               第 {localGroupNumber} 組
             </p>
             <p className="mt-2 text-sm text-muted-foreground">現場 On-site</p>
@@ -382,19 +382,19 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
 
       {/* Member Verification Card */}
       <Card className="w-full max-w-md animate-fade-in">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
           <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 text-lg sm:text-base">
               <Users className="w-5 h-5 text-secondary" />
               組員確認
             </span>
-            <span className="text-sm font-normal text-muted-foreground">
+            <span className="text-base sm:text-sm font-normal text-muted-foreground">
               {readyCount}/{totalCount} 已就位
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
+        <CardContent className="px-4 sm:px-6 pb-6 space-y-4">
+          <p className="text-base sm:text-sm text-muted-foreground">
             請確認以下組員都已到場，然後點擊「準備完成」
           </p>
           
@@ -403,20 +403,20 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
             {otherMembers.map((member) => (
               <div
                 key={member.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                className={`flex items-center gap-3 p-4 sm:p-3 rounded-lg border transition-all touch-manipulation ${
                   member.readyConfirmed 
                     ? 'bg-accent/10 border-accent' 
                     : 'bg-muted/30 border-border'
                 }`}
               >
                 {hasConfirmed ? (
-                  <div className={`w-5 h-5 flex items-center justify-center ${
+                  <div className={`w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center ${
                     member.readyConfirmed ? 'text-accent' : 'text-muted-foreground'
                   }`}>
                     {member.readyConfirmed ? (
-                      <CheckCircle className="w-5 h-5" />
+                      <CheckCircle className="w-6 h-6 sm:w-5 sm:h-5" />
                     ) : (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
                     )}
                   </div>
                 ) : (
@@ -426,12 +426,13 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
                     onCheckedChange={(checked) => 
                       handleCheckMember(member.id, checked as boolean)
                     }
+                    className="w-6 h-6 sm:w-5 sm:h-5"
                   />
                 )}
                 
                 <div className="flex-1">
-                  <p className="font-medium">{member.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="font-medium text-base sm:text-sm">{member.name}</p>
+                  <p className="text-sm sm:text-xs text-muted-foreground">
                     {member.gender === 'male' ? '男' : '女'}
                     {member.readyConfirmed && ' • ✓ 已確認'}
                   </p>
@@ -440,17 +441,17 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
             ))}
             
             {/* Current user (always shown at bottom) */}
-            <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+            <div className={`flex items-center gap-3 p-4 sm:p-3 rounded-lg border ${
               hasConfirmed 
                 ? 'bg-accent/10 border-accent' 
                 : 'bg-primary/5 border-primary/20'
             }`}>
-              <div className="w-5 h-5 flex items-center justify-center text-accent">
-                {hasConfirmed && <CheckCircle className="w-5 h-5" />}
+              <div className="w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center text-accent">
+                {hasConfirmed && <CheckCircle className="w-6 h-6 sm:w-5 sm:h-5" />}
               </div>
               <div className="flex-1">
-                <p className="font-medium">{currentUser?.name} (您)</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="font-medium text-base sm:text-sm">{currentUser?.name} (您)</p>
+                <p className="text-sm sm:text-xs text-muted-foreground">
                   {currentUser?.gender === 'male' ? '男' : '女'}
                   {hasConfirmed && ' • ✓ 已確認'}
                 </p>
@@ -463,31 +464,27 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
             <Button
               variant="gold"
               size="lg"
-              className="w-full"
+              className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
               onClick={handleReady}
               disabled={isSubmitting || otherMembers.length === 0 || 
                 !otherMembers.every(m => checkedMembers.has(m.id))}
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin mr-2" />
                   確認中...
                 </>
               ) : (
                 <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
+                  <CheckCircle className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
                   準備完成 Ready
                 </>
               )}
             </Button>
           ) : (
-            <div className="text-center py-4 space-y-2">
-              <div className="flex items-center justify-center gap-2 text-accent">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="font-medium">等待其他組員確認...</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Waiting for all members to confirm
+            <div className="text-center py-4 sm:py-3 bg-muted/30 rounded-lg">
+              <p className="text-base sm:text-sm text-muted-foreground">
+                ✓ 您已準備完成，等待其他組員...
               </p>
             </div>
           )}

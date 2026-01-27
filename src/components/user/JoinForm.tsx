@@ -172,22 +172,22 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
   return (
     <div className="w-full max-w-lg mx-auto animate-fade-in">
       <Card variant="highlight">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 rounded-full gradient-gold flex items-center justify-center mb-4 glow-gold">
-            <Users className="w-8 h-8 text-secondary-foreground" />
+        <CardHeader className="text-center px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+          <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold flex items-center justify-center mb-5 sm:mb-4 glow-gold">
+            <Users className="w-10 h-10 sm:w-8 sm:h-8 text-secondary-foreground" />
           </div>
-          <CardTitle className="text-2xl">加入靈魂健身房</CardTitle>
-          <CardDescription className="text-base">
+          <CardTitle className="text-2xl sm:text-2xl">加入靈魂健身房</CardTitle>
+          <CardDescription className="text-base sm:text-base mt-1">
             Join Soul Gym Session
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6 pb-6 sm:pb-8">
           {/* Google Sign In Button */}
           <div className="mb-6">
             <Button
               type="button"
               variant="outline"
-              className="w-full h-12 text-base flex items-center justify-center gap-3"
+              className="w-full h-14 sm:h-12 text-lg sm:text-base flex items-center justify-center gap-3 touch-manipulation active:scale-[0.98]"
               onClick={handleGoogleSignIn}
               disabled={isGoogleLoading || authLoading}
             >
@@ -227,9 +227,9 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
             </span>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-base flex items-center gap-2">
+              <Label htmlFor="name" className="text-base sm:text-sm flex items-center gap-2">
                 <UserIcon className="w-4 h-4 text-muted-foreground" />
                 姓名 Name
               </Label>
@@ -239,12 +239,12 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="請輸入您的姓名"
                 required
-                className="h-12 text-base"
+                className="h-14 sm:h-12 text-lg sm:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-base flex items-center gap-2">
+              <Label htmlFor="email" className="text-base sm:text-sm flex items-center gap-2">
                 <Mail className="w-4 h-4 text-muted-foreground" />
                 電子郵件 Email
               </Label>
@@ -255,43 +255,43 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 required
-                className="h-12 text-base"
+                className="h-14 sm:h-12 text-lg sm:text-base"
               />
             </div>
 
             <div className="space-y-3">
-              <Label className="text-base">性別 Gender</Label>
+              <Label className="text-base sm:text-sm">性別 Gender</Label>
               <RadioGroup
                 value={gender}
                 onValueChange={(value) => setGender(value as 'male' | 'female')}
-                className="flex gap-4"
+                className="flex gap-3 sm:gap-4"
               >
                 <div className="flex-1">
                   <Label
                     htmlFor="male"
-                    className={`flex items-center justify-center gap-2 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`flex items-center justify-center gap-2 p-4 sm:p-4 rounded-lg border-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98] ${
                       gender === 'male'
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
                     <RadioGroupItem value="male" id="male" className="sr-only" />
-                    <span className="text-lg">👨</span>
-                    <span className="font-medium">男 Male</span>
+                    <span className="text-xl sm:text-lg">👨</span>
+                    <span className="font-medium text-base sm:text-sm">男 Male</span>
                   </Label>
                 </div>
                 <div className="flex-1">
                   <Label
                     htmlFor="female"
-                    className={`flex items-center justify-center gap-2 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`flex items-center justify-center gap-2 p-4 sm:p-4 rounded-lg border-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98] ${
                       gender === 'female'
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
                     <RadioGroupItem value="female" id="female" className="sr-only" />
-                    <span className="text-lg">👩</span>
-                    <span className="font-medium">女 Female</span>
+                    <span className="text-xl sm:text-lg">👩</span>
+                    <span className="font-medium text-base sm:text-sm">女 Female</span>
                   </Label>
                 </div>
               </RadioGroup>
@@ -301,8 +301,8 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border">
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
-                  <Label htmlFor="remote-toggle" className="text-base cursor-pointer">
+                  <MapPin className="w-5 h-5 sm:w-4 sm:h-4 text-muted-foreground" />
+                  <Label htmlFor="remote-toggle" className="text-base sm:text-sm cursor-pointer">
                     Joining from a Remote Location?
                   </Label>
                 </div>
@@ -315,7 +315,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
               
               {isRemote && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="location" className="text-base flex items-center gap-2">
+                  <Label htmlFor="location" className="text-base sm:text-sm flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     地點名稱 Location Name
                   </Label>
@@ -325,7 +325,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                     onChange={(e) => setLocationName(e.target.value)}
                     placeholder="例如：桃園教會、台中小組"
                     required={isRemote}
-                    className="h-12 text-base"
+                    className="h-14 sm:h-12 text-lg sm:text-base"
                   />
                 </div>
               )}
@@ -335,7 +335,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
               type="submit"
               variant="gold"
               size="xl"
-              className="w-full"
+              className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
               disabled={isLoading || !name || !email || (isRemote && !locationName.trim())}
             >
               {isLoading ? '加入中...' : '加入課程 Join Now'}

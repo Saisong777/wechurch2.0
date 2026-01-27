@@ -20,26 +20,26 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={cn(
       'w-full',
-      variant === 'default' ? 'py-6' : 'py-4',
+      variant === 'default' ? 'py-5 sm:py-6' : 'py-3 sm:py-4',
       className
     )}>
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-center gap-3">
+      <div className="container mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
           {showLogo && (
             <div className="relative">
               <div className="absolute inset-0 bg-secondary/20 rounded-full blur-xl animate-pulse-soft" />
-              <SoulGymLogo size={48} className="relative" />
+              <SoulGymLogo size={variant === 'default' ? 44 : 36} className="relative sm:w-12 sm:h-12" />
             </div>
           )}
           <div className="text-center">
             <h1 className={cn(
               'font-serif font-bold text-foreground',
-              variant === 'default' ? 'text-3xl md:text-4xl' : 'text-2xl'
+              variant === 'default' ? 'text-2xl sm:text-3xl md:text-4xl' : 'text-xl sm:text-2xl'
             )}>
               {title}
             </h1>
             {subtitle && variant === 'default' && (
-              <p className="text-muted-foreground text-sm mt-1 tracking-wide">
+              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 sm:mt-1 tracking-wide">
                 {subtitle}
               </p>
             )}
