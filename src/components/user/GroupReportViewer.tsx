@@ -184,35 +184,38 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="w-5 h-5 text-secondary" />
-            第 {groupNumber} 組 AI 分析報告
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-secondary shrink-0" />
+            <span className="truncate">
+              <span className="hidden sm:inline">第 {groupNumber} 組 AI 分析報告</span>
+              <span className="sm:hidden">{groupNumber}組 AI 報告</span>
+            </span>
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share2 className="w-4 h-4 mr-1" />
-              分享
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={handleShare} className="h-8 px-2 sm:px-3">
+              <Share2 className="w-4 h-4" />
+              <span className="hidden sm:inline ml-1">分享</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
+            <Button variant="outline" size="sm" onClick={handleDownload} className="h-8 w-8 p-0 sm:w-auto sm:px-3">
               <Download className="w-4 h-4" />
             </Button>
           </div>
         </div>
         {reportDate && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
             生成於 {reportDate.toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </p>
         )}
         
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4 sm:space-y-5 p-4 sm:p-6 pt-0 sm:pt-0">
         {/* Group Meta Info */}
         {(parsed.members || parsed.verse) && (
-          <div className="bg-gradient-to-r from-muted/60 to-muted/30 p-4 rounded-lg">
+          <div className="bg-gradient-to-r from-muted/60 to-muted/30 p-3 sm:p-4 rounded-lg">
             {parsed.members && (
-              <p className="text-sm flex items-start gap-2">
+              <p className="text-xs sm:text-sm flex flex-wrap items-start gap-1 sm:gap-2">
                 <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                 <span className="font-medium shrink-0">組員：</span> 
                 <span>
@@ -226,7 +229,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
               </p>
             )}
             {parsed.verse && (
-              <p className="text-sm flex items-start gap-2 mt-2">
+              <p className="text-xs sm:text-sm flex items-start gap-1 sm:gap-2 mt-2">
                 <BookOpen className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                 <span className="font-medium shrink-0">經文：</span>
                 <span className="text-muted-foreground italic">{parsed.verse}</span>
@@ -237,7 +240,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
 
         {/* Structured Sections */}
         {hasStructuredContent ? (
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {parsed.themes && (
               <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
             )}
@@ -260,8 +263,8 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             )}
           </div>
         ) : (
-          <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
-            <div className="text-sm text-foreground whitespace-pre-wrap leading-7">
+          <div className="p-3 sm:p-4 bg-card border border-border rounded-lg shadow-sm">
+            <div className="text-xs sm:text-sm text-foreground whitespace-pre-wrap leading-6 sm:leading-7">
               {parsed.raw}
             </div>
           </div>
@@ -281,11 +284,11 @@ const ContributionsSectionUser: React.FC<{ contributions: string }> = ({ contrib
       
       if (nameMatch) {
         return (
-          <div key={idx} className="flex gap-2 py-2 border-b border-accent/20 last:border-0">
-            <span className="font-bold text-primary shrink-0 min-w-[5rem]">
+          <div key={idx} className="flex flex-col sm:flex-row gap-1 sm:gap-2 py-2 border-b border-accent/20 last:border-0">
+            <span className="font-bold text-primary shrink-0 sm:min-w-[5rem]">
               {nameMatch[1]}
             </span>
-            <span className="text-foreground/90">{nameMatch[2]}</span>
+            <span className="text-foreground/90 text-xs sm:text-sm">{nameMatch[2]}</span>
           </div>
         );
       }
@@ -294,7 +297,7 @@ const ContributionsSectionUser: React.FC<{ contributions: string }> = ({ contrib
       const parts = line.replace(/^[-•]\s*/, '').split(namePattern);
       
       return (
-        <div key={idx} className="py-1.5">
+        <div key={idx} className="py-1.5 text-xs sm:text-sm">
           {parts.map((part, pIdx) => {
             if (namePattern.test(part)) {
               namePattern.lastIndex = 0;
@@ -308,12 +311,13 @@ const ContributionsSectionUser: React.FC<{ contributions: string }> = ({ contrib
   };
   
   return (
-    <div className="p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent shadow-sm">
-      <h3 className="flex items-center gap-2 font-bold text-base mb-4 text-accent">
-        <User className="w-5 h-5" />
-        👤 個人貢獻摘要 Personal Contributions
+    <div className="p-3 sm:p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-accent/15 to-accent/5 border-accent shadow-sm">
+      <h3 className="flex items-center gap-2 font-bold text-sm sm:text-base mb-3 sm:mb-4 text-accent">
+        <User className="w-4 h-4 sm:w-5 sm:h-5" />
+        <span className="hidden sm:inline">👤 個人貢獻摘要 Personal Contributions</span>
+        <span className="sm:hidden">👤 個人貢獻</span>
       </h3>
-      <div className="text-sm leading-relaxed pl-1">
+      <div className="text-xs sm:text-sm leading-relaxed pl-1">
         {formatContributions(contributions)}
       </div>
     </div>

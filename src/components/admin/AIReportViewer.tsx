@@ -115,43 +115,50 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 flex flex-col">
-        <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-primary/10 to-secondary/10">
+      <DialogContent className="max-w-5xl max-h-[90vh] sm:max-h-[90vh] h-[100dvh] sm:h-auto p-0 flex flex-col">
+        <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-gradient-to-r from-primary/10 to-secondary/10">
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <Sparkles className="w-5 h-5 text-secondary" />
-              AI 查經分析報告
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
+              <span className="truncate">AI 查經分析報告</span>
               {verseReference && (
-                <span className="text-sm font-normal text-muted-foreground ml-2">
+                <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-1 sm:ml-2 truncate hidden sm:inline">
                   {verseReference}
                 </span>
               )}
             </DialogTitle>
           </div>
+          {verseReference && (
+            <p className="text-xs text-muted-foreground sm:hidden mt-1 truncate">
+              {verseReference}
+            </p>
+          )}
         </DialogHeader>
         
         {/* Toolbar */}
-        <div className="px-6 py-3 border-b bg-muted/30 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyAll} className="gap-2">
-              <Copy className="w-4 h-4" />
-              複製全部
+        <div className="px-3 sm:px-6 py-2 sm:py-3 border-b bg-muted/30 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Button variant="outline" size="sm" onClick={handleCopyAll} className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm">
+              <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">複製全部</span>
+              <span className="sm:hidden">複製</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handlePrint()} className="gap-2">
-              <Printer className="w-4 h-4" />
+            <Button variant="outline" size="sm" onClick={() => handlePrint()} className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm hidden sm:flex">
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               列印全部
             </Button>
           </div>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="default" size="sm" className="gap-2">
-                <Download className="w-4 h-4" />
-                下載報告
+              <Button variant="default" size="sm" className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm">
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">下載報告</span>
+                <span className="sm:hidden">下載</span>
                 <ChevronDown className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 z-50 bg-popover">
               <DropdownMenuItem onClick={handleDownloadMarkdownAll}>
                 <FileText className="w-4 h-4 mr-2" />
                 全部報告 (Markdown)
@@ -159,6 +166,11 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               <DropdownMenuItem onClick={() => handleDownloadPDF()}>
                 <FileDown className="w-4 h-4 mr-2" />
                 全部報告 (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="sm:hidden" />
+              <DropdownMenuItem onClick={() => handlePrint()} className="sm:hidden">
+                <Printer className="w-4 h-4 mr-2" />
+                列印全部
               </DropdownMenuItem>
               
               {hasMultipleGroups && (
@@ -185,21 +197,22 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         {/* Content Area */}
         {hasMultipleGroups ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-            <div className="px-6 pt-2 border-b flex-shrink-0">
-              <TabsList className="h-auto p-1 bg-muted/50 flex-wrap">
-                <TabsTrigger value="all" className="px-4">
-                  全部 ({parsedSections.length} 組)
+            <div className="px-3 sm:px-6 pt-2 border-b flex-shrink-0 overflow-x-auto">
+              <TabsList className="h-auto p-1 bg-muted/50 flex-nowrap sm:flex-wrap min-w-max sm:min-w-0">
+                <TabsTrigger value="all" className="px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                  全部 ({parsedSections.length})
                 </TabsTrigger>
                 {parsedSections.filter(s => s.groupNumber > 0).map(section => (
-                  <TabsTrigger key={`tab-${section.groupNumber}`} value={`group-${section.groupNumber}`}>
-                    第 {section.groupNumber} 組
+                  <TabsTrigger key={`tab-${section.groupNumber}`} value={`group-${section.groupNumber}`} className="px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                    <span className="hidden sm:inline">第 {section.groupNumber} 組</span>
+                    <span className="sm:hidden">{section.groupNumber}組</span>
                   </TabsTrigger>
                 ))}
               </TabsList>
             </div>
             
-            <div className="flex-1 min-h-0 overflow-auto p-6">
-              <TabsContent value="all" className="mt-0 space-y-8">
+            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
+              <TabsContent value="all" className="mt-0 space-y-6 sm:space-y-8">
                 <div ref={printRef}>
                   {parsedSections.map((section, index) => (
                     <React.Fragment key={`all-${section.groupNumber}`}>
@@ -211,7 +224,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                         onPrint={handlePrint}
                       />
                       {index < parsedSections.length - 1 && (
-                        <Separator className="my-8" />
+                        <Separator className="my-6 sm:my-8" />
                       )}
                     </React.Fragment>
                   ))}
@@ -232,8 +245,8 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             </div>
           </Tabs>
         ) : (
-          <div className="flex-1 min-h-0 overflow-auto p-6" ref={printRef}>
-            <div className="space-y-6">
+          <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6" ref={printRef}>
+            <div className="space-y-5 sm:space-y-6">
               {parsedSections.map((section, index) => (
                 <React.Fragment key={`single-${index}`}>
                   <GroupSection
@@ -245,7 +258,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                     onPrint={handlePrint}
                   />
                   {index < parsedSections.length - 1 && (
-                    <Separator className="my-6" />
+                    <Separator className="my-5 sm:my-6" />
                   )}
                 </React.Fragment>
               ))}
@@ -254,12 +267,13 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         )}
         
         {/* Footer */}
-        <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            報告由 AI 分析助理生成 • {new Date().toLocaleDateString('zh-TW')}
-            {hasMultipleGroups && ` • 共 ${parsedSections.length} 組`}
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-t bg-muted/30 flex items-center justify-between gap-2">
+          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+            <span className="hidden sm:inline">報告由 AI 分析助理生成 • </span>
+            {new Date().toLocaleDateString('zh-TW')}
+            {hasMultipleGroups && <span className="hidden sm:inline"> • 共 {parsedSections.length} 組</span>}
           </p>
-          <Button variant="gold" onClick={() => onOpenChange(false)}>
+          <Button variant="gold" size="sm" onClick={() => onOpenChange(false)} className="h-9 px-4 text-sm shrink-0">
             關閉
           </Button>
         </div>
