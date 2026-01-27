@@ -218,6 +218,75 @@ export type Database = {
         }
         Relationships: []
       }
+      study_responses: {
+        Row: {
+          action_plan: string | null
+          cool_down_note: string | null
+          core_insight_category:
+            | Database["public"]["Enums"]["insight_category_type"]
+            | null
+          core_insight_note: string | null
+          created_at: string
+          heartbeat_verse: string | null
+          id: string
+          observation: string | null
+          scholars_note: string | null
+          session_id: string
+          title_phrase: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_plan?: string | null
+          cool_down_note?: string | null
+          core_insight_category?:
+            | Database["public"]["Enums"]["insight_category_type"]
+            | null
+          core_insight_note?: string | null
+          created_at?: string
+          heartbeat_verse?: string | null
+          id?: string
+          observation?: string | null
+          scholars_note?: string | null
+          session_id: string
+          title_phrase?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_plan?: string | null
+          cool_down_note?: string | null
+          core_insight_category?:
+            | Database["public"]["Enums"]["insight_category_type"]
+            | null
+          core_insight_note?: string | null
+          created_at?: string
+          heartbeat_verse?: string | null
+          id?: string
+          observation?: string | null
+          scholars_note?: string | null
+          session_id?: string
+          title_phrase?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       submissions: {
         Row: {
           application_in_life: string | null
@@ -408,6 +477,45 @@ export type Database = {
         }
         Relationships: []
       }
+      study_responses_public: {
+        Row: {
+          action_plan: string | null
+          cool_down_note: string | null
+          core_insight_category:
+            | Database["public"]["Enums"]["insight_category_type"]
+            | null
+          core_insight_note: string | null
+          created_at: string | null
+          email: string | null
+          group_number: number | null
+          heartbeat_verse: string | null
+          id: string | null
+          observation: string | null
+          participant_name: string | null
+          progress_status: string | null
+          scholars_note: string | null
+          session_id: string | null
+          title_phrase: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       submissions_public: {
         Row: {
           application_in_life: string | null
@@ -541,6 +649,7 @@ export type Database = {
     }
     Enums: {
       app_role: "member" | "leader" | "future_leader" | "admin"
+      insight_category_type: "PROMISE" | "COMMAND" | "WARNING" | "GOD_ATTRIBUTE"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -669,6 +778,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["member", "leader", "future_leader", "admin"],
+      insight_category_type: ["PROMISE", "COMMAND", "WARNING", "GOD_ATTRIBUTE"],
     },
   },
 } as const
