@@ -92,64 +92,64 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
         return;
       }
 
-      // Build all mock responses in memory first (fast)
-      const mockResponses: Array<{
-        session_id: string;
-        user_id: string;
-        title_phrase?: string;
-        heartbeat_verse?: string;
-        observation?: string;
-        core_insight_category?: 'PROMISE' | 'COMMAND' | 'WARNING' | 'GOD_ATTRIBUTE';
-        core_insight_note?: string;
-        scholars_note?: string;
-        action_plan?: string;
-        cool_down_note?: string;
-      }> = [];
-
+      // Generate mock responses for each participant
+      let count = 0;
       for (const participant of participants) {
+        // Randomly decide how much progress this participant has made
         const progressLevel = Math.random();
         
-        const mockResponse: typeof mockResponses[number] = {
+        const mockResponse: Record<string, unknown> = {
           session_id: sessionId,
-          user_id: participant.id,
+          user_id: participant.id, // Using participant ID as user_id for mock
         };
 
-        // Phase 1 (Green) - ALWAYS include at least this phase so everyone has data
-        mockResponse.title_phrase = getRandomItem(MOCK_TITLE_PHRASES);
-        mockResponse.heartbeat_verse = getRandomItem(MOCK_HEARTBEAT_VERSES);
-        mockResponse.observation = getRandomItem(MOCK_OBSERVATIONS);
+        // Phase 1 (Green) - 70% chance
+        if (progressLevel > 0.3) {
+          mockResponse.title_phrase = getRandomItem(MOCK_TITLE_PHRASES);
+          mockResponse.heartbeat_verse = getRandomItem(MOCK_HEARTBEAT_VERSES);
+          mockResponse.observation = getRandomItem(MOCK_OBSERVATIONS);
+        }
 
-        // Phase 2 (Yellow) - 60% chance
-        if (progressLevel > 0.4) {
+        // Phase 2 (Yellow) - 50% chance
+        if (progressLevel > 0.5) {
           mockResponse.core_insight_category = getRandomCategory();
           mockResponse.core_insight_note = getRandomItem(MOCK_CORE_NOTES);
           mockResponse.scholars_note = getRandomItem(MOCK_SCHOLARS_NOTES);
         }
 
-        // Phase 3 (Blue) - 40% chance
-        if (progressLevel > 0.6) {
+        // Phase 3 (Blue) - 30% chance
+        if (progressLevel > 0.7) {
           mockResponse.action_plan = getRandomItem(MOCK_ACTION_PLANS);
           mockResponse.cool_down_note = getRandomItem(MOCK_COOL_DOWN_NOTES);
         }
 
-        // Always add since Phase 1 is guaranteed
-        mockResponses.push(mockResponse);
+        // Only insert if there's at least some content
+        if (Object.keys(mockResponse).length > 2) {
+          const { error } = await supabase
+            .from('study_responses')
+            .upsert(mockResponse as {
+              session_id: string;
+              user_id: string;
+              title_phrase?: string;
+              heartbeat_verse?: string;
+              observation?: string;
+              core_insight_category?: 'PROMISE' | 'COMMAND' | 'WARNING' | 'GOD_ATTRIBUTE';
+              core_insight_note?: string;
+              scholars_note?: string;
+              action_plan?: string;
+              cool_down_note?: string;
+            }, {
+              onConflict: 'session_id,user_id',
+            });
+
+          if (!error) {
+            count++;
+            setGeneratedCount(count);
+          }
+        }
       }
 
-      if (mockResponses.length === 0) {
-        toast.info('沒有生成任何資料');
-        return;
-      }
-
-      // Batch upsert all at once - much faster and atomic
-      const { error } = await supabase
-        .from('study_responses')
-        .upsert(mockResponses, { onConflict: 'session_id,user_id' });
-
-      if (error) throw error;
-
-      setGeneratedCount(mockResponses.length);
-      toast.success(`成功生成 ${mockResponses.length} 筆模擬資料！`);
+      toast.success(`成功生成 ${count} 筆模擬資料！`);
     } catch (error) {
       console.error('Error generating mock data:', error);
       toast.error('生成失敗 Generation failed');

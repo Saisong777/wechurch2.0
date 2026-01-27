@@ -20,8 +20,6 @@ import { toast } from 'sonner';
 
 type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'study' | 'review';
 
-const VALID_STEPS: UserStep[] = ['landing', 'enter-session', 'join', 'waiting', 'group-reveal', 'verification', 'study', 'review'];
-
 // localStorage keys for session persistence
 const STORAGE_KEYS = {
   SESSION_ID: 'pending_session_id',
@@ -38,33 +36,11 @@ export const UserPage: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
 
-  const resetLocalState = useCallback(() => {
-    // Clear only the keys we own to avoid nuking unrelated app storage.
-    localStorage.removeItem(STORAGE_KEYS.SESSION_ID);
-    localStorage.removeItem(STORAGE_KEYS.PARTICIPANT_ID);
-    localStorage.removeItem(STORAGE_KEYS.USER_STEP);
-    localStorage.removeItem('pending_session_id');
-    // Guest profile fields
-    localStorage.removeItem('bible_study_guest_name');
-    localStorage.removeItem('bible_study_guest_email');
-    localStorage.removeItem('bible_study_guest_gender');
-    localStorage.removeItem('bible_study_guest_location');
-
-    setCurrentSession(null);
-    setCurrentUser(null);
-    setSessionId('');
-    setShowScanner(false);
-    setStep('enter-session');
-  }, [setCurrentSession, setCurrentUser]);
-
   // Restore user session on page load/refresh
   const restoreUserSession = useCallback(async () => {
     const storedSessionId = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
     const storedParticipantId = localStorage.getItem(STORAGE_KEYS.PARTICIPANT_ID);
-    const rawStoredStep = localStorage.getItem(STORAGE_KEYS.USER_STEP);
-    const storedStep = (rawStoredStep && (VALID_STEPS as string[]).includes(rawStoredStep))
-      ? (rawStoredStep as UserStep)
-      : null;
+    const storedStep = localStorage.getItem(STORAGE_KEYS.USER_STEP) as UserStep | null;
     const storedEmail = localStorage.getItem('bible_study_guest_email');
 
     // If no session or participant info stored, nothing to restore
@@ -420,36 +396,12 @@ export const UserPage: React.FC = () => {
       case 'review':
         return (
           <div className="px-4 py-8">
-            <SubmissionReview onEdit={() => setStep('study')} />
+            <SubmissionReview />
           </div>
         );
 
       default:
-        // Safety net: if step is corrupted (e.g., multiple test accounts on same device),
-        // show a recoverable UI instead of a blank screen.
-        return (
-          <div className="w-full max-w-md mx-auto px-4 py-10 animate-fade-in">
-            <Card variant="highlight" className="border-2">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl">畫面狀態已失效</CardTitle>
-                <CardDescription className="text-base mt-1">
-                  可能是同一台裝置切換多個帳號測試造成狀態不一致。
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  請點擊下方按鈕重置後重新輸入課程代碼。
-                </p>
-                <Button variant="gold" size="xl" className="w-full" onClick={resetLocalState}>
-                  重置並重新加入
-                </Button>
-                <Button variant="outline" className="w-full" onClick={() => setStep('enter-session')}>
-                  返回輸入課程代碼
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return null;
     }
   };
 

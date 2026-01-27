@@ -7,26 +7,6 @@ interface GroupRevealProps {
   onContinue: () => void;
 }
 
-// Group color palette - distinct, easy-to-identify colors
-const GROUP_COLORS = [
-  { bg: 'from-red-500 to-red-600', glow: 'bg-red-500/40', text: 'text-white' },           // Group 1 - Red
-  { bg: 'from-blue-500 to-blue-600', glow: 'bg-blue-500/40', text: 'text-white' },         // Group 2 - Blue
-  { bg: 'from-green-500 to-green-600', glow: 'bg-green-500/40', text: 'text-white' },      // Group 3 - Green
-  { bg: 'from-yellow-400 to-yellow-500', glow: 'bg-yellow-400/40', text: 'text-black' },   // Group 4 - Yellow
-  { bg: 'from-purple-500 to-purple-600', glow: 'bg-purple-500/40', text: 'text-white' },   // Group 5 - Purple
-  { bg: 'from-orange-500 to-orange-600', glow: 'bg-orange-500/40', text: 'text-white' },   // Group 6 - Orange
-  { bg: 'from-pink-500 to-pink-600', glow: 'bg-pink-500/40', text: 'text-white' },         // Group 7 - Pink
-  { bg: 'from-cyan-500 to-cyan-600', glow: 'bg-cyan-500/40', text: 'text-white' },         // Group 8 - Cyan
-  { bg: 'from-indigo-500 to-indigo-600', glow: 'bg-indigo-500/40', text: 'text-white' },   // Group 9 - Indigo
-  { bg: 'from-teal-500 to-teal-600', glow: 'bg-teal-500/40', text: 'text-white' },         // Group 10 - Teal
-];
-
-function getGroupColor(groupNumber: number) {
-  // Use modulo to cycle through colors for groups > 10
-  const colorIndex = ((groupNumber - 1) % GROUP_COLORS.length);
-  return GROUP_COLORS[colorIndex];
-}
-
 export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
   const { currentUser, currentSession, users } = useSession();
   const [showNumber, setShowNumber] = useState(false);
@@ -48,29 +28,21 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
 
   // Calculate local group number within the user's location
   const localGroupInfo = useMemo(() => {
-    // If no groups data available, fall back to global group number
-    if (!currentSession?.groups || currentSession.groups.length === 0) {
+    if (!currentSession?.groups || !currentUser?.groupNumber) {
       return { localNumber: globalGroupNumber, totalGroupsInLocation: 1 };
     }
 
     // Get all groups in the user's location
     const locationGroups = currentSession.groups
       .filter(g => {
-        // Safely check if group has members before accessing location
-        if (!g.members || g.members.length === 0) return false;
         const groupLocation = g.members[0]?.location || 'On-site';
         return groupLocation === userLocation;
       })
       .sort((a, b) => a.number - b.number);
 
-    // If no groups found in location, fall back to global number
-    if (locationGroups.length === 0) {
-      return { localNumber: globalGroupNumber, totalGroupsInLocation: 1 };
-    }
-
     // Find the local index of the user's group within their location
     const localIndex = locationGroups.findIndex(g => g.number === globalGroupNumber);
-    const localNumber = localIndex >= 0 ? localIndex + 1 : globalGroupNumber;
+    const localNumber = localIndex >= 0 ? localIndex + 1 : 1;
 
     return {
       localNumber,
@@ -80,9 +52,6 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
 
   const { localNumber } = localGroupInfo;
   const isRemote = userLocation !== 'On-site';
-  
-  // Get color based on local group number
-  const groupColor = getGroupColor(localNumber);
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
@@ -107,9 +76,9 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
             <p className="text-muted-foreground text-lg mb-4">您的小組</p>
             
             <div className="relative inline-block">
-              <div className={`absolute inset-0 ${groupColor.glow} rounded-full blur-3xl animate-pulse-soft`} />
-              <div className={`relative w-48 h-48 md:w-64 md:h-64 rounded-full bg-gradient-to-br ${groupColor.bg} flex items-center justify-center shadow-2xl`}>
-                <span className={`font-serif text-8xl md:text-9xl font-bold ${groupColor.text} drop-shadow-lg`}>
+              <div className="absolute inset-0 bg-secondary/40 rounded-full blur-3xl animate-pulse-soft" />
+              <div className="relative w-48 h-48 md:w-64 md:h-64 rounded-full gradient-gold flex items-center justify-center glow-gold">
+                <span className="font-serif text-8xl md:text-9xl font-bold text-secondary-foreground">
                   {localNumber}
                 </span>
               </div>

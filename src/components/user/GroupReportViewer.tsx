@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Users, BookOpen, Share2, Download, User, Loader2 } from 'lucide-react';
+import { Sparkles, Users, BookOpen, Share2, Download, User } from 'lucide-react';
+import { fetchAIReports } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
 import { EnhancedSection } from '@/components/admin/report-elements';
 import {
@@ -11,7 +12,6 @@ import {
   downloadBlob,
   GroupReport,
 } from '@/components/admin/report-viewer';
-import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
 
 interface GroupReportViewerProps {
   sessionId: string;
@@ -76,20 +76,26 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   groupNumber,
   verseReference,
 }) => {
-  // Use the shared hook with polling support
-  const { 
-    latestAnalysis, 
-    isLoading, 
-    isPending, 
-    isCompleted 
-  } = useSessionAnalysis({
-    sessionId,
-    groupNumber,
-    reportType: 'group',
-  });
+  const [report, setReport] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reportDate, setReportDate] = useState<Date | null>(null);
 
-  const report = isCompleted && latestAnalysis ? latestAnalysis.content : null;
-  const reportDate = latestAnalysis?.createdAt || null;
+  useEffect(() => {
+    const loadReport = async () => {
+      setLoading(true);
+      const reports = await fetchAIReports(sessionId, groupNumber);
+      
+      if (reports.length > 0) {
+        setReport(reports[0].content);
+        setReportDate(reports[0].createdAt);
+      } else {
+        setReport(null);
+      }
+      setLoading(false);
+    };
+    
+    loadReport();
+  }, [sessionId, groupNumber]);
 
   const handleShare = async () => {
     if (!report) return;
@@ -128,7 +134,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
     toast.success('已下載！');
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Card>
         <CardHeader>
@@ -138,23 +144,6 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Show pending state with spinner when report is being generated
-  if (isPending) {
-    return (
-      <Card className="border-muted">
-        <CardContent className="py-8 text-center">
-          <Loader2 className="w-10 h-10 text-secondary mx-auto mb-3 animate-spin" />
-          <p className="text-foreground font-medium">
-            正在生成小組報告...
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            AI 正在整合組員的 insights，請稍候
-          </p>
         </CardContent>
       </Card>
     );

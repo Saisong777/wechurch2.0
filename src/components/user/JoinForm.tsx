@@ -30,33 +30,24 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
 
   // Load saved info from localStorage or from logged-in user
   useEffect(() => {
-    // First, check localStorage for saved guest data (works for both returning guests and post-OAuth)
-    const savedName = localStorage.getItem('bible_study_guest_name');
-    const savedEmail = localStorage.getItem('bible_study_guest_email');
-    const savedGender = localStorage.getItem('bible_study_guest_gender');
-    const savedLocation = localStorage.getItem('bible_study_guest_location');
-    
-    // Pre-fill from saved data first
-    if (savedName) setName(savedName);
-    if (savedEmail) setEmail(savedEmail);
-    if (savedGender === 'male' || savedGender === 'female') setGender(savedGender);
-    if (savedLocation && savedLocation !== 'On-site') {
-      setIsRemote(true);
-      setLocationName(savedLocation);
-    }
-    
-    // If user is logged in via Google, override with their Google profile data
     if (user) {
+      // Pre-fill from Google account
       const displayName = user.user_metadata?.full_name || user.user_metadata?.name || '';
       const userEmail = user.email || '';
-      if (displayName) {
-        setName(displayName);
-        // Also save to localStorage for consistency
-        localStorage.setItem('bible_study_guest_name', displayName);
-      }
-      if (userEmail) {
-        setEmail(userEmail);
-        localStorage.setItem('bible_study_guest_email', userEmail);
+      if (displayName) setName(displayName);
+      if (userEmail) setEmail(userEmail);
+    } else {
+      // Load from localStorage for returning guests
+      const savedName = localStorage.getItem('bible_study_guest_name');
+      const savedEmail = localStorage.getItem('bible_study_guest_email');
+      const savedGender = localStorage.getItem('bible_study_guest_gender');
+      const savedLocation = localStorage.getItem('bible_study_guest_location');
+      if (savedName) setName(savedName);
+      if (savedEmail) setEmail(savedEmail);
+      if (savedGender === 'male' || savedGender === 'female') setGender(savedGender);
+      if (savedLocation && savedLocation !== 'On-site') {
+        setIsRemote(true);
+        setLocationName(savedLocation);
       }
     }
   }, [user]);
@@ -99,64 +90,38 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
     localStorage.setItem('bible_study_guest_gender', gender);
     localStorage.setItem('bible_study_guest_location', location);
 
-    try {
-      // If user is not already authenticated, sign in anonymously and attach email
-      // This is critical for RLS policies that check auth.jwt() ->> 'email'
-      const { data: sessionData } = await supabase.auth.getSession();
-      
-      if (!sessionData.session) {
-        // Sign in anonymously first
-        const { error: anonError } = await supabase.auth.signInAnonymously();
-        if (anonError) {
-          console.error('[JoinForm] Anonymous sign-in failed:', anonError);
-          // Continue anyway - some features may not work
-        } else {
-          // Attach email to the anonymous user's JWT
-          const { error: updateError } = await supabase.auth.updateUser({ 
-            email: email 
-          });
-          if (updateError) {
-            console.error('[JoinForm] Failed to attach email to anonymous user:', updateError);
+    const joinedUser = await joinSession(currentSession.id, name, email, gender, location);
+
+    if (joinedUser) {
+      // Check if this is a latecomer joining during grouping/studying phase
+      // If so, auto-assign them to the smallest group
+      const sessionStatus = currentSession.status;
+      const isLatecomer = ['grouping', 'verification', 'studying'].includes(sessionStatus) && !joinedUser.groupNumber;
+
+      if (isLatecomer) {
+        const smallestGroup = await findSmallestGroup(currentSession.id);
+        if (smallestGroup) {
+          const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup);
+          if (assigned) {
+            joinedUser.groupNumber = smallestGroup;
+            toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`, {
+              description: 'You have been assigned to the smallest group.',
+            });
           }
         }
       }
 
-      const joinedUser = await joinSession(currentSession.id, name, email, gender, location);
-
-      if (joinedUser) {
-        // Check if this is a latecomer joining during grouping/studying phase
-        // If so, auto-assign them to the smallest group
-        const sessionStatus = currentSession.status;
-        const isLatecomer = ['grouping', 'verification', 'studying'].includes(sessionStatus) && !joinedUser.groupNumber;
-
-        if (isLatecomer) {
-          const smallestGroup = await findSmallestGroup(currentSession.id);
-          if (smallestGroup) {
-            const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup);
-            if (assigned) {
-              joinedUser.groupNumber = smallestGroup;
-              toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`, {
-                description: 'You have been assigned to the smallest group.',
-              });
-            }
-          }
-        }
-
-        setCurrentUser(joinedUser);
-        addUser(joinedUser);
-        // Clear pending session from localStorage after successful join
-        localStorage.removeItem('pending_session_id');
-        // Save participant ID for session restoration
-        localStorage.setItem('bible_study_participant_id', joinedUser.id);
-        // Save email for RPC verification (critical for set_participant_ready)
-        localStorage.setItem('user_email', email);
-        toast.success('成功加入健身課程！');
-        onJoined(isLatecomer && !!joinedUser.groupNumber);
-      } else {
-        toast.error('加入失敗，請重試');
-      }
-    } catch (error) {
-      console.error('[JoinForm] Error during join:', error);
+      setCurrentUser(joinedUser);
+      addUser(joinedUser);
+      // Clear pending session from localStorage after successful join
+      localStorage.removeItem('pending_session_id');
+      // Save participant ID for session restoration
+      localStorage.setItem('bible_study_participant_id', joinedUser.id);
+      // Save email for RPC verification (critical for set_participant_ready)
+      localStorage.setItem('user_email', email);
+      toast.success('成功加入健身課程！');
+      onJoined(isLatecomer && !!joinedUser.groupNumber);
+    } else {
       toast.error('加入失敗，請重試');
     }
     
