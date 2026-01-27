@@ -34,25 +34,37 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       if (!sessionId || !userId) return null;
       
       // Try direct query first (works for authenticated users)
-      const { data, error } = await supabase
-        .from('study_responses')
-        .select('*')
-        .eq('session_id', sessionId)
-        .eq('user_id', userId)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('study_responses')
+          .select('*')
+          .eq('session_id', sessionId)
+          .eq('user_id', userId)
+          .maybeSingle();
 
-      // If RLS blocks us, the error will be caught but data will be null
-      if (error) {
-        console.log('[useStudyResponse] Direct query failed, may need edge function:', error.message);
+        // If RLS blocks us, the error will be caught but data will be null
+        if (error) {
+          console.log('[useStudyResponse] Direct query failed, falling back to edge function:', error.message);
+        }
+
+        // If direct query succeeded, we're done.
+        if (data) {
+          console.log('[useStudyResponse] Direct query succeeded');
+          return data as StudyResponse;
+        }
+      } catch (directQueryError) {
+        console.log('[useStudyResponse] Direct query exception:', directQueryError);
       }
-
-      // If direct query succeeded, we're done.
-      if (data) return data as StudyResponse;
 
       // Fallback for guests (or when table is not directly readable due to RLS)
       // NOTE: this is required so a refresh on the review page still works.
-      if (!participantEmail) return null;
+      if (!participantEmail) {
+        console.log('[useStudyResponse] No participant email, cannot call edge function');
+        return null;
+      }
 
+      console.log('[useStudyResponse] Calling edge function with:', { sessionId, userId, email: '***' });
+      
       const { data: result, error: fnError } = await supabase.functions.invoke('get-study-response', {
         body: {
           sessionId,
@@ -61,9 +73,16 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
         },
       });
 
-      if (fnError) throw fnError;
-      if (result?.error) throw new Error(result.error);
+      if (fnError) {
+        console.error('[useStudyResponse] Edge function error:', fnError);
+        throw fnError;
+      }
+      if (result?.error) {
+        console.error('[useStudyResponse] Edge function returned error:', result.error);
+        throw new Error(result.error);
+      }
 
+      console.log('[useStudyResponse] Edge function succeeded, data:', result?.data ? 'present' : 'null');
       return (result?.data ?? null) as StudyResponse | null;
     },
     enabled: enabled && !!sessionId && !!userId,

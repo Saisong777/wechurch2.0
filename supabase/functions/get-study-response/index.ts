@@ -27,7 +27,14 @@ serve(async (req) => {
 
     const { sessionId, participantId, participantEmail }: GetStudyResponseRequest = await req.json();
 
+    console.log("[get-study-response] Request received:", {
+      sessionId: sessionId?.substring(0, 8) + '...',
+      participantId: participantId?.substring(0, 8) + '...',
+      emailProvided: !!participantEmail,
+    });
+
     if (!sessionId || !participantId || !participantEmail) {
+      console.error("[get-study-response] Missing required fields");
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -42,8 +49,16 @@ serve(async (req) => {
       .eq("session_id", sessionId)
       .maybeSingle();
 
-    if (participantError || !participant) {
-      console.error("[get-study-response] Participant not found:", participantError);
+    if (participantError) {
+      console.error("[get-study-response] Participant query error:", participantError);
+      return new Response(
+        JSON.stringify({ error: "Failed to verify participant" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    
+    if (!participant) {
+      console.log("[get-study-response] Participant not found for session:", sessionId);
       return new Response(
         JSON.stringify({ error: "Participant not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -61,6 +76,8 @@ serve(async (req) => {
       );
     }
 
+    console.log("[get-study-response] Participant verified, fetching study response");
+
     const { data: response, error: responseError } = await supabase
       .from("study_responses")
       .select("*")
@@ -75,6 +92,8 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    console.log("[get-study-response] Success, response found:", !!response);
 
     return new Response(
       JSON.stringify({ success: true, data: response ?? null }),
