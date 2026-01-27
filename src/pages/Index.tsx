@@ -45,7 +45,7 @@ const Index = () => {
               Soul Gym
             </p>
             <p className="text-muted-foreground mt-4 max-w-lg mx-auto">
-              一起，活出耶穌一樣的豐盛生命
+              一起，活出耶穌的豐盛生命
             </p>
           </div>
 
