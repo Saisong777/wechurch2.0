@@ -635,13 +635,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "submissions_participant_id_fkey"
-            columns: ["participant_id"]
-            isOneToOne: false
-            referencedRelation: "participants_public"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "submissions_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
@@ -716,54 +709,6 @@ export type Database = {
           name?: string | null
           ready_confirmed?: boolean | null
           session_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "participants_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "participants_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "sessions_public"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      participants_public: {
-        Row: {
-          display_name: string | null
-          gender: string | null
-          group_number: number | null
-          id: string | null
-          joined_at: string | null
-          location: string | null
-          session_id: string | null
-          status: boolean | null
-        }
-        Insert: {
-          display_name?: string | null
-          gender?: string | null
-          group_number?: number | null
-          id?: string | null
-          joined_at?: string | null
-          location?: string | null
-          session_id?: string | null
-          status?: boolean | null
-        }
-        Update: {
-          display_name?: string | null
-          gender?: string | null
-          group_number?: number | null
-          id?: string | null
-          joined_at?: string | null
-          location?: string | null
-          session_id?: string | null
-          status?: boolean | null
         }
         Relationships: [
           {
@@ -922,13 +867,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "submissions_participant_id_fkey"
-            columns: ["participant_id"]
-            isOneToOne: false
-            referencedRelation: "participants_public"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "submissions_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
@@ -1030,7 +968,6 @@ export type Database = {
         Args: { p_email: string; p_session_id: string }
         Returns: boolean
       }
-      clear_mock_participants: { Args: { p_session_id: string }; Returns: Json }
       draw_next_card: {
         Args: {
           p_game_id: string
@@ -1056,10 +993,6 @@ export type Database = {
           ready_confirmed: boolean
         }[]
       }
-      get_session_participants: {
-        Args: { p_session_id: string }
-        Returns: Json
-      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1083,10 +1016,6 @@ export type Database = {
         Returns: boolean
       }
       reset_icebreaker_deck: { Args: { p_game_id: string }; Returns: boolean }
-      seed_mock_participants: {
-        Args: { p_count?: number; p_session_id: string }
-        Returns: Json
-      }
       set_participant_ready: {
         Args: {
           p_email: string

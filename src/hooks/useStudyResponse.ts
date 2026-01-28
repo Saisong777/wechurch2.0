@@ -4,8 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { StudyResponse, StudyResponseFormData, emptyFormData, InsightCategory } from '@/types/spiritual-fitness';
 import { toast } from 'sonner';
 
-const POLLING_INTERVAL = 15000; // 15 seconds - optimized for 100+ concurrent users
-const DEBOUNCE_DELAY = 1500; // 1.5 seconds - slightly longer to batch rapid changes
+const POLLING_INTERVAL = 4000; // 4 seconds
+const DEBOUNCE_DELAY = 1000; // 1 second
 
 interface UseStudyResponseOptions {
   sessionId: string | undefined;

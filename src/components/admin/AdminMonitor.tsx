@@ -188,10 +188,7 @@ export const AdminMonitor: React.FC = () => {
   useEffect(() => {
     if (!isVerificationPhase || !currentSession?.id) return;
     
-    // 8-10 seconds with jitter to prevent thundering herd for 100+ users
-    const baseInterval = 8000;
-    const jitter = Math.random() * 2000;
-    const interval = setInterval(refreshReadyStatus, baseInterval + jitter);
+    const interval = setInterval(refreshReadyStatus, 3000);
     return () => clearInterval(interval);
   }, [isVerificationPhase, currentSession?.id, refreshReadyStatus]);
 

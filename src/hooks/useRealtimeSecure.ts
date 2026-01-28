@@ -304,14 +304,12 @@ export const useRealtimeSecure = ({
       lastParticipantIdsRef.current = currentIds;
     };
     
-    // FAIL-SAFE POLLING: Every 10-12 seconds with jitter to prevent thundering herd
-    // This catches missed WebSocket events on mobile while reducing DB load for 100+ users
-    const baseInterval = 10000;
-    const jitter = Math.random() * 2000; // 0-2 seconds random jitter
+    // FAIL-SAFE POLLING: Every 3 seconds, do a full status check
+    // This catches missed WebSocket events on mobile
     const heartbeatInterval = setInterval(() => {
       fullStatusCheck();
       doPoll();
-    }, baseInterval + jitter);
+    }, 3000);
     
     // Initial check
     fullStatusCheck();
