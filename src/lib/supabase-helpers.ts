@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User, StudySubmission, GroupingSettings, Group } from "@/types/bible-study";
+import { withRetry } from "./retry-helpers";
 
 // Generic error message for client-side display
 const GENERIC_ERROR = "An error occurred. Please try again.";
@@ -155,7 +156,7 @@ export const assignLatecomerToGroup = async (
   return !error;
 };
 
-// Participant functions
+// Participant functions - with retry logic for high-concurrency scenarios
 export const joinSession = async (
   sessionId: string,
   name: string,
@@ -163,55 +164,71 @@ export const joinSession = async (
   gender: "male" | "female",
   location: string = "On-site"
 ): Promise<User | null> => {
-  // First check if user already exists using the security definer function
-  const { data: existingData } = await supabase
-    .rpc("get_participant_for_reentry", {
-      p_session_id: sessionId,
-      p_email: email,
-    });
+  return withRetry(async () => {
+    // First check if user already exists using the security definer function
+    const { data: existingData, error: reentryError } = await supabase
+      .rpc("get_participant_for_reentry", {
+        p_session_id: sessionId,
+        p_email: email,
+      });
 
-  if (existingData && existingData.length > 0) {
-    const existing = existingData[0];
+    if (reentryError) {
+      console.error("[joinSession] Re-entry check failed:", reentryError.message);
+      throw reentryError;
+    }
+
+    if (existingData && existingData.length > 0) {
+      const existing = existingData[0];
+      return {
+        id: existing.id,
+        name: existing.name,
+        email: email,
+        gender: existing.gender as "male" | "female",
+        groupNumber: existing.group_number || undefined,
+        joinedAt: new Date(existing.joined_at),
+        location: existing.location,
+        readyConfirmed: existing.ready_confirmed,
+      };
+    }
+
+    // New user - insert with retry
+    const { data, error } = await supabase
+      .from("participants")
+      .insert({
+        session_id: sessionId,
+        name,
+        email,
+        gender,
+        location,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Join session error:", error.code, error.message);
+      throw error;
+    }
+
     return {
-      id: existing.id,
-      name: existing.name,
-      email: email,
-      gender: existing.gender as "male" | "female",
-      groupNumber: existing.group_number || undefined,
-      joinedAt: new Date(existing.joined_at),
-      location: existing.location,
-      readyConfirmed: existing.ready_confirmed,
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      gender: data.gender as "male" | "female",
+      groupNumber: data.group_number || undefined,
+      joinedAt: new Date(data.joined_at),
+      location: data.location,
+      readyConfirmed: data.ready_confirmed,
     };
-  }
-
-  // New user - insert
-  const { data, error } = await supabase
-    .from("participants")
-    .insert({
-      session_id: sessionId,
-      name,
-      email,
-      gender,
-      location,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Join session error:", error.code, error.message);
+  }, {
+    maxRetries: 3,
+    baseDelay: 1000,
+    onRetry: (attempt, error) => {
+      console.log(`[joinSession] Retry ${attempt} after error:`, error.message);
+    }
+  }).catch(err => {
+    console.error("[joinSession] All retries failed:", err);
     return null;
-  }
-
-  return {
-    id: data.id,
-    name: data.name,
-    email: data.email,
-    gender: data.gender as "male" | "female",
-    groupNumber: data.group_number || undefined,
-    joinedAt: new Date(data.joined_at),
-    location: data.location,
-    readyConfirmed: data.ready_confirmed,
-  };
+  });
 };
 
 // Fetch participants using the secure view (hides emails from non-owners)
@@ -542,32 +559,37 @@ export const updateParticipantReady = async (
   return !error;
 };
 
-// Fetch group members for verification
+// Fetch group members for verification - with retry for reliability
 export const fetchGroupMembers = async (
   sessionId: string,
   groupNumber: number
 ): Promise<User[]> => {
-  const { data, error } = await supabase
-    .from("participant_names")
-    .select("*")
-    .eq("session_id", sessionId)
-    .eq("group_number", groupNumber)
-    .order("joined_at", { ascending: true });
+  return withRetry(async () => {
+    const { data, error } = await supabase
+      .from("participant_names")
+      .select("*")
+      .eq("session_id", sessionId)
+      .eq("group_number", groupNumber)
+      .order("joined_at", { ascending: true });
 
-  if (error) {
-    return [];
-  }
+    if (error) {
+      throw error;
+    }
 
-  return data.map((p: { id: string; name: string; email: string | null; gender: string; group_number: number | null; joined_at: string; location: string; ready_confirmed: boolean }) => ({
-    id: p.id,
-    name: p.name,
-    email: p.email || "",
-    gender: p.gender as "male" | "female",
-    groupNumber: p.group_number || undefined,
-    joinedAt: new Date(p.joined_at),
-    location: p.location,
-    readyConfirmed: p.ready_confirmed,
-  }));
+    return data.map((p: { id: string; name: string; email: string | null; gender: string; group_number: number | null; joined_at: string; location: string; ready_confirmed: boolean }) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email || "",
+      gender: p.gender as "male" | "female",
+      groupNumber: p.group_number || undefined,
+      joinedAt: new Date(p.joined_at),
+      location: p.location,
+      readyConfirmed: p.ready_confirmed,
+    }));
+  }, {
+    maxRetries: 2,
+    baseDelay: 500,
+  }).catch(() => []);
 };
 
 // Submission functions
