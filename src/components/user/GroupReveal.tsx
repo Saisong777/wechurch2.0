@@ -43,12 +43,19 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
     };
   }, []);
 
-  const globalGroupNumber = currentUser?.groupNumber || 1;
+  // CRITICAL: Use the actual database group number - never default to 1
+  // This was causing all users to appear in group 1
+  const globalGroupNumber = currentUser?.groupNumber;
   const userLocation = currentUser?.location || 'On-site';
 
-  // Calculate local group number within the user's location
+  // Calculate local group number within the user's location (for display only)
   const localGroupInfo = useMemo(() => {
-    // If no groups data available, fall back to global group number
+    // If no group number assigned yet, return undefined - don't fake it
+    if (!globalGroupNumber) {
+      return { localNumber: undefined, totalGroupsInLocation: 0 };
+    }
+
+    // If no groups data available, use the actual global group number
     if (!currentSession?.groups || currentSession.groups.length === 0) {
       return { localNumber: globalGroupNumber, totalGroupsInLocation: 1 };
     }
@@ -63,26 +70,39 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
       })
       .sort((a, b) => a.number - b.number);
 
-    // If no groups found in location, fall back to global number
+    // If no groups found in location, use actual global number (don't default to 1!)
     if (locationGroups.length === 0) {
       return { localNumber: globalGroupNumber, totalGroupsInLocation: 1 };
     }
 
     // Find the local index of the user's group within their location
     const localIndex = locationGroups.findIndex(g => g.number === globalGroupNumber);
+    // If not found in location groups, use the global number (not 1!)
     const localNumber = localIndex >= 0 ? localIndex + 1 : globalGroupNumber;
 
     return {
       localNumber,
       totalGroupsInLocation: locationGroups.length,
     };
-  }, [currentSession?.groups, currentUser?.groupNumber, globalGroupNumber, userLocation]);
+  }, [currentSession?.groups, globalGroupNumber, userLocation]);
 
   const { localNumber } = localGroupInfo;
   const isRemote = userLocation !== 'On-site';
   
-  // Get color based on local group number
-  const groupColor = getGroupColor(localNumber);
+  // Get color based on local group number (use 1 only for color if undefined)
+  const groupColor = getGroupColor(localNumber || 1);
+  
+  // Show loading state if group number not yet assigned
+  if (!localNumber) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center">
+        <div className="animate-pulse text-center">
+          <p className="text-muted-foreground text-lg sm:text-lg">正在取得分組資訊...</p>
+          <p className="text-muted-foreground text-base sm:text-sm mt-2">Loading group assignment...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center">
