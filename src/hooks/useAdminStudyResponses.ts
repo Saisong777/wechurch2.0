@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { StudyResponsePublic, ProgressStatus } from '@/types/spiritual-fitness';
 
-const POLLING_INTERVAL = 3000; // 3 seconds for faster updates
+const POLLING_INTERVAL = 8000; // 8 seconds - optimized for high concurrency (100+ users)
 
 interface UseAdminStudyResponsesOptions {
   sessionId: string | undefined;

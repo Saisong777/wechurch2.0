@@ -42,7 +42,7 @@ export const usePrayerWall = () => {
       return data as Prayer[];
     },
     enabled: !!user,
-    refetchInterval: 5000,
+    refetchInterval: 20000, // 20 seconds - prayer wall is not time-critical
     refetchOnWindowFocus: true,
   });
 };

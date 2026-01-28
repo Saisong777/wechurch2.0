@@ -173,7 +173,7 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
 
       return members;
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000, // 15 seconds - CRM data doesn't need rapid updates
   });
 
   const stats = useQuery({
@@ -208,7 +208,7 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
         avgAttendance,
       };
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000, // 15 seconds - stats don't need rapid updates
   });
 
   // Role management mutation
