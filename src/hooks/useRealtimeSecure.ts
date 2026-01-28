@@ -304,12 +304,12 @@ export const useRealtimeSecure = ({
       lastParticipantIdsRef.current = currentIds;
     };
     
-    // FAIL-SAFE POLLING: Increased to 8 seconds to reduce DB load
-    // This catches missed WebSocket events on mobile while being gentler on resources
+    // FAIL-SAFE POLLING: Every 3 seconds, do a full status check
+    // This catches missed WebSocket events on mobile
     const heartbeatInterval = setInterval(() => {
       fullStatusCheck();
       doPoll();
-    }, 8000);
+    }, 3000);
     
     // Initial check
     fullStatusCheck();

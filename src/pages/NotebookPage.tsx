@@ -77,7 +77,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { lovable } from '@/integrations/lovable/index';
+import { supabase } from '@/integrations/supabase/client';
 import { Mail, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -93,11 +93,14 @@ const NotebookAuthFormContent: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin + '/notebook',
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/notebook',
+        },
       });
-      if (result.error) {
-        toast.error(result.error.message);
+      if (error) {
+        toast.error(error.message);
       }
     } catch (err) {
       toast.error('Google 登入失敗，請重試');
