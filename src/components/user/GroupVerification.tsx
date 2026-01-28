@@ -25,27 +25,41 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   const [isSyncing, setIsSyncing] = useState(false);
   const [errorState, setErrorState] = useState<'none' | 'no-group' | 'no-members' | 'fetch-error'>('none');
 
+  // CRITICAL: Always use the actual groupNumber from the database
+  // Never fall back to 1 as this causes all users to appear in group 1
   const globalGroupNumber = currentUser?.groupNumber;
   const location = currentUser?.location || 'On-site';
   const isRemote = location !== 'On-site';
 
-  // Calculate local group number within the user's location
+  // Use the actual group number for all logic - localGroupNumber is only for display
+  // If we don't have groups data, just show the actual group number
   const localGroupNumber = useMemo(() => {
-    if (!currentSession?.groups || !globalGroupNumber) {
-      return globalGroupNumber || 1;
+    // If no group number assigned, don't fake it - return undefined
+    if (!globalGroupNumber) {
+      return undefined;
     }
 
-    // Get all groups in the user's location
-    const locationGroups = currentSession.groups
-      .filter(g => {
-        const groupLocation = g.members[0]?.location || 'On-site';
-        return groupLocation === location;
-      })
-      .sort((a, b) => a.number - b.number);
+    // If we have groups data from session context, calculate local display number
+    if (currentSession?.groups && currentSession.groups.length > 0) {
+      // Get all groups in the user's location
+      const locationGroups = currentSession.groups
+        .filter(g => {
+          if (!g.members || g.members.length === 0) return false;
+          const groupLocation = g.members[0]?.location || 'On-site';
+          return groupLocation === location;
+        })
+        .sort((a, b) => a.number - b.number);
 
-    // Find the local index of the user's group within their location
-    const localIndex = locationGroups.findIndex(g => g.number === globalGroupNumber);
-    return localIndex >= 0 ? localIndex + 1 : 1;
+      // Find the local index of the user's group within their location
+      const localIndex = locationGroups.findIndex(g => g.number === globalGroupNumber);
+      if (localIndex >= 0) {
+        return localIndex + 1;
+      }
+    }
+
+    // Fallback: just use the global group number for display
+    // This is better than showing "1" for everyone
+    return globalGroupNumber;
   }, [currentSession?.groups, globalGroupNumber, location]);
 
   // Force re-sync current user data from DB
@@ -261,6 +275,9 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   const totalCount = groupMembers.length;
   const otherMembers = groupMembers.filter(m => m.id !== currentUser?.id);
 
+  // Display-safe group number - use localGroupNumber if available, otherwise globalGroupNumber
+  const displayGroupNumber = localGroupNumber ?? globalGroupNumber ?? 0;
+
   // Loading state
   if (isLoading) {
     return (
@@ -370,7 +387,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
                 </span>
               </div>
             </div>
-            <p className="mt-4 text-lg sm:text-base text-muted-foreground">第 {localGroupNumber} 組</p>
+            <p className="mt-4 text-lg sm:text-base text-muted-foreground">第 {displayGroupNumber} 組</p>
           </>
         ) : (
           <>
@@ -382,12 +399,12 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
               <div className="absolute inset-0 bg-secondary/40 rounded-full blur-3xl animate-pulse-soft" />
               <div className="relative w-40 h-40 sm:w-44 sm:h-44 md:w-56 md:h-56 rounded-full gradient-gold flex items-center justify-center glow-gold shadow-2xl">
                 <span className="font-serif text-7xl sm:text-8xl md:text-9xl font-bold text-secondary-foreground drop-shadow-lg">
-                  {localGroupNumber}
+                  {displayGroupNumber}
                 </span>
               </div>
             </div>
             <p className="mt-5 sm:mt-6 font-serif text-2xl sm:text-3xl font-bold text-foreground">
-              第 {localGroupNumber} 組
+              第 {displayGroupNumber} 組
             </p>
             <p className="mt-2 text-sm text-muted-foreground">現場 On-site</p>
           </>
