@@ -197,10 +197,10 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
         // Silent subscription - no toast to avoid notification spam during transitions
       });
 
-    // Fallback polling every 5 seconds (reduced from 2s since we have realtime now)
+    // Fallback polling every 10 seconds - rely more on realtime, reduce DB load
     const pollInterval = setInterval(async () => {
       await fetchMembers();
-    }, 5000);
+    }, 10000);
 
     return () => {
       supabase.removeChannel(channel);
