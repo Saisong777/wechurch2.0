@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, MapPin } from 'lucide-react';
+import { staggeredStart } from '@/lib/retry-utils';
 
 interface GroupRevealProps {
   onContinue: () => void;
@@ -31,8 +32,27 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
   const { currentUser, currentSession, users } = useSession();
   const [showNumber, setShowNumber] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const initRef = useRef(false);
+
+  // High-concurrency optimization: stagger initial animation to prevent
+  // 500 users triggering animations at the exact same millisecond
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+
+    const init = async () => {
+      // Random 0-1s stagger to spread out animation triggers
+      await staggeredStart(1000);
+      setIsReady(true);
+    };
+    init();
+  }, []);
 
   useEffect(() => {
+    // Only start animation sequence after staggered initialization
+    if (!isReady) return;
+
     // Reveal animation sequence
     const timer1 = setTimeout(() => setShowNumber(true), 500);
     const timer2 = setTimeout(() => setShowDetails(true), 1500);
@@ -41,7 +61,7 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, []);
+  }, [isReady]);
 
   // CRITICAL: Use the actual database group number - never default to 1
   // This was causing all users to appear in group 1
