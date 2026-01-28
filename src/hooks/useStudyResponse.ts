@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { StudyResponse, StudyResponseFormData, emptyFormData, InsightCategory } from '@/types/spiritual-fitness';
 import { toast } from 'sonner';
+import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
 
-const POLLING_INTERVAL = 4000; // 4 seconds
-const DEBOUNCE_DELAY = 1000; // 1 second
+// HIGH CONCURRENCY OPTIMIZED: Increased intervals for 500+ users
+const POLLING_INTERVAL = HIGH_CONCURRENCY_CONFIG.STUDY_RESPONSE_POLL_MS; // 10 seconds
+const DEBOUNCE_DELAY = HIGH_CONCURRENCY_CONFIG.SAVE_DEBOUNCE_MS; // 1.5 seconds
 
 interface UseStudyResponseOptions {
   sessionId: string | undefined;
