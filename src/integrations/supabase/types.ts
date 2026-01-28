@@ -1030,6 +1030,7 @@ export type Database = {
         Args: { p_email: string; p_session_id: string }
         Returns: boolean
       }
+      clear_mock_participants: { Args: { p_session_id: string }; Returns: Json }
       draw_next_card: {
         Args: {
           p_game_id: string
@@ -1082,6 +1083,10 @@ export type Database = {
         Returns: boolean
       }
       reset_icebreaker_deck: { Args: { p_game_id: string }; Returns: boolean }
+      seed_mock_participants: {
+        Args: { p_count?: number; p_session_id: string }
+        Returns: Json
+      }
       set_participant_ready: {
         Args: {
           p_email: string
