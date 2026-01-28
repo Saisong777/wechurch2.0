@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { User } from '@/types/bible-study';
 import type { Database } from '@/integrations/supabase/types';
+import { withRetry, staggeredStart, HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
 
 type CardLevel = Database['public']['Enums']['card_level'];
 
@@ -78,23 +79,36 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
     [members, gameState.currentDrawerId]
   );
 
-  // Load members and initialize game
+  // Load members and initialize game with staggered start for high concurrency
   const initGame = useCallback(async () => {
     try {
-      // Load group members
-      const groupMembers = await fetchGroupMembers(sessionId, groupNumber);
+      // Stagger initial load to prevent thundering herd
+      await staggeredStart(1500);
+      
+      // Load group members with retry
+      const groupMembers = await withRetry(
+        () => fetchGroupMembers(sessionId, groupNumber),
+        { maxRetries: 3, baseDelayMs: 500 }
+      );
       setMembers(groupMembers);
 
       // Find existing game for this session/group (get the OLDEST one to ensure consistency)
-      let { data: existingGames, error } = await supabase
-        .from('icebreaker_games')
-        .select('*')
-        .eq('bible_study_session_id', sessionId)
-        .eq('group_number', groupNumber)
-        .eq('mode', 'session')
-        .eq('status', 'active')
-        .order('created_at', { ascending: true })
-        .limit(1);
+      const fetchExistingGame = async () => {
+        const { data, error } = await supabase
+          .from('icebreaker_games')
+          .select('*')
+          .eq('bible_study_session_id', sessionId)
+          .eq('group_number', groupNumber)
+          .eq('mode', 'session')
+          .eq('status', 'active')
+          .order('created_at', { ascending: true })
+          .limit(1);
+        if (error) throw error;
+        return data;
+      };
+      
+      let existingGames = await withRetry(fetchExistingGame, { maxRetries: 2 });
+      let error = null;
 
       if (error) throw error;
 

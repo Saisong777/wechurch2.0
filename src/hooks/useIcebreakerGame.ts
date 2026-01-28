@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
+import { withRetry, staggeredStart } from '@/lib/retry-utils';
 
 type CardLevel = Database['public']['Enums']['card_level'];
 type GameMode = Database['public']['Enums']['game_mode'];
@@ -130,23 +131,29 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     return { content: data.content_text, contentEn: data.content_text_en };
   };
 
-  // Create a new game
+  // Create a new game with retry logic
   const createGame = useCallback(async (mode: GameMode = 'standalone') => {
     setState(prev => ({ ...prev, isLoading: true }));
     
     try {
-      const { data, error } = await supabase
-        .from('icebreaker_games')
-        .insert({
-          mode,
-          current_level: 'L1',
-          bible_study_session_id: options.sessionId || null,
-          group_number: options.groupNumber || null,
-        })
-        .select('id, room_code')
-        .single();
+      // Stagger game creation to prevent race conditions
+      await staggeredStart(1000);
+      
+      const data = await withRetry(async () => {
+        const { data, error } = await supabase
+          .from('icebreaker_games')
+          .insert({
+            mode,
+            current_level: 'L1',
+            bible_study_session_id: options.sessionId || null,
+            group_number: options.groupNumber || null,
+          })
+          .select('id, room_code')
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
+        return data;
+      }, { maxRetries: 2, baseDelayMs: 500 });
 
       setState(prev => ({
         ...prev,
@@ -226,22 +233,30 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, []);
 
-  // Find existing game for session/group
+  // Find existing game for session/group with retry
   const findSessionGame = useCallback(async () => {
     if (!options.sessionId || !options.groupNumber) return null;
 
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      const { data, error } = await supabase
-        .from('icebreaker_games')
-        .select('*')
-        .eq('bible_study_session_id', options.sessionId)
-        .eq('group_number', options.groupNumber)
-        .eq('status', 'active')
-        .maybeSingle();
+      // Stagger initial search to prevent thundering herd
+      await staggeredStart(1000);
+      
+      const data = await withRetry(async () => {
+        const { data, error } = await supabase
+          .from('icebreaker_games')
+          .select('*')
+          .eq('bible_study_session_id', options.sessionId)
+          .eq('group_number', options.groupNumber)
+          .eq('status', 'active')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-      if (error) throw error;
+        if (error) throw error;
+        return data;
+      }, { maxRetries: 2, baseDelayMs: 500 });
 
       if (data) {
         // Found existing game - join it
@@ -283,7 +298,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, [options.sessionId, options.groupNumber]);
 
-  // Draw a card
+  // Draw a card with retry
   const drawCard = useCallback(async (level?: CardLevel) => {
     if (!state.gameId) {
       toast.error('請先開始遊戲');
@@ -296,14 +311,15 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
-      const { data, error } = await supabase.rpc('draw_next_card', {
-        p_game_id: state.gameId,
-        p_level: level || state.currentLevel,
-      });
+      const result = await withRetry(async () => {
+        const { data, error } = await supabase.rpc('draw_next_card', {
+          p_game_id: state.gameId,
+          p_level: level || state.currentLevel,
+        });
 
-      if (error) throw error;
-
-      const result = data?.[0];
+        if (error) throw error;
+        return data?.[0];
+      }, { maxRetries: 2, baseDelayMs: 300 });
       
       if (!result?.card_id) {
         toast.info(result?.card_content || '這個等級的牌已經抽完了！');

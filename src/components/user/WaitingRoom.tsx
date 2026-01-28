@@ -6,7 +6,7 @@ import { useRealtimeSecure, ConnectionState } from '@/hooks/useRealtimeSecure';
 import { ConnectionStatus } from '@/components/ui/connection-status';
 import { Clock, Users, MapPin, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-
+import { withRetry } from '@/lib/retry-utils';
 interface WaitingRoomProps {
   onGroupingStarted: () => void;
   onSessionEnded?: () => void;
@@ -113,7 +113,18 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await forceRefresh();
+      // Use retry with backoff for manual refresh to handle transient failures
+      await withRetry(
+        () => forceRefresh(),
+        { maxRetries: 2, baseDelayMs: 500, maxDelayMs: 2000 }
+      );
+    } catch (error) {
+      console.error('[WaitingRoom] Manual refresh failed after retries:', error);
+      toast({
+        title: '⚠️ 刷新失敗',
+        description: '請稍後再試',
+        variant: 'destructive',
+      });
     } finally {
       setTimeout(() => setIsRefreshing(false), 500);
     }
