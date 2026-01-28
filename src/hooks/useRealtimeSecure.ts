@@ -2,21 +2,18 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session, StudySubmission } from "@/types/bible-study";
 import { RealtimePostgresChangesPayload, RealtimeChannel } from "@supabase/supabase-js";
+import { HIGH_CONCURRENCY_CONFIG, staggeredStart } from "@/lib/retry-utils";
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
 /**
  * Secure realtime hook for PARTICIPANTS (non-admin users).
  * 
- * This hook uses a combination of approaches:
- * - For participants: Uses the participant_names view (emails excluded at DB level)
- * - For sessions: Uses direct postgres_changes (no sensitive data)
- * - For submissions: Uses submissions_public view (emails excluded at DB level)
- * 
- * Mobile-optimized features:
- * - Fail-safe polling every 3 seconds (queries DB directly)
+ * OPTIMIZED FOR HIGH CONCURRENCY (500+ users):
+ * - WebSocket subscriptions as PRIMARY sync method
+ * - Polling as FALLBACK only (8-second interval vs previous 3s)
+ * - Staggered initial connections to prevent thundering herd
  * - Visibility change detection for instant refetch when user returns
- * - Manual refresh capability exposed via callback
  * - Connection state tracking for UI feedback
  * 
  * Emails are never exposed to participant clients at any point.
@@ -304,16 +301,20 @@ export const useRealtimeSecure = ({
       lastParticipantIdsRef.current = currentIds;
     };
     
-    // FAIL-SAFE POLLING: Every 3 seconds, do a full status check
-    // This catches missed WebSocket events on mobile
+    // HIGH CONCURRENCY OPTIMIZED: 8-second heartbeat (was 3s)
+    // For 500 users: 500/8 = 62.5 req/sec vs 500/3 = 167 req/sec
+    // Stagger initial connection to prevent thundering herd
+    staggeredStart(2000).then(() => {
+      fullStatusCheck();
+      doPoll();
+    });
+    
     const heartbeatInterval = setInterval(() => {
       fullStatusCheck();
       doPoll();
-    }, 3000);
+    }, HIGH_CONCURRENCY_CONFIG.HEARTBEAT_INTERVAL_MS);
     
-    // Initial check
-    fullStatusCheck();
-    doPoll();
+    // Initial check is now handled inside staggeredStart above
 
     // VISIBILITY CHANGE: When user returns to tab/unlocks phone, immediately refresh
     const handleVisibilityChange = () => {

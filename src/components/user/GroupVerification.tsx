@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/bible-study';
 import { Users, CheckCircle, Loader2, MapPin, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
 
 interface GroupVerificationProps {
   onAllReady: () => void;
@@ -197,10 +198,11 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
         // Silent subscription - no toast to avoid notification spam during transitions
       });
 
-    // Fallback polling every 5 seconds (reduced from 2s since we have realtime now)
+    // HIGH CONCURRENCY OPTIMIZED: 10-second polling (was 5s)
+    // WebSocket is primary, this is fallback only
     const pollInterval = setInterval(async () => {
       await fetchMembers();
-    }, 5000);
+    }, HIGH_CONCURRENCY_CONFIG.GROUP_VERIFICATION_POLL_MS);
 
     return () => {
       supabase.removeChannel(channel);
