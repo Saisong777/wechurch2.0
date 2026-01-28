@@ -85,19 +85,23 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
       const groupMembers = await fetchGroupMembers(sessionId, groupNumber);
       setMembers(groupMembers);
 
-      // Find or create icebreaker game
-      let { data: existingGame, error } = await supabase
+      // Find existing game for this session/group (get the OLDEST one to ensure consistency)
+      let { data: existingGames, error } = await supabase
         .from('icebreaker_games')
         .select('*')
         .eq('bible_study_session_id', sessionId)
         .eq('group_number', groupNumber)
         .eq('mode', 'session')
-        .maybeSingle();
+        .eq('status', 'active')
+        .order('created_at', { ascending: true })
+        .limit(1);
 
       if (error) throw error;
 
+      let existingGame = existingGames?.[0] || null;
+
       if (!existingGame) {
-        // Create new game with drawer order
+        // Try to create new game with drawer order
         const shuffledOrder = groupMembers
           .map(m => m.id)
           .sort(() => Math.random() - 0.5);
@@ -115,8 +119,24 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
           .select()
           .single();
 
-        if (createError) throw createError;
-        existingGame = newGame;
+        // Handle race condition: if insert failed due to conflict, re-fetch
+        if (createError) {
+          console.log('[TurnBasedCardGame] Create failed, re-fetching existing game...');
+          const { data: retryGames } = await supabase
+            .from('icebreaker_games')
+            .select('*')
+            .eq('bible_study_session_id', sessionId)
+            .eq('group_number', groupNumber)
+            .eq('mode', 'session')
+            .eq('status', 'active')
+            .order('created_at', { ascending: true })
+            .limit(1);
+          
+          existingGame = retryGames?.[0] || null;
+          if (!existingGame) throw createError; // Still no game, throw original error
+        } else {
+          existingGame = newGame;
+        }
       }
 
       // Initialize drawer order if not set
