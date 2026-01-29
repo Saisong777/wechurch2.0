@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { staggeredStart, withRetry } from '@/lib/retry-utils';
 
 export type AppRole = 'member' | 'leader' | 'future_leader' | 'admin';
 
@@ -17,38 +18,65 @@ export const useUserRole = (): UserRoleResult => {
   const { user, loading: authLoading } = useAuth();
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
 
   const fetchRole = async () => {
     if (!user) {
       setRole(null);
       setLoading(false);
+      lastFetchedUserIdRef.current = null;
       return;
     }
 
     try {
-      // Use RPC to get user's highest role
-      const { data, error } = await supabase.rpc('get_user_role', {
-        _user_id: user.id,
-      });
+      setLoading(true);
 
-      if (error) {
-        console.error('[useUserRole] Error fetching role:', error);
-        setRole('member'); // Default to member on error
-      } else {
-        setRole(data as AppRole || 'member');
-      }
+      // Use RPC to get user's highest role (retried with jitter to avoid login thundering herd)
+      const roleData = await withRetry(
+        async () => {
+          const res = await supabase.rpc('get_user_role', { _user_id: user.id });
+          if (res.error) throw res.error;
+          return (res.data as AppRole | null) ?? 'member';
+        },
+        // Keep retries small; this runs for every user after login
+        { maxRetries: 2, baseDelayMs: 600, maxDelayMs: 4000, jitterFactor: 0.4 }
+      );
+
+      setRole(roleData);
     } catch (err) {
       console.error('[useUserRole] Unexpected error:', err);
       setRole('member');
     } finally {
       setLoading(false);
+      lastFetchedUserIdRef.current = user.id;
     }
   };
 
   useEffect(() => {
-    if (!authLoading) {
-      fetchRole();
+    if (authLoading) return;
+
+    // Avoid double-fetch from rapid auth state transitions
+    if (!user) {
+      setRole(null);
+      setLoading(false);
+      lastFetchedUserIdRef.current = null;
+      return;
     }
+
+    if (lastFetchedUserIdRef.current === user.id) {
+      setLoading(false);
+      return;
+    }
+
+    // HIGH CONCURRENCY: stagger initial role lookup to avoid login thundering herd
+    let cancelled = false;
+    staggeredStart(2000).then(() => {
+      if (!cancelled) fetchRole();
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, authLoading]);
 
   const isAdmin = role === 'admin';
