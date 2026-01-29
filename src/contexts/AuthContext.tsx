@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
+import { withRetry, staggeredStart } from '@/lib/retry-utils';
 
 interface AuthContextType {
   session: Session | null;
@@ -14,12 +15,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Retry configuration for auth operations - more aggressive for high-concurrency scenarios
+const AUTH_RETRY_OPTIONS = {
+  maxRetries: 3,
+  baseDelayMs: 500,
+  maxDelayMs: 5000,
+  jitterFactor: 0.4, // Higher jitter to spread load
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const initAttempted = useRef(false);
 
   useEffect(() => {
+    // Prevent double initialization
+    if (initAttempted.current) return;
+    initAttempted.current = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
@@ -29,21 +43,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // Check session immediately
+    // Stagger initial session check to prevent thundering herd
     let cancelled = false;
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (cancelled) return;
+    const initSession = async () => {
+      // Add 0-1.5s random delay to spread initial load
+      await staggeredStart(1500);
       
-      if (error) {
-        console.warn('[AuthContext] Failed to get session:', error);
-        setSession(null);
-        setUser(null);
-      } else {
-        setSession(data.session);
-        setUser(data.session?.user ?? null);
+      if (cancelled) return;
+
+      try {
+        // Use retry mechanism for session fetch
+        const result = await withRetry(
+          async () => {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) throw error;
+            return data;
+          },
+          AUTH_RETRY_OPTIONS
+        );
+        
+        if (!cancelled) {
+          setSession(result.session);
+          setUser(result.session?.user ?? null);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.warn('[AuthContext] Failed to get session after retries:', error);
+        if (!cancelled) {
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+        }
       }
-      setLoading(false);
-    });
+    };
+
+    initSession();
 
     return () => {
       cancelled = true;
@@ -66,15 +100,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    try {
+      const result = await withRetry(
+        async () => {
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error) throw error;
+          return { error: null };
+        },
+        AUTH_RETRY_OPTIONS
+      );
+      return result;
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error(String(error)) };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await withRetry(
+        async () => {
+          const { error } = await supabase.auth.signOut();
+          if (error) throw error;
+        },
+        { ...AUTH_RETRY_OPTIONS, maxRetries: 2 }
+      );
+    } catch (error) {
+      console.warn('[AuthContext] Sign out failed after retries:', error);
+    }
   };
 
   return (
