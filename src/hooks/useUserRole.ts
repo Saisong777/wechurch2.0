@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { staggeredStart, withRetry } from '@/lib/retry-utils';
+import { withRetry } from '@/lib/retry-utils';
 
 export type AppRole = 'member' | 'leader' | 'future_leader' | 'admin';
 
@@ -68,14 +68,18 @@ export const useUserRole = (): UserRoleResult => {
       return;
     }
 
-    // HIGH CONCURRENCY: stagger initial role lookup to avoid login thundering herd
+    // HIGH CONCURRENCY: Additional stagger AFTER auth completes
+    // This ensures role fetches are spread out even if auth resolves simultaneously
+    // Combined with AuthContext stagger, total spread is up to 3.5s
     let cancelled = false;
-    staggeredStart(2000).then(() => {
+    const delay = Math.random() * 1500; // 0-1.5s additional delay
+    const timeoutId = setTimeout(() => {
       if (!cancelled) fetchRole();
-    });
+    }, delay);
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
   }, [user, authLoading]);
 
