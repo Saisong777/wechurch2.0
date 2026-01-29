@@ -827,7 +827,6 @@ export type Database = {
             | null
           core_insight_note: string | null
           created_at: string | null
-          email: string | null
           group_number: number | null
           heartbeat_verse: string | null
           id: string | null
