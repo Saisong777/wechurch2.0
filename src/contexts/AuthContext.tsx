@@ -1,9 +1,7 @@
 import * as React from 'react';
-import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-// Note: Stagger removed from initial auth check - it was causing slow load times
-// The stagger is now only applied in useUserRole for role lookups during high concurrency
 
 interface AuthContextType {
   session: Session | null;
@@ -20,13 +18,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Prevent double initialization in StrictMode
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
@@ -36,28 +29,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // Check session immediately (no stagger for initial check)
-    // The stagger was causing slow initial load times
+    // Check session immediately
     let cancelled = false;
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        if (!cancelled) {
-          setSession(data.session);
-          setUser(data.session?.user ?? null);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.warn('[AuthContext] Failed to get session:', err);
-        if (!cancelled) {
-          setSession(null);
-          setUser(null);
-          setLoading(false);
-        }
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (cancelled) return;
+      
+      if (error) {
+        console.warn('[AuthContext] Failed to get session:', error);
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
       }
-    })();
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;
