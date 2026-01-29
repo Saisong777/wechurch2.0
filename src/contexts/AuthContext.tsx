@@ -2,7 +2,8 @@ import * as React from 'react';
 import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-import { staggeredStart, withRetry } from '@/lib/retry-utils';
+// Note: Stagger removed from initial auth check - it was causing slow load times
+// The stagger is now only applied in useUserRole for role lookups during high concurrency
 
 interface AuthContextType {
   session: Session | null;
@@ -35,37 +36,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // HIGH CONCURRENCY: Stagger initial session check to prevent thundering herd
-    // When 100+ users open the app simultaneously, this spreads the load over 1.5s
+    // Check session immediately (no stagger for initial check)
+    // The stagger was causing slow initial load times
     let cancelled = false;
-    staggeredStart(1500).then(async () => {
-      if (cancelled) return;
-      
+    (async () => {
       try {
-        // Use retry logic in case of transient network issues
-        const sessionData = await withRetry(
-          async () => {
-            const { data, error } = await supabase.auth.getSession();
-            if (error) throw error;
-            return data.session;
-          },
-          { maxRetries: 2, baseDelayMs: 500, maxDelayMs: 2000, jitterFactor: 0.4 }
-        );
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
         
         if (!cancelled) {
-          setSession(sessionData);
-          setUser(sessionData?.user ?? null);
+          setSession(data.session);
+          setUser(data.session?.user ?? null);
           setLoading(false);
         }
       } catch (err) {
-        console.warn('[AuthContext] Failed to get session, user may need to re-login:', err);
+        console.warn('[AuthContext] Failed to get session:', err);
         if (!cancelled) {
           setSession(null);
           setUser(null);
           setLoading(false);
         }
       }
-    });
+    })();
 
     return () => {
       cancelled = true;

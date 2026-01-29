@@ -68,19 +68,9 @@ export const useUserRole = (): UserRoleResult => {
       return;
     }
 
-    // HIGH CONCURRENCY: Additional stagger AFTER auth completes
-    // This ensures role fetches are spread out even if auth resolves simultaneously
-    // Combined with AuthContext stagger, total spread is up to 3.5s
-    let cancelled = false;
-    const delay = Math.random() * 1500; // 0-1.5s additional delay
-    const timeoutId = setTimeout(() => {
-      if (!cancelled) fetchRole();
-    }, delay);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-    };
+    // Fetch role immediately for faster initial load
+    // The withRetry inside fetchRole handles transient failures
+    fetchRole();
   }, [user, authLoading]);
 
   const isAdmin = role === 'admin';
