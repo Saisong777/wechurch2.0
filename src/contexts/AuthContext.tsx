@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
+import { staggeredStart, withRetry } from '@/lib/retry-utils';
 
 interface AuthContextType {
   session: Session | null;
@@ -18,25 +19,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent double initialization in StrictMode
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
         setLoading(false);
       }
     );
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    // HIGH CONCURRENCY: Stagger initial session check to prevent thundering herd
+    // When 100+ users open the app simultaneously, this spreads the load over 1.5s
+    let cancelled = false;
+    staggeredStart(1500).then(async () => {
+      if (cancelled) return;
+      
+      try {
+        // Use retry logic in case of transient network issues
+        const sessionData = await withRetry(
+          async () => {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) throw error;
+            return data.session;
+          },
+          { maxRetries: 2, baseDelayMs: 500, maxDelayMs: 2000, jitterFactor: 0.4 }
+        );
+        
+        if (!cancelled) {
+          setSession(sessionData);
+          setUser(sessionData?.user ?? null);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.warn('[AuthContext] Failed to get session, user may need to re-login:', err);
+        if (!cancelled) {
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+        }
+      }
     });
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
   }, []);

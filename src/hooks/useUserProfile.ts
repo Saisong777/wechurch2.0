@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { staggeredStart, withRetry } from '@/lib/retry-utils';
+import { withRetry } from '@/lib/retry-utils';
 
 interface UserProfile {
   display_name: string | null;
@@ -70,14 +70,17 @@ export const useUserProfile = () => {
       return;
     }
 
-    // HIGH CONCURRENCY: stagger initial profile lookup to avoid login thundering herd.
+    // HIGH CONCURRENCY: Additional stagger AFTER auth completes
+    // Combined with AuthContext stagger, total spread is up to 3.5s
     let cancelled = false;
-    staggeredStart(2000).then(() => {
+    const delay = Math.random() * 1500; // 0-1.5s additional delay
+    const timeoutId = setTimeout(() => {
       if (!cancelled) fetchProfile();
-    });
+    }, delay);
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
   }, [user]);
 
