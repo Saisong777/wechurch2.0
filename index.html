@@ -23,6 +23,9 @@
     <link rel="preconnect" href="https://evyfzgrkvpwyvwmiajtx.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://evyfzgrkvpwyvwmiajtx.supabase.co" />
 
+    <!-- Preload main entry module to reduce critical chain delay -->
+    <link rel="modulepreload" href="/src/main.tsx" />
+
     <!-- Inline critical CSS for faster FCP -->
     <style>
       body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
