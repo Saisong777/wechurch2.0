@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 import { withRetry, staggeredStart } from '@/lib/retry-utils';
@@ -27,13 +27,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const initAttempted = useRef(false);
 
   useEffect(() => {
-    // Prevent double initialization
-    if (initAttempted.current) return;
-    initAttempted.current = true;
-
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
