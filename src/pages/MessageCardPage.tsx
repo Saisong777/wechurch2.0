@@ -219,22 +219,21 @@ export const MessageCardPage: React.FC = () => {
     localStorage.setItem('bible_study_guest_email', guestEmail);
 
     // Sync to potential_members table (non-blocking)
+    // First try to insert, if conflict then we don't need to update since they already exist
     withRetry(
       async () => {
-        const { error } = await supabase.from('potential_members').upsert(
-          {
-            email: guestEmail.trim().toLowerCase(),
-            name: guestName.trim(),
-            first_joined_at: new Date().toISOString(),
-            last_session_at: new Date().toISOString(),
-            sessions_count: 1,
-          },
-          {
-            onConflict: 'email',
-            ignoreDuplicates: false,
-          }
-        );
-        if (error) throw error;
+        const normalizedEmail = guestEmail.trim().toLowerCase();
+        const { error } = await supabase.from('potential_members').insert({
+          email: normalizedEmail,
+          name: guestName.trim(),
+          first_joined_at: new Date().toISOString(),
+          last_session_at: new Date().toISOString(),
+          sessions_count: 1,
+        });
+        // Ignore duplicate key errors - user already exists which is fine
+        if (error && !error.message.includes('duplicate key')) {
+          throw error;
+        }
       },
       { maxRetries: 2, baseDelayMs: 500, jitterFactor: 0.3 }
     ).catch(err => {

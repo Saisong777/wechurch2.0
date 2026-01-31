@@ -275,6 +275,8 @@ const CRMPage = () => {
           linkedCount={stats?.linkedCount ?? 0}
           pendingCount={stats?.pendingCount ?? 0}
           avgAttendance={stats?.avgAttendance ?? 0}
+          newThisWeek={stats?.newThisWeek ?? 0}
+          newThisMonth={stats?.newThisMonth ?? 0}
           loading={statsLoading}
         />
 

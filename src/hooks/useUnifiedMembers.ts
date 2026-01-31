@@ -180,11 +180,11 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
     queryKey: ['unified-members-stats'],
     queryFn: async () => {
       // Registered users stats
-      const { data: profiles } = await supabase.from('profiles').select('id');
+      const { data: profiles } = await supabase.from('profiles').select('id, created_at');
       const { data: roles } = await supabase.from('user_roles').select('role');
 
       // Potential members stats
-      const { data: pm } = await supabase.from('potential_members').select('status, user_id, sessions_count');
+      const { data: pm } = await supabase.from('potential_members').select('status, user_id, sessions_count, first_joined_at, created_at');
 
       const registeredCount = profiles?.length || 0;
       const adminCount = roles?.filter(r => r.role === 'admin').length || 0;
@@ -198,6 +198,26 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
         ? Math.round((pm?.reduce((sum, p) => sum + p.sessions_count, 0) || 0) / potentialTotal * 10) / 10
         : 0;
 
+      // Calculate new members (past 7 days and 30 days)
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      // New registered users
+      const newRegisteredWeek = profiles?.filter(p => new Date(p.created_at) >= oneWeekAgo).length || 0;
+      const newRegisteredMonth = profiles?.filter(p => new Date(p.created_at) >= oneMonthAgo).length || 0;
+
+      // New potential members (using first_joined_at or created_at)
+      const newPotentialWeek = pm?.filter(p => {
+        const joinDate = new Date(p.first_joined_at || p.created_at);
+        return joinDate >= oneWeekAgo;
+      }).length || 0;
+
+      const newPotentialMonth = pm?.filter(p => {
+        const joinDate = new Date(p.first_joined_at || p.created_at);
+        return joinDate >= oneMonthAgo;
+      }).length || 0;
+
       return {
         registeredCount,
         adminCount,
@@ -206,6 +226,10 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
         linkedCount,
         pendingCount,
         avgAttendance,
+        newThisWeek: newRegisteredWeek + newPotentialWeek,
+        newThisMonth: newRegisteredMonth + newPotentialMonth,
+        newRegisteredWeek,
+        newPotentialWeek,
       };
     },
     refetchInterval: 5000,
