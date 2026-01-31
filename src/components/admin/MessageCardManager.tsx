@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, ChevronLeft } from 'lucide-react';
+import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, ChevronLeft, Pencil, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -40,6 +40,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [showDownloadsDialog, setShowDownloadsDialog] = useState(false);
   const [selectedCard, setSelectedCard] = useState<MessageCard | null>(null);
@@ -50,6 +51,13 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   const [newTitle, setNewTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // Edit form state
+  const [editTitle, setEditTitle] = useState('');
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editPreviewUrl, setEditPreviewUrl] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -186,6 +194,90 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
     } catch (err) {
       console.error('Error deleting card:', err);
       toast.error('刪除失敗');
+    }
+  };
+
+  const handleOpenEdit = (card: MessageCard) => {
+    setSelectedCard(card);
+    setEditTitle(card.title);
+    setEditFile(null);
+    setEditPreviewUrl(null);
+    setShowEditDialog(true);
+  };
+
+  const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('請選擇圖片檔案');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('圖片大小不能超過 10MB');
+      return;
+    }
+
+    setEditFile(file);
+    setEditPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedCard) return;
+    
+    if (!editTitle.trim()) {
+      toast.error('請輸入標題');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      let newImagePath = selectedCard.image_path;
+
+      // If new image selected, upload it
+      if (editFile) {
+        const fileExt = editFile.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('message-cards')
+          .upload(fileName, editFile);
+
+        if (uploadError) throw uploadError;
+
+        // Delete old image
+        await supabase.storage.from('message-cards').remove([selectedCard.image_path]);
+        
+        newImagePath = fileName;
+      }
+
+      // Update database record
+      const { data, error: updateError } = await supabase
+        .from('message_cards')
+        .update({
+          title: editTitle.trim(),
+          image_path: newImagePath,
+        })
+        .eq('id', selectedCard.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      toast.success('更新成功！');
+      setCards(prev => prev.map(c => c.id === selectedCard.id ? data : c));
+      setShowEditDialog(false);
+      
+      // Reset form
+      setEditTitle('');
+      setEditFile(null);
+      setEditPreviewUrl(null);
+    } catch (err) {
+      console.error('Error updating card:', err);
+      toast.error('更新失敗');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -358,6 +450,14 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => handleOpenEdit(card)}
+                  >
+                    <Pencil className="w-4 h-4 mr-1" />
+                    編輯
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       setSelectedCard(card);
                       setShowQRDialog(true);
@@ -481,6 +581,85 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                   size={400}
                   level="H"
                 />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>編輯信息卡片</DialogTitle>
+          </DialogHeader>
+          {selectedCard && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">標題</Label>
+                <Input
+                  id="edit-title"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="例如：2024/01/28 主日信息"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>圖片</Label>
+                <input
+                  type="file"
+                  ref={editFileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleEditFileSelect}
+                />
+                <div className="space-y-2">
+                  <div className="rounded-lg overflow-hidden bg-muted relative group">
+                    <img 
+                      src={editPreviewUrl || getImageUrl(selectedCard.image_path)} 
+                      alt="Preview" 
+                      className="w-full h-auto"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => editFileInputRef.current?.click()}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        更換圖片
+                      </Button>
+                    </div>
+                  </div>
+                  {editFile && (
+                    <p className="text-xs text-muted-foreground">
+                      已選擇新圖片：{editFile.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowEditDialog(false)}
+                >
+                  取消
+                </Button>
+                <Button
+                  variant="gold"
+                  className="flex-1"
+                  onClick={handleUpdate}
+                  disabled={updating || !editTitle.trim()}
+                >
+                  {updating ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />更新中...</>
+                  ) : (
+                    '儲存變更'
+                  )}
+                </Button>
               </div>
             </div>
           )}
