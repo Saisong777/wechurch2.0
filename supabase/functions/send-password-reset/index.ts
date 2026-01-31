@@ -66,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send custom branded email
     const emailResponse = await resend.emails.send({
-      from: "WeChurch <noreply@mail.wechurch.lovable.app>",
+      from: "WeChurch <noreply@wechurch.online>",
       to: [email],
       subject: "重設您的 WeChurch 密碼",
       html: `
