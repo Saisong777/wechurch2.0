@@ -17,7 +17,8 @@ import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Dumbbell, Flame, Users, History, Sparkles, Image, ToggleLeft } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft } from 'lucide-react';
+import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
 import { fetchParticipants, fetchSubmissions } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
@@ -133,8 +134,8 @@ export const AdminPage: React.FC = () => {
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex items-center gap-2">
-                <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-secondary" />
-                <h2 className="text-xl sm:text-2xl font-semibold">課程管理</h2>
+                <WeChurchIcon size={28} className="text-primary" />
+                <h2 className="text-xl sm:text-2xl font-semibold font-display">課程管理</h2>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button 
@@ -254,14 +255,14 @@ export const AdminPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Top navbar - responsive */}
-      <div className="gradient-navy text-primary-foreground py-2 sm:py-3 px-3 sm:px-4">
+      <div className="gradient-sky text-white py-2 sm:py-3 px-3 sm:px-4">
         <div className="container mx-auto flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {step !== 'auth' && step !== 'dashboard' ? (
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-primary-foreground hover:bg-white/10 px-2 sm:px-3"
+                className="text-white hover:bg-white/10 px-2 sm:px-3"
                 onClick={handleBackToDashboard}
               >
                 <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -269,17 +270,17 @@ export const AdminPage: React.FC = () => {
               </Button>
             ) : (
               <Link to="/">
-                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-white/10 px-2 sm:px-3">
+                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 px-2 sm:px-3">
                   <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="hidden sm:inline">首頁</span>
                 </Button>
               </Link>
             )}
             <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-              <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-secondary flex-shrink-0" />
-              <span className="text-xs sm:text-sm opacity-80 truncate">
+              <Home className="w-4 h-4 sm:w-5 sm:h-5 text-coral flex-shrink-0" />
+              <span className="text-xs sm:text-sm opacity-90 truncate font-display">
                 <span className="sm:hidden">控制台</span>
-                <span className="hidden sm:inline">教練控制台 Coach Dashboard</span>
+                <span className="hidden sm:inline">WeChurch 管理後台</span>
               </span>
             </div>
           </div>
@@ -291,13 +292,13 @@ export const AdminPage: React.FC = () => {
                     {role === 'admin' ? '管理員' : role === 'leader' ? '小組長' : '儲備'}
                   </span>
                 )}
-                <span className="text-xs sm:text-sm opacity-80 hidden lg:inline truncate max-w-32">
+                <span className="text-xs sm:text-sm opacity-90 hidden lg:inline truncate max-w-32">
                   {user.email}
                 </span>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-primary-foreground hover:bg-white/10 p-2"
+                  className="text-white hover:bg-white/10 p-2"
                   onClick={handleSignOut}
                 >
                   <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -327,9 +328,9 @@ export const AdminPage: React.FC = () => {
                 <div
                   className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium transition-all ${
                     step === s
-                      ? 'gradient-gold text-secondary-foreground glow-gold'
+                      ? 'gradient-coral text-white shadow-lg'
                       : ['create', 'waiting', 'monitor'].indexOf(step) > index
-                      ? 'bg-accent text-accent-foreground'
+                      ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >
@@ -339,7 +340,7 @@ export const AdminPage: React.FC = () => {
                   <div
                     className={`w-8 sm:w-12 h-1 rounded ${
                       ['create', 'waiting', 'monitor'].indexOf(step) > index
-                        ? 'bg-accent'
+                        ? 'bg-primary'
                         : 'bg-muted'
                     }`}
                   />
