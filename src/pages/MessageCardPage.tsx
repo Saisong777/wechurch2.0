@@ -218,6 +218,29 @@ export const MessageCardPage: React.FC = () => {
     localStorage.setItem('bible_study_guest_name', guestName);
     localStorage.setItem('bible_study_guest_email', guestEmail);
 
+    // Sync to potential_members table (non-blocking)
+    withRetry(
+      async () => {
+        const { error } = await supabase.from('potential_members').upsert(
+          {
+            email: guestEmail.trim().toLowerCase(),
+            name: guestName.trim(),
+            first_joined_at: new Date().toISOString(),
+            last_session_at: new Date().toISOString(),
+            sessions_count: 1,
+          },
+          {
+            onConflict: 'email',
+            ignoreDuplicates: false,
+          }
+        );
+        if (error) throw error;
+      },
+      { maxRetries: 2, baseDelayMs: 500, jitterFactor: 0.3 }
+    ).catch(err => {
+      console.warn('Failed to sync to potential_members (non-critical):', err);
+    });
+
     // Record and show download
     await recordDownloadAndShow();
   };
