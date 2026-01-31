@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -12,7 +12,7 @@ import {
   Sparkles,
   Users,
   ChevronRight,
-  Church
+  Home
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -26,8 +26,8 @@ import {
 import { LogOut, BookMarked, Settings, User } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
-import { useState } from 'react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
+import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 
 const featureConfig = [
   {
@@ -38,8 +38,9 @@ const featureConfig = [
     description: '一起活出耶穌的豐盛生命',
     icon: Dumbbell,
     href: '/user',
-    bgColor: 'bg-amber-500/10',
-    iconColor: 'text-amber-600',
+    bgColor: 'bg-secondary/15',
+    iconColor: 'text-secondary',
+    hoverBorder: 'hover:border-secondary/40',
   },
   {
     id: 'learn',
@@ -49,8 +50,9 @@ const featureConfig = [
     description: '聖經研讀與屬靈資源',
     icon: BookOpen,
     href: '/learn',
-    bgColor: 'bg-blue-500/10',
-    iconColor: 'text-blue-600',
+    bgColor: 'bg-primary/15',
+    iconColor: 'text-primary',
+    hoverBorder: 'hover:border-primary/40',
   },
   {
     id: 'play',
@@ -60,8 +62,9 @@ const featureConfig = [
     description: '透過遊戲認識彼此',
     icon: Gamepad2,
     href: '/icebreaker',
-    bgColor: 'bg-emerald-500/10',
+    bgColor: 'bg-emerald-500/15',
     iconColor: 'text-emerald-600',
+    hoverBorder: 'hover:border-emerald-400/40',
   },
   {
     id: 'share',
@@ -71,8 +74,9 @@ const featureConfig = [
     description: '禱告牆與經文圖卡',
     icon: Share2,
     href: '/share',
-    bgColor: 'bg-rose-500/10',
-    iconColor: 'text-rose-600',
+    bgColor: 'bg-rose-500/15',
+    iconColor: 'text-rose-500',
+    hoverBorder: 'hover:border-rose-400/40',
   },
 ];
 
@@ -84,7 +88,6 @@ const Index = () => {
   const { isFeatureEnabled, getDisabledMessage, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   
-  // If session ID is in URL, redirect to user page with that session
   useEffect(() => {
     const sessionId = searchParams.get('session');
     if (sessionId) {
@@ -112,22 +115,20 @@ const Index = () => {
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
       {/* Header */}
       <header className="w-full py-4 px-4">
         <div className="container mx-auto flex items-center justify-between">
           <div className="w-10" />
           
           {/* Logo & Title */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 group">
             <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
-              <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-                <Church className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <div className="absolute inset-0 bg-primary/15 rounded-full blur-xl animate-pulse-soft" />
+              <WeChurchLogo size={44} className="relative group-hover:scale-105 transition-transform" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">WeChurch</h1>
+              <h1 className="text-2xl font-bold text-foreground">WeChurch</h1>
             </div>
           </div>
 
@@ -218,8 +219,8 @@ const Index = () => {
               const cardContent = (
                 <Card className={`h-full transition-all duration-300 border-2 hover:shadow-xl ${
                   !isEnabled 
-                    ? 'opacity-60 border-muted border-dashed' 
-                    : 'hover:border-primary/30 hover:scale-[1.02]'
+                    ? 'opacity-60 border-muted border-dashed cursor-not-allowed' 
+                    : `${feature.hoverBorder} hover:scale-[1.02] cursor-pointer`
                 }`}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -251,7 +252,7 @@ const Index = () => {
               
               if (!isEnabled) {
                 return (
-                  <div key={feature.id} className="block group cursor-not-allowed">
+                  <div key={feature.id} className="block group">
                     {cardContent}
                   </div>
                 );
@@ -268,7 +269,7 @@ const Index = () => {
           {/* Footer Tagline */}
           <div className="text-center mt-12 animate-fade-in" style={{ animationDelay: '200ms' }}>
             <div className="inline-flex items-center gap-2 text-muted-foreground">
-              <Heart className="w-4 h-4 text-destructive" />
+              <Heart className="w-4 h-4 text-secondary" />
               <span className="text-sm">與弟兄姊妹一起成長</span>
               <Users className="w-4 h-4 text-primary" />
             </div>
@@ -281,7 +282,7 @@ const Index = () => {
         <div className="container mx-auto max-w-4xl">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Church className="w-4 h-4 text-primary" />
+              <Home className="w-4 h-4 text-primary" />
               <span>© {new Date().getFullYear()} WeChurch. All rights reserved.</span>
             </div>
             <div className="flex items-center gap-1">

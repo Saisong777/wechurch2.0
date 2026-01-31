@@ -9,14 +9,14 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { lovable } from '@/integrations/lovable';
 import { supabase } from '@/integrations/supabase/client';
-import { LogIn, Mail, Lock, User, ArrowLeft } from 'lucide-react';
+import { LogIn, Mail, Lock, User, ArrowLeft, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 
 const LoginPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // If already logged in, redirect to notebook
   React.useEffect(() => {
     if (!loading && user) {
       const redirectTo = localStorage.getItem('login_redirect') || '/notebook';
@@ -27,7 +27,7 @@ const LoginPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
         <Header />
         <main className="container mx-auto px-4 py-12">
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -39,13 +39,18 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
       <Header title="WeChurch" subtitle="" />
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-md mx-auto">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <LogIn className="w-8 h-8 text-primary" />
+            <div className="relative inline-block mb-4">
+              <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse-soft" />
+              <WeChurchLogo size={80} className="relative" />
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+              <Sparkles className="w-4 h-4" />
+              歡迎回來
             </div>
             <p className="text-muted-foreground text-lg">
               一起與主同行，歡迎登入
@@ -143,11 +148,10 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  // Forgot password mode
   if (mode === 'forgot') {
     if (resetEmailSent) {
       return (
-        <Card variant="highlight" className="w-full border-2">
+        <Card variant="highlight" className="w-full border-2 shadow-lg">
           <CardContent className="pt-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
               <Mail className="w-6 h-6 text-primary" />
@@ -176,7 +180,7 @@ const LoginForm: React.FC = () => {
     }
 
     return (
-      <Card variant="highlight" className="w-full border-2">
+      <Card variant="highlight" className="w-full border-2 shadow-lg">
         <CardHeader className="text-center pb-4">
           <CardTitle className="text-xl">忘記密碼</CardTitle>
           <CardDescription>輸入您的電子郵件，我們將發送重設連結</CardDescription>
@@ -226,7 +230,7 @@ const LoginForm: React.FC = () => {
   }
 
   return (
-    <Card variant="highlight" className="w-full border-2">
+    <Card variant="highlight" className="w-full border-2 shadow-lg">
       <CardHeader className="text-center pb-4">
         <CardTitle className="text-xl">
           {mode === 'login' ? '登入帳戶' : '建立新帳戶'}
@@ -241,7 +245,7 @@ const LoginForm: React.FC = () => {
           type="button"
           variant="outline"
           size="lg"
-          className="w-full h-12 text-base border-2 hover:bg-muted/50"
+          className="w-full h-12 text-base border-2 hover:bg-muted/50 hover:border-primary/30 transition-all"
           onClick={handleGoogleSignIn}
           disabled={isGoogleLoading}
         >

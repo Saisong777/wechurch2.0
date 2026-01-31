@@ -14,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        serif: ['Oswald', 'sans-serif'],
-        display: ['Oswald', 'sans-serif'],
+        serif: ['Nunito', 'sans-serif'],
+        display: ['Nunito', 'sans-serif'],
         sans: ['Inter', 'sans-serif'],
       },
       colors: {
