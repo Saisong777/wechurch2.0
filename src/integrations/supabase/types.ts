@@ -180,6 +180,71 @@ export type Database = {
           },
         ]
       }
+      message_card_downloads: {
+        Row: {
+          card_id: string
+          downloaded_at: string
+          id: string
+          user_email: string
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          card_id: string
+          downloaded_at?: string
+          id?: string
+          user_email: string
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          card_id?: string
+          downloaded_at?: string
+          id?: string
+          user_email?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_card_downloads_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "message_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_cards: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          image_path: string
+          is_active: boolean
+          short_code: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_path: string
+          is_active?: boolean
+          short_code: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_path?: string
+          is_active?: boolean
+          short_code?: string
+          title?: string
+        }
+        Relationships: []
+      }
       participants: {
         Row: {
           email: string
@@ -1042,6 +1107,7 @@ export type Database = {
           cards_remaining: number
         }[]
       }
+      generate_card_short_code: { Args: never; Returns: string }
       generate_short_code: { Args: never; Returns: string }
       get_participant_for_reentry: {
         Args: { p_email: string; p_session_id: string }
