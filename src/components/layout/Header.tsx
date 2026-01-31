@@ -25,8 +25,8 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  title = '靈魂健身房',
-  subtitle = 'Soul Gym',
+  title = 'WeChurch',
+  subtitle,
   showLogo = true,
   className,
   variant = 'default',
