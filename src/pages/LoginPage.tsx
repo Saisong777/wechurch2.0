@@ -121,12 +121,17 @@ const LoginForm: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const response = await supabase.functions.invoke('send-password-reset', {
+        body: {
+          email,
+          redirectUrl: `${window.location.origin}/reset-password`,
+        },
       });
       
-      if (error) {
-        toast.error(error.message);
+      if (response.error) {
+        toast.error(response.error.message || '發送失敗，請重試');
+      } else if (response.data?.error) {
+        toast.error(response.data.error);
       } else {
         setResetEmailSent(true);
         toast.success('密碼重設連結已發送至您的信箱！');
