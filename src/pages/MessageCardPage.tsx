@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Download, Image, Loader2, Lock, Mail, User, ChevronLeft } from 'lucide-react';
+import { Download, Image, Loader2, Lock, Mail, User, ChevronLeft, ScanLine } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { QRCodeScanner } from '@/components/user/QRCodeScanner';
 
 type PageStep = 'enter-code' | 'auth' | 'download';
 
@@ -35,10 +35,10 @@ export const MessageCardPage: React.FC = () => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   
   // Guest auth state
-  const [authMode, setAuthMode] = useState<'google' | 'guest'>('google');
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // Load saved guest info
   useEffect(() => {
@@ -182,6 +182,30 @@ export const MessageCardPage: React.FC = () => {
     toast.success('下載開始！');
   };
 
+  const handleQRScan = (scannedValue: string) => {
+    // Extract code from URL or use directly
+    let cardCode = scannedValue;
+    
+    try {
+      const url = new URL(scannedValue);
+      const codeParam = url.searchParams.get('code');
+      if (codeParam) {
+        cardCode = codeParam;
+      }
+    } catch {
+      // Not a URL, use as-is (might be direct 4-digit code)
+    }
+
+    // Clean up and validate
+    cardCode = cardCode.toUpperCase().trim();
+    if (cardCode.length === 4) {
+      setCode(cardCode);
+      handleCheckCode(cardCode);
+    } else {
+      toast.error('無效的 QR Code');
+    }
+  };
+
   const renderEnterCode = () => (
     <div className="px-4 py-8 max-w-md mx-auto">
       <Card className="border-2">
@@ -192,11 +216,31 @@ export const MessageCardPage: React.FC = () => {
           <div>
             <CardTitle className="text-2xl font-serif">本週信息摘要</CardTitle>
             <CardDescription className="text-base mt-2">
-              輸入 4 位數代碼下載今天的信息卡片
+              掃描 QR Code 或輸入 4 位數代碼下載信息卡片
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* QR Code Scanner Button */}
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full h-14 text-base border-2 border-dashed hover:border-secondary hover:bg-secondary/5"
+            onClick={() => setScannerOpen(true)}
+          >
+            <ScanLine className="w-5 h-5 mr-2" />
+            掃描 QR Code
+          </Button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">或輸入代碼</span>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="code" className="text-base">代碼 Code</Label>
             <Input
@@ -223,6 +267,13 @@ export const MessageCardPage: React.FC = () => {
           </Button>
         </CardContent>
       </Card>
+
+      {/* QR Code Scanner Dialog */}
+      <QRCodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleQRScan}
+      />
     </div>
   );
 
