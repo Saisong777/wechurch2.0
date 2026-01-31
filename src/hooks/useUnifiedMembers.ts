@@ -50,7 +50,7 @@ export interface UnifiedMember {
 }
 
 interface UseUnifiedMembersOptions {
-  tab: 'all' | 'registered' | 'potential';
+  tab: 'all' | 'registered' | 'potential' | 'incomplete';
   status?: 'pending' | 'member' | 'declined' | 'all';
   subscribed?: boolean | 'all';
   role?: AppRole | 'all';

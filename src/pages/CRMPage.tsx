@@ -25,12 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Users, RefreshCw, Copy, FlaskConical, UserCheck, Clock } from 'lucide-react';
+import { ArrowLeft, Users, RefreshCw, Copy, FlaskConical, UserCheck, Clock, AlertCircle } from 'lucide-react';
 import { UnifiedStatsCards } from '@/components/admin/UnifiedStatsCards';
 import { UnifiedMemberCard } from '@/components/admin/UnifiedMemberCard';
 import { UnifiedMemberTable } from '@/components/admin/UnifiedMemberTable';
 import { CRMBulkActions } from '@/components/admin/CRMBulkActions';
 import { LinkUserDialog } from '@/components/admin/LinkUserDialog';
+import { IncompleteMembersPanel } from '@/components/admin/IncompleteMembersPanel';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -41,7 +42,7 @@ const CRMPage = () => {
   const { isLeader, isAdmin, loading: roleLoading } = useUserRole();
   const isMobile = useIsMobile();
   
-  const [tab, setTab] = useState<'all' | 'registered' | 'potential'>('all');
+  const [tab, setTab] = useState<'all' | 'registered' | 'potential' | 'incomplete'>('all');
   const [status, setStatus] = useState<'all' | 'pending' | 'member' | 'declined'>('all');
   const [role, setRole] = useState<AppRole | 'all'>('all');
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -295,6 +296,10 @@ const CRMPage = () => {
                     <Clock className="h-4 w-4" />
                     潛在會員
                   </TabsTrigger>
+                  <TabsTrigger value="incomplete" className="gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    待完善
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
               
@@ -371,8 +376,10 @@ const CRMPage = () => {
               />
             )}
 
-            {/* Member List */}
-            {isLoading ? (
+            {/* Member List or Incomplete Panel */}
+            {tab === 'incomplete' ? (
+              <IncompleteMembersPanel />
+            ) : isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
                   <Skeleton key={i} className="h-20 w-full" />
@@ -417,7 +424,7 @@ const CRMPage = () => {
             )}
 
             {/* Count info */}
-            {members && members.length > 0 && (
+            {tab !== 'incomplete' && members && members.length > 0 && (
               <p className="text-sm text-muted-foreground text-center">
                 顯示 {members.length} 筆資料
               </p>
