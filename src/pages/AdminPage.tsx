@@ -9,6 +9,7 @@ import { AdminMonitor } from '@/components/admin/AdminMonitor';
 import { HistoryBrowser } from '@/components/admin/HistoryBrowser';
 import { CardQuestionManager } from '@/components/admin/CardQuestionManager';
 import { MessageCardManager } from '@/components/admin/MessageCardManager';
+import { QuickShareMessageCard } from '@/components/admin/QuickShareMessageCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -172,6 +173,12 @@ export const AdminPage: React.FC = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Quick Share Message Card */}
+            <div className="mb-6">
+              <QuickShareMessageCard onManageCards={() => setStep('message-cards')} />
+            </div>
+
             <SessionHistory 
               onCreateNew={() => setStep('create')} 
               onSelectSession={handleSelectSession}
