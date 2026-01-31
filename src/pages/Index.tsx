@@ -1,19 +1,87 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Settings, Users, Sparkles, Loader2, Dumbbell, Heart } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  Dumbbell, 
+  BookOpen, 
+  Gamepad2, 
+  Share2, 
+  Heart, 
+  Sparkles,
+  Users,
+  ChevronRight,
+  Church
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserRole } from '@/hooks/useUserRole';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { LogOut, BookMarked, Settings, User } from 'lucide-react';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useState } from 'react';
+import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
+
+const features = [
+  {
+    id: 'live',
+    title: 'We Live',
+    subtitle: '靈魂健身房',
+    description: '一起活出耶穌的豐盛生命',
+    icon: Dumbbell,
+    href: '/user',
+    color: 'from-amber-500 to-orange-600',
+    bgColor: 'bg-amber-500/10',
+    iconColor: 'text-amber-600',
+  },
+  {
+    id: 'learn',
+    title: 'We Learn',
+    subtitle: '學習成長',
+    description: '聖經研讀與屬靈資源',
+    icon: BookOpen,
+    href: '/learn',
+    color: 'from-blue-500 to-indigo-600',
+    bgColor: 'bg-blue-500/10',
+    iconColor: 'text-blue-600',
+    comingSoon: true,
+  },
+  {
+    id: 'play',
+    title: 'We Play',
+    subtitle: '破冰遊戲',
+    description: '透過遊戲認識彼此',
+    icon: Gamepad2,
+    href: '/icebreaker',
+    color: 'from-emerald-500 to-teal-600',
+    bgColor: 'bg-emerald-500/10',
+    iconColor: 'text-emerald-600',
+  },
+  {
+    id: 'share',
+    title: 'We Share',
+    subtitle: '分享代禱',
+    description: '禱告牆與經文圖卡',
+    icon: Share2,
+    href: '/share',
+    color: 'from-rose-500 to-pink-600',
+    bgColor: 'bg-rose-500/10',
+    iconColor: 'text-rose-600',
+  },
+];
 
 const Index = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const { canCreateSession, loading: roleLoading } = useUserRole();
-  
-  const loading = authLoading || (user && roleLoading);
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { profile } = useUserProfile();
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
   
   // If session ID is in URL, redirect to user page with that session
   useEffect(() => {
@@ -23,95 +91,193 @@ const Index = () => {
     }
   }, [searchParams, navigate]);
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const getInitials = (email: string | undefined) => {
+    if (!email) return 'U';
+    return email.charAt(0).toUpperCase();
+  };
+
+  const getDisplayName = () => {
+    if (profile?.display_name) return profile.display_name;
+    if (user?.user_metadata?.display_name) return user.user_metadata.display_name;
+    if (user?.email) return user.email.split('@')[0];
+    return '使用者';
+  };
+
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+      {/* Header */}
+      <header className="w-full py-4 px-4">
+        <div className="container mx-auto flex items-center justify-between">
+          <div className="w-10" />
+          
+          {/* Logo & Title */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+              <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                <Church className="w-5 h-5 text-primary-foreground" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">WeChurch</h1>
+            </div>
+          </div>
+
+          {/* User Menu */}
+          <div className="w-10 flex justify-end">
+            {authLoading ? (
+              <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
+            ) : user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 p-0">
+                    <Avatar className="w-9 h-9">
+                      <AvatarImage src={avatarUrl || undefined} />
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                        {getInitials(user.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-3 py-2">
+                    <p className="text-sm font-medium truncate">{getDisplayName()}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/notebook" className="flex items-center gap-2 cursor-pointer">
+                      <BookMarked className="w-4 h-4" />
+                      我的筆記本
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin" className="flex items-center gap-2 cursor-pointer">
+                      <Settings className="w-4 h-4" />
+                      管理後台
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowProfileSettings(true)} className="cursor-pointer">
+                    <User className="w-4 h-4 mr-2" />
+                    個人設定
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleSignOut}
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    登出
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full w-9 h-9"
+                onClick={() => navigate('/notebook')}
+              >
+                <User className="w-5 h-5 text-muted-foreground" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
       
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-4xl mx-auto">
-          {/* Entry Points */}
-          <div className="flex flex-col gap-8 mb-16">
-            {/* Main Participant Entry - Hero Card with animated logo */}
-            <Card variant="highlight" className="group hover:scale-[1.01] transition-all duration-300 cursor-pointer border-2 border-primary/30 shadow-xl hover:shadow-2xl hover:border-primary/50 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
-              <Link to="/user">
-                <CardContent className="py-12 md:py-16 text-center relative">
-                  {/* Animated Logo */}
-                  <div className="relative inline-block mb-6">
-                    <div className="absolute inset-0 bg-secondary/30 rounded-full blur-3xl animate-pulse-soft" />
-                    <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full gradient-gold flex items-center justify-center glow-gold animate-float shadow-lg">
-                      <Dumbbell className="w-14 h-14 md:w-16 md:h-16 text-secondary-foreground" />
-                    </div>
-                  </div>
-                  
-                  {/* Title & Tagline */}
-                  <h1 className="font-serif text-3xl md:text-5xl font-bold text-foreground mb-2">
-                    靈魂健身房
-                  </h1>
-                  <p className="text-lg md:text-xl text-muted-foreground mb-2">
-                    Soul Gym
-                  </p>
-                  <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                    一起，活出耶穌的豐盛生命
-                  </p>
-                  
-                  <Button variant="gold" size="xl" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl">
-                    開始健身 Join Session
-                  </Button>
-                </CardContent>
-              </Link>
-            </Card>
-
-            {/* Secondary Admin Entry - Subtle text link */}
-            {loading ? (
-              <div className="flex justify-center">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : canCreateSession ? (
-              <div className="flex justify-center">
-                <Link 
-                  to="/admin" 
-                  className="group inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
-                  <span className="text-sm">教練入口 Coach Entry</span>
-                </Link>
-              </div>
-            ) : null}
+          {/* Hero Section */}
+          <div className="text-center mb-12 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+              <Sparkles className="w-4 h-4" />
+              歡迎來到 WeChurch
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              一起經歷信仰生活
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-md mx-auto">
+              連結、學習、遊戲、分享 — 在這裡找到屬於你的信仰社群
+            </p>
           </div>
 
-          {/* Features Preview */}
-          <div className="grid md:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
-            <div className="text-center p-6">
-              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 text-secondary" />
-              </div>
-              <h3 className="font-serif text-lg font-semibold mb-2">智慧分組</h3>
-              <p className="text-sm text-muted-foreground">
-                支援隨機或性別平衡分組，自動顯示組別
-              </p>
-            </div>
-            <div className="text-center p-6">
-              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-4">
-                <Heart className="w-6 h-6 text-secondary" />
-              </div>
-              <h3 className="font-serif text-lg font-semibold mb-2">靈魂健身</h3>
-              <p className="text-sm text-muted-foreground">
-                七步驟靈魂健身系統，即時同步
-              </p>
-            </div>
-            <div className="text-center p-6">
-              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-6 h-6 text-secondary" />
-              </div>
-              <h3 className="font-serif text-lg font-semibold mb-2">AI 分析</h3>
-              <p className="text-sm text-muted-foreground">
-                自動生成小組摘要和整體洞察報告
-              </p>
+          {/* Feature Grid */}
+          <div className="grid sm:grid-cols-2 gap-4 md:gap-6 animate-fade-in" style={{ animationDelay: '100ms' }}>
+            {features.map((feature) => {
+              const Icon = feature.icon;
+              const isComingSoon = feature.comingSoon;
+              
+              const cardContent = (
+                <Card className={`h-full transition-all duration-300 border-2 hover:shadow-xl ${
+                  isComingSoon 
+                    ? 'opacity-60 border-muted' 
+                    : 'hover:border-primary/30 hover:scale-[1.02]'
+                }`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className={`w-14 h-14 rounded-2xl ${feature.bgColor} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                        <Icon className={`w-7 h-7 ${feature.iconColor}`} />
+                      </div>
+                      {isComingSoon ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                          即將推出
+                        </span>
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                      )}
+                    </div>
+                    <CardTitle className="text-xl">
+                      {feature.title}
+                    </CardTitle>
+                    <CardDescription className="text-base font-medium text-foreground/70">
+                      {feature.subtitle}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-muted-foreground">
+                      {feature.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+              
+              if (isComingSoon) {
+                return (
+                  <div key={feature.id} className="block group cursor-not-allowed">
+                    {cardContent}
+                  </div>
+                );
+              }
+              
+              return (
+                <Link key={feature.id} to={feature.href} className="block group">
+                  {cardContent}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Footer Tagline */}
+          <div className="text-center mt-12 animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <div className="inline-flex items-center gap-2 text-muted-foreground">
+              <Heart className="w-4 h-4 text-destructive" />
+              <span className="text-sm">與弟兄姊妹一起成長</span>
+              <Users className="w-4 h-4 text-primary" />
             </div>
           </div>
         </div>
       </main>
+
+      <ProfileSettingsDialog 
+        open={showProfileSettings} 
+        onOpenChange={setShowProfileSettings} 
+      />
     </div>
   );
 };

@@ -16,6 +16,8 @@ const NotebookPage = lazy(() => import("./pages/NotebookPage"));
 const IcebreakerPage = lazy(() => import("./pages/IcebreakerPage").then(m => ({ default: m.IcebreakerPage })));
 const PrayerWallPage = lazy(() => import("./pages/PrayerWallPage"));
 const MessageCardPage = lazy(() => import("./pages/MessageCardPage"));
+const SharePage = lazy(() => import("./pages/SharePage"));
+const LearnPage = lazy(() => import("./pages/LearnPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -45,6 +47,8 @@ const App = () => (
                 <Route path="/icebreaker" element={<IcebreakerPage />} />
                 <Route path="/prayer-wall" element={<PrayerWallPage />} />
                 <Route path="/card" element={<MessageCardPage />} />
+                <Route path="/share" element={<SharePage />} />
+                <Route path="/learn" element={<LearnPage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
