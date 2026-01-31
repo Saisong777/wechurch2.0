@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { SoulGymLogo } from '@/components/icons/SoulGymLogo';
+import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -47,7 +47,6 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const getDisplayName = () => {
-    // Prefer profile table data, fallback to user metadata
     if (profile?.display_name) {
       return profile.display_name;
     }
@@ -60,7 +59,6 @@ export const Header: React.FC<HeaderProps> = ({
     return '使用者';
   };
 
-  // Get avatar URL: prefer profile table, fallback to user metadata
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
   return (
@@ -75,17 +73,17 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="w-10 sm:w-12" />
           
           {/* Center: Logo and Title - Clickable to go home */}
-          <Link to="/" className="flex items-center justify-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity">
+          <Link to="/" className="flex items-center justify-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity group">
             {showLogo && (
               <div className="relative">
-                <div className="absolute inset-0 bg-secondary/20 rounded-full blur-xl animate-pulse-soft" />
-                <SoulGymLogo size={variant === 'default' ? 44 : 36} className="relative sm:w-12 sm:h-12" />
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse-soft" />
+                <WeChurchLogo size={variant === 'default' ? 48 : 40} className="relative group-hover:scale-105 transition-transform" />
               </div>
             )}
             <div className="text-center">
               <h1 className={cn(
-                'font-serif font-bold text-foreground',
-                variant === 'default' ? 'text-2xl sm:text-3xl md:text-4xl' : 'text-xl sm:text-2xl'
+                'font-bold text-foreground',
+                variant === 'default' ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'
               )}>
                 {title}
               </h1>
@@ -107,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 p-0">
                     <Avatar className="w-9 h-9">
                       <AvatarImage src={avatarUrl || undefined} />
-                      <AvatarFallback className="bg-secondary/20 text-secondary text-sm font-medium">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                         {getInitials(user.email)}
                       </AvatarFallback>
                     </Avatar>
