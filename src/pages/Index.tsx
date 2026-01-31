@@ -274,6 +274,23 @@ const Index = () => {
         </div>
       </main>
 
+      {/* Footer */}
+      <footer className="w-full py-6 px-4 mt-auto border-t border-border/50">
+        <div className="container mx-auto max-w-4xl">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Church className="w-4 h-4 text-primary" />
+              <span>© {new Date().getFullYear()} WeChurch. All rights reserved.</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                v1.0.0
+              </span>
+            </div>
+          </div>
+        </div>
+      </footer>
+
       <ProfileSettingsDialog 
         open={showProfileSettings} 
         onOpenChange={setShowProfileSettings} 
