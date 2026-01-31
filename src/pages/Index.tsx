@@ -25,52 +25,52 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, BookMarked, Settings, User } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { useState } from 'react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 
-const features = [
+const featureConfig = [
   {
     id: 'live',
+    featureKey: 'we_live',
     title: 'We Live',
     subtitle: '靈魂健身房',
     description: '一起活出耶穌的豐盛生命',
     icon: Dumbbell,
     href: '/user',
-    color: 'from-amber-500 to-orange-600',
     bgColor: 'bg-amber-500/10',
     iconColor: 'text-amber-600',
   },
   {
     id: 'learn',
+    featureKey: 'we_learn',
     title: 'We Learn',
     subtitle: '學習成長',
     description: '聖經研讀與屬靈資源',
     icon: BookOpen,
     href: '/learn',
-    color: 'from-blue-500 to-indigo-600',
     bgColor: 'bg-blue-500/10',
     iconColor: 'text-blue-600',
-    comingSoon: true,
   },
   {
     id: 'play',
+    featureKey: 'we_play',
     title: 'We Play',
     subtitle: '破冰遊戲',
     description: '透過遊戲認識彼此',
     icon: Gamepad2,
     href: '/icebreaker',
-    color: 'from-emerald-500 to-teal-600',
     bgColor: 'bg-emerald-500/10',
     iconColor: 'text-emerald-600',
   },
   {
     id: 'share',
+    featureKey: 'we_share',
     title: 'We Share',
     subtitle: '分享代禱',
     description: '禱告牆與經文圖卡',
     icon: Share2,
     href: '/share',
-    color: 'from-rose-500 to-pink-600',
     bgColor: 'bg-rose-500/10',
     iconColor: 'text-rose-600',
   },
@@ -81,6 +81,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { profile } = useUserProfile();
+  const { isFeatureEnabled, getDisabledMessage, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   
   // If session ID is in URL, redirect to user page with that session
@@ -209,14 +210,15 @@ const Index = () => {
 
           {/* Feature Grid */}
           <div className="grid sm:grid-cols-2 gap-4 md:gap-6 animate-fade-in" style={{ animationDelay: '100ms' }}>
-            {features.map((feature) => {
+            {featureConfig.map((feature) => {
               const Icon = feature.icon;
-              const isComingSoon = feature.comingSoon;
+              const isEnabled = isFeatureEnabled(feature.featureKey);
+              const disabledMessage = getDisabledMessage(feature.featureKey);
               
               const cardContent = (
                 <Card className={`h-full transition-all duration-300 border-2 hover:shadow-xl ${
-                  isComingSoon 
-                    ? 'opacity-60 border-muted' 
+                  !isEnabled 
+                    ? 'opacity-60 border-muted border-dashed' 
                     : 'hover:border-primary/30 hover:scale-[1.02]'
                 }`}>
                   <CardHeader className="pb-3">
@@ -224,9 +226,9 @@ const Index = () => {
                       <div className={`w-14 h-14 rounded-2xl ${feature.bgColor} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                         <Icon className={`w-7 h-7 ${feature.iconColor}`} />
                       </div>
-                      {isComingSoon ? (
+                      {!isEnabled ? (
                         <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
-                          即將推出
+                          {disabledMessage}
                         </span>
                       ) : (
                         <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
@@ -247,7 +249,7 @@ const Index = () => {
                 </Card>
               );
               
-              if (isComingSoon) {
+              if (!isEnabled) {
                 return (
                   <div key={feature.id} className="block group cursor-not-allowed">
                     {cardContent}

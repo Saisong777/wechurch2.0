@@ -10,18 +10,19 @@ import { AdminMonitor } from '@/components/admin/AdminMonitor';
 import { HistoryBrowser } from '@/components/admin/HistoryBrowser';
 import { CardQuestionManager } from '@/components/admin/CardQuestionManager';
 import { MessageCardManager } from '@/components/admin/MessageCardManager';
+import { FeatureToggleManager } from '@/components/admin/FeatureToggleManager';
 import { QuickShareMessageCard } from '@/components/admin/QuickShareMessageCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Dumbbell, Flame, Users, History, Sparkles, Image } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Dumbbell, Flame, Users, History, Sparkles, Image, ToggleLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchParticipants, fetchSubmissions } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
 
-type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'create' | 'waiting' | 'monitor';
+type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'create' | 'waiting' | 'monitor';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -172,6 +173,15 @@ export const AdminPage: React.FC = () => {
                   <Users className="w-5 h-5 sm:w-4 sm:h-4" />
                   會員管理系統
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="default"
+                  onClick={() => setStep('feature-toggles')}
+                  className="gap-2 w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm"
+                >
+                  <ToggleLeft className="w-5 h-5 sm:w-4 sm:h-4" />
+                  功能開關
+                </Button>
               </div>
             </div>
 
@@ -202,6 +212,12 @@ export const AdminPage: React.FC = () => {
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
             <MessageCardManager onBack={handleBackToDashboard} />
+          </div>
+        );
+      case 'feature-toggles':
+        return (
+          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+            <FeatureToggleManager onBack={handleBackToDashboard} />
           </div>
         );
       case 'create':
