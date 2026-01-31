@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, ChevronLeft, Pencil, RefreshCw } from 'lucide-react';
@@ -296,6 +297,28 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
     setShowDownloadsDialog(true);
   };
 
+  const handleToggleActive = async (card: MessageCard) => {
+    const newStatus = !card.is_active;
+    
+    try {
+      const { error } = await supabase
+        .from('message_cards')
+        .update({ is_active: newStatus })
+        .eq('id', card.id);
+
+      if (error) throw error;
+
+      setCards(prev => prev.map(c => 
+        c.id === card.id ? { ...c, is_active: newStatus } : c
+      ));
+      
+      toast.success(newStatus ? '已啟用' : '已停用');
+    } catch (err) {
+      console.error('Error toggling card status:', err);
+      toast.error('操作失敗');
+    }
+  };
+
   const getImageUrl = (imagePath: string) => {
     const { data } = supabase.storage.from('message-cards').getPublicUrl(imagePath);
     return data.publicUrl;
@@ -424,13 +447,20 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => (
-            <Card key={card.id} className="overflow-hidden">
-              <div className="aspect-video bg-muted">
+            <Card key={card.id} className={`overflow-hidden ${!card.is_active ? 'opacity-60' : ''}`}>
+              <div className="aspect-video bg-muted relative">
                 <img
                   src={getImageUrl(card.image_path)}
                   alt={card.title}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover ${!card.is_active ? 'grayscale' : ''}`}
                 />
+                {!card.is_active && (
+                  <div className="absolute top-2 left-2">
+                    <Badge variant="outline" className="bg-background/80">
+                      已停用
+                    </Badge>
+                  </div>
+                )}
               </div>
               <CardHeader className="py-3 px-4">
                 <div className="flex items-start justify-between gap-2">
@@ -440,9 +470,16 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                       {format(new Date(card.created_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
                     </CardDescription>
                   </div>
-                  <Badge variant="secondary" className="font-mono text-sm">
-                    {card.short_code}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={card.is_active}
+                      onCheckedChange={() => handleToggleActive(card)}
+                      aria-label={card.is_active ? '停用' : '啟用'}
+                    />
+                    <Badge variant={card.is_active ? "secondary" : "outline"} className="font-mono text-sm">
+                      {card.short_code}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0 px-4 pb-4">
