@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { JoinForm } from '@/components/user/JoinForm';
 import { WaitingRoom } from '@/components/user/WaitingRoom';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Dumbbell, ArrowRight, QrCode, BookMarked, ChevronLeft } from 'lucide-react';
+import { Dumbbell, ArrowRight, QrCode, BookMarked, ChevronLeft, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isShortCode } from '@/lib/url-helpers';
@@ -430,6 +430,14 @@ export const UserPage: React.FC = () => {
         const storedEmail = localStorage.getItem('bible_study_guest_email');
         return (
           <div className="w-full max-w-md mx-auto px-4 sm:px-4 py-6 sm:py-8 animate-fade-in">
+            {/* Back to Home Button */}
+            <Button variant="ghost" size="sm" asChild className="mb-4">
+              <Link to="/" className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                返回首頁
+              </Link>
+            </Button>
+            
             <Card variant="highlight" className="border-2">
               <CardHeader className="text-center px-4 sm:px-6 pt-8 sm:pt-8 pb-4">
                 <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold flex items-center justify-center mb-5 sm:mb-4 glow-gold">
