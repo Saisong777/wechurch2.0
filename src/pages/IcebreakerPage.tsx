@@ -6,7 +6,7 @@ import { FeatureGate } from '@/components/ui/feature-gate';
 export const IcebreakerPage: React.FC = () => {
   return (
     <FeatureGate 
-      featureKey="we_play" 
+      featureKeys={["we_play", "icebreaker_game"]}
       title="破冰遊戲維護中"
       description="We Play 功能目前暫時關閉，請稍後再試"
     >

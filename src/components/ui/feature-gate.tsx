@@ -7,7 +7,16 @@ import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface FeatureGateProps {
-  featureKey: string;
+  /**
+   * Single feature key (backward compatible).
+   * Prefer `featureKeys` when you need layered gating (e.g. parent + child).
+   */
+  featureKey?: string;
+  /**
+   * Multiple feature keys that must ALL be enabled.
+   * Useful for parent+child feature toggles.
+   */
+  featureKeys?: string[];
   children: React.ReactNode;
   /** Optional custom title for the maintenance screen */
   title?: string;
@@ -22,11 +31,21 @@ interface FeatureGateProps {
  */
 export const FeatureGate: React.FC<FeatureGateProps> = ({
   featureKey,
+  featureKeys,
   children,
   title,
   description,
 }) => {
-  const { isFeatureEnabled, getDisabledMessage, loading } = useFeatureToggles();
+  const { isFeatureEnabled, getDisabledMessage, loading, error } = useFeatureToggles();
+
+  const keysToCheck = (featureKeys && featureKeys.length > 0)
+    ? featureKeys
+    : (featureKey ? [featureKey] : []);
+
+  if (keysToCheck.length === 0) {
+    console.error('[FeatureGate] Missing featureKey/featureKeys');
+    return <>{children}</>;
+  }
 
   // Show loading skeleton while fetching feature toggles
   if (loading) {
@@ -50,13 +69,50 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
     );
   }
 
-  // If feature is enabled, render children
-  if (isFeatureEnabled(featureKey)) {
+  // Fail closed for gated screens if we couldn't load feature toggles.
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-2xl mx-auto">
+            <Button variant="ghost" size="sm" asChild className="mb-6">
+              <Link to="/" className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                返回首頁
+              </Link>
+            </Button>
+
+            <Card className="border-2 border-dashed border-muted">
+              <CardContent className="py-16 text-center">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-6">
+                  <Construction className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h2 className="text-2xl font-bold text-foreground mb-2">
+                  {title || '功能維護中'}
+                </h2>
+                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                  {description || '目前無法確認功能狀態，請稍後再試'}
+                </p>
+                <Button variant="outline" asChild>
+                  <Link to="/">返回首頁</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const firstDisabledKey = keysToCheck.find((k) => !isFeatureEnabled(k));
+
+  // If all required features are enabled, render children
+  if (!firstDisabledKey) {
     return <>{children}</>;
   }
 
   // Feature is disabled - show maintenance screen
-  const disabledMessage = getDisabledMessage(featureKey);
+  const disabledMessage = getDisabledMessage(firstDisabledKey);
 
   return (
     <div className="min-h-screen bg-background">
