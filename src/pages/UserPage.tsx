@@ -16,7 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Dumbbell, ArrowRight, QrCode, BookMarked, ChevronLeft, ArrowLeft } from 'lucide-react';
+import { Home, ArrowRight, QrCode, BookMarked, ChevronLeft, ArrowLeft } from 'lucide-react';
+import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isShortCode } from '@/lib/url-helpers';
@@ -400,29 +401,29 @@ export const UserPage: React.FC = () => {
         return (
           <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 animate-fade-in">
             <div className="relative mb-8">
-              <div className="absolute inset-0 bg-secondary/30 rounded-full blur-3xl animate-pulse-soft" />
-              <div className="relative w-32 h-32 rounded-full gradient-gold flex items-center justify-center glow-gold animate-float">
-                <Dumbbell className="w-16 h-16 text-secondary-foreground" />
+              <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl animate-pulse-soft" />
+              <div className="relative w-32 h-32 rounded-full gradient-sky flex items-center justify-center shadow-xl animate-float">
+                <WeChurchIcon size={64} className="drop-shadow-lg" />
               </div>
             </div>
             
-            <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground text-center mb-4">
-              靈魂健身房
+            <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground text-center mb-4">
+              WeChurch
             </h1>
-            <p className="text-lg text-muted-foreground text-center mb-2">
-              Soul Gym
+            <p className="text-lg text-primary text-center mb-2 font-medium">
+              我們就是教會
             </p>
             <p className="text-muted-foreground text-center max-w-md mb-12">
-              一起，活出耶穌的豐盛生命
+              一起學習、彼此交流的網路之家
             </p>
 
             <Button
-              variant="gold"
+              variant="default"
               size="xl"
               onClick={() => setStep('enter-session')}
-              className="min-w-64"
+              className="min-w-64 gradient-sky hover:opacity-90 text-white shadow-lg"
             >
-              開始健身 Join Session
+              加入課程 Join Session
             </Button>
           </div>
         );
@@ -439,12 +440,12 @@ export const UserPage: React.FC = () => {
               </Link>
             </Button>
             
-            <Card variant="highlight" className="border-2">
+            <Card variant="highlight" className="border-2 border-primary/20">
               <CardHeader className="text-center px-4 sm:px-6 pt-8 sm:pt-8 pb-4">
-                <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-gold flex items-center justify-center mb-5 sm:mb-4 glow-gold">
-                  <Dumbbell className="w-10 h-10 sm:w-8 sm:h-8 text-secondary-foreground" />
+                <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-sky flex items-center justify-center mb-5 sm:mb-4 shadow-lg">
+                  <WeChurchIcon size={40} className="drop-shadow-md" />
                 </div>
-                <CardTitle className="text-2xl sm:text-2xl">輸入課程代碼</CardTitle>
+                <CardTitle className="text-2xl sm:text-2xl font-display">輸入課程代碼</CardTitle>
                 <CardDescription className="text-base sm:text-base mt-2">
                   Enter 4-digit code from your coach
                 </CardDescription>
@@ -468,9 +469,9 @@ export const UserPage: React.FC = () => {
                 </div>
 
                 <Button
-                  variant="gold"
+                  variant="default"
                   size="xl"
-                  className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
+                  className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98] gradient-sky hover:opacity-90 text-white shadow-md"
                   onClick={handleEnterSession}
                   disabled={isLoading || !sessionId.trim()}
                 >
@@ -668,8 +669,8 @@ export const UserPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full gradient-gold flex items-center justify-center animate-pulse">
-            <Dumbbell className="w-8 h-8 text-secondary-foreground" />
+          <div className="w-16 h-16 mx-auto rounded-full gradient-sky flex items-center justify-center animate-pulse shadow-lg">
+            <WeChurchIcon size={32} />
           </div>
           <p className="text-muted-foreground">正在載入您的課程進度...</p>
           <p className="text-sm text-muted-foreground">Loading your session...</p>
