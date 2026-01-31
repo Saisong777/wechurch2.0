@@ -207,6 +207,7 @@ const LoginForm: React.FC = () => {
               required
               minLength={6}
               className="h-11"
+              showStrength={!isLogin}
             />
           </div>
 
