@@ -19,7 +19,7 @@ const LoginPage = () => {
 
   React.useEffect(() => {
     if (!loading && user) {
-      const redirectTo = localStorage.getItem('login_redirect') || '/notebook';
+      const redirectTo = localStorage.getItem('login_redirect') || '/';
       localStorage.removeItem('login_redirect');
       navigate(redirectTo, { replace: true });
     }
@@ -76,7 +76,7 @@ const LoginForm: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      const redirectTo = localStorage.getItem('login_redirect') || '/notebook';
+      const redirectTo = localStorage.getItem('login_redirect') || '/';
       const { error } = await lovable.auth.signInWithOAuth('google', {
         redirect_uri: window.location.origin + redirectTo,
       });
@@ -108,6 +108,10 @@ const LoginForm: React.FC = () => {
           toast.error(error.message);
         } else {
           toast.success('註冊成功！請查收驗證信件');
+          // Send welcome email (non-blocking)
+          supabase.functions.invoke('send-welcome-email', {
+            body: { email, name: displayName || email.split('@')[0] },
+          }).catch(console.error);
         }
       }
     } catch (err) {
