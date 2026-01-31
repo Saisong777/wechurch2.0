@@ -13,6 +13,7 @@ import { Download, Image, Loader2, Lock, Mail, User, ChevronLeft, ScanLine } fro
 import { Link } from 'react-router-dom';
 import { QRCodeScanner } from '@/components/user/QRCodeScanner';
 import { staggeredStart, withRetry } from '@/lib/retry-utils';
+import { FeatureGate } from '@/components/ui/feature-gate';
 
 type PageStep = 'initializing' | 'enter-code' | 'auth' | 'download';
 
@@ -476,20 +477,26 @@ export const MessageCardPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header 
-        variant="compact"
-        title="信息摘要卡片"
-        subtitle="Message Card"
-      />
-      
-      <main className="container mx-auto max-w-4xl">
-        {step === 'initializing' && renderInitializing()}
-        {step === 'enter-code' && renderEnterCode()}
-        {step === 'auth' && renderAuth()}
-        {step === 'download' && renderDownload()}
-      </main>
-    </div>
+    <FeatureGate 
+      featureKey="we_share" 
+      title="信息圖卡維護中"
+      description="信息圖卡功能目前暫時關閉，請稍後再試"
+    >
+      <div className="min-h-screen bg-background">
+        <Header 
+          variant="compact"
+          title="信息摘要卡片"
+          subtitle="Message Card"
+        />
+        
+        <main className="container mx-auto max-w-4xl">
+          {step === 'initializing' && renderInitializing()}
+          {step === 'enter-code' && renderEnterCode()}
+          {step === 'auth' && renderAuth()}
+          {step === 'download' && renderDownload()}
+        </main>
+      </div>
+    </FeatureGate>
   );
 };
 

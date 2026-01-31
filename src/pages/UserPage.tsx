@@ -20,6 +20,7 @@ import { Dumbbell, ArrowRight, QrCode, BookMarked, ChevronLeft, ArrowLeft } from
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isShortCode } from '@/lib/url-helpers';
+import { FeatureGate } from '@/components/ui/feature-gate';
 
 type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'icebreaker' | 'study' | 'review' | 'notebook';
 
@@ -678,11 +679,17 @@ export const UserPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header variant={step === 'landing' ? 'default' : 'compact'} />
-      <main className="container mx-auto pb-8">
-        {renderStep()}
-      </main>
-    </div>
+    <FeatureGate 
+      featureKey="we_live" 
+      title="靈魂健身房維護中"
+      description="We Live 功能目前暫時關閉，請稍後再試"
+    >
+      <div className="min-h-screen bg-background">
+        <Header variant={step === 'landing' ? 'default' : 'compact'} />
+        <main className="container mx-auto pb-8">
+          {renderStep()}
+        </main>
+      </div>
+    </FeatureGate>
   );
 };
