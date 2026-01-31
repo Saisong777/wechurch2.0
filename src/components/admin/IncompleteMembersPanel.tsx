@@ -16,6 +16,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getPublicBaseUrl } from '@/lib/url-helpers';
 
 type IncompleteType = 'unverified' | 'incomplete_profile' | 'potential';
 
@@ -94,12 +95,14 @@ export const IncompleteMembersPanel = () => {
         potential: 'potential_member',
       };
 
+      // Use public base URL to avoid auth-bridge redirect issues
+      const publicBaseUrl = getPublicBaseUrl();
       const { data, error } = await supabase.functions.invoke('send-profile-completion-notice', {
         body: {
           email: member.email,
           name: member.name,
           type: typeMap[member.type],
-          redirectUrl: `${window.location.origin}/login`,
+          redirectUrl: `${publicBaseUrl}/login`,
         },
       });
 
