@@ -125,15 +125,19 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
             <div className="space-y-2">
               <Label htmlFor="displayName" className="text-base flex items-center gap-2">
                 <User className="w-4 h-4 text-muted-foreground" />
-                顯示名稱 Display Name
+                真實姓名 Real Name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="displayName"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="您的名稱"
+                placeholder="請輸入您的真實姓名"
+                required
                 className="h-12 text-base"
               />
+              <p className="text-xs text-muted-foreground">
+                實名制有助於小組分組時彼此認識
+              </p>
             </div>
           )}
 
