@@ -14,6 +14,7 @@ const AdminPage = lazy(() => import("./pages/AdminPage").then(m => ({ default: m
 const CRMPage = lazy(() => import("./pages/CRMPage"));
 const NotebookPage = lazy(() => import("./pages/NotebookPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const IcebreakerPage = lazy(() => import("./pages/IcebreakerPage").then(m => ({ default: m.IcebreakerPage })));
 const PrayerWallPage = lazy(() => import("./pages/PrayerWallPage"));
 const MessageCardPage = lazy(() => import("./pages/MessageCardPage"));
@@ -46,6 +47,7 @@ const App = () => (
                 <Route path="/admin/crm" element={<CRMPage />} />
                 <Route path="/notebook" element={<NotebookPage />} />
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/icebreaker" element={<IcebreakerPage />} />
                 <Route path="/prayer-wall" element={<PrayerWallPage />} />
                 <Route path="/card" element={<MessageCardPage />} />

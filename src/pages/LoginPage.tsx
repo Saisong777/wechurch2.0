@@ -8,7 +8,8 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { lovable } from '@/integrations/lovable';
-import { LogIn, Mail, Lock, User } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { LogIn, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 const LoginPage = () => {
@@ -59,12 +60,13 @@ const LoginPage = () => {
 
 const LoginForm: React.FC = () => {
   const { signIn, signUp } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -88,14 +90,14 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === 'login') {
         const { error } = await signIn(email, password);
         if (error) {
           toast.error(error.message);
         } else {
           toast.success('登入成功！');
         }
-      } else {
+      } else if (mode === 'signup') {
         const { error } = await signUp(email, password, displayName);
         if (error) {
           toast.error(error.message);
@@ -110,14 +112,122 @@ const LoginForm: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error('請輸入電子郵件');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        toast.error(error.message);
+      } else {
+        setResetEmailSent(true);
+        toast.success('密碼重設連結已發送至您的信箱！');
+      }
+    } catch (err) {
+      toast.error('發生錯誤，請重試');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Forgot password mode
+  if (mode === 'forgot') {
+    if (resetEmailSent) {
+      return (
+        <Card variant="highlight" className="w-full border-2">
+          <CardContent className="pt-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <Mail className="w-6 h-6 text-primary" />
+            </div>
+            <h3 className="font-semibold text-lg">請查收您的信箱</h3>
+            <p className="text-muted-foreground text-sm">
+              我們已將密碼重設連結發送至<br />
+              <span className="font-medium text-foreground">{email}</span>
+            </p>
+            <p className="text-muted-foreground text-xs">
+              若未收到信件，請檢查垃圾郵件資料夾
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setMode('login');
+                setResetEmailSent(false);
+              }}
+              className="mt-4"
+            >
+              返回登入
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card variant="highlight" className="w-full border-2">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-xl">忘記密碼</CardTitle>
+          <CardDescription>輸入您的電子郵件，我們將發送重設連結</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                電子郵件
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+                className="h-11"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="default"
+              size="lg"
+              className="w-full"
+              disabled={isLoading}
+            >
+              {isLoading ? '發送中...' : '發送重設連結'}
+            </Button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 mx-auto"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                返回登入
+              </button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card variant="highlight" className="w-full border-2">
       <CardHeader className="text-center pb-4">
         <CardTitle className="text-xl">
-          {isLogin ? '登入帳戶' : '建立新帳戶'}
+          {mode === 'login' ? '登入帳戶' : '建立新帳戶'}
         </CardTitle>
         <CardDescription>
-          {isLogin ? 'Sign In' : 'Create Account'}
+          {mode === 'login' ? 'Sign In' : 'Create Account'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -161,7 +271,7 @@ const LoginForm: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
+          {mode === 'signup' && (
             <div className="space-y-2">
               <Label htmlFor="displayName" className="flex items-center gap-2">
                 <User className="w-4 h-4 text-muted-foreground" />
@@ -194,10 +304,21 @@ const LoginForm: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-muted-foreground" />
-              密碼
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password" className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                密碼
+              </Label>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => setMode('forgot')}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  忘記密碼？
+                </button>
+              )}
+            </div>
             <PasswordInput
               id="password"
               value={password}
@@ -206,7 +327,7 @@ const LoginForm: React.FC = () => {
               required
               minLength={6}
               className="h-11"
-              showStrength={!isLogin}
+              showStrength={mode === 'signup'}
             />
           </div>
 
@@ -217,16 +338,16 @@ const LoginForm: React.FC = () => {
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? '處理中...' : isLogin ? '登入' : '註冊'}
+            {isLoading ? '處理中...' : mode === 'login' ? '登入' : '註冊'}
           </Button>
 
           <div className="text-center">
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {isLogin ? '沒有帳戶？建立新帳戶' : '已有帳戶？登入'}
+              {mode === 'login' ? '沒有帳戶？建立新帳戶' : '已有帳戶？登入'}
             </button>
           </div>
         </form>
