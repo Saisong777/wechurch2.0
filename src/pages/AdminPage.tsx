@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// Force clean rebuild for HMR cache issue
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { AuthForm } from '@/components/auth/AuthForm';
