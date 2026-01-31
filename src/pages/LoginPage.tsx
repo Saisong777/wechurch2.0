@@ -39,16 +39,15 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header title="WeChurch" subtitle="" />
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-md mx-auto">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <LogIn className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="font-serif text-2xl font-bold mb-2">歡迎登入</h1>
-            <p className="text-muted-foreground">
-              登入後即可使用所有功能
+            <p className="text-muted-foreground text-lg">
+              一起與主同行，歡迎登入
             </p>
           </div>
           <LoginForm />
