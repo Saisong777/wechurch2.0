@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFeatureToggles, FeatureToggle } from '@/hooks/useFeatureToggles';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Settings, Power, PowerOff, Edit2, Save, X, ChevronLeft } from 'lucide-react';
+import { Loader2, Settings, Power, PowerOff, Edit2, Save, ChevronLeft, Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -16,16 +16,62 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface FeatureToggleManagerProps {
   onBack?: () => void;
 }
 
+// Define parent-child relationships
+const FEATURE_HIERARCHY: Record<string, string[]> = {
+  we_live: [], // No child features yet
+  we_learn: [], // No child features yet
+  we_play: ['icebreaker_game'],
+  we_share: ['prayer_wall', 'message_cards'],
+};
+
+const PARENT_FEATURE_KEYS = Object.keys(FEATURE_HIERARCHY);
+
 export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBack }) => {
-  const { features, loading, updateFeature, refetch } = useFeatureToggles();
+  const { features, loading, updateFeature, isFeatureEnabled } = useFeatureToggles();
   const [editingFeature, setEditingFeature] = useState<FeatureToggle | null>(null);
   const [editMessage, setEditMessage] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set(PARENT_FEATURE_KEYS));
+
+  // Group features by parent/child
+  const { parentFeatures, childFeaturesByParent } = useMemo(() => {
+    const parents: FeatureToggle[] = [];
+    const children: Record<string, FeatureToggle[]> = {};
+
+    // Initialize children arrays
+    PARENT_FEATURE_KEYS.forEach(key => {
+      children[key] = [];
+    });
+
+    features.forEach(feature => {
+      if (PARENT_FEATURE_KEYS.includes(feature.feature_key)) {
+        parents.push(feature);
+      } else {
+        // Find which parent this child belongs to
+        for (const [parentKey, childKeys] of Object.entries(FEATURE_HIERARCHY)) {
+          if (childKeys.includes(feature.feature_key)) {
+            children[parentKey].push(feature);
+            break;
+          }
+        }
+      }
+    });
+
+    // Sort parents by feature_key
+    parents.sort((a, b) => a.feature_key.localeCompare(b.feature_key));
+
+    return { parentFeatures: parents, childFeaturesByParent: children };
+  }, [features]);
 
   const handleToggle = async (feature: FeatureToggle) => {
     setUpdating(feature.feature_key);
@@ -67,13 +113,17 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
     setUpdating(null);
   };
 
-  // Group features by category
-  const mainFeatures = features.filter(f => 
-    ['we_live', 'we_learn', 'we_play', 'we_share'].includes(f.feature_key)
-  );
-  const subFeatures = features.filter(f => 
-    !['we_live', 'we_learn', 'we_play', 'we_share'].includes(f.feature_key)
-  );
+  const toggleExpanded = (parentKey: string) => {
+    setExpandedParents(prev => {
+      const next = new Set(prev);
+      if (next.has(parentKey)) {
+        next.delete(parentKey);
+      } else {
+        next.add(parentKey);
+      }
+      return next;
+    });
+  };
 
   if (loading) {
     return (
@@ -99,46 +149,110 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
               功能開關管理
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              控制各項功能的開放狀態
+              控制各項功能的開放狀態（父層關閉時子層自動鎖定）
             </p>
           </div>
         </div>
       </div>
 
-      {/* Main Features */}
-      <div>
-        <h3 className="text-lg font-medium mb-4">主要功能</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {mainFeatures.map((feature) => (
-            <FeatureCard
-              key={feature.id}
-              feature={feature}
-              updating={updating === feature.feature_key}
-              onToggle={() => handleToggle(feature)}
-              onEditMessage={() => handleEditMessage(feature)}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Feature Tree */}
+      <div className="space-y-4">
+        {parentFeatures.map((parent) => {
+          const childFeatures = childFeaturesByParent[parent.feature_key] || [];
+          const isExpanded = expandedParents.has(parent.feature_key);
+          const hasChildren = childFeatures.length > 0;
 
-      {/* Sub Features */}
-      {subFeatures.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4">子功能</h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {subFeatures.map((feature) => (
-              <FeatureCard
-                key={feature.id}
-                feature={feature}
-                updating={updating === feature.feature_key}
-                onToggle={() => handleToggle(feature)}
-                onEditMessage={() => handleEditMessage(feature)}
-                compact
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          return (
+            <Collapsible
+              key={parent.id}
+              open={isExpanded}
+              onOpenChange={() => hasChildren && toggleExpanded(parent.feature_key)}
+            >
+              <Card className={`transition-all ${parent.is_enabled ? '' : 'opacity-75 border-dashed'}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {hasChildren && (
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          {parent.is_enabled ? (
+                            <Power className="w-5 h-5 text-accent flex-shrink-0" />
+                          ) : (
+                            <PowerOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                          )}
+                          <span className="truncate">{parent.feature_name}</span>
+                          {hasChildren && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              {childFeatures.length} 子功能
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        {parent.description && (
+                          <CardDescription className="mt-1 ml-7">
+                            {parent.description}
+                          </CardDescription>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {updating === parent.feature_key ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Switch
+                          checked={parent.is_enabled}
+                          onCheckedChange={() => handleToggle(parent)}
+                          aria-label={`Toggle ${parent.feature_name}`}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant={parent.is_enabled ? 'default' : 'secondary'}>
+                      {parent.is_enabled ? '開放中' : parent.disabled_message || '已關閉'}
+                    </Badge>
+                    {!parent.is_enabled && (
+                      <Button variant="ghost" size="sm" onClick={() => handleEditMessage(parent)} className="h-7 px-2">
+                        <Edit2 className="w-3 h-3 mr-1" />
+                        編輯訊息
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Child Features */}
+                  {hasChildren && (
+                    <CollapsibleContent className="mt-4">
+                      <div className="border-l-2 border-muted ml-4 pl-4 space-y-3">
+                        {childFeatures.map((child) => (
+                          <ChildFeatureCard
+                            key={child.id}
+                            feature={child}
+                            parentEnabled={parent.is_enabled}
+                            updating={updating === child.feature_key}
+                            onToggle={() => handleToggle(child)}
+                            onEditMessage={() => handleEditMessage(child)}
+                          />
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  )}
+                </CardContent>
+              </Card>
+            </Collapsible>
+          );
+        })}
+      </div>
 
       {/* Edit Message Dialog */}
       <Dialog open={!!editingFeature} onOpenChange={(open) => !open && setEditingFeature(null)}>
@@ -183,68 +297,79 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
   );
 };
 
-interface FeatureCardProps {
+interface ChildFeatureCardProps {
   feature: FeatureToggle;
+  parentEnabled: boolean;
   updating: boolean;
   onToggle: () => void;
   onEditMessage: () => void;
-  compact?: boolean;
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({
+const ChildFeatureCard: React.FC<ChildFeatureCardProps> = ({
   feature,
+  parentEnabled,
   updating,
   onToggle,
   onEditMessage,
-  compact = false,
 }) => {
+  const isLocked = !parentEnabled;
+  const effectivelyDisabled = isLocked || !feature.is_enabled;
+
   return (
-    <Card className={`transition-all ${feature.is_enabled ? '' : 'opacity-75 border-dashed'}`}>
-      <CardHeader className={compact ? 'pb-2' : ''}>
-        <div className="flex items-start justify-between gap-2">
+    <div className={`p-3 rounded-lg border ${effectivelyDisabled ? 'bg-muted/30 border-dashed' : 'bg-card'} transition-all`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {isLocked ? (
+            <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          ) : feature.is_enabled ? (
+            <Power className="w-4 h-4 text-accent flex-shrink-0" />
+          ) : (
+            <PowerOff className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          )}
           <div className="flex-1 min-w-0">
-            <CardTitle className={`flex items-center gap-2 ${compact ? 'text-base' : ''}`}>
-              {feature.is_enabled ? (
-                <Power className="w-4 h-4 text-accent flex-shrink-0" />
-              ) : (
-                <PowerOff className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              )}
-              <span className="truncate">{feature.feature_name}</span>
-            </CardTitle>
-            {feature.description && !compact && (
-              <CardDescription className="mt-1">
+            <p className={`font-medium truncate ${isLocked ? 'text-muted-foreground' : ''}`}>
+              {feature.feature_name}
+            </p>
+            {feature.description && (
+              <p className="text-xs text-muted-foreground truncate">
                 {feature.description}
-              </CardDescription>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {updating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Switch
-                checked={feature.is_enabled}
-                onCheckedChange={onToggle}
-                aria-label={`Toggle ${feature.feature_name}`}
-              />
+              </p>
             )}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className={compact ? 'pt-0' : ''}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Badge variant={feature.is_enabled ? 'default' : 'secondary'}>
-              {feature.is_enabled ? '開放中' : feature.disabled_message || '已關閉'}
-            </Badge>
-          </div>
-          {!feature.is_enabled && (
-            <Button variant="ghost" size="sm" onClick={onEditMessage} className="h-7 px-2">
-              <Edit2 className="w-3 h-3 mr-1" />
-              編輯訊息
-            </Button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {updating ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Switch
+              checked={feature.is_enabled}
+              onCheckedChange={onToggle}
+              disabled={isLocked}
+              aria-label={`Toggle ${feature.feature_name}`}
+            />
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div className="flex items-center justify-between gap-2 mt-2">
+        <div className="flex items-center gap-2">
+          {isLocked ? (
+            <Badge variant="outline" className="text-xs">
+              <Lock className="w-3 h-3 mr-1" />
+              父層已關閉
+            </Badge>
+          ) : (
+            <Badge variant={feature.is_enabled ? 'default' : 'secondary'} className="text-xs">
+              {feature.is_enabled ? '開放中' : feature.disabled_message || '已關閉'}
+            </Badge>
+          )}
+        </div>
+        {!feature.is_enabled && !isLocked && (
+          <Button variant="ghost" size="sm" onClick={onEditMessage} className="h-6 px-2 text-xs">
+            <Edit2 className="w-3 h-3 mr-1" />
+            編輯
+          </Button>
+        )}
+      </div>
+    </div>
   );
 };
