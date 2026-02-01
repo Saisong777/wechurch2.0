@@ -95,7 +95,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
     }
   };
 
-  // Calculate statistics
+  // Calculate statistics including deleted cards
   const calculateStats = (): { totalDownloads: number; weeklyDownloads: number; uniqueUsers: number; cardStats: CardStats[] } => {
     const now = new Date();
     const weekStart = startOfWeek(now, { weekStartsOn: 0 });
@@ -107,11 +107,18 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
 
     const uniqueEmails = new Set(allDownloads.map(d => d.user_email.toLowerCase()));
     
-    const cardStatsMap = new Map<string, { total: number; weekly: number; users: Set<string> }>();
+    const cardStatsMap = new Map<string, { total: number; weekly: number; users: Set<string>; title: string }>();
     
+    // First, initialize with existing cards
+    cards.forEach(card => {
+      cardStatsMap.set(card.id, { total: 0, weekly: 0, users: new Set(), title: card.title });
+    });
+    
+    // Then, process all downloads (including from deleted cards)
     allDownloads.forEach(d => {
       if (!cardStatsMap.has(d.card_id)) {
-        cardStatsMap.set(d.card_id, { total: 0, weekly: 0, users: new Set() });
+        // This is a download from a deleted card
+        cardStatsMap.set(d.card_id, { total: 0, weekly: 0, users: new Set(), title: '（已刪除卡片）' });
       }
       const stats = cardStatsMap.get(d.card_id)!;
       stats.total++;
@@ -121,13 +128,17 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
       }
     });
 
-    const cardStats: CardStats[] = cards.map(card => ({
-      cardId: card.id,
-      cardTitle: card.title,
-      totalDownloads: cardStatsMap.get(card.id)?.total || 0,
-      weeklyDownloads: cardStatsMap.get(card.id)?.weekly || 0,
-      uniqueUsers: cardStatsMap.get(card.id)?.users.size || 0,
-    })).sort((a, b) => b.totalDownloads - a.totalDownloads);
+    // Convert to array and include deleted card flag
+    const cardStats: CardStats[] = Array.from(cardStatsMap.entries())
+      .filter(([_, stats]) => stats.total > 0) // Only show cards with downloads
+      .map(([cardId, stats]) => ({
+        cardId,
+        cardTitle: stats.title,
+        totalDownloads: stats.total,
+        weeklyDownloads: stats.weekly,
+        uniqueUsers: stats.users.size,
+      }))
+      .sort((a, b) => b.totalDownloads - a.totalDownloads);
 
     return {
       totalDownloads: allDownloads.length,
@@ -256,7 +267,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
       // Delete from storage
       await supabase.storage.from('message-cards').remove([card.image_path]);
       
-      // Delete from database
+      // Delete from database (downloads are preserved due to no CASCADE)
       const { error } = await supabase
         .from('message_cards')
         .delete()
@@ -264,8 +275,10 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
 
       if (error) throw error;
 
-      toast.success('已刪除');
+      toast.success('已刪除（下載記錄已保留）');
       setCards(prev => prev.filter(c => c.id !== card.id));
+      // Refresh downloads to show updated stats
+      fetchAllDownloads();
     } catch (err) {
       console.error('Error deleting card:', err);
       toast.error('刪除失敗');
@@ -368,6 +381,14 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   const handleShowDownloads = (card: MessageCard) => {
     setSelectedCard(card);
     fetchDownloads(card.id);
+    setShowDownloadsDialog(true);
+  };
+
+  // Show downloads for a card (including deleted cards from stats)
+  const handleShowDownloadsById = (cardId: string, cardTitle: string) => {
+    // Create a minimal card object for the dialog
+    setSelectedCard({ id: cardId, title: cardTitle, short_code: '', image_path: '', is_active: false, created_at: '' });
+    fetchDownloads(cardId);
     setShowDownloadsDialog(true);
   };
 
@@ -586,34 +607,49 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                         <TableHead className="text-right">總下載</TableHead>
                         <TableHead className="text-right">本週</TableHead>
                         <TableHead className="text-right">獨立用戶</TableHead>
+                        <TableHead className="w-16"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stats.cardStats.slice(0, 5).map((cardStat) => (
-                        <TableRow key={cardStat.cardId}>
-                          <TableCell className="font-medium max-w-[200px] truncate">
-                            {cardStat.cardTitle}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {cardStat.totalDownloads}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            <span className={cardStat.weeklyDownloads > 0 ? 'text-secondary font-semibold' : 'text-muted-foreground'}>
-                              {cardStat.weeklyDownloads}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {cardStat.uniqueUsers}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {stats.cardStats.map((cardStat) => {
+                        const isDeleted = cardStat.cardTitle === '（已刪除卡片）';
+                        return (
+                          <TableRow key={cardStat.cardId} className={isDeleted ? 'opacity-60' : ''}>
+                            <TableCell className="font-medium max-w-[200px] truncate">
+                              <span className="flex items-center gap-2">
+                                {cardStat.cardTitle}
+                                {isDeleted && (
+                                  <Badge variant="outline" className="text-xs">已刪除</Badge>
+                                )}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {cardStat.totalDownloads}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              <span className={cardStat.weeklyDownloads > 0 ? 'text-secondary font-semibold' : 'text-muted-foreground'}>
+                                {cardStat.weeklyDownloads}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {cardStat.uniqueUsers}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2"
+                                onClick={() => handleShowDownloadsById(cardStat.cardId, cardStat.cardTitle)}
+                              >
+                                <Users className="w-3 h-3 mr-1" />
+                                記錄
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
-                  {stats.cardStats.length > 5 && (
-                    <p className="text-xs text-muted-foreground text-center mt-2">
-                      顯示前 5 張卡片，共 {stats.cardStats.length} 張
-                    </p>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -724,7 +760,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                       <AlertDialogHeader>
                         <AlertDialogTitle>確定要刪除嗎？</AlertDialogTitle>
                         <AlertDialogDescription>
-                          此操作無法復原，圖片和所有下載記錄將會被永久刪除。
+                          此操作無法復原，圖片將會被永久刪除。下載記錄會保留以供日後查閱。
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
