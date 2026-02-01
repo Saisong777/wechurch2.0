@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { Loader2, User, Camera, X } from 'lucide-react';
 import { AvatarCropDialog } from './AvatarCropDialog';
+import { getAvatarUrl } from '@/lib/storage-helpers';
 
 interface ProfileSettingsDialogProps {
   open: boolean;
@@ -118,13 +119,10 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
+      // Use proxied URL to hide Supabase Storage URL
+      const proxiedUrl = getAvatarUrl(filePath);
       // Add cache-busting query param
-      const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
+      const urlWithCacheBust = `${proxiedUrl}&t=${Date.now()}`;
       setAvatarUrl(urlWithCacheBust);
       toast.success('頭像已上傳');
     } catch (error: any) {

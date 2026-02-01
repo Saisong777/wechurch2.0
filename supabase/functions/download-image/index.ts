@@ -5,9 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Allowed buckets for proxy access
+const ALLOWED_BUCKETS = ["message-cards", "avatars"];
+
 /**
- * Proxy endpoint to download message card images without exposing Supabase URLs
+ * Proxy endpoint to download images without exposing Supabase URLs
  * This improves security by hiding the storage backend from end users
+ * 
+ * Supports:
+ * - message-cards bucket (for weekly message summary cards)
+ * - avatars bucket (for user profile pictures)
  */
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -18,10 +25,20 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const imagePath = url.searchParams.get("path");
+    const bucket = url.searchParams.get("bucket") || "message-cards";
     const mode = url.searchParams.get("mode") || "download"; // "download" or "view"
+    
     if (!imagePath) {
       return new Response(
         JSON.stringify({ error: "Missing image path" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate bucket to prevent unauthorized access
+    if (!ALLOWED_BUCKETS.includes(bucket)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid bucket" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -33,7 +50,7 @@ Deno.serve(async (req) => {
 
     // Download the image from storage
     const { data, error } = await supabase.storage
-      .from("message-cards")
+      .from(bucket)
       .download(imagePath);
 
     if (error || !data) {
@@ -59,7 +76,7 @@ Deno.serve(async (req) => {
     const responseHeaders: Record<string, string> = {
       ...corsHeaders,
       "Content-Type": contentType,
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": bucket === "avatars" ? "public, max-age=86400" : "public, max-age=3600",
     };
 
     // Only add Content-Disposition for download mode

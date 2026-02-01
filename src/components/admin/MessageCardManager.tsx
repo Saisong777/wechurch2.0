@@ -14,6 +14,7 @@ import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, Ch
 import { QRCodeSVG } from 'qrcode.react';
 import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { getMessageCardUrl } from '@/lib/storage-helpers';
 
 interface MessageCard {
   id: string;
@@ -391,10 +392,8 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
     }
   };
 
-  const getImageUrl = (imagePath: string) => {
-    const { data } = supabase.storage.from('message-cards').getPublicUrl(imagePath);
-    return data.publicUrl;
-  };
+  // Use proxy URL to hide Supabase Storage URL from browser network tab
+  const getImageUrl = (imagePath: string) => getMessageCardUrl(imagePath, 'view');
 
   if (loading) {
     return (

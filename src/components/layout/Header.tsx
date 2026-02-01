@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, BookMarked, User, Settings } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
+import { convertToProxiedUrl } from '@/lib/storage-helpers';
 
 interface HeaderProps {
   title?: string;
@@ -58,8 +59,9 @@ export const Header: React.FC<HeaderProps> = ({
     }
     return '使用者';
   };
-
-  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+  // Convert direct Supabase Storage URLs to proxied URLs
+  const rawAvatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+  const avatarUrl = rawAvatarUrl ? convertToProxiedUrl(rawAvatarUrl) : undefined;
 
   return (
     <header className={cn(

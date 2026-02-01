@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { QRCodeScanner } from '@/components/user/QRCodeScanner';
 import { staggeredStart, withRetry } from '@/lib/retry-utils';
 import { FeatureGate } from '@/components/ui/feature-gate';
+import { getMessageCardUrl } from '@/lib/storage-helpers';
 
 type PageStep = 'initializing' | 'enter-code' | 'auth' | 'download';
 
@@ -127,8 +128,7 @@ export const MessageCardPage: React.FC = () => {
       setCard(data);
       
       // Use proxy URL to hide Supabase storage URL from users
-      const proxyImageUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-image?path=${encodeURIComponent(data.image_path)}&mode=view`;
-      setImageUrl(proxyImageUrl);
+      setImageUrl(getMessageCardUrl(data.image_path, 'view'));
 
       // If already logged in, proceed to download
       if (user) {
@@ -248,7 +248,7 @@ export const MessageCardPage: React.FC = () => {
     setLoading(true);
     try {
       // Use edge function proxy to hide Supabase URL from users
-      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-image?path=${encodeURIComponent(card.image_path)}`;
+      const proxyUrl = getMessageCardUrl(card.image_path, 'download');
       
       const response = await fetch(proxyUrl);
       if (!response.ok) {
