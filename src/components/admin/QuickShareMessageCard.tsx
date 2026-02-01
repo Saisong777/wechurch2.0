@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Image, QrCode, Copy, Share2, Loader2, ExternalLink } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getMessageCardUrl } from '@/lib/storage-helpers';
 
 interface MessageCard {
   id: string;
@@ -52,10 +53,8 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
     return `${window.location.origin}/card?code=${card.short_code}`;
   };
 
-  const getImageUrl = (imagePath: string) => {
-    const { data } = supabase.storage.from('message-cards').getPublicUrl(imagePath);
-    return data.publicUrl;
-  };
+  // Use proxy URL to hide Supabase Storage URL from browser
+  const getImageUrl = (imagePath: string) => getMessageCardUrl(imagePath, 'view');
 
   const handleCopyLink = () => {
     if (!latestCard) return;
