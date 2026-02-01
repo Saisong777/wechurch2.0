@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,10 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Mail, FileDown, Send, Copy, Paperclip, X, Image, File } from 'lucide-react';
+import { Loader2, Mail, FileDown, Send, Copy, Paperclip, X, Image, File, Clock, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
+import { zhTW } from 'date-fns/locale';
 
 interface Download {
   id: string;
@@ -18,6 +20,14 @@ interface Download {
   user_name: string;
   user_email: string;
   downloaded_at: string;
+}
+
+interface GroupedDownload {
+  email: string;
+  name: string;
+  downloadCount: number;
+  lastDownloadAt: string;
+  downloads: Download[];
 }
 
 interface Attachment {
@@ -42,7 +52,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
   downloads,
   loading,
 }) => {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
@@ -51,28 +61,64 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const toggleSelect = (id: string) => {
-    const newSet = new Set(selectedIds);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
+  // Group downloads by email
+  const groupedDownloads = useMemo(() => {
+    const grouped = new Map<string, GroupedDownload>();
+    
+    for (const download of downloads) {
+      const email = download.user_email.toLowerCase();
+      const existing = grouped.get(email);
+      
+      if (existing) {
+        existing.downloadCount++;
+        existing.downloads.push(download);
+        // Update last download time if this one is more recent
+        if (new Date(download.downloaded_at) > new Date(existing.lastDownloadAt)) {
+          existing.lastDownloadAt = download.downloaded_at;
+          existing.name = download.user_name; // Use most recent name
+        }
+      } else {
+        grouped.set(email, {
+          email: download.user_email,
+          name: download.user_name,
+          downloadCount: 1,
+          lastDownloadAt: download.downloaded_at,
+          downloads: [download],
+        });
+      }
     }
-    setSelectedIds(newSet);
+    
+    // Sort by last download time (most recent first)
+    return Array.from(grouped.values()).sort(
+      (a, b) => new Date(b.lastDownloadAt).getTime() - new Date(a.lastDownloadAt).getTime()
+    );
+  }, [downloads]);
+
+  // Calculate unique user count
+  const uniqueUserCount = groupedDownloads.length;
+
+  const toggleSelect = (email: string) => {
+    const newSet = new Set(selectedEmails);
+    if (newSet.has(email)) {
+      newSet.delete(email);
+    } else {
+      newSet.add(email);
+    }
+    setSelectedEmails(newSet);
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === downloads.length) {
-      setSelectedIds(new Set());
+    if (selectedEmails.size === groupedDownloads.length) {
+      setSelectedEmails(new Set());
     } else {
-      setSelectedIds(new Set(downloads.map(d => d.id)));
+      setSelectedEmails(new Set(groupedDownloads.map(g => g.email.toLowerCase())));
     }
   };
 
   const handleSendToSelected = () => {
-    const recipients = downloads
-      .filter(d => selectedIds.has(d.id))
-      .map(d => ({ name: d.user_name, email: d.user_email }));
+    const recipients = groupedDownloads
+      .filter(g => selectedEmails.has(g.email.toLowerCase()))
+      .map(g => ({ name: g.name, email: g.email }));
     
     if (recipients.length === 0) {
       toast.error('請先選擇收件人');
@@ -86,8 +132,8 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     setShowEmailDialog(true);
   };
 
-  const handleSendToOne = (download: Download) => {
-    setEmailRecipients([{ name: download.user_name, email: download.user_email }]);
+  const handleSendToOne = (grouped: GroupedDownload) => {
+    setEmailRecipients([{ name: grouped.name, email: grouped.email }]);
     setEmailSubject(`${cardTitle} - 信息通知`);
     setEmailBody('');
     setAttachments([]);
@@ -216,7 +262,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
       setEmailSubject('');
       setEmailBody('');
       setAttachments([]);
-      setSelectedIds(new Set());
+      setSelectedEmails(new Set());
     } catch (err) {
       console.error('Error sending email:', err);
       toast.error('發送失敗，請稍後再試');
@@ -226,16 +272,17 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
   };
 
   const handleExportCSV = () => {
-    const selectedDownloads = selectedIds.size > 0 
-      ? downloads.filter(d => selectedIds.has(d.id))
-      : downloads;
+    const selectedGrouped = selectedEmails.size > 0 
+      ? groupedDownloads.filter(g => selectedEmails.has(g.email.toLowerCase()))
+      : groupedDownloads;
     
-    const headers = ['序號', '姓名', 'Email', '下載時間'];
-    const rows = selectedDownloads.map((d, index) => [
+    const headers = ['序號', '姓名', 'Email', '下載次數', '最後下載時間'];
+    const rows = selectedGrouped.map((g, index) => [
       index + 1,
-      d.user_name,
-      d.user_email,
-      format(new Date(d.downloaded_at), 'yyyy/MM/dd HH:mm'),
+      g.name,
+      g.email,
+      g.downloadCount,
+      format(new Date(g.lastDownloadAt), 'yyyy/MM/dd HH:mm'),
     ]);
     
     const csvContent = [
@@ -251,17 +298,17 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     link.click();
     URL.revokeObjectURL(url);
     
-    toast.success(`已匯出 ${selectedDownloads.length} 筆資料`);
+    toast.success(`已匯出 ${selectedGrouped.length} 筆資料`);
   };
 
   const handleCopyEmails = () => {
-    const selectedDownloads = selectedIds.size > 0 
-      ? downloads.filter(d => selectedIds.has(d.id))
-      : downloads;
+    const selectedGrouped = selectedEmails.size > 0 
+      ? groupedDownloads.filter(g => selectedEmails.has(g.email.toLowerCase()))
+      : groupedDownloads;
     
-    const emails = selectedDownloads.map(d => d.user_email).join(', ');
+    const emails = selectedGrouped.map(g => g.email).join(', ');
     navigator.clipboard.writeText(emails);
-    toast.success(`已複製 ${selectedDownloads.length} 個 Email`);
+    toast.success(`已複製 ${selectedGrouped.length} 個 Email`);
   };
 
   const getFileIcon = (file: File) => {
@@ -278,9 +325,18 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between flex-wrap gap-2">
               <span>下載記錄 - {cardTitle}</span>
-              {downloads.length > 0 && (
-                <Badge variant="secondary">共 {downloads.length} 人</Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {downloads.length > 0 && (
+                  <>
+                    <Badge variant="secondary">
+                      {uniqueUserCount} 人
+                    </Badge>
+                    <Badge variant="outline" className="text-muted-foreground">
+                      共 {downloads.length} 次
+                    </Badge>
+                  </>
+                )}
+              </div>
             </DialogTitle>
           </DialogHeader>
           
@@ -288,7 +344,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin" />
             </div>
-          ) : downloads.length === 0 ? (
+          ) : groupedDownloads.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               尚無下載記錄
             </div>
@@ -297,14 +353,14 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
               {/* Toolbar */}
               <div className="flex items-center gap-2 flex-wrap border-b pb-3">
                 <span className="text-sm text-muted-foreground">
-                  已選擇 {selectedIds.size} 人
+                  已選擇 {selectedEmails.size} 人
                 </span>
                 <div className="flex-1" />
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleCopyEmails}
-                  disabled={downloads.length === 0}
+                  disabled={groupedDownloads.length === 0}
                 >
                   <Copy className="w-4 h-4 mr-1" />
                   複製 Email
@@ -313,7 +369,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={handleExportCSV}
-                  disabled={downloads.length === 0}
+                  disabled={groupedDownloads.length === 0}
                 >
                   <FileDown className="w-4 h-4 mr-1" />
                   匯出 CSV
@@ -322,10 +378,10 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                   variant="gold"
                   size="sm"
                   onClick={handleSendToSelected}
-                  disabled={selectedIds.size === 0}
+                  disabled={selectedEmails.size === 0}
                 >
                   <Mail className="w-4 h-4 mr-1" />
-                  發信 ({selectedIds.size})
+                  發信 ({selectedEmails.size})
                 </Button>
               </div>
 
@@ -336,7 +392,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                     <TableRow>
                       <TableHead className="w-10">
                         <Checkbox
-                          checked={selectedIds.size === downloads.length && downloads.length > 0}
+                          checked={selectedEmails.size === groupedDownloads.length && groupedDownloads.length > 0}
                           onCheckedChange={toggleSelectAll}
                           aria-label="全選"
                         />
@@ -344,36 +400,77 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                       <TableHead className="w-12 text-center">#</TableHead>
                       <TableHead>姓名</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>時間</TableHead>
+                      <TableHead className="w-20 text-center">次數</TableHead>
+                      <TableHead>最後下載</TableHead>
                       <TableHead className="w-16"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {downloads.map((d, index) => (
-                      <TableRow key={d.id}>
+                    {groupedDownloads.map((g, index) => (
+                      <TableRow key={g.email}>
                         <TableCell>
                           <Checkbox
-                            checked={selectedIds.has(d.id)}
-                            onCheckedChange={() => toggleSelect(d.id)}
-                            aria-label={`選擇 ${d.user_name}`}
+                            checked={selectedEmails.has(g.email.toLowerCase())}
+                            onCheckedChange={() => toggleSelect(g.email.toLowerCase())}
+                            aria-label={`選擇 ${g.name}`}
                           />
                         </TableCell>
                         <TableCell className="text-center text-muted-foreground font-mono text-sm">
                           {index + 1}
                         </TableCell>
-                        <TableCell className="font-medium">{d.user_name}</TableCell>
+                        <TableCell className="font-medium">{g.name}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {d.user_email}
+                          {g.email}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {g.downloadCount === 1 ? (
+                            <span className="text-muted-foreground">1</span>
+                          ) : (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-primary hover:text-primary/80"
+                                >
+                                  {g.downloadCount}
+                                  <ChevronDown className="w-3 h-3 ml-1" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-0" align="center">
+                                <div className="p-3 border-b">
+                                  <p className="text-sm font-medium">下載時間記錄</p>
+                                  <p className="text-xs text-muted-foreground">{g.name} 共下載 {g.downloadCount} 次</p>
+                                </div>
+                                <div className="max-h-48 overflow-auto p-2">
+                                  {g.downloads
+                                    .sort((a, b) => new Date(b.downloaded_at).getTime() - new Date(a.downloaded_at).getTime())
+                                    .map((d, i) => (
+                                      <div 
+                                        key={d.id}
+                                        className="flex items-center gap-2 py-1.5 px-2 text-sm hover:bg-muted/50 rounded"
+                                      >
+                                        <Clock className="w-3 h-3 text-muted-foreground" />
+                                        <span className="text-muted-foreground">#{g.downloadCount - i}</span>
+                                        <span>
+                                          {format(new Date(d.downloaded_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
+                                        </span>
+                                      </div>
+                                    ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                          {format(new Date(d.downloaded_at), 'MM/dd HH:mm')}
+                          {format(new Date(g.lastDownloadAt), 'MM/dd HH:mm')}
                         </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => handleSendToOne(d)}
+                            onClick={() => handleSendToOne(g)}
                             title="發送郵件"
                           >
                             <Mail className="w-4 h-4" />
@@ -498,9 +595,15 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                 disabled={sending || !emailSubject.trim() || !emailBody.trim() || attachments.some(a => a.uploading)}
               >
                 {sending ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />發送中...</>
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    發送中...
+                  </>
                 ) : (
-                  <><Send className="w-4 h-4 mr-2" />發送</>
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    發送
+                  </>
                 )}
               </Button>
             </div>
