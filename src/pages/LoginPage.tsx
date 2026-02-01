@@ -65,6 +65,7 @@ const LoginPage = () => {
 
 const LoginForm: React.FC = () => {
   const { signIn, signUp } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,18 +77,25 @@ const LoginForm: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      // Always redirect to home after Google OAuth - login_redirect is handled by the useEffect above
-      // Clear any stored redirect to prevent unwanted redirects
+      // Clear any stored redirect to ensure we always go to home
       localStorage.removeItem('login_redirect');
-      const { error } = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin + '/',
+      
+      const { error, redirected } = await lovable.auth.signInWithOAuth('google', {
+        redirect_uri: window.location.origin,
       });
+      
       if (error) {
         toast.error(error.message);
+        setIsGoogleLoading(false);
+        return;
+      }
+      
+      // If not redirected (session set directly), navigate to home
+      if (!redirected) {
+        navigate('/', { replace: true });
       }
     } catch (err) {
       toast.error('Google 登入失敗，請重試');
-    } finally {
       setIsGoogleLoading(false);
     }
   };
