@@ -111,7 +111,7 @@ const handler = async (req: Request): Promise<Response> => {
         `;
 
         const emailResponse = await resend.emails.send({
-          from: "Soul Gym <noreply@wechurch.app>",
+          from: "Soul Gym <noreply@wechurch.online>",
           to: [recipient.email],
           subject: subject,
           html: emailHtml,
