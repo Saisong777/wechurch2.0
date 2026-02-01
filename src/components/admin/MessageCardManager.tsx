@@ -15,6 +15,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { getMessageCardUrl } from '@/lib/storage-helpers';
+import { DownloadRecordsDialog } from './DownloadRecordsDialog';
 
 interface MessageCard {
   id: string;
@@ -912,58 +913,13 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
       </Dialog>
 
       {/* Downloads Dialog */}
-      <Dialog open={showDownloadsDialog} onOpenChange={setShowDownloadsDialog}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>下載記錄 - {selectedCard?.title}</span>
-              {downloads.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  共 {downloads.length} 人
-                </Badge>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          {downloadsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
-          ) : downloads.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              尚無下載記錄
-            </div>
-          ) : (
-            <div className="max-h-96 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12 text-center">#</TableHead>
-                    <TableHead>姓名</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>時間</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {downloads.map((d, index) => (
-                    <TableRow key={d.id}>
-                      <TableCell className="text-center text-muted-foreground font-mono text-sm">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell className="font-medium">{d.user_name}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {d.user_email}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {format(new Date(d.downloaded_at), 'MM/dd HH:mm')}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <DownloadRecordsDialog
+        open={showDownloadsDialog}
+        onOpenChange={setShowDownloadsDialog}
+        cardTitle={selectedCard?.title || ''}
+        downloads={downloads}
+        loading={downloadsLoading}
+      />
     </div>
   );
 };
