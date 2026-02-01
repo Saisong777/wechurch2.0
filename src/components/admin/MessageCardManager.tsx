@@ -761,10 +761,24 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
               </div>
               
               <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-1">代碼</p>
-                <p className="text-4xl font-mono font-bold tracking-widest text-primary">
-                  {selectedCard.short_code}
-                </p>
+                <p className="text-sm text-muted-foreground mb-1">輸入代碼下載圖片</p>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-4xl font-mono font-bold tracking-widest text-primary">
+                    {selectedCard.short_code}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedCard.short_code);
+                      toast.success('已複製代碼');
+                    }}
+                    title="複製代碼"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
 
               <div className="flex gap-2 w-full">
@@ -901,7 +915,14 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
       <Dialog open={showDownloadsDialog} onOpenChange={setShowDownloadsDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>下載記錄 - {selectedCard?.title}</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>下載記錄 - {selectedCard?.title}</span>
+              {downloads.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  共 {downloads.length} 人
+                </Badge>
+              )}
+            </DialogTitle>
           </DialogHeader>
           {downloadsLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -916,19 +937,23 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>姓名</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>時間</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {downloads.map((d) => (
+                  {downloads.map((d, index) => (
                     <TableRow key={d.id}>
+                      <TableCell className="text-center text-muted-foreground font-mono text-sm">
+                        {index + 1}
+                      </TableCell>
                       <TableCell className="font-medium">{d.user_name}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {d.user_email}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                         {format(new Date(d.downloaded_at), 'MM/dd HH:mm')}
                       </TableCell>
                     </TableRow>

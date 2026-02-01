@@ -192,9 +192,23 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
             
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-1">輸入代碼下載圖片</p>
-              <p className="text-4xl font-mono font-bold tracking-widest text-primary">
-                {latestCard.short_code}
-              </p>
+              <div className="flex items-center justify-center gap-2">
+                <p className="text-4xl font-mono font-bold tracking-widest text-primary">
+                  {latestCard.short_code}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    navigator.clipboard.writeText(latestCard.short_code);
+                    toast.success('已複製代碼');
+                  }}
+                  title="複製代碼"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="flex gap-2 w-full">
