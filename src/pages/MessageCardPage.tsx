@@ -244,18 +244,39 @@ export const MessageCardPage: React.FC = () => {
     await recordDownloadAndShow();
   };
 
-  const handleDownload = () => {
-    if (!imageUrl) return;
+  const handleDownload = async () => {
+    if (!card) return;
     
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = `${card?.title || 'message-card'}.jpg`;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success('下載開始！');
+    setLoading(true);
+    try {
+      // Use edge function proxy to hide Supabase URL from users
+      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-image?path=${encodeURIComponent(card.image_path)}`;
+      
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${card.title || 'message-card'}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up blob URL
+      URL.revokeObjectURL(blobUrl);
+      
+      toast.success('下載完成！');
+    } catch (err) {
+      console.error('Download error:', err);
+      toast.error('下載失敗，請重試');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleQRScan = (scannedValue: string) => {
@@ -482,9 +503,13 @@ export const MessageCardPage: React.FC = () => {
             size="lg"
             className="w-full h-14 text-lg"
             onClick={handleDownload}
+            disabled={loading}
           >
-            <Download className="w-5 h-5 mr-2" />
-            下載圖片 Download
+            {loading ? (
+              <><Loader2 className="w-5 h-5 mr-2 animate-spin" />下載中...</>
+            ) : (
+              <><Download className="w-5 h-5 mr-2" />下載圖片 Download</>
+            )}
           </Button>
 
           <Link to="/" className="block">
