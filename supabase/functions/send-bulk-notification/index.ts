@@ -89,24 +89,30 @@ const handler = async (req: Request): Promise<Response> => {
     for (const recipient of recipients) {
       try {
         const emailHtml = `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 24px;">
-              <h1 style="color: #B8860B; font-size: 24px; margin: 0;">🏋️ Soul Gym 靈魂健身房</h1>
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #f0f0f0;">
+              <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0; font-weight: 700;">⛪ WeChurch 微教會</h1>
+              <p style="color: #B8860B; font-size: 14px; margin: 0; font-weight: 500;">📸 信息摘要圖卡</p>
             </div>
             
-            <p style="font-size: 16px; color: #333; margin-bottom: 16px;">
+            <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
               親愛的 ${recipient.name}，
             </p>
             
-            <div style="font-size: 16px; color: #333; line-height: 1.6; white-space: pre-wrap;">
+            <div style="font-size: 16px; color: #333; line-height: 1.8; background-color: #fafafa; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
               ${body.replace(/\n/g, '<br>')}
             </div>
             
             <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
             
-            <p style="font-size: 12px; color: #999; text-align: center;">
-              此郵件由 Soul Gym 靈魂健身房發送
-            </p>
+            <div style="text-align: center;">
+              <p style="font-size: 12px; color: #999; margin: 0 0 4px 0;">
+                此郵件由 WeChurch 微教會 發送
+              </p>
+              <p style="font-size: 11px; color: #bbb; margin: 0;">
+                wechurch.online
+              </p>
+            </div>
           </div>
         `;
 
