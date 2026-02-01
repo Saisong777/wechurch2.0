@@ -19,9 +19,9 @@ const LoginPage = () => {
 
   React.useEffect(() => {
     if (!loading && user) {
-      const redirectTo = localStorage.getItem('login_redirect') || '/';
+      // Always redirect to homepage after login - ignore any stored redirects
       localStorage.removeItem('login_redirect');
-      navigate(redirectTo, { replace: true });
+      navigate('/', { replace: true });
     }
   }, [user, loading, navigate]);
 
