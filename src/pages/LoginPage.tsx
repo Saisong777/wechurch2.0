@@ -76,9 +76,11 @@ const LoginForm: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      const redirectTo = localStorage.getItem('login_redirect') || '/';
+      // Always redirect to home after Google OAuth - login_redirect is handled by the useEffect above
+      // Clear any stored redirect to prevent unwanted redirects
+      localStorage.removeItem('login_redirect');
       const { error } = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin + redirectTo,
+        redirect_uri: window.location.origin + '/',
       });
       if (error) {
         toast.error(error.message);
