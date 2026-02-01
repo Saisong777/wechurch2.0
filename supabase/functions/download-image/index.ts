@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const imagePath = url.searchParams.get("path");
-
+    const mode = url.searchParams.get("mode") || "download"; // "download" or "view"
     if (!imagePath) {
       return new Response(
         JSON.stringify({ error: "Missing image path" }),
@@ -55,15 +55,22 @@ Deno.serve(async (req) => {
     // Extract filename for download
     const filename = imagePath.split("/").pop() || "image";
 
+    // Build response headers based on mode
+    const responseHeaders: Record<string, string> = {
+      ...corsHeaders,
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=3600",
+    };
+
+    // Only add Content-Disposition for download mode
+    if (mode === "download") {
+      responseHeaders["Content-Disposition"] = `attachment; filename="${filename}"`;
+    }
+
     // Return the image with appropriate headers
     return new Response(data, {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "Cache-Control": "public, max-age=3600",
-      },
+      headers: responseHeaders,
     });
   } catch (err) {
     console.error("Download error:", err);

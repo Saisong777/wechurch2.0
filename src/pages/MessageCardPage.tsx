@@ -126,11 +126,9 @@ export const MessageCardPage: React.FC = () => {
 
       setCard(data);
       
-      // Get image URL (CDN-backed, no retry needed)
-      const { data: urlData } = supabase.storage
-        .from('message-cards')
-        .getPublicUrl(data.image_path);
-      setImageUrl(urlData.publicUrl);
+      // Use proxy URL to hide Supabase storage URL from users
+      const proxyImageUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-image?path=${encodeURIComponent(data.image_path)}&mode=view`;
+      setImageUrl(proxyImageUrl);
 
       // If already logged in, proceed to download
       if (user) {
