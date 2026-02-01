@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Mail, FileDown, Send, Copy, CheckSquare, Square } from 'lucide-react';
+import { Loader2, Mail, FileDown, Send, Copy, Paperclip, X, Image, File } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Download {
@@ -18,6 +18,13 @@ interface Download {
   user_name: string;
   user_email: string;
   downloaded_at: string;
+}
+
+interface Attachment {
+  file: File;
+  url?: string;
+  path?: string;
+  uploading?: boolean;
 }
 
 interface DownloadRecordsDialogProps {
@@ -41,6 +48,8 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
   const [emailBody, setEmailBody] = useState('');
   const [sending, setSending] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState<{ name: string; email: string }[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleSelect = (id: string) => {
     const newSet = new Set(selectedIds);
@@ -73,6 +82,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     setEmailRecipients(recipients);
     setEmailSubject(`${cardTitle} - 信息通知`);
     setEmailBody('');
+    setAttachments([]);
     setShowEmailDialog(true);
   };
 
@@ -80,7 +90,80 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     setEmailRecipients([{ name: download.user_name, email: download.user_email }]);
     setEmailSubject(`${cardTitle} - 信息通知`);
     setEmailBody('');
+    setAttachments([]);
     setShowEmailDialog(true);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments: Attachment[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} 超過 10MB 限制`);
+        continue;
+      }
+
+      const attachment: Attachment = { file, uploading: true };
+      newAttachments.push(attachment);
+    }
+
+    setAttachments(prev => [...prev, ...newAttachments]);
+
+    // Upload files to storage
+    for (const attachment of newAttachments) {
+      try {
+        const fileExt = attachment.file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `email-attachments/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('email-attachments')
+          .upload(fileName, attachment.file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('email-attachments')
+          .getPublicUrl(fileName);
+
+        setAttachments(prev => 
+          prev.map(a => 
+            a.file === attachment.file 
+              ? { ...a, url: urlData.publicUrl, path: fileName, uploading: false }
+              : a
+          )
+        );
+      } catch (err) {
+        console.error('Upload error:', err);
+        toast.error(`上傳 ${attachment.file.name} 失敗`);
+        setAttachments(prev => prev.filter(a => a.file !== attachment.file));
+      }
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = async (attachment: Attachment) => {
+    // Remove from storage if uploaded
+    if (attachment.path) {
+      try {
+        await supabase.storage
+          .from('email-attachments')
+          .remove([attachment.path]);
+      } catch (err) {
+        console.error('Failed to remove attachment:', err);
+      }
+    }
+    setAttachments(prev => prev.filter(a => a !== attachment));
   };
 
   const handleSendEmail = async () => {
@@ -89,13 +172,28 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
       return;
     }
 
+    // Check if any attachments are still uploading
+    if (attachments.some(a => a.uploading)) {
+      toast.error('請等待附件上傳完成');
+      return;
+    }
+
     setSending(true);
     try {
+      const attachmentData = attachments
+        .filter(a => a.url)
+        .map(a => ({
+          filename: a.file.name,
+          url: a.url,
+        }));
+
       const { data, error } = await supabase.functions.invoke('send-bulk-notification', {
         body: {
           recipients: emailRecipients,
           subject: emailSubject,
           body: emailBody,
+          isHtml: true,
+          attachments: attachmentData.length > 0 ? attachmentData : undefined,
         },
       });
 
@@ -117,6 +215,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
       setShowEmailDialog(false);
       setEmailSubject('');
       setEmailBody('');
+      setAttachments([]);
       setSelectedIds(new Set());
     } catch (err) {
       console.error('Error sending email:', err);
@@ -163,6 +262,13 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     const emails = selectedDownloads.map(d => d.user_email).join(', ');
     navigator.clipboard.writeText(emails);
     toast.success(`已複製 ${selectedDownloads.length} 個 Email`);
+  };
+
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      return <Image className="w-4 h-4" />;
+    }
+    return <File className="w-4 h-4" />;
   };
 
   return (
@@ -285,11 +391,11 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
 
       {/* Email Compose Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>發送郵件</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 overflow-auto">
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground mb-1">收件人</p>
               <p className="text-sm font-medium">
@@ -311,17 +417,73 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email-body">內容</Label>
-              <Textarea
-                id="email-body"
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
+              <Label>內容</Label>
+              <RichTextEditor
+                content={emailBody}
+                onChange={setEmailBody}
                 placeholder="輸入郵件內容..."
-                rows={6}
+                minHeight="200px"
               />
             </div>
 
-            <div className="flex gap-2">
+            {/* Attachments */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>附件</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="w-4 h-4 mr-1" />
+                  新增附件
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                />
+              </div>
+              
+              {attachments.length > 0 && (
+                <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                  {attachments.map((attachment, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      {attachment.uploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        getFileIcon(attachment.file)
+                      )}
+                      <span className="flex-1 truncate">{attachment.file.name}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {(attachment.file.size / 1024).toFixed(0)} KB
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => removeAttachment(attachment)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                支援圖片、PDF、Office 文件，單檔最大 10MB
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
               <Button
                 variant="outline"
                 className="flex-1"
@@ -333,7 +495,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                 variant="gold"
                 className="flex-1"
                 onClick={handleSendEmail}
-                disabled={sending || !emailSubject.trim() || !emailBody.trim()}
+                disabled={sending || !emailSubject.trim() || !emailBody.trim() || attachments.some(a => a.uploading)}
               >
                 {sending ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />發送中...</>
