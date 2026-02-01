@@ -117,7 +117,20 @@ const handler = async (req: Request): Promise<Response> => {
           html: emailHtml,
         });
 
-        results.push({ email: recipient.email, success: true, id: (emailResponse as any).id || 'sent' });
+        // Resend v2 typically returns { data, error }. Some runtimes may return { id }.
+        const respAny = emailResponse as any;
+        const respError = respAny?.error;
+        const respData = respAny?.data ?? respAny;
+        const respId = respData?.id;
+
+        if (respError) {
+          throw new Error(respError?.message || String(respError));
+        }
+        if (!respId) {
+          throw new Error("Resend returned no id");
+        }
+
+        results.push({ email: recipient.email, success: true, id: respId });
       } catch (err: any) {
         console.error(`Failed to send email to ${recipient.email}:`, err);
         errors.push({ email: recipient.email, error: err.message });

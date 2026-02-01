@@ -91,7 +91,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
 
     setSending(true);
     try {
-      const { error } = await supabase.functions.invoke('send-bulk-notification', {
+      const { data, error } = await supabase.functions.invoke('send-bulk-notification', {
         body: {
           recipients: emailRecipients,
           subject: emailSubject,
@@ -101,7 +101,19 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
 
       if (error) throw error;
 
-      toast.success(`已發送 ${emailRecipients.length} 封郵件`);
+      const sent = (data as any)?.sent ?? 0;
+      const failed = (data as any)?.failed ?? 0;
+      const errors = (data as any)?.errors as Array<{ email: string; error: string }> | undefined;
+
+      if (sent === 0 && failed > 0) {
+        toast.error(`全部發送失敗（${failed}）`);
+      } else if (failed > 0) {
+        const first = errors?.[0];
+        toast.warning(`已發送 ${sent} 封，失敗 ${failed} 封${first ? `（例：${first.email}：${first.error}）` : ''}`);
+      } else {
+        toast.success(`已發送 ${sent || emailRecipients.length} 封郵件`);
+      }
+
       setShowEmailDialog(false);
       setEmailSubject('');
       setEmailBody('');
