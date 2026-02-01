@@ -10,9 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, ChevronLeft, Pencil, RefreshCw } from 'lucide-react';
+import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, ChevronLeft, Pencil, RefreshCw, TrendingUp, Calendar, BarChart3 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 
 interface MessageCard {
@@ -32,6 +32,14 @@ interface Download {
   downloaded_at: string;
 }
 
+interface CardStats {
+  cardId: string;
+  cardTitle: string;
+  totalDownloads: number;
+  weeklyDownloads: number;
+  uniqueUsers: number;
+}
+
 interface MessageCardManagerProps {
   onBack?: () => void;
 }
@@ -47,6 +55,8 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   const [selectedCard, setSelectedCard] = useState<MessageCard | null>(null);
   const [downloads, setDownloads] = useState<Download[]>([]);
   const [downloadsLoading, setDownloadsLoading] = useState(false);
+  const [allDownloads, setAllDownloads] = useState<Download[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   
   // Create form state
   const [newTitle, setNewTitle] = useState('');
@@ -63,7 +73,69 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
 
   useEffect(() => {
     fetchCards();
+    fetchAllDownloads();
   }, []);
+
+  const fetchAllDownloads = async () => {
+    setStatsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('message_card_downloads')
+        .select('*')
+        .order('downloaded_at', { ascending: false });
+
+      if (error) throw error;
+      setAllDownloads(data || []);
+    } catch (err) {
+      console.error('Error fetching all downloads:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Calculate statistics
+  const calculateStats = (): { totalDownloads: number; weeklyDownloads: number; uniqueUsers: number; cardStats: CardStats[] } => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
+
+    const weeklyDownloads = allDownloads.filter(d => 
+      isWithinInterval(new Date(d.downloaded_at), { start: weekStart, end: weekEnd })
+    ).length;
+
+    const uniqueEmails = new Set(allDownloads.map(d => d.user_email.toLowerCase()));
+    
+    const cardStatsMap = new Map<string, { total: number; weekly: number; users: Set<string> }>();
+    
+    allDownloads.forEach(d => {
+      if (!cardStatsMap.has(d.card_id)) {
+        cardStatsMap.set(d.card_id, { total: 0, weekly: 0, users: new Set() });
+      }
+      const stats = cardStatsMap.get(d.card_id)!;
+      stats.total++;
+      stats.users.add(d.user_email.toLowerCase());
+      if (isWithinInterval(new Date(d.downloaded_at), { start: weekStart, end: weekEnd })) {
+        stats.weekly++;
+      }
+    });
+
+    const cardStats: CardStats[] = cards.map(card => ({
+      cardId: card.id,
+      cardTitle: card.title,
+      totalDownloads: cardStatsMap.get(card.id)?.total || 0,
+      weeklyDownloads: cardStatsMap.get(card.id)?.weekly || 0,
+      uniqueUsers: cardStatsMap.get(card.id)?.users.size || 0,
+    })).sort((a, b) => b.totalDownloads - a.totalDownloads);
+
+    return {
+      totalDownloads: allDownloads.length,
+      weeklyDownloads,
+      uniqueUsers: uniqueEmails.size,
+      cardStats,
+    };
+  };
+
+  const stats = calculateStats();
 
   const fetchCards = async () => {
     try {
@@ -425,6 +497,129 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Download Statistics */}
+      {cards.length > 0 && (
+        <div className="space-y-4">
+          {/* Stats Summary Cards */}
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">總下載次數</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {statsLoading ? '...' : stats.totalDownloads}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-primary/10">
+                    <Download className="w-5 h-5 text-primary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-secondary/10 to-secondary/5">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">本週下載</p>
+                    <p className="text-2xl font-bold text-secondary">
+                      {statsLoading ? '...' : stats.weeklyDownloads}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-secondary/10">
+                    <Calendar className="w-5 h-5 text-secondary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-accent/10 to-accent/5">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">獨立用戶</p>
+                    <p className="text-2xl font-bold text-accent-foreground">
+                      {statsLoading ? '...' : stats.uniqueUsers}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-accent/10">
+                    <Users className="w-5 h-5 text-accent-foreground" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-muted to-muted/50">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">卡片數量</p>
+                    <p className="text-2xl font-bold">
+                      {cards.length}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-muted-foreground/10">
+                    <Image className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Per-Card Stats Table */}
+          {!statsLoading && stats.cardStats.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  各卡片下載統計
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>卡片名稱</TableHead>
+                        <TableHead className="text-right">總下載</TableHead>
+                        <TableHead className="text-right">本週</TableHead>
+                        <TableHead className="text-right">獨立用戶</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.cardStats.slice(0, 5).map((cardStat) => (
+                        <TableRow key={cardStat.cardId}>
+                          <TableCell className="font-medium max-w-[200px] truncate">
+                            {cardStat.cardTitle}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {cardStat.totalDownloads}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            <span className={cardStat.weeklyDownloads > 0 ? 'text-secondary font-semibold' : 'text-muted-foreground'}>
+                              {cardStat.weeklyDownloads}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {cardStat.uniqueUsers}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {stats.cardStats.length > 5 && (
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      顯示前 5 張卡片，共 {stats.cardStats.length} 張
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Cards List */}
       {cards.length === 0 ? (
