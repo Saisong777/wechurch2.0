@@ -79,8 +79,14 @@ export interface IStorage {
   resetIcebreakerDeck(gameId: string): Promise<void>;
   
   getMessageCards(): Promise<MessageCard[]>;
+  getAllMessageCards(): Promise<MessageCard[]>;
   getMessageCard(shortCode: string): Promise<MessageCard | undefined>;
+  getMessageCardById(id: string): Promise<MessageCard | undefined>;
   createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard>;
+  updateMessageCard(id: string, data: Partial<{ title: string; imagePath: string; isActive: boolean }>): Promise<MessageCard | undefined>;
+  deleteMessageCard(id: string): Promise<void>;
+  getMessageCardDownloads(): Promise<MessageCardDownload[]>;
+  getMessageCardDownloadsByCardId(cardId: string): Promise<MessageCardDownload[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -452,8 +458,26 @@ export class DatabaseStorage implements IStorage {
     return newCard;
   }
 
+  async getMessageCardById(id: string): Promise<MessageCard | undefined> {
+    const [card] = await db.select().from(messageCards).where(eq(messageCards.id, id)).limit(1);
+    return card;
+  }
+
+  async updateMessageCard(id: string, data: Partial<{ title: string; imagePath: string; isActive: boolean }>): Promise<MessageCard | undefined> {
+    const [updated] = await db.update(messageCards).set(data).where(eq(messageCards.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMessageCard(id: string): Promise<void> {
+    await db.delete(messageCards).where(eq(messageCards.id, id));
+  }
+
   async getMessageCardDownloads(): Promise<MessageCardDownload[]> {
     return db.select().from(messageCardDownloads).orderBy(desc(messageCardDownloads.downloadedAt));
+  }
+
+  async getMessageCardDownloadsByCardId(cardId: string): Promise<MessageCardDownload[]> {
+    return db.select().from(messageCardDownloads).where(eq(messageCardDownloads.cardId, cardId)).orderBy(desc(messageCardDownloads.downloadedAt));
   }
 }
 

@@ -1,7 +1,38 @@
 import type { Express } from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
+
+// Configure multer for file uploads
+const messageCardStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(process.cwd(), 'public', 'message-cards');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `${uniqueSuffix}${ext}`);
+  }
+});
+
+const uploadMessageCard = multer({
+  storage: messageCardStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 export async function registerRoutes(app: Express) {
   await setupAuth(app);
@@ -471,12 +502,78 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Upload message card image
+  app.post("/api/message-cards/upload", uploadMessageCard.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No image file provided" });
+      }
+      const imagePath = req.file.filename;
+      res.json({ imagePath });
+    } catch (error) {
+      console.error("Failed to upload image:", error);
+      res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
+
+  // Delete message card image
+  app.delete("/api/message-cards/image/:filename", async (req, res) => {
+    try {
+      const filePath = path.join(process.cwd(), 'public', 'message-cards', req.params.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete image:", error);
+      res.status(500).json({ error: "Failed to delete image" });
+    }
+  });
+
   app.post("/api/message-cards", async (req, res) => {
     try {
-      const card = await storage.createMessageCard(req.body);
+      // Generate short code if not provided
+      const shortCode = req.body.shortCode || Math.random().toString(36).substring(2, 8).toUpperCase();
+      const card = await storage.createMessageCard({
+        ...req.body,
+        shortCode,
+      });
       res.status(201).json(card);
     } catch (error) {
+      console.error("Failed to create message card:", error);
       res.status(500).json({ error: "Failed to create message card" });
+    }
+  });
+
+  app.patch("/api/message-cards/:id", async (req, res) => {
+    try {
+      const card = await storage.updateMessageCard(req.params.id, req.body);
+      if (!card) {
+        return res.status(404).json({ error: "Card not found" });
+      }
+      res.json(card);
+    } catch (error) {
+      console.error("Failed to update message card:", error);
+      res.status(500).json({ error: "Failed to update message card" });
+    }
+  });
+
+  app.delete("/api/message-cards/:id", async (req, res) => {
+    try {
+      await storage.deleteMessageCard(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete message card:", error);
+      res.status(500).json({ error: "Failed to delete message card" });
+    }
+  });
+
+  app.get("/api/message-card-downloads/by-card/:cardId", async (req, res) => {
+    try {
+      const downloads = await storage.getMessageCardDownloadsByCardId(req.params.cardId);
+      res.json(downloads);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get downloads" });
     }
   });
 
