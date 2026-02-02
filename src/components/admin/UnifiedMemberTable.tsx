@@ -72,9 +72,7 @@ export const UnifiedMemberTable = ({
           <TableRow>
             <TableHead className="w-[50px]">
               <Checkbox
-                checked={allSelected}
-                // @ts-ignore
-                indeterminate={someSelected}
+                checked={someSelected ? "indeterminate" : allSelected}
                 onCheckedChange={onToggleSelectAll}
                 aria-label="Select all"
               />
@@ -135,10 +133,10 @@ export const UnifiedMemberTable = ({
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell className="text-center">{member.sessions_count}</TableCell>
+                <TableCell className="text-center">{member.sessionsCount}</TableCell>
                 <TableCell>
-                  {member.last_session_at 
-                    ? format(new Date(member.last_session_at), 'yyyy/MM/dd', { locale: zhTW })
+                  {member.lastSessionAt 
+                    ? format(new Date(member.lastSessionAt), 'yyyy/MM/dd', { locale: zhTW })
                     : '-'
                   }
                 </TableCell>
@@ -150,32 +148,32 @@ export const UnifiedMemberTable = ({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {isRegistered && member.user_id && isAdmin && (
+                      {isRegistered && member.userId && isAdmin && (
                         <>
                           <DropdownMenuLabel>變更角色</DropdownMenuLabel>
                           <DropdownMenuItem 
-                            onClick={() => onUpdateRole(member.user_id!, 'admin')}
+                            onClick={() => onUpdateRole(member.userId!, 'admin')}
                             disabled={member.role === 'admin'}
                           >
                             <Shield className="h-4 w-4 mr-2" />
                             設為管理員
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => onUpdateRole(member.user_id!, 'leader')}
+                            onClick={() => onUpdateRole(member.userId!, 'leader')}
                             disabled={member.role === 'leader'}
                           >
                             <Crown className="h-4 w-4 mr-2" />
                             設為小組長
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => onUpdateRole(member.user_id!, 'future_leader')}
+                            onClick={() => onUpdateRole(member.userId!, 'future_leader')}
                             disabled={member.role === 'future_leader'}
                           >
                             <Star className="h-4 w-4 mr-2" />
                             設為儲備
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => onUpdateRole(member.user_id!, 'member')}
+                            onClick={() => onUpdateRole(member.userId!, 'member')}
                             disabled={member.role === 'member'}
                           >
                             <Users className="h-4 w-4 mr-2" />
@@ -189,18 +187,18 @@ export const UnifiedMemberTable = ({
                         <>
                           <DropdownMenuLabel>變更狀態</DropdownMenuLabel>
                           {member.status === 'pending' && (
-                            <DropdownMenuItem onClick={() => onUpdateStatus(member.potential_member_id!, 'member')}>
+                            <DropdownMenuItem onClick={() => onUpdateStatus(member.potentialMemberId!, 'member')}>
                               <UserCheck className="h-4 w-4 mr-2" />
                               標記為已轉換
                             </DropdownMenuItem>
                           )}
                           {member.status === 'member' && (
-                            <DropdownMenuItem onClick={() => onUpdateStatus(member.potential_member_id!, 'pending')}>
+                            <DropdownMenuItem onClick={() => onUpdateStatus(member.potentialMemberId!, 'pending')}>
                               標記為待跟進
                             </DropdownMenuItem>
                           )}
                           {member.status !== 'declined' && (
-                            <DropdownMenuItem onClick={() => onUpdateStatus(member.potential_member_id!, 'declined')}>
+                            <DropdownMenuItem onClick={() => onUpdateStatus(member.potentialMemberId!, 'declined')}>
                               標記為已婉拒
                             </DropdownMenuItem>
                           )}
@@ -208,9 +206,9 @@ export const UnifiedMemberTable = ({
                         </>
                       )}
 
-                      {member.potential_member_id && (
+                      {member.potentialMemberId && (
                         <DropdownMenuItem 
-                          onClick={() => onToggleSubscription(member.potential_member_id!, !member.subscribed)}
+                          onClick={() => onToggleSubscription(member.potentialMemberId!, !member.subscribed)}
                         >
                           {member.subscribed ? (
                             <>
@@ -226,10 +224,10 @@ export const UnifiedMemberTable = ({
                         </DropdownMenuItem>
                       )}
 
-                      {!isRegistered && !member.user_id && (
+                      {!isRegistered && !member.userId && (
                         <>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => onLinkUser(member.potential_member_id!)}>
+                          <DropdownMenuItem onClick={() => onLinkUser(member.potentialMemberId!)}>
                             <Link2 className="h-4 w-4 mr-2" />
                             手動連結用戶
                           </DropdownMenuItem>
@@ -240,7 +238,7 @@ export const UnifiedMemberTable = ({
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={() => onDelete(member.potential_member_id!)}
+                            onClick={() => onDelete(member.potentialMemberId!)}
                             className="text-destructive focus:text-destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
