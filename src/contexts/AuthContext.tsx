@@ -7,6 +7,9 @@ interface AuthUser {
   firstName?: string | null;
   lastName?: string | null;
   profileImageUrl?: string | null;
+  legacyUserId?: string;
+  displayName?: string;
+  role?: string;
   user_metadata?: {
     display_name?: string;
     avatar_url?: string;
@@ -38,13 +41,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (response.ok) {
           const userData = await response.json();
           const authUser: AuthUser = {
-            id: userData.id,
+            id: userData.legacyUserId || userData.id,
             email: userData.email,
             firstName: userData.firstName,
             lastName: userData.lastName,
             profileImageUrl: userData.profileImageUrl,
+            legacyUserId: userData.legacyUserId,
+            displayName: userData.displayName,
+            role: userData.role,
             user_metadata: {
-              display_name: userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined,
+              display_name: userData.displayName || (userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined),
               avatar_url: userData.profileImageUrl,
             },
           };
