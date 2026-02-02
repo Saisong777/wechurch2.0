@@ -330,19 +330,6 @@ const JesusTimelinePage = () => {
                                 })}
                               </div>
                             )}
-                            
-                            {event.jesusCharacter && (
-                              <div className="mb-3">
-                                <h5 className="text-xs font-semibold text-muted-foreground mb-1">耶穌的品格</h5>
-                                <p className="text-sm">{event.jesusCharacter}</p>
-                              </div>
-                            )}
-                            {event.gospelCenter && (
-                              <div>
-                                <h5 className="text-xs font-semibold text-muted-foreground mb-1">福音中心</h5>
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{event.gospelCenter}</p>
-                              </div>
-                            )}
                           </div>
                         )}
                       </CardContent>

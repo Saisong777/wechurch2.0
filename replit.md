@@ -204,8 +204,7 @@ npm run db:push # Push database schema
     - Share selected verses via Web Share API
     - Create image cards (圖文卡) with customizable backgrounds, positions, sizes
     - Sticky action bar when verses are selected
-  - Removed "經文內容" header and "焦點" section for cleaner display
-  - Kept "耶穌的品格" and "福音中心" sections
+  - Removed "經文內容" header, "焦點", "耶穌的品格", "福音中心" sections for cleaner display
   - **New API Endpoint**: /api/bible/by-reference parses refs like "Mt 1:1-17"
   - All 208 events filterable by season with full scripture content
 
