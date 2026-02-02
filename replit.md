@@ -102,6 +102,14 @@ npm run db:push # Push database schema
   - Files stored in public/message-cards folder
 - **AdminWaitingRoom Migration**: Converted fetchParticipants to Express API
   - Replaced Supabase client call with fetch to /api/sessions/:id/participants
+- **StressTestSimulator Migration**: Fully migrated to Express API
+  - Participant/submission generation now uses fetch to Express endpoints
+  - Added DELETE /api/sessions/:sessionId/submissions and DELETE /api/sessions/:sessionId/participants
+  - Added storage methods: deleteParticipantsBySession, deleteSubmissionsBySession
+- **setParticipantReady Migration**: Converted RPC to Express API
+  - New endpoint: POST /api/participants/:id/set-ready with Zod validation
+  - GroupVerification component updated to use fetch API
+  - supabase-helpers.ts updateParticipantReady function migrated
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |
