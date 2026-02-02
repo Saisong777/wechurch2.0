@@ -1,50 +1,12 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Construction, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FeatureGate } from '@/components/ui/feature-gate';
-import { Book, Calendar, BookOpen, ArrowLeft, Sparkles } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 
-interface BlessingVerse {
-  verseId: number;
-  bookName: string;
-  chapter: number;
-  verse: number;
-  text: string;
-  blessingType: string | null;
-}
-
-const LearnPage = () => {
-  const { data: randomVerse } = useQuery<BlessingVerse>({
-    queryKey: ['/api/bible/blessing/random'],
-    refetchOnWindowFocus: false,
-  });
-
-  const features = [
-    {
-      title: '聖經閱讀',
-      description: '閱讀和平本聖經，搜尋經文，收藏喜愛的經節',
-      icon: Book,
-      href: '/learn/bible',
-      color: 'bg-sky-500',
-    },
-    {
-      title: '耶穌四季',
-      description: '探索耶穌生平的208個事件，按季節分類的時間軸',
-      icon: Calendar,
-      href: '/learn/jesus-timeline',
-      color: 'bg-amber-500',
-    },
-    {
-      title: '讀經計劃',
-      description: '選擇適合你的讀經計劃，每日靈修陪伴成長',
-      icon: BookOpen,
-      href: '/learn/reading-plans',
-      color: 'bg-emerald-500',
-    },
-  ];
-
+const LearnPage: React.FC = () => {
   return (
     <FeatureGate 
       featureKey="we_learn" 
@@ -55,52 +17,40 @@ const LearnPage = () => {
         <Header title="We Learn" subtitle="學習成長" />
         
         <main className="container mx-auto px-4 py-6">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-2xl mx-auto">
+            {/* Back Button */}
             <Button variant="ghost" size="sm" asChild className="mb-6">
-              <Link to="/" className="gap-2" data-testid="link-back-home">
+              <Link to="/" className="gap-2">
                 <ArrowLeft className="w-4 h-4" />
                 返回首頁
               </Link>
             </Button>
 
-            {randomVerse && (
-              <Card className="mb-6 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-                <CardContent className="py-4">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">今日祝福經文</p>
-                      <p className="text-foreground leading-relaxed">{randomVerse.text}</p>
-                      <p className="text-sm text-primary mt-2 font-medium">
-                        {randomVerse.bookName} {randomVerse.chapter}:{randomVerse.verse}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="grid gap-4">
-              {features.map((feature) => (
-                <Link 
-                  key={feature.href} 
-                  to={feature.href}
-                  data-testid={`link-feature-${feature.href.split('/').pop()}`}
-                >
-                  <Card className="hover-elevate cursor-pointer transition-all">
-                    <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                      <div className={`p-3 rounded-lg ${feature.color}`}>
-                        <feature.icon className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{feature.title}</CardTitle>
-                        <CardDescription className="mt-1">{feature.description}</CardDescription>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+            {/* Coming Soon Card */}
+            <Card className="border-2 border-dashed">
+              <CardContent className="py-16 text-center">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-6">
+                  <Construction className="w-10 h-10 text-primary" />
+                </div>
+                <h2 className="text-2xl font-bold text-foreground mb-2">
+                  即將推出
+                </h2>
+                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                  我們正在打造全新的學習體驗，包含聖經研讀系統與 Rejesus 整合
+                </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
+                    聖經系統
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
+                    Rejesus 整合
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
+                    學習資源
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </main>
       </div>

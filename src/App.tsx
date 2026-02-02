@@ -2,8 +2,7 @@ import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -22,10 +21,9 @@ const PrayerWallPage = lazy(() => import("./pages/PrayerWallPage"));
 const MessageCardPage = lazy(() => import("./pages/MessageCardPage"));
 const SharePage = lazy(() => import("./pages/SharePage"));
 const LearnPage = lazy(() => import("./pages/LearnPage"));
-const BiblePage = lazy(() => import("./pages/BiblePage"));
-const JesusTimelinePage = lazy(() => import("./pages/JesusTimelinePage"));
-const ReadingPlansPage = lazy(() => import("./pages/ReadingPlansPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+
+const queryClient = new QueryClient();
 
 // Minimal loading fallback for Suspense
 const PageLoader = () => (
@@ -57,9 +55,6 @@ const App = () => (
                   <Route path="/card" element={<MessageCardPage />} />
                   <Route path="/share" element={<SharePage />} />
                   <Route path="/learn" element={<LearnPage />} />
-                  <Route path="/learn/bible" element={<BiblePage />} />
-                  <Route path="/learn/jesus-timeline" element={<JesusTimelinePage />} />
-                  <Route path="/learn/reading-plans" element={<ReadingPlansPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
