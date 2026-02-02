@@ -152,6 +152,16 @@ export const prayerComments = pgTable("prayer_comments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const prayerNotifications = pgTable("prayer_notifications", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  prayerId: uuid("prayer_id").references(() => prayers.id).notNull(),
+  type: text("type").notNull(),
+  actorName: text("actor_name"),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const cardQuestions = pgTable("card_questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   contentText: text("content_text").notNull(),

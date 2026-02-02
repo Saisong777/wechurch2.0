@@ -86,9 +86,28 @@ npm run db:push # Push database schema
 ## Recent Changes
 - 2026-02-02: Initial migration from Lovable to Replit
 - Set up Express server with full-stack template
-- Created Drizzle schema with all tables
+- Created Drizzle schema with all tables (20+ tables)
 - Configured PostgreSQL database
 - Fixed CSS import order for Google Fonts
+- **Data Migration Completed**: Imported 1,170 records from Supabase CSV exports
+
+### Data Migration Summary (2026-02-02)
+| Table                   | Records |
+|------------------------|---------|
+| users                  | 106     |
+| user_roles             | 106     |
+| potential_members      | 117     |
+| sessions               | 11      |
+| study_responses        | 253     |
+| ai_reports             | 72      |
+| feature_toggles        | 7       |
+| card_questions         | 52      |
+| icebreaker_games       | 273     |
+| message_cards          | 1       |
+| message_card_downloads | 172     |
+| **Total**              | **1,170**|
+
+Note: Some tables (participants, submissions, prayers, prayer_amens, prayer_comments, prayer_notifications) were empty in the original Supabase export.
 
 ## User Preferences
 - Interface language: Traditional Chinese (繁體中文)
