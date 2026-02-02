@@ -1,0 +1,8 @@
+id;feature_key;feature_name;description;is_enabled;disabled_message;updated_at;updated_by
+27660929-9db1-4c1b-9bbc-e24ec43da24d;we_learn;We Learn 學習成長;聖經研讀與屬靈資源;false;即將推出;2026-01-31 13:53:55.188822+00;
+57b17029-6ad9-4bd5-8ebb-71b0a1065b3b;we_share;We Share 分享代禱;禱告牆與信息圖卡;true;功能維護中;2026-01-31 13:53:55.188822+00;
+ad57e185-bc6c-47f2-9ebc-c338e7d1743e;message_cards;信息圖卡;We Share 下的經文圖卡分享;true;功能維護中;2026-01-31 13:53:55.188822+00;
+a91a60da-181f-4be1-aaa4-d187d138ccab;prayer_wall;禱告牆;We Share 下的禱告牆功能;false;功能維護中;2026-01-31 13:57:58.74+00;
+7ef67238-21a0-42c7-ab13-db41fb48a6ee;icebreaker_game;破冰卡牌遊戲;We Play 下的破冰遊戲;false;功能維護中;2026-01-31 15:34:11.427+00;
+f1609322-6cb1-433b-905a-e95f573cb3fa;we_live;We Live 靈魂健身房;查經與小組討論功能;false;功能維護中;2026-02-01 04:45:57.53+00;
+26a287fb-f409-42ef-ab5c-267b441b8ab6;we_play;We Play 破冰遊戲;破冰卡牌遊戲功能;false;功能維護中;2026-02-01 04:46:04.263+00;

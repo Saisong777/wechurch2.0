@@ -16,6 +16,13 @@ WeChurch is a comprehensive Christian community platform migrated from Lovable/S
 3. **We Play (破冰遊戲)** - Icebreaker card games for small groups
 4. **We Share (分享)** - Prayer wall and message card sharing
 
+### Rejesus Integration Features (New)
+5. **Bible Reader** - Chinese Union Traditional Bible with 31,000+ verses
+6. **Jesus Timeline** - 208 events from Jesus' life (4 seasons structure)
+7. **Reading Plans** - 12 reading plan templates with 312 daily items
+8. **Devotional Notes** - Personal Bible study note-taking
+9. **Saved Verses** - Bookmark and annotate favorite verses
+
 ## Project Architecture
 
 ### Directory Structure
@@ -39,6 +46,8 @@ WeChurch is a comprehensive Christian community platform migrated from Lovable/S
 
 ### Database Schema
 The application uses PostgreSQL with the following main tables:
+
+**WeChurch Core Tables:**
 - `users` - User accounts and profiles
 - `sessions` - Bible study sessions
 - `participants` - Session participants
@@ -52,6 +61,18 @@ The application uses PostgreSQL with the following main tables:
 - `feature_toggles` - Feature flags
 - `potential_members` - CRM tracking
 - `message_cards` - Shareable message cards
+
+**Rejesus Integration Tables:**
+- `chinese_union_trad` - Chinese Union Traditional Bible (31k+ verses)
+- `blessing_verses` - Curated blessing verses
+- `jesus_4seasons` - Jesus life timeline (208 events)
+- `jesus_daily_content` - Daily devotional content
+- `devotional_notes` - User Bible study notes
+- `saved_verses` - User saved/bookmarked verses
+- `reading_plan_templates` - Reading plan templates (12 plans)
+- `reading_plan_template_items` - Daily reading items (312 items)
+- `user_reading_plans` - User's active reading plans
+- `user_reading_progress` - Daily reading progress tracking
 
 ### API Endpoints
 - `GET/POST /api/sessions` - Session management
@@ -141,6 +162,16 @@ npm run db:push # Push database schema
 | **Total**              | **1,170**|
 
 Note: Some tables (participants, submissions, prayers, prayer_amens, prayer_comments, prayer_notifications) were empty in the original Supabase export.
+
+### Rejesus Data Migration (2026-02-02)
+| Table                        | Records |
+|-----------------------------|---------|
+| chinese_union_trad          | 31,102  |
+| jesus_4seasons              | 208     |
+| jesus_daily_content         | 12      |
+| reading_plan_templates      | 12      |
+| reading_plan_template_items | 312     |
+| **Total**                   | **31,646**|
 
 ## User Preferences
 - Interface language: Traditional Chinese (繁體中文)
