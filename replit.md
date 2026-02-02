@@ -90,6 +90,11 @@ npm run db:push # Push database schema
 - Configured PostgreSQL database
 - Fixed CSS import order for Google Fonts
 - **Data Migration Completed**: Imported 1,170 records from Supabase CSV exports
+- **Icebreaker Game Migration**: Fully migrated from Supabase to Express API
+  - useIcebreakerGame hook converted to API calls with polling (3s intervals)
+  - TurnBasedCardGame and IcebreakerGame components migrated
+  - New API endpoints: /api/icebreaker/session-game, /api/icebreaker/games/:gameId/draw-card, /api/icebreaker/games/:gameId/reset
+  - Card drawing now tracks usedCardIds to prevent repeat cards
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |
