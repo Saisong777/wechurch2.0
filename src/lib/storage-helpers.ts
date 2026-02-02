@@ -8,10 +8,17 @@
 export const getMessageCardUrl = (imagePath: string, mode: 'view' | 'download' = 'view'): string => {
   if (!imagePath) return '';
   
-  // Handle full URLs (including legacy Supabase URLs)
+  // Handle full URLs
   if (imagePath.startsWith('http')) {
-    // If it's a Supabase URL from the previous environment, it might be expired or inaccessible.
-    // However, for now we keep it to maintain compatibility with migrated data.
+    // Check if it's a wechurch.replit.app URL (migrated data with incorrect path)
+    // Extract filename and use our API which handles fallback to Supabase
+    if (imagePath.includes('wechurch.replit.app/message-cards/')) {
+      const filename = imagePath.split('/').pop();
+      if (filename) {
+        return `/api/message-cards/image/${filename}`;
+      }
+    }
+    // For actual Supabase URLs or other external URLs, return as-is
     return imagePath;
   }
   
