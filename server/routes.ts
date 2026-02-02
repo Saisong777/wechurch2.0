@@ -138,6 +138,43 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/participants/:id/set-ready", async (req, res) => {
+    try {
+      const setReadySchema = z.object({
+        sessionId: z.string().uuid(),
+        email: z.string().email(),
+        ready: z.boolean(),
+      });
+      
+      const parsed = setReadySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data", success: false, details: parsed.error.errors });
+      }
+      
+      const { sessionId, email, ready } = parsed.data;
+      const participantId = req.params.id;
+      
+      const participant = await storage.getParticipant(participantId);
+      if (!participant) {
+        return res.status(404).json({ error: "Participant not found", success: false });
+      }
+      
+      if (participant.sessionId !== sessionId || participant.email !== email) {
+        return res.status(403).json({ error: "Verification failed", success: false });
+      }
+      
+      const session = await storage.getSession(sessionId);
+      if (!session || (session.status !== "grouping" && session.status !== "studying")) {
+        return res.status(400).json({ error: "Session not in valid state", success: false });
+      }
+      
+      await storage.updateParticipant(participantId, { readyConfirmed: ready });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to set participant ready", success: false });
+    }
+  });
+
   app.get("/api/sessions/:sessionId/submissions", async (req, res) => {
     try {
       const submissions = await storage.getSubmissions(req.params.sessionId);

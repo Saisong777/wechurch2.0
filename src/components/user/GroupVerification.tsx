@@ -246,28 +246,38 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
 
     setIsSubmitting(true);
 
-    // Use secure RPC with email verification from localStorage
-    const { data, error } = await supabase.rpc('set_participant_ready', {
-      p_session_id: currentSession.id,
-      p_participant_id: currentUser.id,
-      p_email: userEmail,
-      p_ready: true,
-    });
+    try {
+      const response = await fetch(`/api/participants/${currentUser.id}/set-ready`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          sessionId: currentSession.id,
+          email: userEmail,
+          ready: true,
+        }),
+      });
 
-    if (error) {
-      console.error('[GroupVerification] RPC error:', error);
-      toast.error('確認失敗，請重試', {
-        description: error.message,
-      });
-    } else if (data === true) {
-      setHasConfirmed(true);
-      setCurrentUser({ ...currentUser, readyConfirmed: true });
-      toast.success('已確認準備完成！等待其他組員...');
-      await fetchMembers(); // Refresh to check if all ready
-    } else {
-      toast.error('驗證失敗：可能聚會狀態已變更或身份不符', {
-        description: 'Verification failed. Session may have ended or identity mismatch.',
-      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('[GroupVerification] API error:', data.error);
+        toast.error('確認失敗，請重試', {
+          description: data.error,
+        });
+      } else if (data.success) {
+        setHasConfirmed(true);
+        setCurrentUser({ ...currentUser, readyConfirmed: true });
+        toast.success('已確認準備完成！等待其他組員...');
+        await fetchMembers(); // Refresh to check if all ready
+      } else {
+        toast.error('驗證失敗：可能聚會狀態已變更或身份不符', {
+          description: 'Verification failed. Session may have ended or identity mismatch.',
+        });
+      }
+    } catch (error: any) {
+      console.error('[GroupVerification] Error:', error);
+      toast.error('確認失敗，請重試');
     }
 
     setIsSubmitting(false);

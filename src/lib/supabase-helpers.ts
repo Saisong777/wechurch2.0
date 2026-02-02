@@ -509,37 +509,44 @@ export const assignGroupsToParticipants = async (
   return groups;
 };
 
-// Update participant's ready confirmation status using secure RPC
+// Update participant's ready confirmation status using Express API
 export const updateParticipantReady = async (
   participantId: string,
   ready: boolean,
   sessionId?: string,
   email?: string
 ): Promise<boolean> => {
-  // If session and email provided, use the secure RPC function
+  // If session and email provided, use the secure API endpoint
   if (sessionId && email) {
-    const { data, error } = await supabase.rpc("set_participant_ready", {
-      p_session_id: sessionId,
-      p_participant_id: participantId,
-      p_email: email,
-      p_ready: ready,
-    });
+    try {
+      const response = await fetch(`/api/participants/${participantId}/set-ready`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ sessionId, email, ready }),
+      });
 
-    if (error) {
-      console.error("[updateParticipantReady] RPC error:", error);
+      const data = await response.json();
+      return data.success === true;
+    } catch (error) {
+      console.error("[updateParticipantReady] API error:", error);
       return false;
     }
-
-    return data === true;
   }
 
-  // Fallback to direct update (for admin use)
-  const { error } = await supabase
-    .from("participants")
-    .update({ ready_confirmed: ready })
-    .eq("id", participantId);
-  
-  return !error;
+  // Fallback to direct update via PATCH (for admin use)
+  try {
+    const response = await fetch(`/api/participants/${participantId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ readyConfirmed: ready }),
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("[updateParticipantReady] PATCH error:", error);
+    return false;
+  }
 };
 
 // Fetch group members for verification
