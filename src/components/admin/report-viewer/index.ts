@@ -7,6 +7,7 @@ export {
   generateSectionMarkdown, 
   generatePrintHTML, 
   generatePPTHTML,
+  generatePPTX,
   downloadBlob, 
   openPrintWindow 
 } from './export';

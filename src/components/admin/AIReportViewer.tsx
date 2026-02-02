@@ -25,6 +25,7 @@ import {
   generateSectionMarkdown,
   generatePrintHTML,
   generatePPTHTML,
+  generatePPTX,
   downloadBlob,
   openPrintWindow,
   GroupSection,
@@ -117,23 +118,24 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   };
 
   // --- PPT Export handler ---
-  const handleDownloadPPT = () => {
+  const handleDownloadPPT = async () => {
     if (!parsedSections.length) return;
     
-    const html = generatePPTHTML(parsedSections, verseReference);
-    const pptWindow = window.open('', '_blank');
-    if (!pptWindow) {
-      toast.error('無法開啟簡報視窗，請檢查瀏覽器設定');
-      return;
+    try {
+      toast.info('正在生成 PowerPoint 文件...');
+      await generatePPTX(parsedSections, verseReference);
+      toast.success('PowerPoint 已下載！一組一頁方便閱讀');
+    } catch (error) {
+      console.error('PPT generation error:', error);
+      toast.error('PowerPoint 生成失敗，使用網頁簡報模式');
+      // Fallback to HTML presentation
+      const html = generatePPTHTML(parsedSections, verseReference);
+      const pptWindow = window.open('', '_blank');
+      if (pptWindow) {
+        pptWindow.document.write(html);
+        pptWindow.document.close();
+      }
     }
-    
-    pptWindow.document.write(html);
-    pptWindow.document.close();
-    
-    toast.success('簡報已開啟！使用方向鍵或點擊切換頁面', {
-      description: '按 Ctrl+P 可列印為 PDF',
-      duration: 5000,
-    });
   };
 
   // Get current content based on active tab

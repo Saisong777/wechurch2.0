@@ -1,6 +1,7 @@
-// Export utilities for AI report viewer (Markdown & PDF/Print)
+// Export utilities for AI report viewer (Markdown & PDF/Print/PPTX)
 
 import { GroupReport } from './parse';
+import PptxGenJS from 'pptxgenjs';
 
 // Generate structured Markdown from a parsed section (for downloads)
 export function generateSectionMarkdown(section: GroupReport, verseReference?: string): string {
@@ -669,4 +670,139 @@ function formatForSlide(content: string): string {
   // Limit to reasonable length for a slide
   const lines = cleaned.split('\n').slice(0, 8);
   return lines.join('\n');
+}
+
+// Generate real PPTX file - one group per slide
+export async function generatePPTX(sections: GroupReport[], verseReference?: string): Promise<void> {
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_16x9';
+  pptx.title = `查經報告 - ${verseReference || '靈魂健身房'}`;
+  pptx.author = '靈魂健身房';
+
+  const groupReports = sections.filter(s => s.groupNumber > 0).sort((a, b) => a.groupNumber - b.groupNumber);
+
+  // Title slide
+  const titleSlide = pptx.addSlide();
+  titleSlide.addText('查經分析報告', {
+    x: 0.5, y: 2, w: 9, h: 1.2,
+    fontSize: 44, bold: true, color: '16A085',
+    align: 'center', fontFace: 'Microsoft JhengHei'
+  });
+  titleSlide.addText(verseReference || '靈魂健身房', {
+    x: 0.5, y: 3.2, w: 9, h: 0.6,
+    fontSize: 24, color: '666666',
+    align: 'center', fontFace: 'Microsoft JhengHei'
+  });
+  titleSlide.addText(new Date().toLocaleDateString('zh-TW'), {
+    x: 0.5, y: 4, w: 9, h: 0.5,
+    fontSize: 16, color: '999999',
+    align: 'center', fontFace: 'Microsoft JhengHei'
+  });
+
+  // One slide per group - all content on one page
+  for (const section of groupReports) {
+    const slide = pptx.addSlide();
+    
+    // Group header
+    slide.addText(`第 ${section.groupNumber} 組`, {
+      x: 0.3, y: 0.2, w: 3, h: 0.5,
+      fontSize: 24, bold: true, color: '16A085',
+      fontFace: 'Microsoft JhengHei'
+    });
+
+    // Members
+    if (section.members) {
+      slide.addText(`組員：${section.members}`, {
+        x: 0.3, y: 0.7, w: 9.4, h: 0.35,
+        fontSize: 11, color: '666666',
+        fontFace: 'Microsoft JhengHei'
+      });
+    }
+
+    let yPos = 1.15;
+    const leftX = 0.3;
+    const rightX = 5.1;
+    const boxW = 4.5;
+    const boxH = 1.8;
+
+    // Helper to add content box
+    const addContentBox = (x: number, y: number, title: string, content: string, color: string) => {
+      slide.addText(title, {
+        x, y, w: boxW, h: 0.35,
+        fontSize: 13, bold: true, color,
+        fontFace: 'Microsoft JhengHei'
+      });
+      slide.addText(cleanContent(content, 120), {
+        x, y: y + 0.35, w: boxW, h: boxH - 0.4,
+        fontSize: 10, color: '333333', valign: 'top',
+        fontFace: 'Microsoft JhengHei'
+      });
+    };
+
+    // Themes - top left
+    if (section.themes) {
+      addContentBox(leftX, yPos, '📖 主題', section.themes, '16A34A');
+    }
+
+    // Observations - top right
+    if (section.observations) {
+      addContentBox(rightX, yPos, '🔍 事實發現', section.observations, '0D9488');
+    }
+
+    yPos += boxH + 0.15;
+
+    // Insights - bottom left
+    if (section.insights) {
+      addContentBox(leftX, yPos, '💡 獨特亮光', section.insights, 'D97706');
+    }
+
+    // Applications - bottom right
+    if (section.applications) {
+      addContentBox(rightX, yPos, '🎯 如何應用', section.applications, '2563EB');
+    }
+
+    // Personal contributions at the bottom
+    if (section.contributions) {
+      slide.addText('👤 個人貢獻摘要', {
+        x: 0.3, y: 4.65, w: 9.4, h: 0.3,
+        fontSize: 11, bold: true, color: '9333EA',
+        fontFace: 'Microsoft JhengHei'
+      });
+      slide.addText(cleanContent(section.contributions, 200), {
+        x: 0.3, y: 4.95, w: 9.4, h: 0.5,
+        fontSize: 9, color: '555555', valign: 'top',
+        fontFace: 'Microsoft JhengHei'
+      });
+    }
+  }
+
+  // Thank you slide
+  const endSlide = pptx.addSlide();
+  endSlide.addText('感謝參與', {
+    x: 0.5, y: 2.3, w: 9, h: 1,
+    fontSize: 44, bold: true, color: '16A085',
+    align: 'center', fontFace: 'Microsoft JhengHei'
+  });
+  endSlide.addText('願神的話語常存在我們心中', {
+    x: 0.5, y: 3.4, w: 9, h: 0.6,
+    fontSize: 20, color: '666666',
+    align: 'center', fontFace: 'Microsoft JhengHei'
+  });
+
+  // Download the file with .pptx extension
+  const filename = `查經報告-${verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.pptx`;
+  await pptx.writeFile({ fileName: filename });
+}
+
+// Clean content for slide (remove markdown, limit length)
+function cleanContent(content: string, maxLen: number): string {
+  if (!content) return '';
+  const cleaned = content
+    .replace(/\*\*/g, '')
+    .replace(/^[-•]\s*/gm, '• ')
+    .trim();
+  if (cleaned.length > maxLen) {
+    return cleaned.substring(0, maxLen) + '...';
+  }
+  return cleaned;
 }
