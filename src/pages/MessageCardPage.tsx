@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable/index';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Download, Image, Loader2, Lock, Mail, User, ChevronLeft, ScanLine } from 'lucide-react';
@@ -21,9 +19,9 @@ type PageStep = 'initializing' | 'enter-code' | 'auth' | 'download';
 interface MessageCard {
   id: string;
   title: string;
-  short_code: string;
-  image_path: string;
-  created_at: string;
+  shortCode: string;
+  imagePath: string;
+  createdAt: string;
 }
 
 /**
@@ -105,15 +103,12 @@ export const MessageCardPage: React.FC = () => {
       // Use retry with exponential backoff for high-concurrency
       const data = await withRetry(
         async () => {
-          const { data, error } = await supabase
-            .from('message_cards')
-            .select('*')
-            .eq('short_code', codeToCheck)
-            .eq('is_active', true)
-            .maybeSingle();
-
-          if (error) throw error;
-          return data;
+          const response = await fetch(`/api/message-cards/${codeToCheck}`);
+          if (!response.ok) {
+            if (response.status === 404) return null;
+            throw new Error('Failed to fetch card');
+          }
+          return await response.json();
         },
         { maxRetries: 3, baseDelayMs: 500, jitterFactor: 0.4 }
       );
@@ -128,7 +123,7 @@ export const MessageCardPage: React.FC = () => {
       setCard(data);
       
       // Use proxy URL to hide Supabase storage URL from users
-      setImageUrl(getMessageCardUrl(data.image_path, 'view'));
+      setImageUrl(getMessageCardUrl(data.imagePath, 'view'));
 
       // If already logged in, proceed to download
       if (user) {
@@ -170,13 +165,17 @@ export const MessageCardPage: React.FC = () => {
       // Background recording with retry - don't await to not block UI
       withRetry(
         async () => {
-          const { error } = await supabase.from('message_card_downloads').insert({
-            card_id: card.id,
-            user_id: user?.id || null,
-            user_name: userName,
-            user_email: userEmail,
+          const response = await fetch('/api/message-card-downloads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cardId: card.id,
+              userId: user?.id || null,
+              userName: userName,
+              userEmail: userEmail,
+            }),
           });
-          if (error) throw error;
+          if (!response.ok) throw new Error('Failed to record download');
         },
         { maxRetries: 2, baseDelayMs: 1000, jitterFactor: 0.5 }
       ).catch(err => {
@@ -192,15 +191,10 @@ export const MessageCardPage: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      const { error } = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.href,
-      });
-      if (error) {
-        toast.error('Google 登入失敗，請重試');
-      }
+      // Redirect to Replit auth
+      window.location.href = `/api/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`;
     } catch (err) {
-      toast.error('Google 登入失敗，請重試');
-    } finally {
+      toast.error('登入失敗，請重試');
       setIsGoogleLoading(false);
     }
   };
@@ -221,16 +215,20 @@ export const MessageCardPage: React.FC = () => {
     withRetry(
       async () => {
         const normalizedEmail = guestEmail.trim().toLowerCase();
-        const { error } = await supabase.from('potential_members').insert({
-          email: normalizedEmail,
-          name: guestName.trim(),
-          first_joined_at: new Date().toISOString(),
-          last_session_at: new Date().toISOString(),
-          sessions_count: 1,
+        const response = await fetch('/api/potential-members', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            name: guestName.trim(),
+            firstJoinedAt: new Date().toISOString(),
+            lastSessionAt: new Date().toISOString(),
+            sessionsCount: 1,
+          }),
         });
-        // Ignore duplicate key errors - user already exists which is fine
-        if (error && !error.message.includes('duplicate key')) {
-          throw error;
+        // Ignore 409 conflict errors - user already exists which is fine
+        if (!response.ok && response.status !== 409) {
+          throw new Error('Failed to sync potential member');
         }
       },
       { maxRetries: 2, baseDelayMs: 500, jitterFactor: 0.3 }
@@ -248,7 +246,7 @@ export const MessageCardPage: React.FC = () => {
     setLoading(true);
     try {
       // Use edge function proxy to hide Supabase URL from users
-      const proxyUrl = getMessageCardUrl(card.image_path, 'download');
+      const proxyUrl = getMessageCardUrl(card.imagePath, 'download');
       
       const response = await fetch(proxyUrl);
       if (!response.ok) {

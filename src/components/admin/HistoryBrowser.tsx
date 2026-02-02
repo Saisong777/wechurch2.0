@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,36 +51,36 @@ import { OverallReportCharts } from './report-viewer/OverallReportCharts';
 
 interface AIReport {
   id: string;
-  report_type: 'group' | 'overall';
-  group_number: number | null;
+  reportType: 'group' | 'overall';
+  groupNumber: number | null;
   content: string;
-  created_at: string;
+  createdAt: string;
 }
 
 interface SessionWithResponses {
   id: string;
-  short_code: string | null;
-  verse_reference: string;
+  shortCode: string | null;
+  verseReference: string;
   status: string;
-  created_at: string;
-  participant_count: number;
+  createdAt: string;
+  participantCount: number;
   responses: StudyResponseWithParticipant[];
   aiReports: AIReport[];
 }
 
 interface StudyResponseWithParticipant {
   id: string;
-  participant_name: string;
-  group_number: number | null;
-  title_phrase: string | null;
-  heartbeat_verse: string | null;
+  participantName: string;
+  groupNumber: number | null;
+  titlePhrase: string | null;
+  heartbeatVerse: string | null;
   observation: string | null;
-  core_insight_category: InsightCategory | null;
-  core_insight_note: string | null;
-  scholars_note: string | null;
-  action_plan: string | null;
-  cool_down_note: string | null;
-  created_at: string;
+  coreInsightCategory: InsightCategory | null;
+  coreInsightNote: string | null;
+  scholarsNote: string | null;
+  actionPlan: string | null;
+  coolDownNote: string | null;
+  createdAt: string;
 }
 
 type TimeFilter = 'all' | 'this-month' | 'last-month' | 'older';
@@ -94,70 +93,64 @@ export const HistoryBrowser: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<SessionWithResponses | null>(null);
   const [activeTab, setActiveTab] = useState<'notes' | 'reports'>('notes');
 
-  // Fetch all sessions with their responses
+  // Fetch all sessions with their responses using API
   const { data: sessions, isLoading } = useQuery({
     queryKey: ['admin_history', user?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<SessionWithResponses[]> => {
       if (!user?.id) return [];
 
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('sessions')
-        .select('id, short_code, verse_reference, status, created_at')
-        .eq('owner_id', user.id)
-        .order('created_at', { ascending: false });
+      // Fetch sessions from API
+      const sessionsRes = await fetch('/api/sessions');
+      if (!sessionsRes.ok) throw new Error('Failed to fetch sessions');
+      const sessionsData = await sessionsRes.json();
 
-      if (sessionsError) throw sessionsError;
-      if (!sessionsData) return [];
-
+      // Process each session to get additional data
       const sessionsWithData = await Promise.all(
-        sessionsData.map(async (session) => {
-          const [countResult, responsesResult, reportsResult] = await Promise.all([
-            supabase
-              .from('participants')
-              .select('*', { count: 'exact', head: true })
-              .eq('session_id', session.id),
-            supabase
-              .from('study_responses_public')
-              .select('*')
-              .eq('session_id', session.id)
-              .order('group_number', { ascending: true }),
-            supabase
-              .from('ai_reports')
-              .select('id, report_type, group_number, content, created_at')
-              .eq('session_id', session.id)
-              .eq('status', 'COMPLETED')
-              .order('group_number', { ascending: true, nullsFirst: false }),
+        sessionsData.map(async (session: any) => {
+          // Fetch study responses and reports in parallel
+          const [responsesRes, reportsRes] = await Promise.all([
+            fetch(`/api/sessions/${session.id}/study-responses`),
+            fetch(`/api/sessions/${session.id}/reports`),
           ]);
 
+          const responses = responsesRes.ok ? await responsesRes.json() : [];
+          const reports = reportsRes.ok ? await reportsRes.json() : [];
+
           return {
-            ...session,
-            participant_count: countResult.count || 0,
-            responses: (responsesResult.data || []).map(r => ({
+            id: session.id,
+            shortCode: session.shortCode,
+            verseReference: session.verseReference,
+            status: session.status,
+            createdAt: session.createdAt,
+            participantCount: session.participantCount || 0,
+            responses: (responses || []).map((r: any) => ({
               id: r.id || '',
-              participant_name: r.participant_name || 'Unknown',
-              group_number: r.group_number,
-              title_phrase: r.title_phrase,
-              heartbeat_verse: r.heartbeat_verse,
+              participantName: r.participantName || 'Unknown',
+              groupNumber: r.groupNumber,
+              titlePhrase: r.titlePhrase,
+              heartbeatVerse: r.heartbeatVerse,
               observation: r.observation,
-              core_insight_category: r.core_insight_category as InsightCategory | null,
-              core_insight_note: r.core_insight_note,
-              scholars_note: r.scholars_note,
-              action_plan: r.action_plan,
-              cool_down_note: r.cool_down_note,
-              created_at: r.created_at || '',
+              coreInsightCategory: r.coreInsightCategory as InsightCategory | null,
+              coreInsightNote: r.coreInsightNote,
+              scholarsNote: r.scholarsNote,
+              actionPlan: r.actionPlan,
+              coolDownNote: r.coolDownNote,
+              createdAt: r.createdAt || '',
             })),
-            aiReports: (reportsResult.data || []).map(r => ({
-              id: r.id,
-              report_type: r.report_type as 'group' | 'overall',
-              group_number: r.group_number,
-              content: r.content,
-              created_at: r.created_at,
-            })),
+            aiReports: (reports || [])
+              .filter((r: any) => r.status === 'COMPLETED')
+              .map((r: any) => ({
+                id: r.id,
+                reportType: r.reportType as 'group' | 'overall',
+                groupNumber: r.groupNumber,
+                content: r.content,
+                createdAt: r.createdAt,
+              })),
           };
         })
       );
 
-      return sessionsWithData as SessionWithResponses[];
+      return sessionsWithData;
     },
     enabled: !!user?.id,
     staleTime: 60000,
@@ -165,7 +158,7 @@ export const HistoryBrowser: React.FC = () => {
 
   // Filter sessions by time
   const filterByTime = (session: SessionWithResponses) => {
-    const sessionDate = new Date(session.created_at);
+    const sessionDate = new Date(session.createdAt);
     const now = new Date();
     const lastMonth = subMonths(now, 1);
 
@@ -185,12 +178,12 @@ export const HistoryBrowser: React.FC = () => {
   const filteredSessions = useMemo(() => {
     return (sessions || []).filter(session => {
       const matchesSearch = 
-        session.verse_reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.short_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        session.verseReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        session.shortCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         session.responses.some(r => 
-          r.participant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.title_phrase?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.core_insight_note?.toLowerCase().includes(searchTerm.toLowerCase())
+          r.participantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          r.titlePhrase?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          r.coreInsightNote?.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
       const matchesStatus = filterStatus === 'all' || session.status === filterStatus;
@@ -205,7 +198,7 @@ export const HistoryBrowser: React.FC = () => {
     const groups: Record<string, SessionWithResponses[]> = {};
     
     filteredSessions.forEach(session => {
-      const monthKey = format(new Date(session.created_at), 'yyyy-MM');
+      const monthKey = format(new Date(session.createdAt), 'yyyy-MM');
       if (!groups[monthKey]) {
         groups[monthKey] = [];
       }
@@ -218,7 +211,7 @@ export const HistoryBrowser: React.FC = () => {
   // Statistics
   const stats = useMemo(() => {
     const allSessions = sessions || [];
-    const thisMonthSessions = allSessions.filter(s => isThisMonth(new Date(s.created_at)));
+    const thisMonthSessions = allSessions.filter(s => isThisMonth(new Date(s.createdAt)));
     const totalNotes = allSessions.reduce((sum, s) => sum + s.responses.length, 0);
     const totalReports = allSessions.reduce((sum, s) => sum + s.aiReports.length, 0);
 
@@ -232,37 +225,37 @@ export const HistoryBrowser: React.FC = () => {
 
   // Export to text
   const handleExport = (session: SessionWithResponses) => {
-    let content = `查經記錄 - ${session.verse_reference}\n`;
-    content += `日期：${format(new Date(session.created_at), 'yyyy/MM/dd HH:mm')}\n`;
-    content += `參與人數：${session.participant_count}\n`;
+    let content = `查經記錄 - ${session.verseReference}\n`;
+    content += `日期：${format(new Date(session.createdAt), 'yyyy/MM/dd HH:mm')}\n`;
+    content += `參與人數：${session.participantCount}\n`;
     content += `${'='.repeat(50)}\n\n`;
 
     content += `【個人筆記】\n${'─'.repeat(25)}\n\n`;
     session.responses.forEach((response) => {
-      content += `【${response.participant_name}】${response.group_number ? ` (第 ${response.group_number} 組)` : ''}\n`;
-      if (response.title_phrase) content += `📌 1. 定標題：${response.title_phrase}\n`;
-      if (response.heartbeat_verse) content += `💓 2. 心跳的時刻：${response.heartbeat_verse}\n`;
+      content += `【${response.participantName}】${response.groupNumber ? ` (第 ${response.groupNumber} 組)` : ''}\n`;
+      if (response.titlePhrase) content += `📌 1. 定標題：${response.titlePhrase}\n`;
+      if (response.heartbeatVerse) content += `💓 2. 心跳的時刻：${response.heartbeatVerse}\n`;
       if (response.observation) content += `👁 3. 查看聖經的資訊：${response.observation}\n`;
-      if (response.core_insight_note) {
-        const cat = INSIGHT_CATEGORIES.find(c => c.value === response.core_insight_category);
-        content += `💪 4. 思想神的話${cat ? ` (${cat.emoji} ${cat.label})` : ''}：${response.core_insight_note}\n`;
+      if (response.coreInsightNote) {
+        const cat = INSIGHT_CATEGORIES.find(c => c.value === response.coreInsightCategory);
+        content += `💪 4. 思想神的話${cat ? ` (${cat.emoji} ${cat.label})` : ''}：${response.coreInsightNote}\n`;
       }
-      if (response.scholars_note) content += `📖 5. 學長姐的話：${response.scholars_note}\n`;
-      if (response.action_plan) content += `🎯 6. 我決定要這樣做：${response.action_plan}\n`;
-      if (response.cool_down_note) content += `💬 7. 自由發揮：${response.cool_down_note}\n`;
+      if (response.scholarsNote) content += `📖 5. 學長姐的話：${response.scholarsNote}\n`;
+      if (response.actionPlan) content += `🎯 6. 我決定要這樣做：${response.actionPlan}\n`;
+      if (response.coolDownNote) content += `💬 7. 自由發揮：${response.coolDownNote}\n`;
       content += '\n';
     });
 
     if (session.aiReports.length > 0) {
       content += `\n【AI 整合分析】\n${'─'.repeat(25)}\n\n`;
       
-      const groupReports = session.aiReports.filter(r => r.report_type === 'group');
+      const groupReports = session.aiReports.filter(r => r.reportType === 'group');
       groupReports.forEach(report => {
-        content += `🤖 第 ${report.group_number} 組 AI 摘要\n`;
+        content += `🤖 第 ${report.groupNumber} 組 AI 摘要\n`;
         content += `${report.content}\n\n`;
       });
       
-      const overallReport = session.aiReports.find(r => r.report_type === 'overall');
+      const overallReport = session.aiReports.find(r => r.reportType === 'overall');
       if (overallReport) {
         content += `🌟 全體整合報告\n`;
         content += `${overallReport.content}\n\n`;
@@ -273,7 +266,7 @@ export const HistoryBrowser: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `查經記錄_${session.verse_reference}_${format(new Date(session.created_at), 'yyyyMMdd')}.txt`;
+    a.download = `查經記錄_${session.verseReference}_${format(new Date(session.createdAt), 'yyyyMMdd')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -316,15 +309,15 @@ export const HistoryBrowser: React.FC = () => {
           <CardHeader className="pb-3">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <CardTitle className="text-xl">{selectedSession.verse_reference}</CardTitle>
+                <CardTitle className="text-xl">{selectedSession.verseReference}</CardTitle>
                 <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
-                    {format(new Date(selectedSession.created_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
+                    {format(new Date(selectedSession.createdAt), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
                   </span>
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
-                    {selectedSession.participant_count} 人參與
+                    {selectedSession.participantCount} 人參與
                   </span>
                   <Badge variant={selectedSession.status === 'completed' ? 'default' : 'secondary'}>
                     {selectedSession.status === 'completed' ? '已完成' : 
@@ -582,7 +575,7 @@ const SessionCard: React.FC<{
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-medium text-base truncate">{session.verse_reference}</span>
+              <span className="font-medium text-base truncate">{session.verseReference}</span>
               <Badge 
                 variant={session.status === 'completed' ? 'default' : 'secondary'}
                 className="flex-shrink-0"
@@ -597,11 +590,11 @@ const SessionCard: React.FC<{
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
-                {format(new Date(session.created_at), 'MM/dd HH:mm')}
+                {format(new Date(session.createdAt), 'MM/dd HH:mm')}
               </span>
               <span className="flex items-center gap-1">
                 <Users className="w-3.5 h-3.5" />
-                {session.participant_count} 人
+                {session.participantCount} 人
               </span>
               <span className="flex items-center gap-1">
                 <FileText className="w-3.5 h-3.5" />
@@ -627,7 +620,7 @@ const ResponseCard: React.FC<{
   response: StudyResponseWithParticipant;
 }> = ({ response }) => {
   const selectedCategory = INSIGHT_CATEGORIES.find(
-    c => c.value === response.core_insight_category
+    c => c.value === response.coreInsightCategory
   );
 
   return (
@@ -637,25 +630,25 @@ const ResponseCard: React.FC<{
           <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
             <User className="w-4 h-4 text-secondary" />
           </div>
-          <span className="font-medium">{response.participant_name}</span>
-          {response.group_number && (
+          <span className="font-medium">{response.participantName}</span>
+          {response.groupNumber && (
             <Badge variant="outline" className="text-xs">
-              第 {response.group_number} 組
+              第 {response.groupNumber} 組
             </Badge>
           )}
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-2 text-sm">
-        {response.title_phrase && (
+        {response.titlePhrase && (
           <div className="flex items-start gap-2">
             <Sparkles className="w-3.5 h-3.5 mt-0.5 text-accent flex-shrink-0" />
-            <span><strong>定標題：</strong>{response.title_phrase}</span>
+            <span><strong>定標題：</strong>{response.titlePhrase}</span>
           </div>
         )}
-        {response.heartbeat_verse && (
+        {response.heartbeatVerse && (
           <div className="flex items-start gap-2">
             <Heart className="w-3.5 h-3.5 mt-0.5 text-accent flex-shrink-0" />
-            <span><strong>抓心跳：</strong>{response.heartbeat_verse}</span>
+            <span><strong>抓心跳：</strong>{response.heartbeatVerse}</span>
           </div>
         )}
         {response.observation && (
@@ -664,31 +657,31 @@ const ResponseCard: React.FC<{
             <span><strong>看現場：</strong>{response.observation}</span>
           </div>
         )}
-        {response.core_insight_note && (
+        {response.coreInsightNote && (
           <div className="flex items-start gap-2">
             <Dumbbell className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />
             <span>
               <strong>練核心{selectedCategory ? ` (${selectedCategory.emoji})` : ''}：</strong>
-              {response.core_insight_note}
+              {response.coreInsightNote}
             </span>
           </div>
         )}
-        {response.scholars_note && (
+        {response.scholarsNote && (
           <div className="flex items-start gap-2">
             <BookOpen className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />
-            <span><strong>學長姐的話：</strong>{response.scholars_note}</span>
+            <span><strong>學長姐的話：</strong>{response.scholarsNote}</span>
           </div>
         )}
-        {response.action_plan && (
+        {response.actionPlan && (
           <div className="flex items-start gap-2">
             <Target className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" />
-            <span><strong>帶一招：</strong>{response.action_plan}</span>
+            <span><strong>帶一招：</strong>{response.actionPlan}</span>
           </div>
         )}
-        {response.cool_down_note && (
+        {response.coolDownNote && (
           <div className="flex items-start gap-2">
             <MessageCircle className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" />
-            <span><strong>自由發揮：</strong>{response.cool_down_note}</span>
+            <span><strong>自由發揮：</strong>{response.coolDownNote}</span>
           </div>
         )}
       </CardContent>
@@ -702,8 +695,8 @@ interface HistoryReportsWithChartsProps {
 }
 
 const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ reports }) => {
-  const groupReports = reports.filter(r => r.report_type === 'group' && r.group_number !== 0);
-  const overallReport = reports.find(r => r.report_type === 'overall' || r.group_number === 0);
+  const groupReports = reports.filter(r => r.reportType === 'group' && r.groupNumber !== 0);
+  const overallReport = reports.find(r => r.reportType === 'overall' || r.groupNumber === 0);
   
   // Parse group reports for chart visualization
   const parsedGroupReports: GroupReport[] = useMemo(() => {
@@ -714,7 +707,7 @@ const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ rep
         observations: '', insights: '', applications: '', contributions: '', raw: ''
       };
       return {
-        groupNumber: r.group_number || 0,
+        groupNumber: r.groupNumber || 0,
         members: section.members || '',
         verse: section.verse || '',
         themes: section.themes || '',
@@ -762,7 +755,7 @@ const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ rep
       
       {/* Overall Report First - with enhanced formatting */}
       {reports
-        .filter(r => r.report_type === 'overall' || r.group_number === 0)
+        .filter(r => r.reportType === 'overall' || r.groupNumber === 0)
         .map(report => (
           <HistoryReportSection 
             key={report.id}
@@ -772,8 +765,8 @@ const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ rep
         ))}
 
       {/* Separator if both overall and group reports exist */}
-      {reports.some(r => r.report_type === 'overall' || r.group_number === 0) &&
-       reports.some(r => r.report_type === 'group' && r.group_number !== 0) && (
+      {reports.some(r => r.reportType === 'overall' || r.groupNumber === 0) &&
+       reports.some(r => r.reportType === 'group' && r.groupNumber !== 0) && (
         <div className="relative py-2">
           <Separator />
           <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
@@ -784,7 +777,7 @@ const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ rep
 
       {/* Group Reports - with enhanced formatting */}
       {reports
-        .filter(r => r.report_type === 'group' && r.group_number !== 0)
+        .filter(r => r.reportType === 'group' && r.groupNumber !== 0)
         .map(report => (
           <HistoryReportSection 
             key={report.id}
@@ -811,7 +804,7 @@ const HistoryReportSection: React.FC<HistoryReportSectionProps> = ({ report, var
   
   const handleCopy = () => {
     navigator.clipboard.writeText(report.content);
-    toast.success(isOverall ? '全體報告已複製！' : `第 ${report.group_number} 組報告已複製！`);
+    toast.success(isOverall ? '全體報告已複製！' : `第 ${report.groupNumber} 組報告已複製！`);
   };
   
   const hasStructuredContent = section && (section.themes || section.observations || section.insights || section.applications);
@@ -840,7 +833,7 @@ const HistoryReportSection: React.FC<HistoryReportSectionProps> = ({ report, var
             "font-semibold",
             isOverall && "text-accent"
           )}>
-            {isOverall ? '📊 全會眾綜合分析' : `第 ${report.group_number} 組`}
+            {isOverall ? '📊 全會眾綜合分析' : `第 ${report.groupNumber} 組`}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -848,7 +841,7 @@ const HistoryReportSection: React.FC<HistoryReportSectionProps> = ({ report, var
             "text-xs",
             isOverall ? "text-muted-foreground" : "text-primary-foreground/70"
           )}>
-            {format(new Date(report.created_at), 'MM/dd HH:mm')}
+            {format(new Date(report.createdAt), 'MM/dd HH:mm')}
           </span>
           <Button
             variant="ghost"

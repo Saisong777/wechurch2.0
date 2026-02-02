@@ -3,14 +3,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface LinkUserDialogProps {
@@ -30,19 +28,23 @@ export const LinkUserDialog = ({ open, onOpenChange, memberId, onLink }: LinkUse
 
     setLoading(true);
     try {
-      // Find user by email in profiles
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('email', email.trim())
-        .single();
-
-      if (error || !profile) {
+      // Find user by email from API
+      const response = await fetch(`/api/users?email=${encodeURIComponent(email.trim())}`);
+      
+      if (!response.ok) {
+        toast.error('搜尋用戶時發生錯誤');
+        return;
+      }
+      
+      const users = await response.json();
+      const user = users.find((u: any) => u.email?.toLowerCase() === email.trim().toLowerCase());
+      
+      if (!user) {
         toast.error('找不到此 Email 對應的用戶');
         return;
       }
 
-      onLink(memberId, profile.user_id);
+      onLink(memberId, user.id);
       setEmail('');
       onOpenChange(false);
     } catch (err) {

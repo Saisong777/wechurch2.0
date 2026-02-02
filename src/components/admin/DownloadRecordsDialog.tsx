@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Mail, FileDown, Send, Copy, Paperclip, X, Image, File, Clock, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
@@ -16,10 +15,10 @@ import { zhTW } from 'date-fns/locale';
 
 interface Download {
   id: string;
-  card_id: string;
-  user_name: string;
-  user_email: string;
-  downloaded_at: string;
+  cardId: string;
+  userName: string;
+  userEmail: string;
+  downloadedAt: string;
 }
 
 interface GroupedDownload {
@@ -66,23 +65,23 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     const grouped = new Map<string, GroupedDownload>();
     
     for (const download of downloads) {
-      const email = download.user_email.toLowerCase();
+      const email = download.userEmail.toLowerCase();
       const existing = grouped.get(email);
       
       if (existing) {
         existing.downloadCount++;
         existing.downloads.push(download);
         // Update last download time if this one is more recent
-        if (new Date(download.downloaded_at) > new Date(existing.lastDownloadAt)) {
-          existing.lastDownloadAt = download.downloaded_at;
-          existing.name = download.user_name; // Use most recent name
+        if (new Date(download.downloadedAt) > new Date(existing.lastDownloadAt)) {
+          existing.lastDownloadAt = download.downloadedAt;
+          existing.name = download.userName; // Use most recent name
         }
       } else {
         grouped.set(email, {
-          email: download.user_email,
-          name: download.user_name,
+          email: download.userEmail,
+          name: download.userName,
           downloadCount: 1,
-          lastDownloadAt: download.downloaded_at,
+          lastDownloadAt: download.downloadedAt,
           downloads: [download],
         });
       }
@@ -155,42 +154,18 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
         continue;
       }
 
-      const attachment: Attachment = { file, uploading: true };
+      // Create local URL for preview (file storage not yet migrated)
+      const localUrl = URL.createObjectURL(file);
+      const attachment: Attachment = { 
+        file, 
+        uploading: false,
+        url: localUrl,
+        path: file.name 
+      };
       newAttachments.push(attachment);
     }
 
     setAttachments(prev => [...prev, ...newAttachments]);
-
-    // Upload files to storage
-    for (const attachment of newAttachments) {
-      try {
-        const fileExt = attachment.file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-        const filePath = `email-attachments/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('email-attachments')
-          .upload(fileName, attachment.file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('email-attachments')
-          .getPublicUrl(fileName);
-
-        setAttachments(prev => 
-          prev.map(a => 
-            a.file === attachment.file 
-              ? { ...a, url: urlData.publicUrl, path: fileName, uploading: false }
-              : a
-          )
-        );
-      } catch (err) {
-        console.error('Upload error:', err);
-        toast.error(`上傳 ${attachment.file.name} 失敗`);
-        setAttachments(prev => prev.filter(a => a.file !== attachment.file));
-      }
-    }
 
     // Reset file input
     if (fileInputRef.current) {
@@ -199,15 +174,9 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
   };
 
   const removeAttachment = async (attachment: Attachment) => {
-    // Remove from storage if uploaded
-    if (attachment.path) {
-      try {
-        await supabase.storage
-          .from('email-attachments')
-          .remove([attachment.path]);
-      } catch (err) {
-        console.error('Failed to remove attachment:', err);
-      }
+    // Revoke local URL if exists
+    if (attachment.url && attachment.url.startsWith('blob:')) {
+      URL.revokeObjectURL(attachment.url);
     }
     setAttachments(prev => prev.filter(a => a !== attachment));
   };
@@ -233,17 +202,26 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
           url: a.url,
         }));
 
-      const { data, error } = await supabase.functions.invoke('send-bulk-notification', {
-        body: {
+      // TODO: Migrate email sending to API endpoint
+      // For now, show a message that this feature requires email service setup
+      const response = await fetch('/api/send-bulk-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           recipients: emailRecipients,
           subject: emailSubject,
           body: emailBody,
           isHtml: true,
           attachments: attachmentData.length > 0 ? attachmentData : undefined,
-        },
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || '發送失敗');
+      }
+
+      const data = await response.json();
 
       const sent = (data as any)?.sent ?? 0;
       const failed = (data as any)?.failed ?? 0;
@@ -444,7 +422,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                                 </div>
                                 <div className="max-h-48 overflow-auto p-2">
                                   {g.downloads
-                                    .sort((a, b) => new Date(b.downloaded_at).getTime() - new Date(a.downloaded_at).getTime())
+                                    .sort((a, b) => new Date(b.downloadedAt).getTime() - new Date(a.downloadedAt).getTime())
                                     .map((d, i) => (
                                       <div 
                                         key={d.id}
@@ -453,7 +431,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                                         <Clock className="w-3 h-3 text-muted-foreground" />
                                         <span className="text-muted-foreground">#{g.downloadCount - i}</span>
                                         <span>
-                                          {format(new Date(d.downloaded_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
+                                          {format(new Date(d.downloadedAt), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
                                         </span>
                                       </div>
                                     ))}

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +25,7 @@ interface IncompleteMember {
   name: string;
   type: IncompleteType;
   issue: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export const IncompleteMembersPanel = () => {
@@ -34,51 +33,51 @@ export const IncompleteMembersPanel = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
 
-  // Fetch incomplete members from multiple sources
+  // Fetch incomplete members from multiple sources using API
   const { data: incompleteMembers, isLoading, refetch } = useQuery({
     queryKey: ['incomplete-members'],
     queryFn: async () => {
       const members: IncompleteMember[] = [];
 
-      // 1. Get profiles with missing display_name (incomplete profile)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, user_id, email, display_name, created_at');
-
-      for (const profile of profiles || []) {
-        if (!profile.display_name || profile.display_name.trim() === '') {
-          members.push({
-            id: `profile-${profile.user_id}`,
-            email: profile.email || '',
-            name: profile.email?.split('@')[0] || '未知',
-            type: 'incomplete_profile',
-            issue: '缺少真實姓名',
-            created_at: profile.created_at,
-          });
+      // 1. Get users with missing display name (incomplete profile)
+      const usersRes = await fetch('/api/users');
+      if (usersRes.ok) {
+        const users = await usersRes.json();
+        for (const user of users || []) {
+          if (!user.displayName || user.displayName.trim() === '') {
+            members.push({
+              id: `profile-${user.id}`,
+              email: user.email || '',
+              name: user.email?.split('@')[0] || '未知',
+              type: 'incomplete_profile',
+              issue: '缺少真實姓名',
+              createdAt: user.createdAt,
+            });
+          }
         }
       }
 
-      // 2. Get potential members who haven't registered (status = 'pending' and no user_id)
-      const { data: potentialMembers } = await supabase
-        .from('potential_members')
-        .select('id, email, name, status, user_id, created_at, sessions_count')
-        .is('user_id', null)
-        .eq('status', 'pending');
-
-      for (const pm of potentialMembers || []) {
-        members.push({
-          id: `potential-${pm.id}`,
-          email: pm.email,
-          name: pm.name,
-          type: 'potential',
-          issue: `參加 ${pm.sessions_count} 次活動，尚未註冊`,
-          created_at: pm.created_at,
-        });
+      // 2. Get potential members who haven't registered (status = 'pending' and no userId)
+      const pmRes = await fetch('/api/potential-members');
+      if (pmRes.ok) {
+        const potentialMembers = await pmRes.json();
+        for (const pm of potentialMembers || []) {
+          if (!pm.userId && pm.status === 'pending') {
+            members.push({
+              id: `potential-${pm.id}`,
+              email: pm.email,
+              name: pm.name,
+              type: 'potential',
+              issue: `參加 ${pm.sessionsCount || 0} 次活動，尚未註冊`,
+              createdAt: pm.createdAt,
+            });
+          }
+        }
       }
 
-      // Sort by created_at desc
+      // Sort by createdAt desc
       members.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
       return members;
@@ -86,7 +85,7 @@ export const IncompleteMembersPanel = () => {
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  // Send notification mutation
+  // Send notification mutation using API
   const sendNotification = useMutation({
     mutationFn: async (member: IncompleteMember) => {
       const typeMap: Record<IncompleteType, string> = {
@@ -97,17 +96,24 @@ export const IncompleteMembersPanel = () => {
 
       // Use public base URL to avoid auth-bridge redirect issues
       const publicBaseUrl = getPublicBaseUrl();
-      const { data, error } = await supabase.functions.invoke('send-profile-completion-notice', {
-        body: {
+      
+      const response = await fetch('/api/send-profile-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: member.email,
           name: member.name,
           type: typeMap[member.type],
           redirectUrl: `${publicBaseUrl}/login`,
-        },
+        }),
       });
 
-      if (error) throw error;
-      return data;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || '發送失敗');
+      }
+
+      return await response.json();
     },
     onSuccess: (_, member) => {
       toast.success(`已發送通知給 ${member.email}`);

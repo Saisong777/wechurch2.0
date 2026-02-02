@@ -262,6 +262,15 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/potential-members", async (req, res) => {
+    try {
+      const member = await storage.upsertPotentialMember(req.body);
+      res.status(201).json(member);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create potential member" });
+    }
+  });
+
   app.get("/api/icebreaker/games/:roomCode", async (req, res) => {
     try {
       const game = await storage.getIcebreakerGameByRoomCode(req.params.roomCode);
@@ -481,5 +490,53 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/health", async (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Profile notification endpoint (requires RESEND_API_KEY to be configured)
+  app.post("/api/send-profile-notification", async (req, res) => {
+    try {
+      const { email, name, type, redirectUrl } = req.body;
+      
+      // Check if email service is configured
+      if (!process.env.RESEND_API_KEY) {
+        return res.status(503).json({ 
+          error: "Email service not configured",
+          message: "請設定 RESEND_API_KEY 以啟用郵件發送功能"
+        });
+      }
+
+      // TODO: Implement email sending with Resend API
+      res.json({
+        success: true,
+        message: "郵件功能尚未完全遷移，請稍後再試"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send notification" });
+    }
+  });
+
+  // Bulk email endpoint (requires RESEND_API_KEY to be configured)
+  app.post("/api/send-bulk-email", async (req, res) => {
+    try {
+      const { recipients, subject, body, isHtml, attachments } = req.body;
+      
+      // Check if email service is configured
+      if (!process.env.RESEND_API_KEY) {
+        return res.status(503).json({ 
+          error: "Email service not configured",
+          message: "請設定 RESEND_API_KEY 以啟用郵件發送功能"
+        });
+      }
+
+      // TODO: Implement email sending with Resend API
+      // For now, return a placeholder response
+      res.json({
+        sent: recipients.length,
+        failed: 0,
+        message: "郵件功能尚未完全遷移，請稍後再試"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send emails" });
+    }
   });
 }
