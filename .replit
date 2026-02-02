@@ -27,7 +27,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd B && npm run dev"
+args = "npm run dev"
 waitForPort = 5000
 
 [nix]
