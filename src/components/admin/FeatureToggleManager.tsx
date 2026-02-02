@@ -54,12 +54,12 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
     });
 
     features.forEach(feature => {
-      if (PARENT_FEATURE_KEYS.includes(feature.feature_key)) {
+      if (PARENT_FEATURE_KEYS.includes(feature.featureKey)) {
         parents.push(feature);
       } else {
         // Find which parent this child belongs to
         for (const [parentKey, childKeys] of Object.entries(FEATURE_HIERARCHY)) {
-          if (childKeys.includes(feature.feature_key)) {
+          if (childKeys.includes(feature.featureKey)) {
             children[parentKey].push(feature);
             break;
           }
@@ -68,20 +68,20 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
     });
 
     // Sort parents by feature_key
-    parents.sort((a, b) => a.feature_key.localeCompare(b.feature_key));
+    parents.sort((a, b) => a.featureKey.localeCompare(b.featureKey));
 
     return { parentFeatures: parents, childFeaturesByParent: children };
   }, [features]);
 
   const handleToggle = async (feature: FeatureToggle) => {
-    setUpdating(feature.feature_key);
-    const success = await updateFeature(feature.feature_key, !feature.is_enabled);
+    setUpdating(feature.featureKey);
+    const success = await updateFeature(feature.featureKey, !feature.isEnabled);
     
     if (success) {
       toast.success(
-        feature.is_enabled 
-          ? `已關閉「${feature.feature_name}」` 
-          : `已開啟「${feature.feature_name}」`
+        feature.isEnabled 
+          ? `已關閉「${feature.featureName}」` 
+          : `已開啟「${feature.featureName}」`
       );
     } else {
       toast.error('更新失敗，請稍後再試');
@@ -91,16 +91,16 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
 
   const handleEditMessage = (feature: FeatureToggle) => {
     setEditingFeature(feature);
-    setEditMessage(feature.disabled_message || '即將推出');
+    setEditMessage(feature.disabledMessage || '即將推出');
   };
 
   const handleSaveMessage = async () => {
     if (!editingFeature) return;
     
-    setUpdating(editingFeature.feature_key);
+    setUpdating(editingFeature.featureKey);
     const success = await updateFeature(
-      editingFeature.feature_key, 
-      editingFeature.is_enabled, 
+      editingFeature.featureKey, 
+      editingFeature.isEnabled, 
       editMessage
     );
     
@@ -158,17 +158,17 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
       {/* Feature Tree */}
       <div className="space-y-4">
         {parentFeatures.map((parent) => {
-          const childFeatures = childFeaturesByParent[parent.feature_key] || [];
-          const isExpanded = expandedParents.has(parent.feature_key);
+          const childFeatures = childFeaturesByParent[parent.featureKey] || [];
+          const isExpanded = expandedParents.has(parent.featureKey);
           const hasChildren = childFeatures.length > 0;
 
           return (
             <Collapsible
               key={parent.id}
               open={isExpanded}
-              onOpenChange={() => hasChildren && toggleExpanded(parent.feature_key)}
+              onOpenChange={() => hasChildren && toggleExpanded(parent.featureKey)}
             >
-              <Card className={`transition-all ${parent.is_enabled ? '' : 'opacity-75 border-dashed'}`}>
+              <Card className={`transition-all ${parent.isEnabled ? '' : 'opacity-75 border-dashed'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -185,12 +185,12 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
                       )}
                       <div className="flex-1 min-w-0">
                         <CardTitle className="flex items-center gap-2 text-lg">
-                          {parent.is_enabled ? (
+                          {parent.isEnabled ? (
                             <Power className="w-5 h-5 text-accent flex-shrink-0" />
                           ) : (
                             <PowerOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                           )}
-                          <span className="truncate">{parent.feature_name}</span>
+                          <span className="truncate">{parent.featureName}</span>
                           {hasChildren && (
                             <Badge variant="outline" className="ml-2 text-xs">
                               {childFeatures.length} 子功能
@@ -205,13 +205,13 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {updating === parent.feature_key ? (
+                      {updating === parent.featureKey ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <Switch
-                          checked={parent.is_enabled}
+                          checked={parent.isEnabled}
                           onCheckedChange={() => handleToggle(parent)}
-                          aria-label={`Toggle ${parent.feature_name}`}
+                          aria-label={`Toggle ${parent.featureName}`}
                         />
                       )}
                     </div>
@@ -219,10 +219,10 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="flex items-center justify-between gap-2">
-                    <Badge variant={parent.is_enabled ? 'default' : 'secondary'}>
-                      {parent.is_enabled ? '開放中' : parent.disabled_message || '已關閉'}
+                    <Badge variant={parent.isEnabled ? 'default' : 'secondary'}>
+                      {parent.isEnabled ? '開放中' : parent.disabledMessage || '已關閉'}
                     </Badge>
-                    {!parent.is_enabled && (
+                    {!parent.isEnabled && (
                       <Button variant="ghost" size="sm" onClick={() => handleEditMessage(parent)} className="h-7 px-2">
                         <Edit2 className="w-3 h-3 mr-1" />
                         編輯訊息
@@ -238,8 +238,8 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
                           <ChildFeatureCard
                             key={child.id}
                             feature={child}
-                            parentEnabled={parent.is_enabled}
-                            updating={updating === child.feature_key}
+                            parentEnabled={parent.isEnabled}
+                            updating={updating === child.featureKey}
                             onToggle={() => handleToggle(child)}
                             onEditMessage={() => handleEditMessage(child)}
                           />
@@ -266,7 +266,7 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>功能名稱</Label>
-              <p className="text-sm text-muted-foreground">{editingFeature?.feature_name}</p>
+              <p className="text-sm text-muted-foreground">{editingFeature?.featureName}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="message">關閉時顯示訊息</Label>
@@ -313,7 +313,7 @@ const ChildFeatureCard: React.FC<ChildFeatureCardProps> = ({
   onEditMessage,
 }) => {
   const isLocked = !parentEnabled;
-  const effectivelyDisabled = isLocked || !feature.is_enabled;
+  const effectivelyDisabled = isLocked || !feature.isEnabled;
 
   return (
     <div className={`p-3 rounded-lg border ${effectivelyDisabled ? 'bg-muted/30 border-dashed' : 'bg-card'} transition-all`}>
@@ -321,14 +321,14 @@ const ChildFeatureCard: React.FC<ChildFeatureCardProps> = ({
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {isLocked ? (
             <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          ) : feature.is_enabled ? (
+          ) : feature.isEnabled ? (
             <Power className="w-4 h-4 text-accent flex-shrink-0" />
           ) : (
             <PowerOff className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           )}
           <div className="flex-1 min-w-0">
             <p className={`font-medium truncate ${isLocked ? 'text-muted-foreground' : ''}`}>
-              {feature.feature_name}
+              {feature.featureName}
             </p>
             {feature.description && (
               <p className="text-xs text-muted-foreground truncate">
@@ -342,10 +342,10 @@ const ChildFeatureCard: React.FC<ChildFeatureCardProps> = ({
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <Switch
-              checked={feature.is_enabled}
+              checked={feature.isEnabled}
               onCheckedChange={onToggle}
               disabled={isLocked}
-              aria-label={`Toggle ${feature.feature_name}`}
+              aria-label={`Toggle ${feature.featureName}`}
             />
           )}
         </div>
@@ -358,12 +358,12 @@ const ChildFeatureCard: React.FC<ChildFeatureCardProps> = ({
               父層已關閉
             </Badge>
           ) : (
-            <Badge variant={feature.is_enabled ? 'default' : 'secondary'} className="text-xs">
-              {feature.is_enabled ? '開放中' : feature.disabled_message || '已關閉'}
+            <Badge variant={feature.isEnabled ? 'default' : 'secondary'} className="text-xs">
+              {feature.isEnabled ? '開放中' : feature.disabledMessage || '已關閉'}
             </Badge>
           )}
         </div>
-        {!feature.is_enabled && !isLocked && (
+        {!feature.isEnabled && !isLocked && (
           <Button variant="ghost" size="sm" onClick={onEditMessage} className="h-6 px-2 text-xs">
             <Edit2 className="w-3 h-3 mr-1" />
             編輯

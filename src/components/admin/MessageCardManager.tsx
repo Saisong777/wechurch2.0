@@ -97,11 +97,13 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
     const weekStart = startOfWeek(now, { weekStartsOn: 0 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
 
-    const weeklyDownloads = allDownloads.filter(d => 
-      isWithinInterval(new Date(d.downloaded_at), { start: weekStart, end: weekEnd })
-    ).length;
+    const weeklyDownloads = allDownloads.filter(d => {
+      const downloadedAt = d.downloadedAt;
+      if (!downloadedAt) return false;
+      return isWithinInterval(new Date(downloadedAt), { start: weekStart, end: weekEnd });
+    }).length;
 
-    const uniqueEmails = new Set(allDownloads.map(d => d.user_email.toLowerCase()));
+    const uniqueEmails = new Set(allDownloads.filter(d => d.userEmail).map(d => d.userEmail.toLowerCase()));
     
     const cardStatsMap = new Map<string, { total: number; weekly: number; users: Set<string>; title: string }>();
     
@@ -112,14 +114,17 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
     
     // Then, process all downloads (including from deleted cards)
     allDownloads.forEach(d => {
-      if (!cardStatsMap.has(d.card_id)) {
+      const cardId = d.cardId;
+      if (!cardId) return;
+      if (!cardStatsMap.has(cardId)) {
         // This is a download from a deleted card
-        cardStatsMap.set(d.card_id, { total: 0, weekly: 0, users: new Set(), title: '（已刪除卡片）' });
+        cardStatsMap.set(cardId, { total: 0, weekly: 0, users: new Set(), title: '（已刪除卡片）' });
       }
-      const stats = cardStatsMap.get(d.card_id)!;
+      const stats = cardStatsMap.get(cardId)!;
       stats.total++;
-      stats.users.add(d.user_email.toLowerCase());
-      if (isWithinInterval(new Date(d.downloaded_at), { start: weekStart, end: weekEnd })) {
+      if (d.userEmail) stats.users.add(d.userEmail.toLowerCase());
+      const downloadedAt = d.downloadedAt;
+      if (downloadedAt && isWithinInterval(new Date(downloadedAt), { start: weekStart, end: weekEnd })) {
         stats.weekly++;
       }
     });
@@ -258,7 +263,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   const handleDelete = async (card: MessageCard) => {
     try {
       // Delete from storage
-      await supabase.storage.from('message-cards').remove([card.image_path]);
+      await supabase.storage.from('message-cards').remove([card.imagePath]);
       
       // Delete from database (downloads are preserved due to no CASCADE)
       const { error } = await supabase
@@ -314,7 +319,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
 
     setUpdating(true);
     try {
-      let newImagePath = selectedCard.image_path;
+      let newImagePath = selectedCard.imagePath;
 
       // If new image selected, upload it
       if (editFile) {
@@ -328,7 +333,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
         if (uploadError) throw uploadError;
 
         // Delete old image
-        await supabase.storage.from('message-cards').remove([selectedCard.image_path]);
+        await supabase.storage.from('message-cards').remove([selectedCard.imagePath]);
         
         newImagePath = fileName;
       }
@@ -363,7 +368,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   };
 
   const getDownloadUrl = (card: MessageCard) => {
-    return `${window.location.origin}/card?code=${card.short_code}`;
+    return `${window.location.origin}/card?code=${card.shortCode}`;
   };
 
   const handleCopyLink = (card: MessageCard) => {
@@ -380,13 +385,13 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   // Show downloads for a card (including deleted cards from stats)
   const handleShowDownloadsById = (cardId: string, cardTitle: string) => {
     // Create a minimal card object for the dialog
-    setSelectedCard({ id: cardId, title: cardTitle, short_code: '', image_path: '', is_active: false, created_at: '' });
+    setSelectedCard({ id: cardId, title: cardTitle, shortCode: '', imagePath: '', isActive: false, createdAt: '' });
     fetchDownloads(cardId);
     setShowDownloadsDialog(true);
   };
 
   const handleToggleActive = async (card: MessageCard) => {
-    const newStatus = !card.is_active;
+    const newStatus = !card.isActive;
     
     try {
       const { error } = await supabase
@@ -671,14 +676,14 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => (
-            <Card key={card.id} className={`overflow-hidden ${!card.is_active ? 'opacity-60' : ''}`}>
+            <Card key={card.id} className={`overflow-hidden ${!card.isActive ? 'opacity-60' : ''}`}>
               <div className="aspect-video bg-muted relative">
                 <img
-                  src={getImageUrl(card.image_path)}
+                  src={getImageUrl(card.imagePath)}
                   alt={card.title}
-                  className={`w-full h-full object-cover ${!card.is_active ? 'grayscale' : ''}`}
+                  className={`w-full h-full object-cover ${!card.isActive ? 'grayscale' : ''}`}
                 />
-                {!card.is_active && (
+                {!card.isActive && (
                   <div className="absolute top-2 left-2">
                     <Badge variant="outline" className="bg-background/80">
                       已停用
@@ -691,17 +696,17 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                   <div className="min-w-0 flex-1">
                     <CardTitle className="text-base truncate">{card.title}</CardTitle>
                     <CardDescription className="text-xs">
-                      {format(new Date(card.created_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
+                      {format(new Date(card.createdAt), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch
-                      checked={card.is_active}
+                      checked={card.isActive}
                       onCheckedChange={() => handleToggleActive(card)}
-                      aria-label={card.is_active ? '停用' : '啟用'}
+                      aria-label={card.isActive ? '停用' : '啟用'}
                     />
-                    <Badge variant={card.is_active ? "secondary" : "outline"} className="font-mono text-sm">
-                      {card.short_code}
+                    <Badge variant={card.isActive ? "secondary" : "outline"} className="font-mono text-sm">
+                      {card.shortCode}
                     </Badge>
                   </div>
                 </div>
@@ -794,14 +799,14 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                 <p className="text-sm text-muted-foreground mb-1">輸入代碼下載圖片</p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-4xl font-mono font-bold tracking-widest text-primary">
-                    {selectedCard.short_code}
+                    {selectedCard.shortCode}
                   </p>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => {
-                      navigator.clipboard.writeText(selectedCard.short_code);
+                      navigator.clipboard.writeText(selectedCard.shortCode);
                       toast.success('已複製代碼');
                     }}
                     title="複製代碼"
@@ -835,7 +840,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                         canvas.height = img.height;
                         ctx?.drawImage(img, 0, 0);
                         const link = document.createElement('a');
-                        link.download = `qr-${selectedCard.short_code}.png`;
+                        link.download = `qr-${selectedCard.shortCode}.png`;
                         link.href = canvas.toDataURL('image/png');
                         link.click();
                       };
@@ -892,7 +897,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                 <div className="space-y-2">
                   <div className="rounded-lg overflow-hidden bg-muted relative group">
                     <img 
-                      src={editPreviewUrl || getImageUrl(selectedCard.image_path)} 
+                      src={editPreviewUrl || getImageUrl(selectedCard.imagePath)} 
                       alt="Preview" 
                       className="w-full h-auto"
                     />

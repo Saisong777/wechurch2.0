@@ -326,6 +326,53 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Card Questions CRUD for admin
+  app.get("/api/card-questions", async (req, res) => {
+    try {
+      const questions = await storage.getAllCardQuestions();
+      res.json(questions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get card questions" });
+    }
+  });
+
+  app.post("/api/card-questions", async (req, res) => {
+    try {
+      const { contentText, contentTextEn, level, isActive, sortOrder } = req.body;
+      const question = await storage.createCardQuestion({
+        contentText,
+        contentTextEn,
+        level,
+        isActive: isActive ?? true,
+        sortOrder: sortOrder ?? 0,
+      });
+      res.json(question);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create card question" });
+    }
+  });
+
+  app.patch("/api/card-questions/:id", async (req, res) => {
+    try {
+      const question = await storage.updateCardQuestion(req.params.id, req.body);
+      if (!question) {
+        return res.status(404).json({ error: "Question not found" });
+      }
+      res.json(question);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update card question" });
+    }
+  });
+
+  app.delete("/api/card-questions/:id", async (req, res) => {
+    try {
+      await storage.deleteCardQuestion(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete card question" });
+    }
+  });
+
   app.get("/api/message-cards", async (req, res) => {
     try {
       const cards = await storage.getMessageCards();

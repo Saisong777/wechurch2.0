@@ -68,6 +68,10 @@ export interface IStorage {
   createIcebreakerPlayer(player: { gameId: string; displayName: string; gender?: string; participantId?: string }): Promise<IcebreakerPlayer>;
   
   getCardQuestions(level?: string): Promise<CardQuestion[]>;
+  getAllCardQuestions(): Promise<CardQuestion[]>;
+  createCardQuestion(question: { contentText: string; contentTextEn?: string; level: string; isActive: boolean; sortOrder: number }): Promise<CardQuestion>;
+  updateCardQuestion(id: string, updates: Partial<CardQuestion>): Promise<CardQuestion | undefined>;
+  deleteCardQuestion(id: string): Promise<boolean>;
   
   getMessageCards(): Promise<MessageCard[]>;
   getMessageCard(shortCode: string): Promise<MessageCard | undefined>;
@@ -307,6 +311,25 @@ export class DatabaseStorage implements IStorage {
       return db.select().from(cardQuestions).where(and(eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
     }
     return db.select().from(cardQuestions).where(eq(cardQuestions.isActive, true));
+  }
+
+  async getAllCardQuestions(): Promise<CardQuestion[]> {
+    return db.select().from(cardQuestions).orderBy(cardQuestions.level, cardQuestions.sortOrder);
+  }
+
+  async createCardQuestion(question: { contentText: string; contentTextEn?: string; level: string; isActive: boolean; sortOrder: number }): Promise<CardQuestion> {
+    const [newQuestion] = await db.insert(cardQuestions).values(question).returning();
+    return newQuestion;
+  }
+
+  async updateCardQuestion(id: string, updates: Partial<CardQuestion>): Promise<CardQuestion | undefined> {
+    const [updated] = await db.update(cardQuestions).set(updates).where(eq(cardQuestions.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCardQuestion(id: string): Promise<boolean> {
+    const result = await db.delete(cardQuestions).where(eq(cardQuestions.id, id));
+    return true;
   }
 
   async getMessageCards(): Promise<MessageCard[]> {

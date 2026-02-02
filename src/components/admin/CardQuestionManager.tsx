@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,18 +42,17 @@ import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Loader2, Search, Filter, Sparkles, Upload } from 'lucide-react';
 import { BulkImportDialog } from './BulkImportDialog';
 import { cn } from '@/lib/utils';
-import type { Database } from '@/integrations/supabase/types';
 
-type CardLevel = Database['public']['Enums']['card_level'];
+type CardLevel = 'L1' | 'L2' | 'L3';
 
 interface CardQuestion {
   id: string;
-  content_text: string;
-  content_text_en: string | null;
+  contentText: string;
+  contentTextEn: string | null;
   level: CardLevel;
-  is_active: boolean;
-  sort_order: number;
-  created_at: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
 }
 
 const levelConfig: Record<CardLevel, { label: string; labelEn: string; color: string }> = {
@@ -80,25 +78,19 @@ export const CardQuestionManager: React.FC = () => {
 
   // Form states
   const [formData, setFormData] = useState({
-    content_text: '',
-    content_text_en: '',
+    contentText: '',
+    contentTextEn: '',
     level: 'L1' as CardLevel,
-    is_active: true,
-    sort_order: 0,
+    isActive: true,
+    sortOrder: 0,
   });
 
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
     try {
-      // Use RPC or direct query - admins have full access
-      const { data, error } = await supabase
-        .from('card_questions')
-        .select('*')
-        .order('level', { ascending: true })
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const response = await fetch('/api/card-questions');
+      if (!response.ok) throw new Error('Failed to fetch questions');
+      const data = await response.json();
       setQuestions(data || []);
     } catch (error) {
       console.error('Failed to fetch questions:', error);
@@ -115,11 +107,11 @@ export const CardQuestionManager: React.FC = () => {
   const openCreateDialog = () => {
     setEditingQuestion(null);
     setFormData({
-      content_text: '',
-      content_text_en: '',
+      contentText: '',
+      contentTextEn: '',
       level: 'L1',
-      is_active: true,
-      sort_order: questions.length,
+      isActive: true,
+      sortOrder: questions.length,
     });
     setDialogOpen(true);
   };
@@ -127,17 +119,17 @@ export const CardQuestionManager: React.FC = () => {
   const openEditDialog = (question: CardQuestion) => {
     setEditingQuestion(question);
     setFormData({
-      content_text: question.content_text,
-      content_text_en: question.content_text_en || '',
+      contentText: question.contentText,
+      contentTextEn: question.contentTextEn || '',
       level: question.level,
-      is_active: question.is_active,
-      sort_order: question.sort_order,
+      isActive: question.isActive,
+      sortOrder: question.sortOrder,
     });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!formData.content_text.trim()) {
+    if (!formData.contentText.trim()) {
       toast.error('請輸入問題內容');
       return;
     }
@@ -145,33 +137,32 @@ export const CardQuestionManager: React.FC = () => {
     setSaving(true);
     try {
       if (editingQuestion) {
-        // Update existing question
-        const { error } = await supabase
-          .from('card_questions')
-          .update({
-            content_text: formData.content_text.trim(),
-            content_text_en: formData.content_text_en.trim() || null,
+        const response = await fetch(`/api/card-questions/${editingQuestion.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentText: formData.contentText.trim(),
+            contentTextEn: formData.contentTextEn.trim() || null,
             level: formData.level,
-            is_active: formData.is_active,
-            sort_order: formData.sort_order,
-          })
-          .eq('id', editingQuestion.id);
-
-        if (error) throw error;
+            isActive: formData.isActive,
+            sortOrder: formData.sortOrder,
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to update');
         toast.success('問題已更新');
       } else {
-        // Create new question
-        const { error } = await supabase
-          .from('card_questions')
-          .insert({
-            content_text: formData.content_text.trim(),
-            content_text_en: formData.content_text_en.trim() || null,
+        const response = await fetch('/api/card-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentText: formData.contentText.trim(),
+            contentTextEn: formData.contentTextEn.trim() || null,
             level: formData.level,
-            is_active: formData.is_active,
-            sort_order: formData.sort_order,
-          });
-
-        if (error) throw error;
+            isActive: formData.isActive,
+            sortOrder: formData.sortOrder,
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to create');
         toast.success('問題已新增');
       }
 
@@ -189,12 +180,10 @@ export const CardQuestionManager: React.FC = () => {
     if (!questionToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from('card_questions')
-        .delete()
-        .eq('id', questionToDelete.id);
-
-      if (error) throw error;
+      const response = await fetch(`/api/card-questions/${questionToDelete.id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete');
       toast.success('問題已刪除');
       setDeleteDialogOpen(false);
       setQuestionToDelete(null);
@@ -207,20 +196,20 @@ export const CardQuestionManager: React.FC = () => {
 
   const toggleActive = async (question: CardQuestion) => {
     try {
-      const { error } = await supabase
-        .from('card_questions')
-        .update({ is_active: !question.is_active })
-        .eq('id', question.id);
-
-      if (error) throw error;
+      const response = await fetch(`/api/card-questions/${question.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !question.isActive }),
+      });
+      if (!response.ok) throw new Error('Failed to update');
       
       setQuestions(prev => 
         prev.map(q => 
-          q.id === question.id ? { ...q, is_active: !q.is_active } : q
+          q.id === question.id ? { ...q, isActive: !q.isActive } : q
         )
       );
       
-      toast.success(question.is_active ? '問題已停用' : '問題已啟用');
+      toast.success(question.isActive ? '問題已停用' : '問題已啟用');
     } catch (error) {
       console.error('Failed to toggle question:', error);
       toast.error('操作失敗');
@@ -230,23 +219,23 @@ export const CardQuestionManager: React.FC = () => {
   // Filter questions
   const filteredQuestions = questions.filter(q => {
     const matchesSearch = 
-      q.content_text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (q.content_text_en?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+      q.contentText.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (q.contentTextEn?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
     const matchesLevel = filterLevel === 'all' || q.level === filterLevel;
     const matchesActive = 
       filterActive === 'all' || 
-      (filterActive === 'active' && q.is_active) ||
-      (filterActive === 'inactive' && !q.is_active);
+      (filterActive === 'active' && q.isActive) ||
+      (filterActive === 'inactive' && !q.isActive);
     return matchesSearch && matchesLevel && matchesActive;
   });
 
   // Stats
   const stats = {
     total: questions.length,
-    active: questions.filter(q => q.is_active).length,
-    L1: questions.filter(q => q.level === 'L1' && q.is_active).length,
-    L2: questions.filter(q => q.level === 'L2' && q.is_active).length,
-    L3: questions.filter(q => q.level === 'L3' && q.is_active).length,
+    active: questions.filter(q => q.isActive).length,
+    L1: questions.filter(q => q.level === 'L1' && q.isActive).length,
+    L2: questions.filter(q => q.level === 'L2' && q.isActive).length,
+    L3: questions.filter(q => q.level === 'L3' && q.isActive).length,
   };
 
   if (loading) {
@@ -372,7 +361,7 @@ export const CardQuestionManager: React.FC = () => {
                   filteredQuestions.map((question) => (
                     <TableRow 
                       key={question.id}
-                      className={cn(!question.is_active && 'opacity-50')}
+                      className={cn(!question.isActive && 'opacity-50')}
                     >
                       <TableCell>
                         <Badge 
@@ -385,16 +374,16 @@ export const CardQuestionManager: React.FC = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-xs">
-                        <p className="line-clamp-2">{question.content_text}</p>
+                        <p className="line-clamp-2">{question.contentText}</p>
                       </TableCell>
                       <TableCell className="hidden md:table-cell max-w-xs">
                         <p className="line-clamp-2 text-muted-foreground">
-                          {question.content_text_en || '-'}
+                          {question.contentTextEn || '-'}
                         </p>
                       </TableCell>
                       <TableCell className="text-center">
                         <Switch
-                          checked={question.is_active}
+                          checked={question.isActive}
                           onCheckedChange={() => toggleActive(question)}
                         />
                       </TableCell>
@@ -473,8 +462,8 @@ export const CardQuestionManager: React.FC = () => {
             <div className="space-y-2">
               <Label>問題內容（中文）*</Label>
               <Textarea
-                value={formData.content_text}
-                onChange={(e) => setFormData(prev => ({ ...prev, content_text: e.target.value }))}
+                value={formData.contentText}
+                onChange={(e) => setFormData(prev => ({ ...prev, contentText: e.target.value }))}
                 placeholder="輸入問題內容..."
                 rows={3}
               />
@@ -483,8 +472,8 @@ export const CardQuestionManager: React.FC = () => {
             <div className="space-y-2">
               <Label>問題內容（英文）</Label>
               <Textarea
-                value={formData.content_text_en}
-                onChange={(e) => setFormData(prev => ({ ...prev, content_text_en: e.target.value }))}
+                value={formData.contentTextEn}
+                onChange={(e) => setFormData(prev => ({ ...prev, contentTextEn: e.target.value }))}
                 placeholder="Enter question in English (optional)..."
                 rows={3}
               />
@@ -493,8 +482,8 @@ export const CardQuestionManager: React.FC = () => {
             <div className="flex items-center justify-between">
               <Label>啟用此問題</Label>
               <Switch
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
               />
             </div>
           </div>
