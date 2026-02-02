@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -6,13 +6,36 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
-import { fetchParticipants, assignGroupsToParticipants } from '@/lib/supabase-helpers';
+import { assignGroupsToParticipants } from '@/lib/supabase-helpers';
 import { Users, UserCheck, Settings, Shuffle, Scale, Copy, UserX, Share2 } from 'lucide-react';
-import { GroupingSettings } from '@/types/bible-study';
+import { GroupingSettings, User } from '@/types/bible-study';
 import { toast } from 'sonner';
 import { SessionQRCode } from './SessionQRCode';
 import { StressTestSimulator } from './StressTestSimulator';
 import { getSessionJoinUrl } from '@/lib/url-helpers';
+
+// Fetch participants from Express API
+const fetchParticipantsFromAPI = async (sessionId: string): Promise<User[]> => {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/participants`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email || '',
+      gender: p.gender as 'male' | 'female',
+      groupNumber: p.groupNumber,
+      readyConfirmed: p.readyConfirmed || false,
+      location: p.location || 'On-site',
+    }));
+  } catch (error) {
+    console.error('Error fetching participants:', error);
+    return [];
+  }
+};
 
 interface AdminWaitingRoomProps {
   onGroupingComplete: () => void;
@@ -36,15 +59,16 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
   });
 
   // Load existing participants on mount
-  useEffect(() => {
-    const loadParticipants = async () => {
-      if (currentSession?.id) {
-        const participants = await fetchParticipants(currentSession.id);
-        setUsers(participants);
-      }
-    };
-    loadParticipants();
+  const loadParticipants = useCallback(async () => {
+    if (currentSession?.id) {
+      const participants = await fetchParticipantsFromAPI(currentSession.id);
+      setUsers(participants);
+    }
   }, [currentSession?.id, setUsers]);
+
+  useEffect(() => {
+    loadParticipants();
+  }, [loadParticipants]);
 
   const maleCount = users.filter(u => u.gender === 'male').length;
   const femaleCount = users.filter(u => u.gender === 'female').length;
@@ -356,13 +380,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
 
       {/* Stress Test Simulator */}
       <StressTestSimulator 
-        onParticipantsGenerated={async () => {
-          // Refresh participants after generation
-          if (currentSession?.id) {
-            const participants = await fetchParticipants(currentSession.id);
-            setUsers(participants);
-          }
-        }}
+        onParticipantsGenerated={loadParticipants}
       />
       <Button
         variant="gold"
