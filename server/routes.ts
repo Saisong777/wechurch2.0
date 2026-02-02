@@ -186,6 +186,7 @@ export async function registerRoutes(app: Express) {
       
       const parsed = batchAssignSchema.safeParse(req.body);
       if (!parsed.success) {
+        console.error("[batch-assign-groups] Validation error:", parsed.error.errors);
         return res.status(400).json({ error: "Invalid request data", success: false, details: parsed.error.errors });
       }
       
@@ -199,6 +200,7 @@ export async function registerRoutes(app: Express) {
       
       res.json({ success: true });
     } catch (error) {
+      console.error("[batch-assign-groups] Error:", error);
       res.status(500).json({ error: "Failed to batch assign groups", success: false });
     }
   });
