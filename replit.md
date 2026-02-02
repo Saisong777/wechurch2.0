@@ -194,14 +194,13 @@ npm run db:push # Push database schema
     - 9 text position options (左上/上/右上/左/中/右/左下/下/右下)
     - 5 aspect ratio options (正方形/直式3:4/限時動態9:16/橫式4:3/寬螢幕16:9)
 - **Jesus Timeline Enhancements** (2026-02-02): Complete timeline redesign
-  - **6 Filter Buttons**: 前後之言 (modal), 後設, 春, 夏, 秋, 冬 filter buttons
-  - **All Events View**: Shows all 208 events, filterable by season
-  - **Full Scripture Content**: Each event displays actual Bible verse text when expanded
-  - **ScriptureDisplay Component**: Fetches verses from chinese_union_trad table
+  - **5 Filter Buttons**: 前後言, 春, 夏, 秋, 冬 (removed separate preface modal button)
+  - **Scripture Expanded by Default**: Events show full scripture content, click to collapse
+  - **Gospel Names as Badges**: Shows 馬太/馬可/路加/約翰 instead of "X 福音書"
+  - **Side-by-Side Gospel Display**: Multiple gospels in grid layout with colored backgrounds
+  - **SelectableVerse Component**: New reusable component for copy/share on hover
   - **New API Endpoint**: /api/bible/by-reference parses refs like "Mt 1:1-17"
-  - Added '後設' (metadata) as a new season category for background content
-  - Gospel verses listed in order with verse numbers
-  - Each gospel (馬太/馬可/路加/約翰) shown in separate sections
+  - All 208 events filterable by season with full scripture content
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |
