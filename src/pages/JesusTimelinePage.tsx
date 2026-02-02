@@ -32,7 +32,12 @@ const JesusTimelinePage = () => {
   const [selectedSeason, setSelectedSeason] = useState<string>('春');
 
   const { data: events = [], isLoading, isError } = useQuery<JesusEvent[]>({
-    queryKey: ['/api/jesus/timeline', { season: selectedSeason }],
+    queryKey: ['/api/jesus/timeline', selectedSeason],
+    queryFn: async () => {
+      const res = await fetch(`/api/jesus/timeline?season=${encodeURIComponent(selectedSeason)}`);
+      if (!res.ok) throw new Error('Failed to fetch timeline');
+      return res.json();
+    },
   });
 
   const currentSeason = seasonInfo[selectedSeason as keyof typeof seasonInfo];

@@ -35,6 +35,11 @@ const ReadingPlansPage = () => {
 
   const { data: planItems = [], isLoading: itemsLoading, isError: itemsError } = useQuery<ReadingPlanItem[]>({
     queryKey: ['/api/reading-plans', selectedPlanId, 'items'],
+    queryFn: async () => {
+      const res = await fetch(`/api/reading-plans/${selectedPlanId}/items`);
+      if (!res.ok) throw new Error('Failed to fetch plan items');
+      return res.json();
+    },
     enabled: !!selectedPlanId,
   });
 

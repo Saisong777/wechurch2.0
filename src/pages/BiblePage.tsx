@@ -40,16 +40,31 @@ const BiblePage = () => {
 
   const { data: chapters = [], isError: chaptersError } = useQuery<BibleChapter[]>({
     queryKey: ['/api/bible/chapters', selectedBook],
+    queryFn: async () => {
+      const res = await fetch(`/api/bible/chapters/${encodeURIComponent(selectedBook!)}`);
+      if (!res.ok) throw new Error('Failed to fetch chapters');
+      return res.json();
+    },
     enabled: !!selectedBook,
   });
 
   const { data: verses = [], isLoading: versesLoading, isError: versesError } = useQuery<BibleVerse[]>({
     queryKey: ['/api/bible/verses', selectedBook, selectedChapter],
+    queryFn: async () => {
+      const res = await fetch(`/api/bible/verses/${encodeURIComponent(selectedBook!)}/${selectedChapter}`);
+      if (!res.ok) throw new Error('Failed to fetch verses');
+      return res.json();
+    },
     enabled: !!selectedBook && !!selectedChapter,
   });
 
   const { data: searchResults = [], isLoading: searchLoading, isError: searchError } = useQuery<BibleVerse[]>({
-    queryKey: ['/api/bible/search', { q: searchQuery }],
+    queryKey: ['/api/bible/search', searchQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/bible/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!res.ok) throw new Error('Failed to search');
+      return res.json();
+    },
     enabled: isSearching && searchQuery.length >= 2,
   });
 
