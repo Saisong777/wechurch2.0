@@ -324,7 +324,7 @@ export const ScriptureViewer = ({ verses, className = '' }: ScriptureViewerProps
                     />
                   ))}
                   <button
-                    className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center bg-muted ${
+                    className={`px-3 h-10 rounded-lg border-2 flex items-center justify-center gap-1 bg-muted text-sm ${
                       customImage ? 'border-primary ring-2 ring-primary/30' : 'border-transparent'
                     }`}
                     onClick={() => fileInputRef.current?.click()}
@@ -332,6 +332,7 @@ export const ScriptureViewer = ({ verses, className = '' }: ScriptureViewerProps
                     data-testid="button-upload-bg"
                   >
                     <Upload className="w-4 h-4" />
+                    上傳圖片
                   </button>
                   <input
                     ref={fileInputRef}
