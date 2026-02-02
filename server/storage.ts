@@ -52,6 +52,7 @@ export interface IStorage {
   createPrayer(prayer: InsertPrayer): Promise<Prayer>;
   updatePrayer(id: string, data: Partial<Prayer>): Promise<Prayer | undefined>;
   deletePrayer(id: string): Promise<void>;
+  createPrayerAmen(prayerId: string, userId: string): Promise<{ prayerId: string; userId: string }>;
   
   getFeatureToggles(): Promise<FeatureToggle[]>;
   getFeatureToggle(key: string): Promise<FeatureToggle | undefined>;
@@ -275,6 +276,11 @@ export class DatabaseStorage implements IStorage {
 
   async deletePrayer(id: string): Promise<void> {
     await db.delete(prayers).where(eq(prayers.id, id));
+  }
+
+  async createPrayerAmen(prayerId: string, userId: string): Promise<{ prayerId: string; userId: string }> {
+    await db.insert(prayerAmens).values({ prayerId, userId }).onConflictDoNothing();
+    return { prayerId, userId };
   }
 
   async getFeatureToggles(): Promise<FeatureToggle[]> {

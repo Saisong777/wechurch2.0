@@ -393,6 +393,16 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/prayers/:id/amen", async (req, res) => {
+    try {
+      const amen = await storage.createPrayerAmen(req.params.id, req.body.userId);
+      res.status(201).json(amen);
+    } catch (error) {
+      console.error("[create-prayer-amen] Error:", error);
+      res.status(500).json({ error: "Failed to add amen" });
+    }
+  });
+
   app.get("/api/feature-toggles", async (req, res) => {
     try {
       const toggles = await storage.getFeatureToggles();

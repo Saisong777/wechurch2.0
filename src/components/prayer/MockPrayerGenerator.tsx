@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { supabase } from '@/integrations/supabase/client';
 import { Wand2, Loader2, CheckCircle, Heart, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -61,56 +60,49 @@ export const MockPrayerGenerator: React.FC = () => {
 
     try {
       const count = prayerCount[0];
-      const minAmens = amenRange[0];
       const maxAmens = amenRange[1];
 
-      // Generate prayers
-      const mockPrayers = Array.from({ length: count }, () => ({
-        user_id: user.id,
-        content: getRandomItem(MOCK_PRAYER_CONTENTS),
-        is_anonymous: Math.random() > 0.5,
-      }));
-
-      const { data: insertedPrayers, error: prayerError } = await supabase
-        .from('prayers')
-        .insert(mockPrayers)
-        .select('id');
-
-      if (prayerError) throw prayerError;
+      // Generate prayers via Express API
+      const insertedPrayers: { id: string }[] = [];
+      for (let i = 0; i < count; i++) {
+        const prayerData = {
+          userId: user.id,
+          content: getRandomItem(MOCK_PRAYER_CONTENTS),
+          isAnonymous: Math.random() > 0.5,
+          category: 'other',
+        };
+        const res = await fetch('/api/prayers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(prayerData),
+        });
+        if (res.ok) {
+          const prayer = await res.json();
+          insertedPrayers.push(prayer);
+        }
+      }
 
       // Generate amens for each prayer
       let totalAmens = 0;
-      if (insertedPrayers && insertedPrayers.length > 0) {
-        const amenInserts: { prayer_id: string; user_id: string }[] = [];
-
-        for (const prayer of insertedPrayers) {
-          const amenCount = getRandomInt(minAmens, maxAmens);
-          
-          // For simulation, we'll just add amens from the current user
-          // In a real scenario, you'd have multiple users
-          if (amenCount > 0) {
-            amenInserts.push({
-              prayer_id: prayer.id,
-              user_id: user.id,
-            });
-            totalAmens += 1; // Only 1 per user per prayer due to constraint
-          }
-        }
-
-        if (amenInserts.length > 0) {
-          const { error: amenError } = await supabase
-            .from('prayer_amens')
-            .upsert(amenInserts, { onConflict: 'prayer_id,user_id' });
-
-          if (amenError) {
-            console.warn('Some amens may have failed:', amenError);
+      for (const prayer of insertedPrayers) {
+        const shouldAddAmen = getRandomInt(0, 100) < maxAmens;
+        if (shouldAddAmen) {
+          const res = await fetch(`/api/prayers/${prayer.id}/amen`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userId: user.id }),
+          });
+          if (res.ok) {
+            totalAmens++;
           }
         }
       }
 
-      setGeneratedStats({ prayers: count, amens: totalAmens });
+      setGeneratedStats({ prayers: insertedPrayers.length, amens: totalAmens });
       queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
-      toast.success(`成功生成 ${count} 個禱告事項！`);
+      toast.success(`成功生成 ${insertedPrayers.length} 個禱告事項！`);
     } catch (error) {
       console.error('Error generating mock data:', error);
       toast.error('生成失敗');
@@ -123,13 +115,18 @@ export const MockPrayerGenerator: React.FC = () => {
     if (!user) return;
 
     try {
-      // Only delete prayers created by current user
-      const { error } = await supabase
-        .from('prayers')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (error) throw error;
+      // Delete prayers by fetching first, then deleting each one
+      const res = await fetch('/api/prayers', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch prayers');
+      const prayers = await res.json();
+      
+      const userPrayers = prayers.filter((p: any) => p.userId === user.id);
+      for (const prayer of userPrayers) {
+        await fetch(`/api/prayers/${prayer.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
       toast.success('已清除所有禱告');

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { INSIGHT_CATEGORIES, InsightCategory } from '@/types/spiritual-fitness';
 import { Wand2, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,13 +78,12 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
     setGeneratedCount(0);
 
     try {
-      // Get participants for this session
-      const { data: participants, error: pError } = await supabase
-        .from('participants')
-        .select('id, name')
-        .eq('session_id', sessionId);
-
-      if (pError) throw pError;
+      // Get participants for this session via Express API
+      const participantsResponse = await fetch(`/api/sessions/${sessionId}/participants`, {
+        credentials: 'include',
+      });
+      if (!participantsResponse.ok) throw new Error('Failed to fetch participants');
+      const participants = await participantsResponse.json();
 
       if (!participants || participants.length === 0) {
         toast.error('沒有找到參與者 No participants found');
@@ -94,44 +92,44 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
 
       // Build all mock responses in memory first (fast)
       const mockResponses: Array<{
-        session_id: string;
-        user_id: string;
-        title_phrase?: string;
-        heartbeat_verse?: string;
+        sessionId: string;
+        userId: string;
+        titlePhrase?: string;
+        heartbeatVerse?: string;
         observation?: string;
-        core_insight_category?: 'PROMISE' | 'COMMAND' | 'WARNING' | 'GOD_ATTRIBUTE';
-        core_insight_note?: string;
-        scholars_note?: string;
-        action_plan?: string;
-        cool_down_note?: string;
+        coreInsightCategory?: 'PROMISE' | 'COMMAND' | 'WARNING' | 'GOD_ATTRIBUTE';
+        coreInsightNote?: string;
+        scholarsNote?: string;
+        actionPlan?: string;
+        coolDownNote?: string;
       }> = [];
 
       for (const participant of participants) {
         const progressLevel = Math.random();
         
         const mockResponse: typeof mockResponses[number] = {
-          session_id: sessionId,
-          user_id: participant.id,
+          sessionId: sessionId,
+          userId: participant.id,
         };
 
         // Phase 1 (Green) - 70% chance
         if (progressLevel > 0.3) {
-          mockResponse.title_phrase = getRandomItem(MOCK_TITLE_PHRASES);
-          mockResponse.heartbeat_verse = getRandomItem(MOCK_HEARTBEAT_VERSES);
+          mockResponse.titlePhrase = getRandomItem(MOCK_TITLE_PHRASES);
+          mockResponse.heartbeatVerse = getRandomItem(MOCK_HEARTBEAT_VERSES);
           mockResponse.observation = getRandomItem(MOCK_OBSERVATIONS);
         }
 
         // Phase 2 (Yellow) - 50% chance
         if (progressLevel > 0.5) {
-          mockResponse.core_insight_category = getRandomCategory();
-          mockResponse.core_insight_note = getRandomItem(MOCK_CORE_NOTES);
-          mockResponse.scholars_note = getRandomItem(MOCK_SCHOLARS_NOTES);
+          mockResponse.coreInsightCategory = getRandomCategory();
+          mockResponse.coreInsightNote = getRandomItem(MOCK_CORE_NOTES);
+          mockResponse.scholarsNote = getRandomItem(MOCK_SCHOLARS_NOTES);
         }
 
         // Phase 3 (Blue) - 30% chance
         if (progressLevel > 0.7) {
-          mockResponse.action_plan = getRandomItem(MOCK_ACTION_PLANS);
-          mockResponse.cool_down_note = getRandomItem(MOCK_COOL_DOWN_NOTES);
+          mockResponse.actionPlan = getRandomItem(MOCK_ACTION_PLANS);
+          mockResponse.coolDownNote = getRandomItem(MOCK_COOL_DOWN_NOTES);
         }
 
         // Only include if there's at least some content
@@ -145,15 +143,25 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
         return;
       }
 
-      // Batch upsert all at once - much faster and atomic
-      const { error } = await supabase
-        .from('study_responses')
-        .upsert(mockResponses, { onConflict: 'session_id,user_id' });
+      // Insert each study response via Express API
+      let insertedCount = 0;
+      for (const response of mockResponses) {
+        const res = await fetch(`/api/study-responses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(response),
+        });
+        if (res.ok) {
+          insertedCount++;
+        } else {
+          const errorData = await res.json();
+          console.error('Study response creation failed:', errorData);
+        }
+      }
 
-      if (error) throw error;
-
-      setGeneratedCount(mockResponses.length);
-      toast.success(`成功生成 ${mockResponses.length} 筆模擬資料！`);
+      setGeneratedCount(insertedCount);
+      toast.success(`成功生成 ${insertedCount} 筆模擬資料！`);
     } catch (error) {
       console.error('Error generating mock data:', error);
       toast.error('生成失敗 Generation failed');
