@@ -90,9 +90,7 @@ export interface IStorage {
   getMessageCardById(id: string): Promise<MessageCard | undefined>;
   createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard>;
   updateMessageCard(id: string, data: Partial<{ title: string; imagePath: string; isActive: boolean }>): Promise<MessageCard | undefined>;
-  deleteMessageCard(id: string): Promise<void>;
-  getMessageCardDownloads(): Promise<MessageCardDownload[]>;
-  getMessageCardDownloadsByCardId(cardId: string): Promise<MessageCardDownload[]>;
+  deleteAiReport(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -521,6 +519,10 @@ export class DatabaseStorage implements IStorage {
 
   async getMessageCardDownloadsByCardId(cardId: string): Promise<MessageCardDownload[]> {
     return db.select().from(messageCardDownloads).where(eq(messageCardDownloads.cardId, cardId)).orderBy(desc(messageCardDownloads.downloadedAt));
+  }
+
+  async deleteAiReport(id: string): Promise<void> {
+    await db.delete(aiReports).where(eq(aiReports.id, id));
   }
 }
 

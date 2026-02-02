@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation } from 'lucide-react';
+import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -48,12 +49,24 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'overall' | 'compare' | number>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   
   const parsedSections = reportContent ? parseReportContent(reportContent) : [];
   
+  // Filter sections based on search query
+  const filteredSections = parsedSections.filter(section => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      (section.raw?.toLowerCase().includes(query) || "") ||
+      (section.groupInfo && section.groupInfo.toLowerCase().includes(query)) ||
+      (section.groupNumber > 0 && `第 ${section.groupNumber} 組`.includes(query))
+    );
+  });
+
   // Separate group reports (groupNumber > 0) from overall reports (groupNumber === 0)
-  const groupReports = parsedSections.filter(s => s.groupNumber > 0);
-  const overallReports = parsedSections.filter(s => s.groupNumber === 0);
+  const groupReports = filteredSections.filter(s => s.groupNumber > 0);
+  const overallReports = filteredSections.filter(s => s.groupNumber === 0);
   const hasMultipleGroups = groupReports.length > 1 || (groupReports.length >= 1 && overallReports.length >= 1);
   
   // --- Copy handlers ---
@@ -155,7 +168,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-secondary" />
-              <span className="truncate">AI 查經分析報告</span>
+              <span className="truncate">查經分析報告</span>
             </DialogTitle>
             {verseReference && (
               <Badge variant="secondary" className="hidden sm:flex items-center gap-1 font-normal">
@@ -255,6 +268,15 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         {/* Toolbar */}
         <div className="px-3 sm:px-6 py-2 border-b bg-background/50 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="relative w-40 sm:w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="搜尋報告內容..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-8 text-xs sm:text-sm"
+              />
+            </div>
             <Button variant="outline" size="sm" onClick={handleCopyAll} className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm">
               <Copy className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">複製全部</span>
@@ -364,24 +386,48 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               </React.Fragment>
             ))}
 
-            {/* Group Reports */}
-            {!showCompare && visibleGroups.map((section, index) => (
-              <React.Fragment key={`group-${section.groupNumber}`}>
-                <GroupSection
-                  section={section}
-                  onCopy={handleCopyGroup}
-                  onDownloadMarkdown={handleDownloadMarkdownGroup}
-                  onDownloadPDF={handleDownloadPDF}
-                  onPrint={handlePrint}
-                />
-                {index < visibleGroups.length - 1 && (
-                  <Separator className="my-6 sm:my-8" />
-                )}
-              </React.Fragment>
-            ))}
+            {visibleGroups.length > 0 && (
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-semibold">各組查經內容</h3>
+                </div>
+                {(() => {
+                  const groupedByNumber = visibleGroups.reduce((acc, curr) => {
+                    const num = curr.groupNumber || 0;
+                    if (!acc[num]) acc[num] = [];
+                    acc[num].push(curr);
+                    return acc;
+                  }, {} as Record<number, typeof visibleGroups>);
+
+                  return Object.entries(groupedByNumber)
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([groupNum, sections]) => (
+                      <div key={`group-wrapper-${groupNum}`} className="space-y-4 border rounded-lg p-4 bg-muted/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Users className="w-4 h-4 text-secondary" />
+                          <h4 className="font-medium text-sm">第 {groupNum} 組</h4>
+                        </div>
+                        {sections.map((section, idx) => (
+                          <React.Fragment key={`section-${section.groupNumber}-${idx}`}>
+                            <GroupSection
+                              section={section}
+                              onCopy={handleCopyGroup}
+                              onDownloadMarkdown={handleDownloadMarkdownGroup}
+                              onDownloadPDF={handleDownloadPDF}
+                              onPrint={handlePrint}
+                            />
+                            {idx < sections.length - 1 && <Separator className="my-4" />}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    ));
+                })()}
+              </div>
+            )}
 
             {/* Empty State */}
-            {!showCompare && visibleOverall.length === 0 && visibleGroups.length === 0 && (
+            {visibleOverall.length === 0 && visibleGroups.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>尚無報告內容</p>
@@ -393,7 +439,6 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         {/* Footer */}
         <div className="px-3 sm:px-6 py-3 sm:py-4 border-t bg-muted/30 flex items-center justify-between gap-2">
           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-            <span className="hidden sm:inline">報告由 AI 分析助理生成 • </span>
             {new Date().toLocaleDateString('zh-TW')}
             {hasMultipleGroups && (
               <span className="hidden sm:inline">

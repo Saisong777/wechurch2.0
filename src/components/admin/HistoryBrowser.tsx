@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { queryClient } from '@/lib/queryClient';
 import { 
   Search, 
   Calendar, 
@@ -37,7 +38,8 @@ import {
   CheckCircle2,
   CalendarDays,
   FolderOpen,
-  Copy
+  Copy,
+  Trash2
 } from 'lucide-react';
 import { format, startOfMonth, isThisMonth, subMonths, isSameMonth } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -92,6 +94,7 @@ export const HistoryBrowser: React.FC = () => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [selectedSession, setSelectedSession] = useState<SessionWithResponses | null>(null);
   const [activeTab, setActiveTab] = useState<'notes' | 'reports'>('notes');
+  const [notesSearchTerm, setNotesSearchTerm] = useState('');
 
   // Fetch all sessions with their responses using API
   const { data: sessions, isLoading } = useQuery({
@@ -138,14 +141,15 @@ export const HistoryBrowser: React.FC = () => {
               createdAt: r.createdAt || '',
             })),
             aiReports: (reports || [])
-              .filter((r: any) => r.status === 'COMPLETED')
               .map((r: any) => ({
                 id: r.id,
                 reportType: r.reportType as 'group' | 'overall',
                 groupNumber: r.groupNumber,
                 content: r.content,
                 createdAt: r.createdAt,
-              })),
+                status: r.status,
+              }))
+              .filter((r: any) => r.status === 'COMPLETED'),
           };
         })
       );
@@ -155,6 +159,30 @@ export const HistoryBrowser: React.FC = () => {
     enabled: !!user?.id,
     staleTime: 60000,
   });
+
+  // Group responses by group number for the selected session
+  const groupedResponses = useMemo(() => {
+    if (!selectedSession) return {};
+    
+    const filtered = selectedSession.responses.filter(r => {
+      if (!notesSearchTerm) return true;
+      const query = notesSearchTerm.toLowerCase();
+      return (
+        r.participantName.toLowerCase().includes(query) ||
+        (r.titlePhrase?.toLowerCase().includes(query) || '') ||
+        (r.coreInsightNote?.toLowerCase().includes(query) || '') ||
+        (r.actionPlan?.toLowerCase().includes(query) || '')
+      );
+    });
+
+    const groups: Record<number, StudyResponseWithParticipant[]> = {};
+    filtered.forEach(r => {
+      const g = r.groupNumber || 0;
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(r);
+    });
+    return groups;
+  }, [selectedSession, notesSearchTerm]);
 
   // Filter sessions by time
   const filterByTime = (session: SessionWithResponses) => {
@@ -222,6 +250,22 @@ export const HistoryBrowser: React.FC = () => {
       totalReports,
     };
   }, [sessions]);
+
+  const handleDeleteReport = async (reportId: string, sessionId: string) => {
+    if (!confirm('確定要刪除此報告嗎？')) return;
+    
+    try {
+      const res = await fetch(`/api/reports/${reportId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('刪除失敗');
+      
+      toast.success('報告已刪除');
+      // Invalidate query to refresh data
+      queryClient.invalidateQueries({ queryKey: ['admin_history'] });
+    } catch (err) {
+      console.error('Error deleting report:', err);
+      toast.error('刪除失敗');
+    }
+  };
 
   // Export to text
   const handleExport = (session: SessionWithResponses) => {
@@ -358,19 +402,45 @@ export const HistoryBrowser: React.FC = () => {
           </TabsList>
 
           <TabsContent value="notes" className="mt-4">
-            <ScrollArea className="h-[calc(100vh-420px)]">
-              {selectedSession.responses.length === 0 ? (
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="搜尋筆記內容或參與者..."
+                value={notesSearchTerm}
+                onChange={(e) => setNotesSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <ScrollArea className="h-[calc(100vh-480px)]">
+              {Object.keys(groupedResponses).length === 0 ? (
                 <Card className="text-center py-12">
                   <CardContent>
                     <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                    <p className="text-muted-foreground">尚無筆記提交</p>
+                    <p className="text-muted-foreground">尚無符合條件的筆記</p>
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-3 pr-4">
-                  {selectedSession.responses.map((response) => (
-                    <ResponseCard key={response.id} response={response} />
-                  ))}
+                <div className="space-y-6 pr-4">
+                  {Object.entries(groupedResponses)
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([groupNum, responses]) => (
+                      <div key={`group-notes-${groupNum}`} className="space-y-3">
+                        <div className="flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
+                          <Users className="w-4 h-4 text-secondary" />
+                          <h3 className="font-semibold text-sm">
+                            {groupNum === '0' ? '未分組' : `第 ${groupNum} 組`}
+                          </h3>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {responses.length} 筆
+                          </Badge>
+                        </div>
+                        <div className="grid gap-3">
+                          {responses.map((response) => (
+                            <ResponseCard key={response.id} response={response} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
             </ScrollArea>
@@ -386,7 +456,11 @@ export const HistoryBrowser: React.FC = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <HistoryReportsWithCharts reports={selectedSession.aiReports} />
+                <HistoryReportsWithCharts 
+                  reports={selectedSession.aiReports} 
+                  sessionId={selectedSession.id}
+                  onDelete={handleDeleteReport}
+                />
               )}
             </ScrollArea>
           </TabsContent>

@@ -308,6 +308,15 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.delete("/api/reports/:id", async (req, res) => {
+    try {
+      await storage.deleteAiReport(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete report" });
+    }
+  });
+
   app.post("/api/sessions/:sessionId/reports", async (req, res) => {
     try {
       const { reportType, groupNumber, fastMode, filledOnly } = req.body;
