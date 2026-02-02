@@ -25,7 +25,6 @@ import {
   generateSectionMarkdown,
   generatePrintHTML,
   generatePPTHTML,
-  generatePPTX,
   downloadBlob,
   openPrintWindow,
   GroupSection,
@@ -117,24 +116,18 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     toast.success(groupNumber === 0 ? '全組總結 Markdown 已下載！' : `第 ${groupNumber} 組 Markdown 已下載！`);
   };
 
-  // --- PPT Export handler ---
-  const handleDownloadPPT = async () => {
+  // --- Presentation mode handler (web-based slideshow) ---
+  const handleDownloadPPT = () => {
     if (!parsedSections.length) return;
     
-    try {
-      toast.info('正在生成 PowerPoint 文件...');
-      await generatePPTX(parsedSections, verseReference);
-      toast.success('PowerPoint 已下載！一組一頁方便閱讀');
-    } catch (error) {
-      console.error('PPT generation error:', error);
-      toast.error('PowerPoint 生成失敗，使用網頁簡報模式');
-      // Fallback to HTML presentation
-      const html = generatePPTHTML(parsedSections, verseReference);
-      const pptWindow = window.open('', '_blank');
-      if (pptWindow) {
-        pptWindow.document.write(html);
-        pptWindow.document.close();
-      }
+    const html = generatePPTHTML(parsedSections, verseReference);
+    const pptWindow = window.open('', '_blank');
+    if (pptWindow) {
+      pptWindow.document.write(html);
+      pptWindow.document.close();
+      toast.success('簡報已開啟！使用方向鍵或點擊換頁');
+    } else {
+      toast.error('無法開啟簡報視窗，請檢查彈出式視窗設定');
     }
   };
 

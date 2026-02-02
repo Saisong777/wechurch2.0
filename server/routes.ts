@@ -375,20 +375,27 @@ export async function registerRoutes(app: Express) {
       if (reportType === 'group' && groupNumber) {
         content = generateMarkdownReport(filteredResponses, groupNumber);
       } else {
-        // Overall report - group by groupNumber
+        // Overall report - first add combined summary, then group-by-group sections
+        const sections: string[] = [];
+        
+        // Add overall combined summary (全會眾綜合分析) first
+        sections.push(generateMarkdownReport(filteredResponses, undefined));
+        
+        // Then add individual group sections
         const groupedResponses = new Map<number, typeof filteredResponses>();
         filteredResponses.forEach(r => {
           const grp = r.groupNumber || 0;
-          if (!groupedResponses.has(grp)) groupedResponses.set(grp, []);
-          groupedResponses.get(grp)!.push(r);
+          if (grp > 0) { // Only include actual groups, not ungrouped responses
+            if (!groupedResponses.has(grp)) groupedResponses.set(grp, []);
+            groupedResponses.get(grp)!.push(r);
+          }
         });
         
-        const sections: string[] = [];
         const sortedGroups = [...groupedResponses.keys()].sort((a, b) => a - b);
         sortedGroups.forEach(grp => {
           const grpResponses = groupedResponses.get(grp)!;
           if (grpResponses.length > 0) {
-            sections.push(generateMarkdownReport(grpResponses, grp || undefined));
+            sections.push(generateMarkdownReport(grpResponses, grp));
           }
         });
         content = sections.join('\n========================================\n\n');

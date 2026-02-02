@@ -310,132 +310,120 @@ export function openPrintWindow(html: string, autoPrint = true): void {
 }
 
 // Generate PowerPoint-style HTML for presentation export
+// One slide per group with all sections combined, matching report format colors
 export function generatePPTHTML(sections: GroupReport[], verseReference?: string): string {
   const slides: string[] = [];
+  
+  const groupReports = sections.filter(s => s.groupNumber > 0).sort((a, b) => a.groupNumber - b.groupNumber);
+  const overallReport = sections.find(s => s.groupNumber === 0);
   
   // Title slide
   slides.push(`
     <div class="slide title-slide">
       <div class="slide-content">
-        <h1 class="main-title">🧠 查經分析報告</h1>
+        <h1 class="main-title">查經分析報告</h1>
         <h2 class="subtitle">${verseReference || '靈魂健身房'}</h2>
         <p class="date">${new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>
     </div>
   `);
 
-  // Overview slide if multiple groups
-  const groupReports = sections.filter(s => s.groupNumber > 0);
-  const overallReport = sections.find(s => s.groupNumber === 0);
-  
-  if (groupReports.length > 1) {
-    slides.push(`
-      <div class="slide overview-slide">
-        <div class="slide-content">
-          <h2 class="slide-title">📊 總覽</h2>
-          <div class="stats-grid">
-            <div class="stat-card">
-              <span class="stat-number">${groupReports.length}</span>
-              <span class="stat-label">小組</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-number">${groupReports.reduce((sum, g) => sum + (g.members?.split(/[,，、]/).filter(Boolean).length || 0), 0)}</span>
-              <span class="stat-label">參與人數</span>
-            </div>
-          </div>
-          <div class="group-list">
-            ${groupReports.map(g => `<span class="group-badge">第 ${g.groupNumber} 組</span>`).join('')}
-          </div>
-        </div>
-      </div>
-    `);
-  }
-
-  // Overall summary slide
+  // Overall report slide (全部人) - one slide with all content
   if (overallReport) {
-    if (overallReport.themes) {
-      slides.push(`
-        <div class="slide section-slide themes-slide">
-          <div class="slide-content">
-            <h2 class="slide-title">🎯 整體主題</h2>
-            <div class="section-content">${formatForSlide(overallReport.themes)}</div>
-          </div>
-        </div>
-      `);
-    }
-    if (overallReport.insights) {
-      slides.push(`
-        <div class="slide section-slide insights-slide">
-          <div class="slide-content">
-            <h2 class="slide-title">💡 精選亮光</h2>
-            <div class="section-content">${formatForSlide(overallReport.insights)}</div>
-          </div>
-        </div>
-      `);
-    }
-  }
-
-  // Individual group slides
-  for (const section of groupReports) {
-    // Group title slide
     slides.push(`
-      <div class="slide group-title-slide">
+      <div class="slide content-slide overall-slide">
         <div class="slide-content">
-          <h2 class="slide-title">👥 第 ${section.groupNumber} 組</h2>
-          ${section.members ? `<p class="members">${section.members}</p>` : ''}
+          <div class="slide-header">
+            <h2 class="slide-title overall-title">📊 全會眾綜合分析</h2>
+          </div>
+          <div class="content-grid">
+            ${overallReport.themes ? `
+              <div class="content-box themes-box">
+                <h3 class="box-title">📖 主題</h3>
+                <div class="box-content">${formatForSlide(overallReport.themes, 6)}</div>
+              </div>
+            ` : ''}
+            ${overallReport.observations ? `
+              <div class="content-box observations-box">
+                <h3 class="box-title">🔍 事實發現</h3>
+                <div class="box-content">${formatForSlide(overallReport.observations, 6)}</div>
+              </div>
+            ` : ''}
+            ${overallReport.insights ? `
+              <div class="content-box insights-box">
+                <h3 class="box-title">💡 獨特亮光</h3>
+                <div class="box-content">${formatForSlide(overallReport.insights, 6)}</div>
+              </div>
+            ` : ''}
+            ${overallReport.applications ? `
+              <div class="content-box applications-box">
+                <h3 class="box-title">🎯 如何應用</h3>
+                <div class="box-content">${formatForSlide(overallReport.applications, 6)}</div>
+              </div>
+            ` : ''}
+          </div>
+          ${overallReport.contributions ? `
+            <div class="contributions-section">
+              <h3 class="contributions-title">👤 個人貢獻摘要</h3>
+              <div class="contributions-content">${formatForSlide(overallReport.contributions, 4)}</div>
+            </div>
+          ` : ''}
         </div>
       </div>
     `);
+  }
 
-    // Group content slides
-    if (section.themes) {
-      slides.push(`
-        <div class="slide section-slide themes-slide">
-          <div class="slide-content">
-            <div class="slide-header">
-              <span class="group-indicator">第 ${section.groupNumber} 組</span>
-              <h2 class="slide-title">📖 主題</h2>
-            </div>
-            <div class="section-content">${formatForSlide(section.themes)}</div>
+  // Individual group slides - one slide per group with all sections
+  for (const section of groupReports) {
+    slides.push(`
+      <div class="slide content-slide group-slide">
+        <div class="slide-content">
+          <div class="slide-header">
+            <h2 class="slide-title">第 ${section.groupNumber} 組</h2>
+            ${section.members ? `<span class="members-badge">${section.members}</span>` : ''}
           </div>
-        </div>
-      `);
-    }
-
-    if (section.insights) {
-      slides.push(`
-        <div class="slide section-slide insights-slide">
-          <div class="slide-content">
-            <div class="slide-header">
-              <span class="group-indicator">第 ${section.groupNumber} 組</span>
-              <h2 class="slide-title">💡 亮光</h2>
-            </div>
-            <div class="section-content">${formatForSlide(section.insights)}</div>
+          <div class="content-grid">
+            ${section.themes ? `
+              <div class="content-box themes-box">
+                <h3 class="box-title">📖 主題</h3>
+                <div class="box-content">${formatForSlide(section.themes, 6)}</div>
+              </div>
+            ` : ''}
+            ${section.observations ? `
+              <div class="content-box observations-box">
+                <h3 class="box-title">🔍 事實發現</h3>
+                <div class="box-content">${formatForSlide(section.observations, 6)}</div>
+              </div>
+            ` : ''}
+            ${section.insights ? `
+              <div class="content-box insights-box">
+                <h3 class="box-title">💡 獨特亮光</h3>
+                <div class="box-content">${formatForSlide(section.insights, 6)}</div>
+              </div>
+            ` : ''}
+            ${section.applications ? `
+              <div class="content-box applications-box">
+                <h3 class="box-title">🎯 如何應用</h3>
+                <div class="box-content">${formatForSlide(section.applications, 6)}</div>
+              </div>
+            ` : ''}
           </div>
-        </div>
-      `);
-    }
-
-    if (section.applications) {
-      slides.push(`
-        <div class="slide section-slide applications-slide">
-          <div class="slide-content">
-            <div class="slide-header">
-              <span class="group-indicator">第 ${section.groupNumber} 組</span>
-              <h2 class="slide-title">✍️ 應用</h2>
+          ${section.contributions ? `
+            <div class="contributions-section">
+              <h3 class="contributions-title">👤 個人貢獻摘要</h3>
+              <div class="contributions-content">${formatForSlide(section.contributions, 4)}</div>
             </div>
-            <div class="section-content">${formatForSlide(section.applications)}</div>
-          </div>
+          ` : ''}
         </div>
-      `);
-    }
+      </div>
+    `);
   }
 
   // Thank you slide
   slides.push(`
     <div class="slide title-slide">
       <div class="slide-content">
-        <h1 class="main-title">🙏 感謝參與</h1>
+        <h1 class="main-title">感謝參與</h1>
         <p class="subtitle">願神的話語常存在我們心中</p>
       </div>
     </div>
@@ -465,9 +453,8 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
       }
       
       .slide-content {
-        width: 90%;
-        max-width: 1000px;
-        text-align: center;
+        width: 95%;
+        max-width: 1400px;
         z-index: 1;
       }
       
@@ -475,6 +462,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
       .title-slide {
         background: linear-gradient(135deg, #16a085 0%, #1abc9c 50%, #2ecc71 100%);
         color: white;
+        text-align: center;
       }
       
       .main-title {
@@ -495,113 +483,149 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
         opacity: 0.7;
       }
       
-      /* Overview Slide */
-      .overview-slide {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-      }
-      
-      .slide-title {
-        font-size: 2.5rem;
-        margin-bottom: 2rem;
-      }
-      
-      .stats-grid {
-        display: flex;
-        justify-content: center;
-        gap: 3rem;
-        margin-bottom: 2rem;
-      }
-      
-      .stat-card {
-        background: rgba(255,255,255,0.2);
-        border-radius: 1rem;
-        padding: 2rem 3rem;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-      
-      .stat-number {
-        font-size: 4rem;
-        font-weight: 700;
-      }
-      
-      .stat-label {
-        font-size: 1.2rem;
-        opacity: 0.9;
-      }
-      
-      .group-list {
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        flex-wrap: wrap;
-      }
-      
-      .group-badge {
-        background: rgba(255,255,255,0.2);
-        padding: 0.5rem 1.5rem;
-        border-radius: 2rem;
-        font-size: 1rem;
-      }
-      
-      /* Section Slides */
-      .section-slide {
-        background: #ffffff;
-        color: #1a1a2e;
-      }
-      
-      .section-slide .slide-content {
-        text-align: left;
+      /* Content Slide (Group and Overall) */
+      .content-slide {
+        background: #f8fafc;
+        padding: 2rem;
       }
       
       .slide-header {
         display: flex;
         align-items: center;
-        gap: 1rem;
+        gap: 1.5rem;
         margin-bottom: 1.5rem;
+        flex-wrap: wrap;
       }
       
-      .group-indicator {
-        background: #16a085;
-        color: white;
-        padding: 0.3rem 1rem;
+      .slide-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #16a085;
+        margin: 0;
+      }
+      
+      .overall-title {
+        color: #7c3aed;
+        font-size: 2.2rem;
+      }
+      
+      .members-badge {
+        font-size: 0.95rem;
+        color: #64748b;
+        background: #e2e8f0;
+        padding: 0.4rem 1rem;
         border-radius: 1rem;
+      }
+      
+      /* Content Grid - 2x2 layout */
+      .content-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      
+      .content-box {
+        background: white;
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-left: 4px solid;
+      }
+      
+      /* Color scheme matching report format */
+      .themes-box {
+        border-color: #22c55e;
+      }
+      .themes-box .box-title {
+        color: #16a34a;
+      }
+      
+      .observations-box {
+        border-color: #14b8a6;
+      }
+      .observations-box .box-title {
+        color: #0d9488;
+      }
+      
+      .insights-box {
+        border-color: #f59e0b;
+        background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
+      }
+      .insights-box .box-title {
+        color: #d97706;
+      }
+      
+      .applications-box {
+        border-color: #3b82f6;
+        background: linear-gradient(135deg, #eff6ff 0%, #fff 100%);
+      }
+      .applications-box .box-title {
+        color: #2563eb;
+      }
+      
+      .box-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+      }
+      
+      .box-content {
         font-size: 0.9rem;
-      }
-      
-      .section-content {
-        font-size: 1.5rem;
-        line-height: 2;
+        line-height: 1.6;
+        color: #374151;
         white-space: pre-wrap;
-        max-height: 60vh;
-        overflow: hidden;
       }
       
-      .themes-slide .slide-title { color: #16a34a; }
-      .themes-slide { border-left: 8px solid #22c55e; }
-      
-      .insights-slide .slide-title { color: #d97706; }
-      .insights-slide { border-left: 8px solid #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, #fff 100%); }
-      
-      .applications-slide .slide-title { color: #2563eb; }
-      .applications-slide { border-left: 8px solid #3b82f6; background: linear-gradient(135deg, #eff6ff 0%, #fff 100%); }
-      
-      /* Group Title Slide */
-      .group-title-slide {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        color: white;
+      /* Contributions Section */
+      .contributions-section {
+        background: linear-gradient(135deg, #faf5ff 0%, #fff 100%);
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        border-left: 4px solid #a855f7;
       }
       
-      .group-title-slide .slide-title {
-        font-size: 3rem;
+      .contributions-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #9333ea;
+        margin-bottom: 0.5rem;
       }
       
-      .members {
-        margin-top: 1rem;
-        font-size: 1.3rem;
-        opacity: 0.8;
+      .contributions-content {
+        font-size: 0.85rem;
+        line-height: 1.5;
+        color: #4b5563;
+        white-space: pre-wrap;
+      }
+      
+      /* Overall slide special styling */
+      .overall-slide {
+        background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 50%, #f8fafc 100%);
+      }
+      
+      /* Navigation hint */
+      .nav-hint {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        font-size: 0.8rem;
+        color: #94a3b8;
+        background: rgba(255,255,255,0.9);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+      }
+      
+      /* Slide counter */
+      .slide-counter {
+        position: fixed;
+        bottom: 1rem;
+        left: 1rem;
+        font-size: 0.9rem;
+        color: #64748b;
+        background: rgba(255,255,255,0.9);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
       }
       
       @media print {
@@ -609,6 +633,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
           page-break-after: always;
           page-break-inside: avoid;
         }
+        .nav-hint, .slide-counter { display: none; }
       }
     </style>
   `;
@@ -623,15 +648,18 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
       </head>
       <body>
         ${slides.join('\n')}
+        <div class="nav-hint">← → 或點擊切換頁面</div>
+        <div class="slide-counter"></div>
         <script>
-          // Add keyboard navigation
           let currentSlide = 0;
           const slides = document.querySelectorAll('.slide');
+          const counter = document.querySelector('.slide-counter');
           
           function showSlide(n) {
             slides.forEach((s, i) => {
               s.style.display = i === n ? 'flex' : 'none';
             });
+            counter.textContent = (n + 1) + ' / ' + slides.length;
           }
           
           document.addEventListener('keydown', (e) => {
@@ -644,7 +672,6 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
             }
           });
           
-          // Click to advance
           document.body.addEventListener('click', () => {
             currentSlide = Math.min(currentSlide + 1, slides.length - 1);
             showSlide(currentSlide);
@@ -658,7 +685,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
 }
 
 // Format content for slide display (trim and limit)
-function formatForSlide(content: string): string {
+function formatForSlide(content: string, maxLines: number = 8): string {
   if (!content) return '';
   
   // Clean up markdown and limit length
@@ -668,7 +695,7 @@ function formatForSlide(content: string): string {
     .trim();
   
   // Limit to reasonable length for a slide
-  const lines = cleaned.split('\n').slice(0, 8);
+  const lines = cleaned.split('\n').slice(0, maxLines);
   return lines.join('\n');
 }
 
