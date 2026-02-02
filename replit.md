@@ -95,6 +95,13 @@ npm run db:push # Push database schema
   - TurnBasedCardGame and IcebreakerGame components migrated
   - New API endpoints: /api/icebreaker/session-game, /api/icebreaker/games/:gameId/draw-card, /api/icebreaker/games/:gameId/reset
   - Card drawing now tracks usedCardIds to prevent repeat cards
+- **Message Card System Migration**: Fully migrated from Supabase to Express API
+  - Added multer for file uploads (10MB limit, images only)
+  - New endpoints: POST /upload, PATCH /:id, DELETE /:id, GET /by-card/:cardId
+  - MessageCardManager component now uses fetch API
+  - Files stored in public/message-cards folder
+- **AdminWaitingRoom Migration**: Converted fetchParticipants to Express API
+  - Replaced Supabase client call with fetch to /api/sessions/:id/participants
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |
