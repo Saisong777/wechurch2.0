@@ -170,6 +170,25 @@ npm run db:push # Push database schema
     - Day completion toggling with visual feedback
     - "My Plans" view with progress bars and completion badges
     - Remove plan from My Plans list
+- **Bible Reader UI Improvements** (2026-02-02): Enhanced reading experience and added verse card sharing
+  - **Layout Improvements**:
+    - Larger text (text-lg) for better readability
+    - Increased spacing between verses and sections
+    - Wider container (max-w-4xl) and taller ScrollArea (600px)
+    - Better visual hierarchy with larger chapter titles
+  - **Multi-Select Fix**:
+    - Changed from verse.id to verse.verse for selection (more reliable)
+    - Added visual checkmark indicator for selected verses
+    - Added "取消選取" button to clear all selections
+    - Better verse range formatting (e.g., "1-3,5,7-9")
+  - **Verse Card Creator**:
+    - Modal dialog for creating shareable image cards
+    - 6 preset gradient backgrounds (晨曦, 夕陽, 大海, 森林, 天空, 星夜)
+    - Custom image upload support
+    - Uses html2canvas for rendering card to PNG
+    - Download button to save image locally
+    - Share button using Web Share API (with download fallback)
+    - Dark overlay on images for text readability
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |
