@@ -657,7 +657,7 @@ export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string =
     s.groupNumber, s.name, s.email, s.bibleVerse, s.theme, s.movingVerse,
     s.factsDiscovered, s.traditionalExegesis, s.inspirationFromGod,
     s.applicationInLife, s.others, s.submittedAt.toISOString(),
-  ];
+  ]);
   const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
   return csvContent;
 };
