@@ -1083,6 +1083,48 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Fetch Bible verses by scripture reference (e.g., "Mt 1:1-17")
+  app.get("/api/bible/by-reference", async (req, res) => {
+    try {
+      const ref = req.query.ref as string;
+      if (!ref) {
+        return res.status(400).json({ error: "Missing ref parameter" });
+      }
+      
+      // Map gospel abbreviations to Chinese book names
+      const bookMap: Record<string, string> = {
+        'Mt': '馬太福音',
+        'Mk': '馬可福音',
+        'Lk': '路加福音',
+        'Jn': '約翰福音',
+      };
+      
+      // Parse reference like "Mt 1:1-17" or "Lk 3:23-38"
+      const match = ref.match(/^(Mt|Mk|Lk|Jn)\s*(\d+):(\d+)(?:-(\d+))?$/);
+      if (!match) {
+        return res.json({ verses: [], error: "Invalid reference format" });
+      }
+      
+      const [, abbr, chapterStr, startStr, endStr] = match;
+      const bookName = bookMap[abbr];
+      const chapter = parseInt(chapterStr);
+      const startVerse = parseInt(startStr);
+      const endVerse = endStr ? parseInt(endStr) : startVerse;
+      
+      const allVerses = await storage.getBibleVerses(bookName, chapter);
+      const filteredVerses = allVerses.filter(v => v.verse >= startVerse && v.verse <= endVerse);
+      
+      res.json({ 
+        bookName,
+        chapter,
+        verses: filteredVerses 
+      });
+    } catch (error) {
+      console.error('Error fetching verses by reference:', error);
+      res.status(500).json({ error: "Failed to get verses" });
+    }
+  });
+
   app.get("/api/jesus/daily-content", async (req, res) => {
     try {
       const season = req.query.season as string | undefined;
