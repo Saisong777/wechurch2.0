@@ -193,6 +193,14 @@ npm run db:push # Push database schema
     - 4 font size options (小/中/大/特大)
     - 9 text position options (左上/上/右上/左/中/右/左下/下/右下)
     - 5 aspect ratio options (正方形/直式3:4/限時動態9:16/橫式4:3/寬螢幕16:9)
+- **Jesus Timeline Enhancements** (2026-02-02): Complete timeline redesign
+  - **前後之言 Button**: Season prefaces now displayed in a modal dialog instead of inline
+  - **All Events View**: Shows all 208 events at once, grouped by season (後設/春/夏/秋/冬)
+  - **Individual Gospel References**: Each event shows scripture from each gospel (太/可/路/約)
+  - **Side-by-side Gospel Display**: Multiple gospel references shown as colored badges
+  - Added '後設' (metadata) as a new season category for background content
+  - Removed season filter buttons for unified timeline view
+  - Improved ScrollArea for full-page scrolling with sticky season headers
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |
