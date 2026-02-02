@@ -224,6 +224,197 @@ export const messageCardDownloads = pgTable("message_card_downloads", {
   downloadedAt: timestamp("downloaded_at").defaultNow().notNull(),
 });
 
+// ============================================
+// Rejesus Integration Tables
+// ============================================
+
+// Chinese Union Traditional Bible
+export const chineseUnionTrad = pgTable("chinese_union_trad", {
+  verseId: integer("verse_id").primaryKey(),
+  bookName: text("book_name").notNull(),
+  bookNumber: integer("book_number"),
+  chapter: integer("chapter").notNull(),
+  verse: integer("verse").notNull(),
+  text: text("text").notNull(),
+});
+
+// Blessing Verses
+export const blessingVerses = pgTable("blessing_verses", {
+  id: serial("id").primaryKey(),
+  verseId: integer("verse_id").notNull(),
+  bookName: text("book_name").notNull(),
+  bookNumber: integer("book_number"),
+  chapter: integer("chapter").notNull(),
+  verse: integer("verse").notNull(),
+  text: text("text").notNull(),
+  blessingVerse: text("blessing_verse"),
+  blessingType: text("blessing_type"),
+  aiPastoralSafety: text("ai_pastoral_safety"),
+  textNorm: text("text_norm"),
+  upliftScore: integer("uplift_score"),
+  emotionalFocus: text("emotional_focus"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Jesus 4 Seasons - Timeline of Jesus' life
+export const jesus4Seasons = pgTable("jesus_4seasons", {
+  id: serial("id").primaryKey(),
+  displayOrder: integer("display_order").notNull().default(0),
+  eventId: text("event_id"),
+  dateMaybe: text("date_maybe"),
+  dateStage: text("date_stage"),
+  stageShort: text("stage_short"),
+  season: text("season").notNull(),
+  approximateDate: text("approximate_date"),
+  location: text("location"),
+  eventName: text("event_name").notNull(),
+  eventCategory: text("event_category"),
+  theologicalTheme: text("theological_theme"),
+  jesusCharacter: text("jesus_character"),
+  focus: text("focus"),
+  gospelCenter: text("gospel_center"),
+  scriptureOverview: text("scripture_overview"),
+  scriptureMt: text("scripture_mt"),
+  scriptureMk: text("scripture_mk"),
+  scriptureLk: text("scripture_lk"),
+  scriptureJn: text("scripture_jn"),
+  scriptureStatus: text("scripture_status"),
+  harmonyPrinciple: text("harmony_principle"),
+  dateConfidence: text("date_confidence"),
+  orderConfidence: text("order_confidence"),
+  dataType: text("data_type"),
+  categoryFiveMain: text("category_five_main"),
+  categoryResearchBasis: text("category_research_basis"),
+  teachingThemeResearch: text("teaching_theme_research"),
+  categoryResearchDetail: text("category_research_detail"),
+  teachingKingdomSecondary: text("teaching_kingdom_secondary"),
+  parableSecondary: text("parable_secondary"),
+  miracleSecondary: text("miracle_secondary"),
+  categoryResearchFinal: text("category_research_final"),
+  demonstrationSecondary: text("demonstration_secondary"),
+  wisdomSecondary: text("wisdom_secondary"),
+  humorSecondary: text("humor_secondary"),
+  categoryResearchUltimate: text("category_research_ultimate"),
+  categoryTags: text("category_tags"),
+  ntCrossReference: text("nt_cross_reference"),
+  ntCrossReferenceReason: text("nt_cross_reference_reason"),
+  ntCrossReferenceEvent: text("nt_cross_reference_event"),
+  ntCrossReferenceConclusion: text("nt_cross_reference_conclusion"),
+  themeIndexResearch: text("theme_index_research"),
+  otMessiahCrossRef: text("ot_messiah_cross_ref"),
+  otScriptureQuoteJesus: text("ot_scripture_quote_jesus"),
+  typologyPeople: text("typology_people"),
+  otScriptureQuoteJesusExpanded: text("ot_scripture_quote_jesus_expanded"),
+  typologyPrimaryLevel: text("typology_primary_level"),
+  typologySecondaryLevel: text("typology_secondary_level"),
+  gospelCenterMicroNarrative: text("gospel_center_micro_narrative"),
+  gospelCenterOld: text("gospel_center_old"),
+  userPainPointTags: text("user_pain_point_tags"),
+  takeawayPhrase: text("takeaway_phrase"),
+  userPainPointPrimary: text("user_pain_point_primary"),
+  userPainPointSecondary: text("user_pain_point_secondary"),
+});
+
+// Jesus Daily Content
+export const jesusDailyContent = pgTable("jesus_daily_content", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  month: integer("month").notNull(),
+  eventId: text("event_id").notNull().unique(),
+  eventName: text("event_name").notNull(),
+  location: text("location"),
+  scriptureOverview: text("scripture_overview"),
+  aiDescription: text("ai_description").notNull(),
+  imageUrl: text("image_url"),
+  dateMaybe: text("date_maybe"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Devotional Notes
+export const devotionalNotes = pgTable("devotional_notes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  verseReference: text("verse_reference").notNull(),
+  verseText: text("verse_text").notNull(),
+  theme: text("theme"),
+  keyVerse: text("key_verse"),
+  newUnderstanding: text("new_understanding"),
+  promises: text("promises"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Saved Verses
+export const savedVerses = pgTable("saved_verses", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  verseReference: text("verse_reference").notNull(),
+  verseText: text("verse_text").notNull(),
+  bookName: text("book_name").notNull(),
+  chapter: integer("chapter").notNull(),
+  verseStart: integer("verse_start").notNull(),
+  verseEnd: integer("verse_end"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Reading Plan Templates
+export const readingPlanTemplates = pgTable("reading_plan_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("custom"),
+  durationDays: integer("duration_days").notNull().default(365),
+  isPublic: boolean("is_public").notNull().default(false),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Reading Plan Template Items
+export const readingPlanTemplateItems = pgTable("reading_plan_template_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: uuid("template_id").references(() => readingPlanTemplates.id).notNull(),
+  dayNumber: integer("day_number").notNull(),
+  title: text("title"),
+  bookName: text("book_name"),
+  chapterStart: integer("chapter_start"),
+  chapterEnd: integer("chapter_end"),
+  verseStart: integer("verse_start"),
+  verseEnd: integer("verse_end"),
+  scriptureReference: text("scripture_reference"),
+  notes: text("notes"),
+});
+
+// User Reading Plans
+export const userReadingPlans = pgTable("user_reading_plans", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  templateId: uuid("template_id").references(() => readingPlanTemplates.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User Reading Progress
+export const userReadingProgress = pgTable("user_reading_progress", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  planId: uuid("plan_id").references(() => userReadingPlans.id).notNull(),
+  dayNumber: integer("day_number").notNull(),
+  readingDate: date("reading_date").notNull(),
+  scriptureReference: text("scripture_reference").notNull(),
+  isCompleted: boolean("is_completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  devotionalNoteId: uuid("devotional_note_id").references(() => devotionalNotes.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });
 export const insertParticipantSchema = createInsertSchema(participants).omit({ id: true, joinedAt: true, updatedAt: true });
@@ -250,5 +441,27 @@ export type IcebreakerGame = typeof icebreakerGames.$inferSelect;
 export type IcebreakerPlayer = typeof icebreakerPlayers.$inferSelect;
 export type CardQuestion = typeof cardQuestions.$inferSelect;
 export type MessageCard = typeof messageCards.$inferSelect;
+
+// Rejesus Types
+export type ChineseUnionTrad = typeof chineseUnionTrad.$inferSelect;
+export type BlessingVerse = typeof blessingVerses.$inferSelect;
+export type Jesus4Season = typeof jesus4Seasons.$inferSelect;
+export type JesusDailyContent = typeof jesusDailyContent.$inferSelect;
+export type DevotionalNote = typeof devotionalNotes.$inferSelect;
+export type SavedVerse = typeof savedVerses.$inferSelect;
+export type ReadingPlanTemplate = typeof readingPlanTemplates.$inferSelect;
+export type ReadingPlanTemplateItem = typeof readingPlanTemplateItems.$inferSelect;
+export type UserReadingPlan = typeof userReadingPlans.$inferSelect;
+export type UserReadingProgress = typeof userReadingProgress.$inferSelect;
+
+export const insertDevotionalNoteSchema = createInsertSchema(devotionalNotes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSavedVerseSchema = createInsertSchema(savedVerses).omit({ id: true, createdAt: true });
+export const insertReadingPlanTemplateSchema = createInsertSchema(readingPlanTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUserReadingPlanSchema = createInsertSchema(userReadingPlans).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type InsertDevotionalNote = z.infer<typeof insertDevotionalNoteSchema>;
+export type InsertSavedVerse = z.infer<typeof insertSavedVerseSchema>;
+export type InsertReadingPlanTemplate = z.infer<typeof insertReadingPlanTemplateSchema>;
+export type InsertUserReadingPlan = z.infer<typeof insertUserReadingPlanSchema>;
 
 export * from "./models/auth";
