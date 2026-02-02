@@ -69,9 +69,14 @@ export interface IStorage {
   
   getCardQuestions(level?: string): Promise<CardQuestion[]>;
   getAllCardQuestions(): Promise<CardQuestion[]>;
+  getCardQuestionById(id: string): Promise<CardQuestion | undefined>;
   createCardQuestion(question: { contentText: string; contentTextEn?: string; level: string; isActive: boolean; sortOrder: number }): Promise<CardQuestion>;
   updateCardQuestion(id: string, updates: Partial<CardQuestion>): Promise<CardQuestion | undefined>;
   deleteCardQuestion(id: string): Promise<boolean>;
+  
+  getSessionIcebreakerGame(sessionId: string, groupNumber: number): Promise<IcebreakerGame | undefined>;
+  drawIcebreakerCard(gameId: string, level: string): Promise<{ cardId: string | null; cardContent: string | null; cardLevel: string; cardsRemaining: number }>;
+  resetIcebreakerDeck(gameId: string): Promise<void>;
   
   getMessageCards(): Promise<MessageCard[]>;
   getMessageCard(shortCode: string): Promise<MessageCard | undefined>;
@@ -330,6 +335,67 @@ export class DatabaseStorage implements IStorage {
   async deleteCardQuestion(id: string): Promise<boolean> {
     const result = await db.delete(cardQuestions).where(eq(cardQuestions.id, id));
     return true;
+  }
+
+  async getCardQuestionById(id: string): Promise<CardQuestion | undefined> {
+    const [card] = await db.select().from(cardQuestions).where(eq(cardQuestions.id, id)).limit(1);
+    return card;
+  }
+
+  async getSessionIcebreakerGame(sessionId: string, groupNumber: number): Promise<IcebreakerGame | undefined> {
+    const [game] = await db.select().from(icebreakerGames)
+      .where(and(
+        eq(icebreakerGames.bibleStudySessionId, sessionId),
+        eq(icebreakerGames.groupNumber, groupNumber),
+        eq(icebreakerGames.status, 'active')
+      ))
+      .orderBy(icebreakerGames.createdAt)
+      .limit(1);
+    return game;
+  }
+
+  async drawIcebreakerCard(gameId: string, level: string): Promise<{ cardId: string | null; cardContent: string | null; cardLevel: string; cardsRemaining: number }> {
+    // Get current game to check usedCardIds
+    const [game] = await db.select().from(icebreakerGames).where(eq(icebreakerGames.id, gameId)).limit(1);
+    const usedCardIds = (game?.usedCardIds as string[]) || [];
+    
+    // Get all active cards for this level
+    const allCards = await db.select().from(cardQuestions)
+      .where(and(eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
+    
+    // Filter out already-drawn cards
+    const availableCards = allCards.filter(card => !usedCardIds.includes(card.id));
+    
+    if (availableCards.length === 0) {
+      return { cardId: null, cardContent: null, cardLevel: level, cardsRemaining: 0 };
+    }
+    
+    // Pick a random card from available ones
+    const randomCard = availableCards[Math.floor(Math.random() * availableCards.length)];
+    
+    // Update game with new usedCardIds
+    const newUsedCardIds = [...usedCardIds, randomCard.id];
+    await db.update(icebreakerGames)
+      .set({ 
+        currentCardId: randomCard.id, 
+        currentLevel: level, 
+        usedCardIds: newUsedCardIds,
+        updatedAt: new Date() 
+      })
+      .where(eq(icebreakerGames.id, gameId));
+    
+    return { 
+      cardId: randomCard.id, 
+      cardContent: randomCard.contentText, 
+      cardLevel: level, 
+      cardsRemaining: availableCards.length - 1 
+    };
+  }
+
+  async resetIcebreakerDeck(gameId: string): Promise<void> {
+    await db.update(icebreakerGames)
+      .set({ currentCardId: null, passCount: 0, usedCardIds: [], updatedAt: new Date() })
+      .where(eq(icebreakerGames.id, gameId));
   }
 
   async getMessageCards(): Promise<MessageCard[]> {

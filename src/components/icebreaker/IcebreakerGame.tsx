@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { RotateCcw, SkipForward, Sparkles, Dumbbell, Users, Copy, Check, Languages, Volume2, VolumeX, Timer, MessageCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface IcebreakerGameProps {
   sessionId?: string;
@@ -142,15 +141,16 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
     
     setIsStartingSharing(true);
     try {
-      const { error } = await supabase
-        .from('icebreaker_games')
-        .update({ 
-          sharing_mode: true,
-          shared_member_ids: [],
-        })
-        .eq('id', gameId);
+      const response = await fetch(`/api/icebreaker/games/${gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sharingMode: true,
+          sharedMemberIds: [],
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to start sharing');
       toast.success(showEnglish ? 'Sharing round started!' : '分享環節已開始！');
     } catch (error) {
       console.error('[IcebreakerGame] Failed to start sharing:', error);

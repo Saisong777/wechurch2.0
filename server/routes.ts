@@ -335,6 +335,56 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/icebreaker/cards/:id", async (req, res) => {
+    try {
+      const card = await storage.getCardQuestionById(req.params.id);
+      if (!card) {
+        return res.status(404).json({ error: "Card not found" });
+      }
+      res.json(card);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get card" });
+    }
+  });
+
+  app.get("/api/icebreaker/session-game", async (req, res) => {
+    try {
+      const { sessionId, groupNumber } = req.query;
+      if (!sessionId || !groupNumber) {
+        return res.status(400).json({ error: "sessionId and groupNumber required" });
+      }
+      const game = await storage.getSessionIcebreakerGame(
+        sessionId as string, 
+        parseInt(groupNumber as string)
+      );
+      if (!game) {
+        return res.status(404).json({ error: "Game not found" });
+      }
+      res.json(game);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get session game" });
+    }
+  });
+
+  app.post("/api/icebreaker/games/:gameId/draw-card", async (req, res) => {
+    try {
+      const { level } = req.body;
+      const result = await storage.drawIcebreakerCard(req.params.gameId, level || 'L1');
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to draw card" });
+    }
+  });
+
+  app.post("/api/icebreaker/games/:gameId/reset", async (req, res) => {
+    try {
+      await storage.resetIcebreakerDeck(req.params.gameId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reset deck" });
+    }
+  });
+
   // Card Questions CRUD for admin
   app.get("/api/card-questions", async (req, res) => {
     try {

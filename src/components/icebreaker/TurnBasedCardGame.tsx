@@ -4,24 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { IcebreakerCard } from './IcebreakerCard';
 import { LevelSelector } from './LevelSelector';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { fetchGroupMembers } from '@/lib/supabase-helpers';
 import { 
   CheckCircle, Circle, Users, Loader2, Sparkles, 
-  Languages, ArrowRight, RefreshCw, Clock 
+  Languages, ArrowRight, Clock 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { User } from '@/types/bible-study';
-import type { Database } from '@/integrations/supabase/types';
-import { withRetry, staggeredStart, HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
+import { withRetry, staggeredStart } from '@/lib/retry-utils';
 
-type CardLevel = Database['public']['Enums']['card_level'];
+type CardLevel = 'L1' | 'L2' | 'L3';
+
+interface User {
+  id: string;
+  name: string;
+}
 
 interface TurnBasedCardGameProps {
   sessionId: string;
@@ -64,7 +64,8 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [showEnglish, setShowEnglish] = useState(false);
 
-  // Derived state
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
   const isMyTurn = gameState.currentDrawerId === currentUserId;
   const hasDrawn = gameState.currentDrawerCardId !== null && isMyTurn;
   const hasShared = gameState.sharedMemberIds.includes(currentUserId);
@@ -73,128 +74,124 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
   const allComplete = sharedCount >= totalCount && totalCount > 0;
   const progress = totalCount > 0 ? (sharedCount / totalCount) * 100 : 0;
 
-  // Get current drawer's info
   const currentDrawer = useMemo(() => 
     members.find(m => m.id === gameState.currentDrawerId),
     [members, gameState.currentDrawerId]
   );
 
-  // Load members and initialize game with staggered start for high concurrency
+  const fetchGroupMembers = async (): Promise<User[]> => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/participants`);
+      if (!response.ok) return [];
+      const participants = await response.json();
+      return participants
+        .filter((p: any) => p.groupNumber === groupNumber)
+        .map((p: any) => ({ id: p.id, name: p.name || p.guestName || 'Unknown' }));
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchCardContent = async (cardId: string): Promise<{ content: string; contentEn: string | null } | null> => {
+    try {
+      const response = await fetch(`/api/icebreaker/cards/${cardId}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return { content: data.contentText, contentEn: data.contentTextEn };
+    } catch {
+      return null;
+    }
+  };
+
   const initGame = useCallback(async () => {
     try {
-      // Stagger initial load to prevent thundering herd
       await staggeredStart(1500);
       
-      // Load group members with retry
       const groupMembers = await withRetry(
-        () => fetchGroupMembers(sessionId, groupNumber),
+        () => fetchGroupMembers(),
         { maxRetries: 3, baseDelayMs: 500 }
       );
       setMembers(groupMembers);
 
-      // Find existing game for this session/group (get the OLDEST one to ensure consistency)
-      const fetchExistingGame = async () => {
-        const { data, error } = await supabase
-          .from('icebreaker_games')
-          .select('*')
-          .eq('bible_study_session_id', sessionId)
-          .eq('group_number', groupNumber)
-          .eq('mode', 'session')
-          .eq('status', 'active')
-          .order('created_at', { ascending: true })
-          .limit(1);
-        if (error) throw error;
-        return data;
-      };
-      
-      let existingGames = await withRetry(fetchExistingGame, { maxRetries: 2 });
-      let error = null;
-
-      if (error) throw error;
-
-      let existingGame = existingGames?.[0] || null;
+      let existingGame = await withRetry(async () => {
+        const response = await fetch(
+          `/api/icebreaker/session-game?sessionId=${sessionId}&groupNumber=${groupNumber}`
+        );
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error('Failed to fetch game');
+        return response.json();
+      }, { maxRetries: 2 });
 
       if (!existingGame) {
-        // Try to create new game with drawer order
         const shuffledOrder = groupMembers
           .map(m => m.id)
           .sort(() => Math.random() - 0.5);
 
-        const { data: newGame, error: createError } = await supabase
-          .from('icebreaker_games')
-          .insert({
-            bible_study_session_id: sessionId,
-            group_number: groupNumber,
+        const createResponse = await fetch('/api/icebreaker/games', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bibleStudySessionId: sessionId,
+            groupNumber: groupNumber,
             mode: 'session',
-            drawer_order: shuffledOrder,
-            current_drawer_id: shuffledOrder[0] || null,
-            shared_member_ids: [],
-          })
-          .select()
-          .single();
+            drawerOrder: shuffledOrder,
+            currentDrawerId: shuffledOrder[0] || null,
+            sharedMemberIds: [],
+          }),
+        });
 
-        // Handle race condition: if insert failed due to conflict, re-fetch
-        if (createError) {
-          console.log('[TurnBasedCardGame] Create failed, re-fetching existing game...');
-          const { data: retryGames } = await supabase
-            .from('icebreaker_games')
-            .select('*')
-            .eq('bible_study_session_id', sessionId)
-            .eq('group_number', groupNumber)
-            .eq('mode', 'session')
-            .eq('status', 'active')
-            .order('created_at', { ascending: true })
-            .limit(1);
-          
-          existingGame = retryGames?.[0] || null;
-          if (!existingGame) throw createError; // Still no game, throw original error
+        if (createResponse.ok) {
+          existingGame = await createResponse.json();
         } else {
-          existingGame = newGame;
+          const retryResponse = await fetch(
+            `/api/icebreaker/session-game?sessionId=${sessionId}&groupNumber=${groupNumber}`
+          );
+          if (retryResponse.ok) {
+            existingGame = await retryResponse.json();
+          }
         }
       }
 
-      // Initialize drawer order if not set
-      if (!existingGame.drawer_order || existingGame.drawer_order.length === 0) {
+      if (!existingGame) {
+        throw new Error('Failed to create or find game');
+      }
+
+      if (!existingGame.drawerOrder || existingGame.drawerOrder.length === 0) {
         const shuffledOrder = groupMembers
           .map(m => m.id)
           .sort(() => Math.random() - 0.5);
 
-        await supabase
-          .from('icebreaker_games')
-          .update({
-            drawer_order: shuffledOrder,
-            current_drawer_id: shuffledOrder[0] || null,
-          })
-          .eq('id', existingGame.id);
+        await fetch(`/api/icebreaker/games/${existingGame.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            drawerOrder: shuffledOrder,
+            currentDrawerId: shuffledOrder[0] || null,
+          }),
+        });
 
-        existingGame.drawer_order = shuffledOrder;
-        existingGame.current_drawer_id = shuffledOrder[0] || null;
+        existingGame.drawerOrder = shuffledOrder;
+        existingGame.currentDrawerId = shuffledOrder[0] || null;
       }
 
-      // Fetch current card content if exists
       let cardContent = null;
       let cardContentEn = null;
-      if (existingGame.current_drawer_card_id) {
-        const { data: cardData } = await supabase
-          .from('card_questions')
-          .select('content_text, content_text_en')
-          .eq('id', existingGame.current_drawer_card_id)
-          .single();
-        
+      if (existingGame.currentDrawerCardId) {
+        const cardData = await fetchCardContent(existingGame.currentDrawerCardId);
         if (cardData) {
-          cardContent = cardData.content_text;
-          cardContentEn = cardData.content_text_en;
+          cardContent = cardData.content;
+          cardContentEn = cardData.contentEn;
           setIsFlipped(true);
         }
       }
 
       setGameState({
         gameId: existingGame.id,
-        currentDrawerId: existingGame.current_drawer_id || null,
-        currentDrawerCardId: existingGame.current_drawer_card_id || null,
-        drawerOrder: (existingGame.drawer_order as string[]) || [],
-        sharedMemberIds: (existingGame.shared_member_ids as string[]) || [],
-        currentLevel: existingGame.current_level || 'L1',
+        currentDrawerId: existingGame.currentDrawerId || null,
+        currentDrawerCardId: existingGame.currentDrawerCardId || null,
+        drawerOrder: (existingGame.drawerOrder as string[]) || [],
+        sharedMemberIds: (existingGame.sharedMemberIds as string[]) || [],
+        currentLevel: existingGame.currentLevel || 'L1',
         currentCardContent: cardContent,
         currentCardContentEn: cardContentEn,
       });
@@ -210,103 +207,95 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
     initGame();
   }, [initGame]);
 
-  // Subscribe to realtime updates
+  const pollGameState = useCallback(async () => {
+    if (!gameState.gameId) return;
+
+    try {
+      const response = await fetch(`/api/icebreaker/session-game?sessionId=${sessionId}&groupNumber=${groupNumber}`);
+      if (!response.ok) return;
+      
+      const newData = await response.json();
+      
+      let cardContent = gameState.currentCardContent;
+      let cardContentEn = gameState.currentCardContentEn;
+      
+      if (newData.currentDrawerCardId && 
+          newData.currentDrawerCardId !== gameState.currentDrawerCardId) {
+        const cardData = await fetchCardContent(newData.currentDrawerCardId);
+        if (cardData) {
+          cardContent = cardData.content;
+          cardContentEn = cardData.contentEn;
+          setIsFlipped(true);
+        }
+      } else if (!newData.currentDrawerCardId) {
+        cardContent = null;
+        cardContentEn = null;
+        setIsFlipped(false);
+      }
+
+      setGameState(prev => ({
+        ...prev,
+        currentDrawerId: newData.currentDrawerId || null,
+        currentDrawerCardId: newData.currentDrawerCardId || null,
+        drawerOrder: (newData.drawerOrder as string[]) || prev.drawerOrder,
+        sharedMemberIds: (newData.sharedMemberIds as string[]) || [],
+        currentLevel: newData.currentLevel || prev.currentLevel,
+        currentCardContent: cardContent,
+        currentCardContentEn: cardContentEn,
+      }));
+
+      const newSharedIds = newData.sharedMemberIds || [];
+      if (newSharedIds.length >= members.length && members.length > 0) {
+        toast.success('全員分享完成！準備進入查經筆記', { duration: 2000 });
+        setTimeout(onComplete, 1500);
+      }
+    } catch (err) {
+      console.warn('Failed to poll game state:', err);
+    }
+  }, [gameState.gameId, gameState.currentDrawerCardId, sessionId, groupNumber, members.length, onComplete]);
+
   useEffect(() => {
     if (!gameState.gameId) return;
 
-    const channel = supabase
-      .channel(`turn-based-game-${gameState.gameId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'icebreaker_games',
-          filter: `id=eq.${gameState.gameId}`,
-        },
-        async (payload) => {
-          const newData = payload.new as any;
-          
-          // Fetch card content if card changed
-          let cardContent = gameState.currentCardContent;
-          let cardContentEn = gameState.currentCardContentEn;
-          
-          if (newData.current_drawer_card_id && 
-              newData.current_drawer_card_id !== gameState.currentDrawerCardId) {
-            const { data: cardData } = await supabase
-              .from('card_questions')
-              .select('content_text, content_text_en')
-              .eq('id', newData.current_drawer_card_id)
-              .single();
-            
-            if (cardData) {
-              cardContent = cardData.content_text;
-              cardContentEn = cardData.content_text_en;
-              setIsFlipped(true);
-            }
-          } else if (!newData.current_drawer_card_id) {
-            cardContent = null;
-            cardContentEn = null;
-            setIsFlipped(false);
-          }
-
-          setGameState(prev => ({
-            ...prev,
-            currentDrawerId: newData.current_drawer_id || null,
-            currentDrawerCardId: newData.current_drawer_card_id || null,
-            drawerOrder: (newData.drawer_order as string[]) || prev.drawerOrder,
-            sharedMemberIds: (newData.shared_member_ids as string[]) || [],
-            currentLevel: newData.current_level || prev.currentLevel,
-            currentCardContent: cardContent,
-            currentCardContentEn: cardContentEn,
-          }));
-
-          // Check if everyone has shared
-          const newSharedIds = newData.shared_member_ids || [];
-          if (newSharedIds.length >= members.length && members.length > 0) {
-            toast.success('全員分享完成！準備進入查經筆記', { duration: 2000 });
-            setTimeout(onComplete, 1500);
-          }
-        }
-      )
-      .subscribe();
+    pollingRef.current = setInterval(pollGameState, 3000);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
     };
-  }, [gameState.gameId, gameState.currentDrawerCardId, members.length, onComplete]);
+  }, [gameState.gameId, pollGameState]);
 
-  // Draw a card (only for current drawer)
   const drawCard = async () => {
     if (!gameState.gameId || !isMyTurn || isDrawing) return;
 
     setIsDrawing(true);
     try {
-      const { data, error } = await supabase
-        .rpc('draw_next_card', {
-          p_game_id: gameState.gameId,
-          p_level: gameState.currentLevel,
-        });
+      const response = await fetch(`/api/icebreaker/games/${gameState.gameId}/draw-card`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: gameState.currentLevel }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to draw card');
 
-      const result = data?.[0];
-      if (!result?.card_id) {
+      const result = await response.json();
+      if (!result?.cardId) {
         toast.info('這個等級的牌已經抽完了！');
         return;
       }
 
-      // Update game with the drawn card
-      await supabase
-        .from('icebreaker_games')
-        .update({ current_drawer_card_id: result.card_id })
-        .eq('id', gameState.gameId);
+      await fetch(`/api/icebreaker/games/${gameState.gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentDrawerCardId: result.cardId }),
+      });
 
       setGameState(prev => ({
         ...prev,
-        currentDrawerCardId: result.card_id,
-        currentCardContent: result.card_content,
-        currentCardContentEn: null, // Will be fetched via realtime
+        currentDrawerCardId: result.cardId,
+        currentCardContent: result.cardContent,
+        currentCardContentEn: null,
       }));
       setIsFlipped(true);
 
@@ -319,29 +308,27 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
     }
   };
 
-  // Mark as shared and advance to next person
   const markAsShared = async () => {
     if (!gameState.gameId || isMarking || !isMyTurn) return;
 
     setIsMarking(true);
     try {
-      // Add self to shared list
       const newSharedIds = [...gameState.sharedMemberIds, currentUserId];
       
-      // Find next drawer who hasn't shared yet
       const remainingDrawers = gameState.drawerOrder.filter(
         id => !newSharedIds.includes(id)
       );
       const nextDrawerId = remainingDrawers[0] || null;
 
-      await supabase
-        .from('icebreaker_games')
-        .update({
-          shared_member_ids: newSharedIds,
-          current_drawer_id: nextDrawerId,
-          current_drawer_card_id: null, // Reset for next person
-        })
-        .eq('id', gameState.gameId);
+      await fetch(`/api/icebreaker/games/${gameState.gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sharedMemberIds: newSharedIds,
+          currentDrawerId: nextDrawerId,
+          currentDrawerCardId: null,
+        }),
+      });
 
       setGameState(prev => ({
         ...prev,
@@ -366,15 +353,15 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
     }
   };
 
-  // Change level (only for current drawer before drawing)
   const changeLevel = async (level: CardLevel) => {
     if (!gameState.gameId || !isMyTurn || hasDrawn) return;
 
     try {
-      await supabase
-        .from('icebreaker_games')
-        .update({ current_level: level })
-        .eq('id', gameState.gameId);
+      await fetch(`/api/icebreaker/games/${gameState.gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentLevel: level }),
+      });
 
       setGameState(prev => ({ ...prev, currentLevel: level }));
     } catch (error) {
@@ -382,7 +369,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
     }
   };
 
-  // Sort members by drawer order, showing current drawer first
   const sortedMembers = useMemo(() => {
     const order = gameState.drawerOrder;
     return [...members].sort((a, b) => {
@@ -402,7 +388,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
 
   return (
     <div className="w-full max-w-lg mx-auto space-y-6">
-      {/* Header */}
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary">
           <Sparkles className="w-4 h-4" />
@@ -413,7 +398,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         </p>
       </div>
 
-      {/* Progress */}
       <Card className="bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
         <CardContent className="py-4">
           <div className="flex items-center justify-between mb-3">
@@ -429,7 +413,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         </CardContent>
       </Card>
 
-      {/* Language Toggle */}
       <div className="flex items-center justify-center gap-2">
         <Languages className="w-4 h-4 text-muted-foreground" />
         <Label htmlFor="lang-toggle" className="text-sm text-muted-foreground cursor-pointer">
@@ -445,7 +428,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         </Label>
       </div>
 
-      {/* Current Turn Display */}
       {!allComplete && (
         <Card className={cn(
           "border-2 transition-all",
@@ -484,7 +466,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         </Card>
       )}
 
-      {/* Level Selector - Only for current drawer before drawing */}
       {isMyTurn && !hasDrawn && (
         <LevelSelector
           currentLevel={gameState.currentLevel}
@@ -493,7 +474,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         />
       )}
 
-      {/* Card Display */}
       {(isMyTurn || gameState.currentCardContent) && (
         <AnimatePresence mode="wait">
           <motion.div
@@ -515,7 +495,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         </AnimatePresence>
       )}
 
-      {/* Draw Button - For current drawer who hasn't drawn */}
       {isMyTurn && !hasDrawn && (
         <Button
           variant="gold"
@@ -533,7 +512,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         </Button>
       )}
 
-      {/* Share Complete Button - For current drawer who has drawn */}
       {isMyTurn && hasDrawn && (
         <Button
           variant="gold"
@@ -547,11 +525,10 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
           ) : (
             <CheckCircle className="w-5 h-5 mr-2" />
           )}
-          分享完畢 ✓
+          分享完畢
         </Button>
       )}
 
-      {/* Member List */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -611,7 +588,6 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         </CardContent>
       </Card>
 
-      {/* All Complete */}
       {allComplete && (
         <Card className="bg-accent/10 border-accent/30">
           <CardContent className="py-6 text-center">

@@ -1,11 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Database } from '@/integrations/supabase/types';
 import { withRetry, staggeredStart } from '@/lib/retry-utils';
 
-type CardLevel = Database['public']['Enums']['card_level'];
-type GameMode = Database['public']['Enums']['game_mode'];
+type CardLevel = 'L1' | 'L2' | 'L3';
+type GameMode = 'standalone' | 'session';
 
 interface GameState {
   gameId: string | null;
@@ -26,7 +24,6 @@ interface GameState {
   isHost: boolean;
   sessionId: string | null;
   groupNumber: number | null;
-  // Timer sync state
   timerDuration: number;
   timerStartedAt: string | null;
   timerRunning: boolean;
@@ -37,7 +34,7 @@ const MAX_PASSES = 2;
 interface UseIcebreakerGameOptions {
   sessionId?: string;
   groupNumber?: number;
-  roomCode?: string; // For joining existing game
+  roomCode?: string;
 }
 
 export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
@@ -60,105 +57,95 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     timerRunning: false,
   });
 
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Subscribe to real-time updates for group mode
+  const fetchCardContent = async (cardId: string): Promise<{ content: string; contentEn: string | null } | null> => {
+    try {
+      const response = await fetch(`/api/icebreaker/cards/${cardId}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return { content: data.contentText, contentEn: data.contentTextEn };
+    } catch {
+      return null;
+    }
+  };
+
+  const pollGameState = useCallback(async () => {
+    if (!state.gameId || state.mode === 'standalone') return;
+
+    try {
+      const response = await fetch(`/api/icebreaker/games/${state.roomCode}`);
+      if (!response.ok) return;
+      
+      const updated = await response.json();
+      
+      setState(prev => ({
+        ...prev,
+        timerDuration: updated.timerDuration ?? prev.timerDuration,
+        timerStartedAt: updated.timerStartedAt,
+        timerRunning: updated.timerRunning ?? false,
+      }));
+      
+      if (updated.currentCardId && updated.currentCardId !== state.currentCard?.id) {
+        const cardData = await fetchCardContent(updated.currentCardId);
+        if (cardData) {
+          setState(prev => ({
+            ...prev,
+            currentCard: {
+              id: updated.currentCardId,
+              content: cardData.content,
+              contentEn: cardData.contentEn,
+              level: updated.currentLevel,
+            },
+            currentLevel: updated.currentLevel,
+            passCount: updated.passCount || 0,
+            isFlipped: true,
+            isDrawing: false,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to poll game state:', err);
+    }
+  }, [state.gameId, state.mode, state.roomCode, state.currentCard?.id]);
+
   useEffect(() => {
     if (!state.gameId || state.mode === 'standalone') return;
 
-    const channel = supabase
-      .channel(`icebreaker-game-${state.gameId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'icebreaker_games',
-          filter: `id=eq.${state.gameId}`,
-        },
-        (payload) => {
-          const updated = payload.new as any;
-          
-          // Sync timer state for all participants
-          setState(prev => ({
-            ...prev,
-            timerDuration: updated.timer_duration ?? prev.timerDuration,
-            timerStartedAt: updated.timer_started_at,
-            timerRunning: updated.timer_running ?? false,
-          }));
-          
-          // Only update card if we're not the one who triggered the change
-          if (updated.current_card_id && updated.current_card_id !== state.currentCard?.id) {
-            // Fetch the card content
-            fetchCardContent(updated.current_card_id).then((cardData) => {
-              if (cardData) {
-                setState(prev => ({
-                  ...prev,
-                  currentCard: {
-                    id: updated.current_card_id,
-                    content: cardData.content,
-                    contentEn: cardData.contentEn,
-                    level: updated.current_level,
-                  },
-                  currentLevel: updated.current_level,
-                  passCount: updated.pass_count || 0,
-                  isFlipped: true,
-                  isDrawing: false,
-                }));
-              }
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    channelRef.current = channel;
+    pollingRef.current = setInterval(pollGameState, 3000);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
     };
-  }, [state.gameId, state.mode, state.currentCard?.id]);
+  }, [state.gameId, state.mode, pollGameState]);
 
-  // Fetch card content by ID (including English)
-  const fetchCardContent = async (cardId: string): Promise<{ content: string; contentEn: string | null } | null> => {
-    const { data, error } = await supabase
-      .from('card_questions')
-      .select('content_text, content_text_en')
-      .eq('id', cardId)
-      .single();
-
-    if (error || !data) return null;
-    return { content: data.content_text, contentEn: data.content_text_en };
-  };
-
-  // Create a new game with retry logic
   const createGame = useCallback(async (mode: GameMode = 'standalone') => {
     setState(prev => ({ ...prev, isLoading: true }));
     
     try {
-      // Stagger game creation to prevent race conditions
       await staggeredStart(1000);
       
       const data = await withRetry(async () => {
-        const { data, error } = await supabase
-          .from('icebreaker_games')
-          .insert({
+        const response = await fetch('/api/icebreaker/games', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             mode,
-            current_level: 'L1',
-            bible_study_session_id: options.sessionId || null,
-            group_number: options.groupNumber || null,
-          })
-          .select('id, room_code')
-          .single();
-
-        if (error) throw error;
-        return data;
+            currentLevel: 'L1',
+            bibleStudySessionId: options.sessionId || null,
+            groupNumber: options.groupNumber || null,
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to create game');
+        return response.json();
       }, { maxRetries: 2, baseDelayMs: 500 });
 
       setState(prev => ({
         ...prev,
         gameId: data.id,
-        roomCode: data.room_code,
+        roomCode: data.roomCode,
         isLoading: false,
         currentLevel: 'L1',
         passCount: 0,
@@ -177,33 +164,29 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, [options.sessionId, options.groupNumber]);
 
-  // Join an existing game by room code
   const joinGame = useCallback(async (roomCode: string) => {
     setState(prev => ({ ...prev, isLoading: true }));
     
     try {
-      const { data, error } = await supabase
-        .from('icebreaker_games')
-        .select('*')
-        .eq('room_code', roomCode.toUpperCase())
-        .single();
-
-      if (error || !data) {
+      const response = await fetch(`/api/icebreaker/games/${roomCode.toUpperCase()}`);
+      
+      if (!response.ok) {
         toast.error('找不到此遊戲房間');
         setState(prev => ({ ...prev, isLoading: false }));
         return null;
       }
 
-      // Fetch current card content if exists
+      const data = await response.json();
+
       let currentCard = null;
-      if (data.current_card_id) {
-        const cardData = await fetchCardContent(data.current_card_id);
+      if (data.currentCardId) {
+        const cardData = await fetchCardContent(data.currentCardId);
         if (cardData) {
           currentCard = {
-            id: data.current_card_id,
+            id: data.currentCardId,
             content: cardData.content,
             contentEn: cardData.contentEn,
-            level: data.current_level as CardLevel,
+            level: data.currentLevel as CardLevel,
           };
         }
       }
@@ -211,16 +194,16 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
       setState(prev => ({
         ...prev,
         gameId: data.id,
-        roomCode: data.room_code,
+        roomCode: data.roomCode,
         isLoading: false,
-        currentLevel: (data.current_level as CardLevel) || 'L1',
-        passCount: data.pass_count || 0,
+        currentLevel: (data.currentLevel as CardLevel) || 'L1',
+        passCount: data.passCount || 0,
         currentCard,
         isFlipped: !!currentCard,
         mode: data.mode as GameMode,
         isHost: false,
-        sessionId: data.bible_study_session_id,
-        groupNumber: data.group_number,
+        sessionId: data.bibleStudySessionId,
+        groupNumber: data.groupNumber,
       }));
 
       toast.success('已加入遊戲！');
@@ -233,42 +216,33 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, []);
 
-  // Find existing game for session/group with retry
   const findSessionGame = useCallback(async () => {
     if (!options.sessionId || !options.groupNumber) return null;
 
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      // Stagger initial search to prevent thundering herd
       await staggeredStart(1000);
       
       const data = await withRetry(async () => {
-        const { data, error } = await supabase
-          .from('icebreaker_games')
-          .select('*')
-          .eq('bible_study_session_id', options.sessionId)
-          .eq('group_number', options.groupNumber)
-          .eq('status', 'active')
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        if (error) throw error;
-        return data;
+        const response = await fetch(
+          `/api/icebreaker/session-game?sessionId=${options.sessionId}&groupNumber=${options.groupNumber}`
+        );
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error('Failed to find session game');
+        return response.json();
       }, { maxRetries: 2, baseDelayMs: 500 });
 
       if (data) {
-        // Found existing game - join it
         let currentCard = null;
-        if (data.current_card_id) {
-          const cardData = await fetchCardContent(data.current_card_id);
+        if (data.currentCardId) {
+          const cardData = await fetchCardContent(data.currentCardId);
           if (cardData) {
             currentCard = {
-              id: data.current_card_id,
+              id: data.currentCardId,
               content: cardData.content,
               contentEn: cardData.contentEn,
-              level: data.current_level as CardLevel,
+              level: data.currentLevel as CardLevel,
             };
           }
         }
@@ -276,10 +250,10 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
         setState(prev => ({
           ...prev,
           gameId: data.id,
-          roomCode: data.room_code,
+          roomCode: data.roomCode,
           isLoading: false,
-          currentLevel: (data.current_level as CardLevel) || 'L1',
-          passCount: data.pass_count || 0,
+          currentLevel: (data.currentLevel as CardLevel) || 'L1',
+          passCount: data.passCount || 0,
           currentCard,
           isFlipped: !!currentCard,
           mode: 'session',
@@ -298,7 +272,6 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, [options.sessionId, options.groupNumber]);
 
-  // Draw a card with retry
   const drawCard = useCallback(async (level?: CardLevel) => {
     if (!state.gameId) {
       toast.error('請先開始遊戲');
@@ -307,41 +280,38 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
 
     setState(prev => ({ ...prev, isDrawing: true, isFlipped: false }));
 
-    // Add a small delay for the flip-back animation
     await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
       const result = await withRetry(async () => {
-        const { data, error } = await supabase.rpc('draw_next_card', {
-          p_game_id: state.gameId,
-          p_level: level || state.currentLevel,
+        const response = await fetch(`/api/icebreaker/games/${state.gameId}/draw-card`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ level: level || state.currentLevel }),
         });
-
-        if (error) throw error;
-        return data?.[0];
+        if (!response.ok) throw new Error('Failed to draw card');
+        return response.json();
       }, { maxRetries: 2, baseDelayMs: 300 });
       
-      if (!result?.card_id) {
-        toast.info(result?.card_content || '這個等級的牌已經抽完了！');
+      if (!result?.cardId) {
+        toast.info(result?.cardContent || '這個等級的牌已經抽完了！');
         setState(prev => ({ ...prev, isDrawing: false }));
         return;
       }
 
-      // Fetch English content for the card
-      const cardData = await fetchCardContent(result.card_id);
+      const cardData = await fetchCardContent(result.cardId);
 
-      // Trigger flip animation after a brief delay
       setTimeout(() => {
         setState(prev => ({
           ...prev,
           currentCard: {
-            id: result.card_id,
-            content: result.card_content,
+            id: result.cardId,
+            content: result.cardContent,
             contentEn: cardData?.contentEn || null,
-            level: result.card_level as CardLevel,
+            level: result.cardLevel as CardLevel,
           },
-          cardsRemaining: result.cards_remaining,
-          currentLevel: result.card_level as CardLevel,
+          cardsRemaining: result.cardsRemaining,
+          currentLevel: result.cardLevel as CardLevel,
           isDrawing: false,
           isFlipped: true,
         }));
@@ -354,7 +324,6 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, [state.gameId, state.currentLevel]);
 
-  // Pass current card
   const passCard = useCallback(() => {
     if (state.passCount >= MAX_PASSES) {
       toast.error('PASS 次數已用完！');
@@ -366,34 +335,30 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
       passCount: prev.passCount + 1,
     }));
 
-    // Update pass count in database
     if (state.gameId) {
-      supabase
-        .from('icebreaker_games')
-        .update({ pass_count: state.passCount + 1 })
-        .eq('id', state.gameId)
-        .then();
+      fetch(`/api/icebreaker/games/${state.gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passCount: state.passCount + 1 }),
+      }).catch(console.warn);
     }
 
     toast.info(`PASS！剩餘 ${MAX_PASSES - state.passCount - 1} 次`);
     drawCard();
   }, [state.gameId, state.passCount, drawCard]);
 
-  // Change level
   const changeLevel = useCallback((level: CardLevel) => {
     setState(prev => ({ ...prev, currentLevel: level }));
   }, []);
 
-  // Reset deck
   const resetDeck = useCallback(async () => {
     if (!state.gameId) return;
 
     try {
-      const { error } = await supabase.rpc('reset_icebreaker_deck', {
-        p_game_id: state.gameId,
+      const response = await fetch(`/api/icebreaker/games/${state.gameId}/reset`, {
+        method: 'POST',
       });
-
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to reset deck');
 
       setState(prev => ({
         ...prev,
@@ -409,11 +374,9 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     }
   }, [state.gameId]);
 
-  // Sync timer state to database
   const syncTimer = useCallback(async (duration: number, startedAt: string | null, running: boolean) => {
     if (!state.gameId) return;
 
-    // Update local state immediately
     setState(prev => ({
       ...prev,
       timerDuration: duration,
@@ -421,22 +384,21 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
       timerRunning: running,
     }));
 
-    // Sync to database for other participants
     try {
-      await supabase
-        .from('icebreaker_games')
-        .update({
-          timer_duration: duration,
-          timer_started_at: startedAt,
-          timer_running: running,
-        })
-        .eq('id', state.gameId);
+      await fetch(`/api/icebreaker/games/${state.gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timerDuration: duration,
+          timerStartedAt: startedAt,
+          timerRunning: running,
+        }),
+      });
     } catch (error) {
       console.error('Failed to sync timer:', error);
     }
   }, [state.gameId]);
 
-  // Get remaining passes
   const remainingPasses = MAX_PASSES - state.passCount;
 
   return {
