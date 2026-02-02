@@ -323,23 +323,76 @@ export async function registerRoutes(app: Express) {
         );
       }
       
-      const content = JSON.stringify({
-        summary: `Generated ${reportType} report for ${filteredResponses.length} study responses`,
-        responses: filteredResponses.map(r => ({
-          participantName: r.participantName || 'Anonymous',
-          groupNumber: r.groupNumber,
-          titlePhrase: r.titlePhrase,
-          heartbeatVerse: r.heartbeatVerse,
-          observation: r.observation,
-          coreInsightCategory: r.coreInsightCategory,
-          coreInsightNote: r.coreInsightNote,
-          scholarsNote: r.scholarsNote,
-          actionPlan: r.actionPlan,
-          coolDownNote: r.coolDownNote
-        })),
-        fastMode,
-        filledOnly
-      });
+      // Generate markdown-formatted report content
+      const generateMarkdownReport = (responses: typeof filteredResponses, grpNum?: number) => {
+        const members = responses.map(r => r.participantName || '匿名').join('、');
+        const titlePhrases = [...new Set(responses.map(r => r.titlePhrase).filter(Boolean))];
+        const observations = responses.map(r => r.observation).filter(Boolean);
+        const insights = responses.map(r => r.coreInsightNote).filter(Boolean);
+        const applications = responses.map(r => r.actionPlan).filter(Boolean);
+        
+        let content = '';
+        if (grpNum) {
+          content += `**組別：** 第 ${grpNum} 組\n`;
+        } else {
+          content += `**📊 全會眾綜合分析**\n`;
+        }
+        content += `**組員：** ${members}\n\n`;
+        
+        if (titlePhrases.length > 0) {
+          content += `**📖 主題（Themes）：**\n`;
+          titlePhrases.forEach(t => { content += `• ${t}\n`; });
+          content += '\n';
+        }
+        
+        if (observations.length > 0) {
+          content += `**🔍 事實發現（Observations）：**\n`;
+          observations.slice(0, 5).forEach(o => { content += `• ${o}\n`; });
+          content += '\n';
+        }
+        
+        if (insights.length > 0) {
+          content += `**💡 獨特亮光（Unique Insights）：**\n`;
+          insights.slice(0, 5).forEach(i => { content += `• ${i}\n`; });
+          content += '\n';
+        }
+        
+        if (applications.length > 0) {
+          content += `**🎯 如何應用（Applications）：**\n`;
+          applications.slice(0, 5).forEach(a => { content += `• ${a}\n`; });
+          content += '\n';
+        }
+        
+        content += `**👤 個人貢獻摘要：**\n`;
+        responses.forEach(r => {
+          content += `• **${r.participantName || '匿名'}**：${r.titlePhrase || ''}${r.heartbeatVerse ? ' - ' + r.heartbeatVerse : ''}\n`;
+        });
+        
+        return content;
+      };
+      
+      let content: string;
+      if (reportType === 'group' && groupNumber) {
+        content = generateMarkdownReport(filteredResponses, groupNumber);
+      } else {
+        // Overall report - group by groupNumber
+        const groupedResponses = new Map<number, typeof filteredResponses>();
+        filteredResponses.forEach(r => {
+          const grp = r.groupNumber || 0;
+          if (!groupedResponses.has(grp)) groupedResponses.set(grp, []);
+          groupedResponses.get(grp)!.push(r);
+        });
+        
+        const sections: string[] = [];
+        const sortedGroups = [...groupedResponses.keys()].sort((a, b) => a - b);
+        sortedGroups.forEach(grp => {
+          const grpResponses = groupedResponses.get(grp)!;
+          if (grpResponses.length > 0) {
+            sections.push(generateMarkdownReport(grpResponses, grp || undefined));
+          }
+        });
+        content = sections.join('\n========================================\n\n');
+      }
       
       const report = await storage.createAiReport({
         sessionId: req.params.sessionId,
