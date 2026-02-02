@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book } from 'lucide-react';
+import { ArrowLeft, Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle } from 'lucide-react';
 
 interface JesusEvent {
   id: number;
@@ -31,7 +31,7 @@ const seasonInfo = {
 const JesusTimelinePage = () => {
   const [selectedSeason, setSelectedSeason] = useState<string>('春');
 
-  const { data: events = [], isLoading } = useQuery<JesusEvent[]>({
+  const { data: events = [], isLoading, isError } = useQuery<JesusEvent[]>({
     queryKey: ['/api/jesus/timeline', { season: selectedSeason }],
   });
 
@@ -86,6 +86,11 @@ const JesusTimelinePage = () => {
             <CardContent>
               {isLoading ? (
                 <div className="text-center py-8 text-muted-foreground">載入中...</div>
+              ) : isError ? (
+                <div className="text-center py-8 text-destructive flex flex-col items-center gap-2">
+                  <AlertCircle className="w-6 h-6" />
+                  <span>載入時間軸事件時發生錯誤</span>
+                </div>
               ) : events.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">暫無事件</div>
               ) : (

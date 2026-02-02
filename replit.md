@@ -144,6 +144,13 @@ npm run db:push # Push database schema
   - New endpoint: POST /api/participants/:id/set-ready with Zod validation
   - GroupVerification component updated to use fetch API
   - supabase-helpers.ts updateParticipantReady function migrated
+- **We Learn Rejesus Integration** (2026-02-02): Integrated three new features into the Learn section
+  - **Bible Reader** (BiblePage.tsx): Browse 31,102 verses with Old/New Testament separation, chapter navigation, and search
+  - **Jesus 4 Seasons Timeline** (JesusTimelinePage.tsx): 208 events organized by season (春/夏/秋/冬) with visual timeline
+  - **Reading Plans** (ReadingPlansPage.tsx): 12 themed 14-day reading plans with daily content
+  - **Learn Hub** (LearnPage.tsx): Main hub with random blessing verse display and feature navigation cards
+  - New API endpoints: /api/bible/books, /api/bible/chapters/:book, /api/bible/verses/:book/:chapter, /api/bible/search, /api/bible/blessing/random, /api/jesus/timeline, /api/reading-plans, /api/reading-plans/:id/items
+  - All pages include proper error handling, loading states, and data-testid attributes
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |

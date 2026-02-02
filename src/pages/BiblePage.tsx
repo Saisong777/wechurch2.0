@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Search, Book, ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, Search, Book, ChevronRight, X, AlertCircle } from 'lucide-react';
 
 interface BibleBook {
   bookName: string;
@@ -34,21 +34,21 @@ const BiblePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  const { data: books = [] } = useQuery<BibleBook[]>({
+  const { data: books = [], isError: booksError } = useQuery<BibleBook[]>({
     queryKey: ['/api/bible/books'],
   });
 
-  const { data: chapters = [] } = useQuery<BibleChapter[]>({
+  const { data: chapters = [], isError: chaptersError } = useQuery<BibleChapter[]>({
     queryKey: ['/api/bible/chapters', selectedBook],
     enabled: !!selectedBook,
   });
 
-  const { data: verses = [], isLoading: versesLoading } = useQuery<BibleVerse[]>({
+  const { data: verses = [], isLoading: versesLoading, isError: versesError } = useQuery<BibleVerse[]>({
     queryKey: ['/api/bible/verses', selectedBook, selectedChapter],
     enabled: !!selectedBook && !!selectedChapter,
   });
 
-  const { data: searchResults = [], isLoading: searchLoading } = useQuery<BibleVerse[]>({
+  const { data: searchResults = [], isLoading: searchLoading, isError: searchError } = useQuery<BibleVerse[]>({
     queryKey: ['/api/bible/search', { q: searchQuery }],
     enabled: isSearching && searchQuery.length >= 2,
   });
@@ -121,6 +121,11 @@ const BiblePage = () => {
                 </div>
                 {searchLoading ? (
                   <div className="text-center py-8 text-muted-foreground">搜尋中...</div>
+                ) : searchError ? (
+                  <div className="text-center py-8 text-destructive flex flex-col items-center gap-2">
+                    <AlertCircle className="w-6 h-6" />
+                    <span>搜尋時發生錯誤</span>
+                  </div>
                 ) : searchResults.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">找不到相關經文</div>
                 ) : (
@@ -150,11 +155,16 @@ const BiblePage = () => {
                 </div>
                 {versesLoading ? (
                   <div className="text-center py-8 text-muted-foreground">載入中...</div>
+                ) : versesError ? (
+                  <div className="text-center py-8 text-destructive flex flex-col items-center gap-2">
+                    <AlertCircle className="w-6 h-6" />
+                    <span>載入經文時發生錯誤</span>
+                  </div>
                 ) : (
                   <ScrollArea className="h-[500px]">
                     <div className="space-y-2">
                       {verses.map((v) => (
-                        <div key={v.id} className="flex gap-2">
+                        <div key={v.id} className="flex gap-2" data-testid={`verse-${v.chapter}-${v.verse}`}>
                           <span className="text-primary font-medium min-w-[2rem] text-right">{v.verse}</span>
                           <span className="text-foreground">{v.text}</span>
                         </div>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, BookOpen, Clock, ChevronRight, X, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock, ChevronRight, X, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface ReadingPlan {
   id: string;
@@ -26,26 +26,14 @@ interface ReadingPlanItem {
   notes: string | null;
 }
 
-const difficultyColors: Record<string, string> = {
-  easy: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
-  hard: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-};
-
-const difficultyLabels: Record<string, string> = {
-  easy: '入門',
-  medium: '進階',
-  hard: '挑戰',
-};
-
 const ReadingPlansPage = () => {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
-  const { data: plans = [], isLoading: plansLoading } = useQuery<ReadingPlan[]>({
+  const { data: plans = [], isLoading: plansLoading, isError: plansError } = useQuery<ReadingPlan[]>({
     queryKey: ['/api/reading-plans'],
   });
 
-  const { data: planItems = [], isLoading: itemsLoading } = useQuery<ReadingPlanItem[]>({
+  const { data: planItems = [], isLoading: itemsLoading, isError: itemsError } = useQuery<ReadingPlanItem[]>({
     queryKey: ['/api/reading-plans', selectedPlanId, 'items'],
     enabled: !!selectedPlanId,
   });
@@ -82,6 +70,11 @@ const ReadingPlansPage = () => {
                 <CardContent className="py-4">
                   {itemsLoading ? (
                     <div className="text-center py-8 text-muted-foreground">載入中...</div>
+                  ) : itemsError ? (
+                    <div className="text-center py-8 text-destructive flex flex-col items-center gap-2">
+                      <AlertCircle className="w-6 h-6" />
+                      <span>載入計劃內容時發生錯誤</span>
+                    </div>
                   ) : planItems.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">暫無計劃內容</div>
                   ) : (
@@ -131,6 +124,11 @@ const ReadingPlansPage = () => {
 
               {plansLoading ? (
                 <div className="text-center py-8 text-muted-foreground">載入中...</div>
+              ) : plansError ? (
+                <div className="text-center py-8 text-destructive flex flex-col items-center gap-2">
+                  <AlertCircle className="w-6 h-6" />
+                  <span>載入讀經計劃時發生錯誤</span>
+                </div>
               ) : plans.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">暫無讀經計劃</div>
               ) : (
