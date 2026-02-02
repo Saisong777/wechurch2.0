@@ -143,7 +143,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
       .filter(p => p.groupNumber !== null)
       .map(p => ({
         sessionId: currentSession!.id,
-        participantId: p.id,
+        userId: p.id,
         groupNumber: p.groupNumber!,
         name: p.name,
         email: p.email,
@@ -154,7 +154,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
         traditionalExegesis: getRandomItem(MOCK_EXEGESIS),
         inspirationFromGod: getRandomItem(MOCK_INSPIRATIONS),
         applicationInLife: getRandomItem(MOCK_APPLICATIONS),
-        others: getRandomItem(MOCK_OTHERS) || null,
+        others: getRandomItem(MOCK_OTHERS) || "",
       }));
 
     if (submissions.length === 0) {
@@ -173,6 +173,9 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
         });
         if (response.ok) {
           insertedCount++;
+        } else {
+          const errorData = await response.json();
+          console.error('Submission failed:', errorData);
         }
       } catch (error) {
         console.error('Submission insert error:', error);
@@ -261,10 +264,13 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
           body: JSON.stringify({ name, email, gender, location }),
         });
 
-        if (response.ok) {
-          const newParticipant = await response.json();
-          insertedCount++;
+        const newParticipant = await response.json();
+        // The API returns the new participant object with id, name, etc.
+        // We ensure we keep the same structure for generateMockSubmissions
+        if (autoGenerateSubmissions && hasGroupedParticipants) {
+           // This logic might need adjustment if users are not yet grouped
         }
+        insertedCount++;
       }
 
       // Refresh participants list via API

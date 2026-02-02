@@ -219,11 +219,29 @@ export async function registerRoutes(app: Express) {
     try {
       const parsed = insertSubmissionSchema.safeParse({ ...req.body, sessionId: req.params.sessionId });
       if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid submission data", details: parsed.error.errors });
+        console.error("[create-submission] Validation error:", (parsed as any).error.errors);
+        return res.status(400).json({ error: "Invalid submission data", details: (parsed as any).error.errors });
       }
-      const submission = await storage.createSubmission(parsed.data);
+      // Ensure all fields are present or default to empty string to satisfy DB schema
+      const submissionData = {
+        sessionId: req.params.sessionId,
+        participantId: req.body.userId || req.body.participantId,
+        groupNumber: req.body.groupNumber,
+        name: req.body.name,
+        email: req.body.email,
+        bibleVerse: req.body.bibleVerse,
+        theme: req.body.theme || "",
+        movingVerse: req.body.movingVerse || "",
+        factsDiscovered: req.body.factsDiscovered || "",
+        traditionalExegesis: req.body.traditionalExegesis || "",
+        inspirationFromGod: req.body.inspirationFromGod || "",
+        applicationInLife: req.body.applicationInLife || "",
+        others: req.body.others || "",
+      };
+      const submission = await storage.createSubmission(submissionData as any);
       res.status(201).json(submission);
     } catch (error) {
+      console.error("[create-submission] Error:", error);
       res.status(500).json({ error: "Failed to create submission" });
     }
   });
