@@ -41,19 +41,11 @@ async function getCredentials() {
 export async function getResendClient() {
   const { apiKey, fromEmail } = await getCredentials();
   
-  // Use the verified from_email from Resend settings
-  // If not configured or using unverified domain (like gmail.com), use Resend's test address
-  let validFromEmail = fromEmail;
+  // Use verified wechurch domain for sending emails
+  // The domain must be verified at https://resend.com/domains
+  const validFromEmail = 'WeChurch <noreply@wechurch.app>';
   
-  // Check if the fromEmail is from an unverified common email provider
-  const unverifiedDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'qq.com', '163.com'];
-  const emailDomain = fromEmail?.split('@')[1]?.toLowerCase();
-  
-  if (!fromEmail || unverifiedDomains.includes(emailDomain)) {
-    // Use Resend's test address for development/testing
-    validFromEmail = 'WeChurch <onboarding@resend.dev>';
-    console.log('[Resend] Using Resend test address instead of:', fromEmail);
-  }
+  console.log('[Resend] Using from address:', validFromEmail);
   
   return {
     client: new Resend(apiKey),
