@@ -264,12 +264,12 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
           body: JSON.stringify({ name, email, gender, location }),
         });
 
-        const newParticipant = await response.json();
-        // The API returns the new participant object with id, name, etc.
-        // We ensure we keep the same structure for generateMockSubmissions
-        if (autoGenerateSubmissions && hasGroupedParticipants) {
-           // This logic might need adjustment if users are not yet grouped
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Participant creation failed:', errorData);
+          throw new Error(errorData.error || 'Failed to create participant');
         }
+
         insertedCount++;
       }
 

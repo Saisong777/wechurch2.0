@@ -118,11 +118,13 @@ export async function registerRoutes(app: Express) {
     try {
       const parsed = insertParticipantSchema.safeParse({ ...req.body, sessionId: req.params.sessionId });
       if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid participant data", details: parsed.error.errors });
+        console.error("[create-participant] Validation error:", (parsed as any).error.errors);
+        return res.status(400).json({ error: "Invalid participant data", details: (parsed as any).error.errors });
       }
       const participant = await storage.createParticipant(parsed.data);
       res.status(201).json(participant);
     } catch (error) {
+      console.error("[create-participant] Error:", error);
       res.status(500).json({ error: "Failed to create participant" });
     }
   });
