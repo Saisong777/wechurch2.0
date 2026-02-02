@@ -3,7 +3,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, Plus, Calendar, Users, ChevronRight, Trash2, QrCode, Download, Copy, Maximize2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -23,11 +22,11 @@ import { getSessionJoinUrl } from '@/lib/url-helpers';
 
 interface PastSession {
   id: string;
-  short_code: string | null;
-  verse_reference: string;
+  shortCode: string | null;
+  verseReference: string;
   status: string;
-  created_at: string;
-  participant_count?: number;
+  createdAt: string;
+  participantCount?: number;
 }
 
 interface SessionHistoryProps {
@@ -50,54 +49,47 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
     const loadSessions = async () => {
       if (!user) return;
 
-      // First get sessions - exclude completed ones (they're in history browser)
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('sessions')
-        .select('id, short_code, verse_reference, status, created_at')
-        .eq('owner_id', user.id)
-        .neq('status', 'completed')  // Hide completed sessions
-        .order('created_at', { ascending: false });
+      try {
+        const response = await fetch('/api/sessions');
+        if (!response.ok) throw new Error('Failed to fetch sessions');
+        const sessionsData = await response.json();
 
-      if (sessionsError || !sessionsData) {
+        // Filter to non-completed sessions and get participant counts
+        const filteredSessions = sessionsData.filter((s: any) => s.status !== 'completed');
+        
+        const sessionsWithCounts = await Promise.all(
+          filteredSessions.map(async (session: any) => {
+            const participantsRes = await fetch(`/api/sessions/${session.id}/participants`);
+            const participants = participantsRes.ok ? await participantsRes.json() : [];
+            
+            return {
+              id: session.id,
+              shortCode: session.shortCode,
+              verseReference: session.verseReference,
+              status: session.status,
+              createdAt: session.createdAt,
+              participantCount: participants.length || 0,
+            };
+          })
+        );
+
+        setSessions(sessionsWithCounts);
+      } catch (error) {
+        console.error('Error loading sessions:', error);
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      // Then get participant counts for each session
-      const sessionsWithCounts = await Promise.all(
-        sessionsData.map(async (session) => {
-          const { count } = await supabase
-            .from('participants')
-            .select('*', { count: 'exact', head: true })
-            .eq('session_id', session.id);
-          
-          return {
-            ...session,
-            participant_count: count || 0,
-          };
-        })
-      );
-
-      setSessions(sessionsWithCounts);
-      setIsLoading(false);
     };
 
     loadSessions();
   }, [user]);
 
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
+    e.stopPropagation();
     
     try {
-      // Delete related data first (due to foreign key constraints)
-      await supabase.from('ai_reports').delete().eq('session_id', sessionId);
-      await supabase.from('submissions').delete().eq('session_id', sessionId);
-      await supabase.from('participants').delete().eq('session_id', sessionId);
-      
-      // Delete the session
-      const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
-      
-      if (error) throw error;
+      const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete session');
       
       setSessions(sessions.filter(s => s.id !== sessionId));
       toast.success('聚會已刪除');
@@ -116,7 +108,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
 
   const handleCopyId = () => {
     if (!selectedSession) return;
-    const codeToCopy = selectedSession.short_code || selectedSession.id;
+    const codeToCopy = selectedSession.shortCode || selectedSession.id;
     navigator.clipboard.writeText(codeToCopy);
     toast.success('課程代碼已複製！');
   };
@@ -137,7 +129,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
       ctx?.drawImage(img, 0, 0);
       const pngFile = canvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
-      downloadLink.download = `soul-gym-${selectedSession.short_code || selectedSession.id.slice(0, 8)}.png`;
+      downloadLink.download = `soul-gym-${selectedSession.shortCode || selectedSession.id.slice(0, 8)}.png`;
       downloadLink.href = pngFile;
       downloadLink.click();
     };
@@ -211,18 +203,18 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                         <p className="font-serif text-base sm:text-lg font-semibold truncate">
-                          {session.verse_reference}
+                          {session.verseReference}
                         </p>
                         {getStatusBadge(session.status)}
                       </div>
                       <div className="flex items-center gap-3 sm:gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          {format(new Date(session.created_at), 'yyyy/MM/dd')}
+                          {format(new Date(session.createdAt), 'yyyy/MM/dd')}
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          {session.participant_count} 人
+                          {session.participantCount} 人
                         </span>
                       </div>
                     </div>
@@ -281,7 +273,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
         <DialogContent className={isExpanded ? "max-w-2xl" : "max-w-md"}>
           <DialogHeader>
             <DialogTitle className="text-center">
-              {selectedSession?.verse_reference || '查經聚會'}
+              {selectedSession?.verseReference || '查經聚會'}
             </DialogTitle>
           </DialogHeader>
           {selectedSession && (
@@ -293,7 +285,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               >
                 <QRCodeSVG
                   id="session-history-qr"
-                  value={getSessionJoinUrl(selectedSession.short_code || selectedSession.id)}
+                  value={getSessionJoinUrl(selectedSession.shortCode || selectedSession.id)}
                   size={isExpanded ? 350 : 200}
                   level="H"
                   includeMargin
@@ -303,9 +295,9 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               </div>
               
               {/* Short Code prominently displayed */}
-              {selectedSession.short_code && (
+              {selectedSession.shortCode && (
                 <div className="text-center">
-                  <p className="text-3xl font-mono font-bold tracking-[0.3em]">{selectedSession.short_code}</p>
+                  <p className="text-3xl font-mono font-bold tracking-[0.3em]">{selectedSession.shortCode}</p>
                   <p className="text-xs text-muted-foreground mt-1">課程代碼</p>
                 </div>
               )}
@@ -317,7 +309,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               {/* Short Code with copy */}
               <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
                 <span className="text-lg font-mono font-bold">
-                  {selectedSession.short_code || selectedSession.id.slice(0, 8)}
+                  {selectedSession.shortCode || selectedSession.id.slice(0, 8)}
                 </span>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyId}>
                   <Copy className="w-4 h-4" />

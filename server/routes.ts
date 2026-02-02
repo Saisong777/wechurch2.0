@@ -6,9 +6,30 @@ import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 export async function registerRoutes(app: Express) {
   await setupAuth(app);
   registerAuthRoutes(app);
-  app.get("/api/sessions/:shortCode", async (req, res) => {
+  app.get("/api/sessions", async (req, res) => {
+    try {
+      const sessions = await storage.getSessions();
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get sessions" });
+    }
+  });
+
+  app.get("/api/sessions/by-code/:shortCode", async (req, res) => {
     try {
       const session = await storage.getSessionByShortCode(req.params.shortCode);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get session" });
+    }
+  });
+
+  app.get("/api/sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getSession(req.params.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
@@ -40,6 +61,15 @@ export async function registerRoutes(app: Express) {
       res.json(session);
     } catch (error) {
       res.status(500).json({ error: "Failed to update session" });
+    }
+  });
+
+  app.delete("/api/sessions/:id", async (req, res) => {
+    try {
+      await storage.deleteSession(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete session" });
     }
   });
 
@@ -165,14 +195,31 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/prayers", async (req, res) => {
     try {
-      const parsed = insertPrayerSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid prayer data", details: parsed.error.errors });
-      }
-      const prayer = await storage.createPrayer(parsed.data);
+      const prayer = await storage.createPrayer(req.body);
       res.status(201).json(prayer);
     } catch (error) {
       res.status(500).json({ error: "Failed to create prayer" });
+    }
+  });
+
+  app.patch("/api/prayers/:id", async (req, res) => {
+    try {
+      const prayer = await storage.updatePrayer(req.params.id, req.body);
+      if (!prayer) {
+        return res.status(404).json({ error: "Prayer not found" });
+      }
+      res.json(prayer);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update prayer" });
+    }
+  });
+
+  app.delete("/api/prayers/:id", async (req, res) => {
+    try {
+      await storage.deletePrayer(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete prayer" });
     }
   });
 
@@ -288,6 +335,24 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/message-cards/all", async (req, res) => {
+    try {
+      const cards = await storage.getAllMessageCards();
+      res.json(cards);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get all message cards" });
+    }
+  });
+
+  app.get("/api/message-card-downloads", async (req, res) => {
+    try {
+      const downloads = await storage.getMessageCardDownloads();
+      res.json(downloads);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get message card downloads" });
+    }
+  });
+
   app.get("/api/message-cards/:shortCode", async (req, res) => {
     try {
       const card = await storage.getMessageCard(req.params.shortCode);
@@ -306,6 +371,64 @@ export async function registerRoutes(app: Express) {
       res.status(201).json(card);
     } catch (error) {
       res.status(500).json({ error: "Failed to create message card" });
+    }
+  });
+
+  app.get("/api/users", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  app.get("/api/user-roles", async (req, res) => {
+    try {
+      const roles = await storage.getUserRoles();
+      res.json(roles);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get user roles" });
+    }
+  });
+
+  app.put("/api/user-roles/:userId", async (req, res) => {
+    try {
+      const { role } = req.body;
+      await storage.upsertUserRole(req.params.userId, role);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user role" });
+    }
+  });
+
+  app.patch("/api/potential-members/:id", async (req, res) => {
+    try {
+      const updated = await storage.updatePotentialMember(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Potential member not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update potential member" });
+    }
+  });
+
+  app.delete("/api/potential-members/:id", async (req, res) => {
+    try {
+      await storage.deletePotentialMember(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete potential member" });
+    }
+  });
+
+  app.get("/api/sessions/:sessionId/study-responses", async (req, res) => {
+    try {
+      const responses = await storage.getStudyResponses(req.params.sessionId);
+      res.json(responses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get study responses" });
     }
   });
 

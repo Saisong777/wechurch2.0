@@ -8,18 +8,26 @@ import {
   User, InsertUser, Session, InsertSession, Participant, InsertParticipant,
   Submission, InsertSubmission, Prayer, InsertPrayer, StudyResponse, InsertStudyResponse,
   FeatureToggle, PotentialMember, IcebreakerGame, IcebreakerPlayer, CardQuestion,
-  AiReport, MessageCard
+  AiReport, MessageCard, MessageCardDownload
 } from "@shared/schema";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  
+  getUserRoles(): Promise<{ userId: string; role: string }[]>;
+  getUserRole(userId: string): Promise<string | undefined>;
+  upsertUserRole(userId: string, role: string): Promise<void>;
   
   getSession(id: string): Promise<Session | undefined>;
+  getSessions(): Promise<Session[]>;
   getSessionByShortCode(shortCode: string): Promise<Session | undefined>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, data: Partial<Session>): Promise<Session | undefined>;
+  deleteSession(id: string): Promise<void>;
   
   getParticipants(sessionId: string): Promise<Participant[]>;
   getParticipant(id: string): Promise<Participant | undefined>;
@@ -37,6 +45,8 @@ export interface IStorage {
   
   getPrayers(): Promise<Prayer[]>;
   createPrayer(prayer: InsertPrayer): Promise<Prayer>;
+  updatePrayer(id: string, data: Partial<Prayer>): Promise<Prayer | undefined>;
+  deletePrayer(id: string): Promise<void>;
   
   getFeatureToggles(): Promise<FeatureToggle[]>;
   getFeatureToggle(key: string): Promise<FeatureToggle | undefined>;
@@ -44,6 +54,10 @@ export interface IStorage {
   
   getPotentialMembers(): Promise<PotentialMember[]>;
   upsertPotentialMember(data: { email: string; name: string; gender?: string }): Promise<PotentialMember>;
+  updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined>;
+  deletePotentialMember(id: string): Promise<void>;
+  
+  getStudyResponses(sessionId: string): Promise<StudyResponse[]>;
   
   getIcebreakerGame(id: string): Promise<IcebreakerGame | undefined>;
   getIcebreakerGameByRoomCode(roomCode: string): Promise<IcebreakerGame | undefined>;
@@ -71,14 +85,45 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
   async createUser(user: InsertUser): Promise<User> {
     const [newUser] = await db.insert(users).values(user).returning();
     return newUser;
   }
 
+  async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async getUserRoles(): Promise<{ userId: string; role: string }[]> {
+    return db.select({ userId: userRoles.userId, role: userRoles.role }).from(userRoles);
+  }
+
+  async getUserRole(userId: string): Promise<string | undefined> {
+    const [role] = await db.select().from(userRoles).where(eq(userRoles.userId, userId)).limit(1);
+    return role?.role;
+  }
+
+  async upsertUserRole(userId: string, role: string): Promise<void> {
+    const existing = await db.select().from(userRoles).where(eq(userRoles.userId, userId)).limit(1);
+    if (existing.length > 0) {
+      await db.update(userRoles).set({ role }).where(eq(userRoles.userId, userId));
+    } else {
+      await db.insert(userRoles).values({ userId, role });
+    }
+  }
+
   async getSession(id: string): Promise<Session | undefined> {
     const [session] = await db.select().from(sessions).where(eq(sessions.id, id)).limit(1);
     return session;
+  }
+
+  async getSessions(): Promise<Session[]> {
+    return db.select().from(sessions).orderBy(desc(sessions.createdAt));
   }
 
   async getSessionByShortCode(shortCode: string): Promise<Session | undefined> {
@@ -95,6 +140,14 @@ export class DatabaseStorage implements IStorage {
   async updateSession(id: string, data: Partial<Session>): Promise<Session | undefined> {
     const [updated] = await db.update(sessions).set(data).where(eq(sessions.id, id)).returning();
     return updated;
+  }
+
+  async deleteSession(id: string): Promise<void> {
+    await db.delete(aiReports).where(eq(aiReports.sessionId, id));
+    await db.delete(submissions).where(eq(submissions.sessionId, id));
+    await db.delete(studyResponses).where(eq(studyResponses.sessionId, id));
+    await db.delete(participants).where(eq(participants.sessionId, id));
+    await db.delete(sessions).where(eq(sessions.id, id));
   }
 
   async getParticipants(sessionId: string): Promise<Participant[]> {
@@ -163,6 +216,15 @@ export class DatabaseStorage implements IStorage {
     return newPrayer;
   }
 
+  async updatePrayer(id: string, data: Partial<Prayer>): Promise<Prayer | undefined> {
+    const [updated] = await db.update(prayers).set({ ...data, updatedAt: new Date() }).where(eq(prayers.id, id)).returning();
+    return updated;
+  }
+
+  async deletePrayer(id: string): Promise<void> {
+    await db.delete(prayers).where(eq(prayers.id, id));
+  }
+
   async getFeatureToggles(): Promise<FeatureToggle[]> {
     return db.select().from(featureToggles);
   }
@@ -192,6 +254,22 @@ export class DatabaseStorage implements IStorage {
     }
     const [newMember] = await db.insert(potentialMembers).values(data).returning();
     return newMember;
+  }
+
+  async updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined> {
+    const [updated] = await db.update(potentialMembers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(potentialMembers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePotentialMember(id: string): Promise<void> {
+    await db.delete(potentialMembers).where(eq(potentialMembers.id, id));
+  }
+
+  async getStudyResponses(sessionId: string): Promise<StudyResponse[]> {
+    return db.select().from(studyResponses).where(eq(studyResponses.sessionId, sessionId));
   }
 
   async getIcebreakerGame(id: string): Promise<IcebreakerGame | undefined> {
@@ -235,6 +313,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(messageCards).where(eq(messageCards.isActive, true));
   }
 
+  async getAllMessageCards(): Promise<MessageCard[]> {
+    return db.select().from(messageCards).orderBy(desc(messageCards.createdAt));
+  }
+
   async getMessageCard(shortCode: string): Promise<MessageCard | undefined> {
     const [card] = await db.select().from(messageCards).where(eq(messageCards.shortCode, shortCode)).limit(1);
     return card;
@@ -243,6 +325,10 @@ export class DatabaseStorage implements IStorage {
   async createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard> {
     const [newCard] = await db.insert(messageCards).values(card).returning();
     return newCard;
+  }
+
+  async getMessageCardDownloads(): Promise<MessageCardDownload[]> {
+    return db.select().from(messageCardDownloads).orderBy(desc(messageCardDownloads.downloadedAt));
   }
 }
 

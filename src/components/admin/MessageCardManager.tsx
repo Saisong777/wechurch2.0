@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, ChevronLeft, Pencil, RefreshCw, TrendingUp, Calendar, BarChart3 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -20,18 +19,18 @@ import { DownloadRecordsDialog } from './DownloadRecordsDialog';
 interface MessageCard {
   id: string;
   title: string;
-  short_code: string;
-  image_path: string;
-  is_active: boolean;
-  created_at: string;
+  shortCode: string;
+  imagePath: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 interface Download {
   id: string;
-  card_id: string;
-  user_name: string;
-  user_email: string;
-  downloaded_at: string;
+  cardId: string;
+  userName: string;
+  userEmail: string;
+  downloadedAt: string;
 }
 
 interface CardStats {
@@ -81,12 +80,9 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
   const fetchAllDownloads = async () => {
     setStatsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('message_card_downloads')
-        .select('*')
-        .order('downloaded_at', { ascending: false });
-
-      if (error) throw error;
+      const response = await fetch('/api/message-card-downloads');
+      if (!response.ok) throw new Error('Failed to fetch downloads');
+      const data = await response.json();
       setAllDownloads(data || []);
     } catch (err) {
       console.error('Error fetching all downloads:', err);
@@ -152,12 +148,9 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
 
   const fetchCards = async () => {
     try {
-      const { data, error } = await supabase
-        .from('message_cards')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const response = await fetch('/api/message-cards/all');
+      if (!response.ok) throw new Error('Failed to fetch cards');
+      const data = await response.json();
       setCards(data || []);
     } catch (err) {
       console.error('Error fetching cards:', err);

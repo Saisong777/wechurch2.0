@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Image, QrCode, Copy, Share2, Loader2, ExternalLink } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -12,9 +11,9 @@ import { getMessageCardUrl } from '@/lib/storage-helpers';
 interface MessageCard {
   id: string;
   title: string;
-  short_code: string;
-  image_path: string;
-  created_at: string;
+  shortCode: string;
+  imagePath: string;
+  createdAt: string;
 }
 
 interface QuickShareMessageCardProps {
@@ -32,16 +31,10 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
 
   const fetchLatestCard = async () => {
     try {
-      const { data, error } = await supabase
-        .from('message_cards')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      setLatestCard(data);
+      const response = await fetch('/api/message-cards');
+      if (!response.ok) throw new Error('Failed to fetch message cards');
+      const cards = await response.json();
+      setLatestCard(cards.length > 0 ? cards[0] : null);
     } catch (err) {
       console.error('Error fetching latest card:', err);
     } finally {
@@ -50,10 +43,9 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
   };
 
   const getDownloadUrl = (card: MessageCard) => {
-    return `${window.location.origin}/card?code=${card.short_code}`;
+    return `${window.location.origin}/card?code=${card.shortCode}`;
   };
 
-  // Use proxy URL to hide Supabase Storage URL from browser
   const getImageUrl = (imagePath: string) => getMessageCardUrl(imagePath, 'view');
 
   const handleCopyLink = () => {
@@ -67,7 +59,7 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
     
     const shareData = {
       title: latestCard.title,
-      text: `📖 ${latestCard.title}\n\n下載信息摘要圖片，代碼：${latestCard.short_code}`,
+      text: `📖 ${latestCard.title}\n\n下載信息摘要圖片，代碼：${latestCard.shortCode}`,
       url: getDownloadUrl(latestCard),
     };
 
@@ -120,7 +112,7 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
               <CardTitle className="text-base">本週信息摘要</CardTitle>
             </div>
             <Badge variant="secondary" className="font-mono">
-              {latestCard.short_code}
+              {latestCard.shortCode}
             </Badge>
           </div>
           <CardDescription className="text-sm truncate">
@@ -132,7 +124,7 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
           {/* Thumbnail preview */}
           <div className="aspect-video rounded-lg overflow-hidden bg-muted">
             <img
-              src={getImageUrl(latestCard.image_path)}
+              src={getImageUrl(latestCard.imagePath)}
               alt={latestCard.title}
               className="w-full h-full object-cover"
             />
@@ -194,14 +186,14 @@ export const QuickShareMessageCard: React.FC<QuickShareMessageCardProps> = ({ on
               <p className="text-sm text-muted-foreground mb-1">輸入代碼下載圖片</p>
               <div className="flex items-center justify-center gap-2">
                 <p className="text-4xl font-mono font-bold tracking-widest text-primary">
-                  {latestCard.short_code}
+                  {latestCard.shortCode}
                 </p>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => {
-                    navigator.clipboard.writeText(latestCard.short_code);
+                    navigator.clipboard.writeText(latestCard.shortCode);
                     toast.success('已複製代碼');
                   }}
                   title="複製代碼"

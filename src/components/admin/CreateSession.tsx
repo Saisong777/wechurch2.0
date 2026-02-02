@@ -7,7 +7,6 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Dumbbell, Download, CheckCircle, Copy, Flame, Gamepad2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
@@ -40,43 +39,44 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
     
     setIsCreating(true);
     
-    const { data, error } = await supabase
-      .from('sessions')
-      .insert({ 
-        verse_reference: verseReference, 
-        status: 'waiting',
-        owner_id: user.id,
-        icebreaker_enabled: icebreakerEnabled,
-        allow_latecomers: allowLatecomers
-      })
-      .select()
-      .single();
-    
-    if (error) {
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          verseReference,
+          status: 'waiting',
+          ownerId: user.id,
+          icebreakerEnabled,
+          allowLatecomers
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to create session');
+      const data = await response.json();
+
+      setCurrentSession({
+        id: data.id,
+        shortCode: data.shortCode,
+        bibleVerse: '',
+        verseReference: data.verseReference,
+        status: data.status as 'waiting' | 'grouping' | 'studying' | 'completed',
+        createdAt: new Date(data.createdAt),
+        groups: [],
+      });
+      setIsAdmin(true);
+      
+      // Show success modal with QR code
+      setCreatedSessionId(data.id);
+      setCreatedShortCode(data.shortCode || data.id.slice(0, 8));
+      setCreatedVerseRef(data.verseReference);
+      setShowSuccessModal(true);
+    } catch (error) {
       console.error('Error creating session:', error);
       toast.error('建立失敗，請重試');
+    } finally {
       setIsCreating(false);
-      return;
     }
-
-    setCurrentSession({
-      id: data.id,
-      shortCode: data.short_code,
-      bibleVerse: '',
-      verseReference: data.verse_reference,
-      status: data.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-      createdAt: new Date(data.created_at),
-      groups: [],
-    });
-    setIsAdmin(true);
-    
-    // Show success modal with QR code
-    setCreatedSessionId(data.id);
-    setCreatedShortCode(data.short_code || data.id.slice(0, 8));
-    setCreatedVerseRef(data.verse_reference);
-    setShowSuccessModal(true);
-    
-    setIsCreating(false);
   };
 
   const handleCopyCode = () => {

@@ -15,12 +15,10 @@ import { QuickShareMessageCard } from '@/components/admin/QuickShareMessageCard'
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
-import { fetchParticipants, fetchSubmissions } from '@/lib/supabase-helpers';
 import { toast } from 'sonner';
 
 type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'create' | 'waiting' | 'monitor';
@@ -52,32 +50,33 @@ export const AdminPage: React.FC = () => {
   }, [user, loading, canCreateSession, navigate]);
 
   const handleSelectSession = async (sessionId: string) => {
-    // Load session data
-    const { data: sessionData } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single();
+    try {
+      // Load session data
+      const sessionResponse = await fetch(`/api/sessions/${sessionId}`);
+      if (!sessionResponse.ok) throw new Error('Failed to fetch session');
+      const sessionData = await sessionResponse.json();
 
-    if (sessionData) {
+      // Load participants
+      const participantsResponse = await fetch(`/api/sessions/${sessionId}/participants`);
+      const participants = participantsResponse.ok ? await participantsResponse.json() : [];
+
+      // Load submissions
+      const submissionsResponse = await fetch(`/api/sessions/${sessionId}/submissions`);
+      const submissions = submissionsResponse.ok ? await submissionsResponse.json() : [];
+
       setCurrentSession({
         id: sessionData.id,
-        shortCode: sessionData.short_code,
+        shortCode: sessionData.shortCode,
         bibleVerse: '',
-        verseReference: sessionData.verse_reference,
+        verseReference: sessionData.verseReference,
         status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-        createdAt: new Date(sessionData.created_at),
+        createdAt: new Date(sessionData.createdAt),
         groups: [],
-        allowLatecomers: sessionData.allow_latecomers,
-        icebreakerEnabled: sessionData.icebreaker_enabled,
+        allowLatecomers: sessionData.allowLatecomers,
+        icebreakerEnabled: sessionData.icebreakerEnabled,
       });
       setIsAdmin(true);
-
-      // Load participants and submissions
-      const participants = await fetchParticipants(sessionId);
       setUsers(participants);
-
-      const submissions = await fetchSubmissions(sessionId);
       setSubmissions(submissions);
 
       // Determine which step to show based on session status
@@ -85,27 +84,30 @@ export const AdminPage: React.FC = () => {
         setStep('waiting');
       } else {
         // Rebuild groups from participants
-        const groupNumbers = [...new Set(participants.filter(p => p.groupNumber).map(p => p.groupNumber))];
-        const groups = groupNumbers.map(num => ({
+        const groupNumbers = [...new Set(participants.filter((p: any) => p.groupNumber).map((p: any) => p.groupNumber))];
+        const groups = groupNumbers.map((num: number) => ({
           id: `group-${num}`,
-          number: num!,
-          members: participants.filter(p => p.groupNumber === num),
+          number: num,
+          members: participants.filter((p: any) => p.groupNumber === num),
         }));
         
         const updatedSession = {
           id: sessionData.id,
-          shortCode: sessionData.short_code,
+          shortCode: sessionData.shortCode,
           bibleVerse: '',
-          verseReference: sessionData.verse_reference,
+          verseReference: sessionData.verseReference,
           status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-          createdAt: new Date(sessionData.created_at),
+          createdAt: new Date(sessionData.createdAt),
           groups,
-          allowLatecomers: sessionData.allow_latecomers,
-          icebreakerEnabled: sessionData.icebreaker_enabled,
+          allowLatecomers: sessionData.allowLatecomers,
+          icebreakerEnabled: sessionData.icebreakerEnabled,
         };
         setCurrentSession(updatedSession);
         setStep('monitor');
       }
+    } catch (error) {
+      console.error('Error loading session:', error);
+      toast.error('無法載入課程資料');
     }
   };
 

@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface FeatureToggle {
   id: string;
-  feature_key: string;
-  feature_name: string;
+  featureKey: string;
+  featureName: string;
   description: string | null;
-  is_enabled: boolean;
-  disabled_message: string | null;
-  updated_at: string;
+  isEnabled: boolean;
+  disabledMessage: string | null;
+  updatedAt: string;
 }
 
 export function useFeatureToggles() {
@@ -18,12 +17,9 @@ export function useFeatureToggles() {
 
   const fetchFeatures = async () => {
     try {
-      const { data, error } = await supabase
-        .from('feature_toggles')
-        .select('*')
-        .order('feature_key');
-
-      if (error) throw error;
+      const response = await fetch('/api/feature-toggles');
+      if (!response.ok) throw new Error('Failed to fetch features');
+      const data = await response.json();
       setFeatures(data || []);
     } catch (err) {
       console.error('Error fetching feature toggles:', err);
@@ -35,70 +31,38 @@ export function useFeatureToggles() {
 
   useEffect(() => {
     fetchFeatures();
-
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('feature-toggles')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'feature_toggles',
-        },
-        (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            setFeatures(prev => 
-              prev.map(f => f.id === (payload.new as FeatureToggle).id 
-                ? payload.new as FeatureToggle 
-                : f
-              )
-            );
-          } else if (payload.eventType === 'INSERT') {
-            setFeatures(prev => [...prev, payload.new as FeatureToggle]);
-          } else if (payload.eventType === 'DELETE') {
-            setFeatures(prev => prev.filter(f => f.id !== (payload.old as { id: string }).id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const isFeatureEnabled = (featureKey: string): boolean => {
-    const feature = features.find(f => f.feature_key === featureKey);
-    return feature?.is_enabled ?? true; // Default to enabled if not found
+    const feature = features.find(f => f.featureKey === featureKey);
+    return feature?.isEnabled ?? true;
   };
 
   const getDisabledMessage = (featureKey: string): string => {
-    const feature = features.find(f => f.feature_key === featureKey);
-    return feature?.disabled_message || '即將推出';
+    const feature = features.find(f => f.featureKey === featureKey);
+    return feature?.disabledMessage || '即將推出';
   };
 
   const getFeature = (featureKey: string): FeatureToggle | undefined => {
-    return features.find(f => f.feature_key === featureKey);
+    return features.find(f => f.featureKey === featureKey);
   };
 
   const updateFeature = async (featureKey: string, isEnabled: boolean, disabledMessage?: string) => {
     try {
-      const updateData: { is_enabled: boolean; updated_at: string; disabled_message?: string } = {
-        is_enabled: isEnabled,
-        updated_at: new Date().toISOString(),
-      };
-      
-      if (disabledMessage !== undefined) {
-        updateData.disabled_message = disabledMessage;
-      }
+      const feature = features.find(f => f.featureKey === featureKey);
+      if (!feature) return false;
 
-      const { error } = await supabase
-        .from('feature_toggles')
-        .update(updateData)
-        .eq('feature_key', featureKey);
+      const response = await fetch(`/api/feature-toggles/${feature.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isEnabled,
+          ...(disabledMessage !== undefined && { disabledMessage }),
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to update feature');
+      await fetchFeatures();
       return true;
     } catch (err) {
       console.error('Error updating feature toggle:', err);

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole, AppRole } from '@/hooks/useUserRole';
-import { useUnifiedMembers, useSimulateParticipant, PotentialMember } from '@/hooks/useUnifiedMembers';
+import { useUnifiedMembers, PotentialMember } from '@/hooks/useUnifiedMembers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,6 @@ import { CRMBulkActions } from '@/components/admin/CRMBulkActions';
 import { LinkUserDialog } from '@/components/admin/LinkUserDialog';
 import { IncompleteMembersPanel } from '@/components/admin/IncompleteMembersPanel';
 import { AuthForm } from '@/components/auth/AuthForm';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const CRMPage = () => {
@@ -59,30 +58,25 @@ const CRMPage = () => {
     statsLoading, 
     updateRole,
     updatePotentialMember,
-    bulkUpdateStatus,
-    bulkUpdateSubscription,
-    bulkDelete,
     deleteMember,
-    linkUserManually,
     forceRefetch,
   } = useUnifiedMembers({ tab, status, role });
 
   // Get active session for simulation
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const simulateParticipant = useSimulateParticipant();
 
   useEffect(() => {
     const fetchActiveSession = async () => {
-      const { data } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('status', 'waiting')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (data) {
-        setActiveSessionId(data.id);
+      try {
+        const response = await fetch('/api/sessions');
+        if (!response.ok) return;
+        const sessions = await response.json();
+        const waitingSession = sessions.find((s: any) => s.status === 'waiting');
+        if (waitingSession) {
+          setActiveSessionId(waitingSession.id);
+        }
+      } catch (error) {
+        console.error('Error fetching active session:', error);
       }
     };
     fetchActiveSession();
@@ -120,38 +114,20 @@ const CRMPage = () => {
     setSelectedIds(new Set());
   };
 
-  // Bulk action handlers
-  const handleBulkUpdateStatus = (newStatus: PotentialMember['status']) => {
-    // Get potential_member_ids from selected unified members
-    const pmIds = members
-      ?.filter(m => selectedIds.has(m.id) && m.potential_member_id)
-      .map(m => m.potential_member_id!) || [];
-    
-    bulkUpdateStatus.mutate(
-      { ids: pmIds, status: newStatus },
-      { onSuccess: () => setSelectedIds(new Set()) }
-    );
+  // Bulk action handlers - TODO: Implement after API migration
+  const handleBulkUpdateStatus = (_newStatus: PotentialMember['status']) => {
+    toast.info('批量更新狀態功能尚未實現');
+    setSelectedIds(new Set());
   };
 
-  const handleBulkUpdateSubscription = (newSubscribed: boolean) => {
-    const pmIds = members
-      ?.filter(m => selectedIds.has(m.id) && m.potential_member_id)
-      .map(m => m.potential_member_id!) || [];
-    
-    bulkUpdateSubscription.mutate(
-      { ids: pmIds, subscribed: newSubscribed },
-      { onSuccess: () => setSelectedIds(new Set()) }
-    );
+  const handleBulkUpdateSubscription = (_newSubscribed: boolean) => {
+    toast.info('批量更新訂閱功能尚未實現');
+    setSelectedIds(new Set());
   };
 
   const handleBulkDelete = () => {
-    const pmIds = members
-      ?.filter(m => selectedIds.has(m.id) && m.potential_member_id)
-      .map(m => m.potential_member_id!) || [];
-    
-    bulkDelete.mutate(pmIds, {
-      onSuccess: () => setSelectedIds(new Set()),
-    });
+    toast.info('批量刪除功能尚未實現');
+    setSelectedIds(new Set());
   };
 
   // Single member handlers
@@ -172,8 +148,8 @@ const CRMPage = () => {
     setLinkDialogOpen(true);
   };
 
-  const handleLinkConfirm = (potentialMemberId: string, userId: string) => {
-    linkUserManually.mutate({ potentialMemberId, userId });
+  const handleLinkConfirm = (_potentialMemberId: string, _userId: string) => {
+    toast.info('手動連結用戶功能尚未實現');
   };
 
   const handleDeleteClick = (id: string) => {
@@ -190,9 +166,7 @@ const CRMPage = () => {
   };
 
   const handleSimulate = () => {
-    if (activeSessionId) {
-      simulateParticipant.mutate(activeSessionId);
-    }
+    toast.info('模擬功能暫時停用');
   };
 
   const handleCopyEmails = () => {
@@ -209,7 +183,7 @@ const CRMPage = () => {
     }
   };
 
-  const isUpdating = bulkUpdateStatus.isPending || bulkUpdateSubscription.isPending || bulkDelete.isPending;
+  const isUpdating = false;
 
   // Loading state
   if (authLoading || roleLoading) {
@@ -311,7 +285,6 @@ const CRMPage = () => {
                     variant="outline" 
                     size="sm" 
                     onClick={handleSimulate}
-                    disabled={simulateParticipant.isPending}
                   >
                     <FlaskConical className="h-4 w-4 mr-2" />
                     模擬
