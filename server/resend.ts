@@ -41,9 +41,9 @@ async function getCredentials() {
 export async function getResendClient() {
   const { apiKey, fromEmail } = await getCredentials();
   
-  // Use verified wechurch domain for sending emails
+  // Use verified wechurch.online domain for sending emails
   // The domain must be verified at https://resend.com/domains
-  const validFromEmail = 'WeChurch <noreply@wechurch.app>';
+  const validFromEmail = 'WeChurch <noreply@wechurch.online>';
   
   console.log('[Resend] Using from address:', validFromEmail);
   
