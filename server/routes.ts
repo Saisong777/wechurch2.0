@@ -758,6 +758,30 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Get message card image
+  app.get("/api/message-cards/image/:filename", (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(process.cwd(), 'public', 'message-cards', filename);
+    
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ error: "Image not found" });
+    }
+  });
+
+  // Get message card image
+  app.get("/api/message-cards/image/:filename", (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(process.cwd(), 'public', 'message-cards', filename);
+    
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ error: "Image not found" });
+    }
+  });
+
   // Upload message card image
   app.post("/api/message-cards/upload", uploadMessageCard.single('image'), async (req, res) => {
     try {

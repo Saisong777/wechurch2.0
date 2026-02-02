@@ -6,8 +6,8 @@
  * Get URL for message card images stored in public folder
  */
 export const getMessageCardUrl = (imagePath: string, mode: 'view' | 'download' = 'view'): string => {
-  // Return local public URL
-  return `/message-cards/${imagePath}`;
+  // Return Express API URL for message card images
+  return `/api/message-cards/image/${imagePath}`;
 };
 
 /**
