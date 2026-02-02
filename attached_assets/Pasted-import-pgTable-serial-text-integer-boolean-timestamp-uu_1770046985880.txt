@@ -1,0 +1,342 @@
+import { pgTable, serial, text, integer, boolean, timestamp, uuid, date, jsonb, varchar } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const jesus4seasons = pgTable("jesus_4seasons", {
+  id: serial("id").primaryKey(),
+  display_order: integer("display_order").notNull().default(0),
+  EventID: text("EventID"),
+  Date_Maybe: text("Date_Maybe"),
+  Date_Stage: text("Date_Stage"),
+  Stage_Short: text("Stage_Short"),
+  季節: text("季節").notNull(),
+  大約日期: text("大約日期"),
+  地點: text("地點"),
+  事件名稱: text("事件名稱").notNull(),
+  事件分類: text("事件分類"),
+  神學主題: text("神學主題"),
+  耶穌品格: text("耶穌品格"),
+  焦點: text("焦點"),
+  福音中心: text("福音中心"),
+  經文總覽: text("經文總覽"),
+  經文_太: text("經文_太"),
+  經文_可: text("經文_可"),
+  經文_路: text("經文_路"),
+  經文_約: text("經文_約"),
+  經文狀態: text("經文狀態"),
+  合參原則: text("合參原則"),
+  年代確信度: text("年代確信度"),
+  順序確信度: text("順序確信度"),
+  資料類型: text("資料類型"),
+  事件分類_五大精分: text("事件分類_五大精分"),
+  分類依據_研究級: text("分類依據_研究級"),
+  教導_主題_研究級: text("教導_主題_研究級"),
+  事件分類_研究級_細分: text("事件分類_研究級_細分"),
+  教導_天國_二級主題: text("教導_天國_二級主題"),
+  比喻_二級主題: text("比喻_二級主題"),
+  神蹟_二級主題: text("神蹟_二級主題"),
+  事件分類_研究級_終版: text("事件分類_研究級_終版"),
+  示範_二級主題: text("示範_二級主題"),
+  智慧_二級主題: text("智慧_二級主題"),
+  幽默_二級主題: text("幽默_二級主題"),
+  事件分類_研究級_終極: text("事件分類_研究級_終極"),
+  分類_Tags: text("分類_Tags"),
+  新約串珠: text("新約串珠"),
+  新約串珠_理由: text("新約串珠_理由"),
+  新約串珠_事件級: text("新約串珠_事件級"),
+  新約串珠_事件級_結論: text("新約串珠_事件級_結論"),
+  主題索引_研究級: text("主題索引_研究級"),
+  舊約彌賽亞串珠: text("舊約彌賽亞串珠"),
+  舊約經文引用_耶穌: text("舊約經文引用_耶穌"),
+  人事時地物預表: text("人事時地物預表"),
+  舊約經文引用_耶穌_擴充: text("舊約經文引用_耶穌_擴充"),
+  人事時地物預表_一級: text("人事時地物預表_一級"),
+  人事時地物預表_二級: text("人事時地物預表_二級"),
+  福音中心_微型敘事: text("福音中心_微型敘事"),
+  福音中心_old: text("福音中心_old"),
+  使用者痛點標籤: text("使用者痛點標籤"),
+  一句帶走的話: text("一句帶走的話"),
+  使用者痛點_主要: text("使用者痛點_主要"),
+  使用者痛點_次要: text("使用者痛點_次要"),
+});
+
+export const chineseUnionTrad = pgTable("chinese_union_trad", {
+  Verse_ID: integer("Verse ID").primaryKey(),
+  Book_Name: text("Book Name").notNull(),
+  Book_Number: integer("Book Number"),
+  Chapter: integer("Chapter").notNull(),
+  Verse: integer("Verse").notNull(),
+  Text: text("Text").notNull(),
+});
+
+export const blessingVerses = pgTable("blessing_verses", {
+  id: serial("id").primaryKey(),
+  verse_id: integer("verse_id").notNull(),
+  book_name: text("book_name").notNull(),
+  book_number: integer("book_number"),
+  chapter: integer("chapter").notNull(),
+  verse: integer("verse").notNull(),
+  text: text("text").notNull(),
+  blessing_verse: text("blessing_verse"),
+  blessing_type: text("blessing_type"),
+  ai_pastoral_safety: text("ai_pastoral_safety"),
+  text_norm: text("text_norm"),
+  uplift_score: integer("uplift_score"),
+  emotional_focus: text("emotional_focus"),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const profiles = pgTable("profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: text("user_id").notNull().unique(),
+  display_name: text("display_name"),
+  is_leader: boolean("is_leader").notNull().default(false),
+  family_id: text("family_id"),
+  home_group: text("home_group"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const devotionalNotes = pgTable("devotional_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: text("user_id").notNull(),
+  verse_reference: text("verse_reference").notNull(),
+  verse_text: text("verse_text").notNull(),
+  theme: text("theme"),
+  key_verse: text("key_verse"),
+  new_understanding: text("new_understanding"),
+  promises: text("promises"),
+  notes: text("notes"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const savedVerses = pgTable("saved_verses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: text("user_id").notNull(),
+  verse_reference: text("verse_reference").notNull(),
+  verse_text: text("verse_text").notNull(),
+  book_name: text("book_name").notNull(),
+  chapter: integer("chapter").notNull(),
+  verse_start: integer("verse_start").notNull(),
+  verse_end: integer("verse_end"),
+  notes: text("notes"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const jesusDailyContent = pgTable("jesus_daily_content", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  month: integer("month").notNull(),
+  event_id: text("event_id").notNull().unique(),
+  event_name: text("event_name").notNull(),
+  location: text("location"),
+  scripture_overview: text("scripture_overview"),
+  ai_description: text("ai_description").notNull(),
+  image_url: text("image_url"),
+  date_maybe: text("date_maybe"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const groups = pgTable("groups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  invite_code: text("invite_code").notNull().unique(),
+  created_by: text("created_by").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const groupMembers = pgTable("group_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  group_id: uuid("group_id").notNull(),
+  user_id: text("user_id").notNull(),
+  role: text("role").notNull().default("member"),
+  joined_at: timestamp("joined_at").notNull().defaultNow(),
+});
+
+export const groupPosts = pgTable("group_posts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  group_id: uuid("group_id").notNull(),
+  user_id: text("user_id").notNull(),
+  content: text("content").notNull(),
+  post_type: text("post_type").notNull().default("prayer"),
+  is_pinned: boolean("is_pinned").notNull().default(false),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const groupPostComments = pgTable("group_post_comments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  post_id: uuid("post_id").notNull(),
+  user_id: text("user_id").notNull(),
+  content: text("content").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const groupPostPrayers = pgTable("group_post_prayers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  post_id: uuid("post_id").notNull(),
+  user_id: text("user_id").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const readingPlanTemplates = pgTable("reading_plan_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("custom"),
+  duration_days: integer("duration_days").notNull().default(365),
+  is_public: boolean("is_public").notNull().default(false),
+  created_by: text("created_by"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const readingPlanTemplateItems = pgTable("reading_plan_template_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  template_id: uuid("template_id").notNull(),
+  day_number: integer("day_number").notNull(),
+  title: text("title"),
+  book_name: text("book_name"),
+  chapter_start: integer("chapter_start"),
+  chapter_end: integer("chapter_end"),
+  verse_start: integer("verse_start"),
+  verse_end: integer("verse_end"),
+  scripture_reference: text("scripture_reference"),
+  notes: text("notes"),
+});
+
+export const userReadingPlans = pgTable("user_reading_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: text("user_id").notNull(),
+  template_id: uuid("template_id"),
+  name: text("name").notNull(),
+  description: text("description"),
+  start_date: date("start_date").notNull(),
+  end_date: date("end_date"),
+  is_active: boolean("is_active").notNull().default(true),
+  group_id: uuid("group_id"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userReadingProgress = pgTable("user_reading_progress", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: text("user_id").notNull(),
+  plan_id: uuid("plan_id").notNull(),
+  day_number: integer("day_number").notNull(),
+  reading_date: date("reading_date").notNull(),
+  scripture_reference: text("scripture_reference").notNull(),
+  is_completed: boolean("is_completed").notNull().default(false),
+  completed_at: timestamp("completed_at"),
+  devotional_note_id: uuid("devotional_note_id"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const groupingEvents = pgTable("grouping_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  group_size: integer("group_size").notNull().default(4),
+  grouping_mode: text("grouping_mode").notNull().default("balanced_leader_avoid_family_and_homegroup"),
+  status: text("status").notNull().default("draft"),
+  created_by: text("created_by"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+  grouped_at: timestamp("grouped_at"),
+  conflict_report: jsonb("conflict_report"),
+});
+
+export const eventParticipants = pgTable("event_participants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  event_id: uuid("event_id").notNull(),
+  user_id: text("user_id").notNull(),
+  state: text("state").notNull().default("waiting"),
+  group_number: integer("group_number"),
+  joined_at: timestamp("joined_at").notNull().defaultNow(),
+});
+
+export const bibleStudySessions = pgTable("bible_study_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scripture_today: text("scripture_today").notNull(),
+  session_date: date("session_date").notNull(),
+  title: text("title"),
+  google_sheet_url: text("google_sheet_url"),
+  status: text("status").notNull().default("collecting"),
+  created_by: text("created_by").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const bibleStudyResponses = pgTable("bible_study_responses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  session_id: uuid("session_id").notNull(),
+  group_name: text("group_name").notNull(),
+  participant_name: text("participant_name").notNull(),
+  email: text("email").notNull(),
+  observation_theme: text("observation_theme"),
+  key_verse: text("key_verse"),
+  promise_or_command: text("promise_or_command"),
+  warning_or_avoidance: text("warning_or_avoidance"),
+  new_understanding_of_god: text("new_understanding_of_god"),
+  life_action: text("life_action"),
+  other_reflection: text("other_reflection"),
+  email_sent: boolean("email_sent").notNull().default(false),
+  email_sent_at: timestamp("email_sent_at"),
+  submitted_at: timestamp("submitted_at").notNull().defaultNow(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const bibleStudyReports = pgTable("bible_study_reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  session_id: uuid("session_id").notNull(),
+  report_type: text("report_type").notNull(),
+  group_name: text("group_name"),
+  theme_synthesis: text("theme_synthesis"),
+  key_verse_resonance: text("key_verse_resonance"),
+  promise_and_command_consensus: text("promise_and_command_consensus"),
+  group_warning: text("group_warning"),
+  shared_new_understanding: text("shared_new_understanding"),
+  life_application: text("life_application"),
+  prayer_focus: text("prayer_focus"),
+  google_doc_id: text("google_doc_id"),
+  google_doc_url: text("google_doc_url"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userRoles = pgTable("user_roles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: uuid("user_id").notNull(),
+  role: text("role").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Jesus4Seasons = typeof jesus4seasons.$inferSelect;
+export type InsertJesus4Seasons = typeof jesus4seasons.$inferInsert;
+export type ChineseUnionTrad = typeof chineseUnionTrad.$inferSelect;
+export type BlessingVerse = typeof blessingVerses.$inferSelect;
+export type Profile = typeof profiles.$inferSelect;
+export type DevotionalNote = typeof devotionalNotes.$inferSelect;
+export type SavedVerse = typeof savedVerses.$inferSelect;
+export type JesusDailyContent = typeof jesusDailyContent.$inferSelect;
+export type Group = typeof groups.$inferSelect;
+export type GroupMember = typeof groupMembers.$inferSelect;
+export type GroupPost = typeof groupPosts.$inferSelect;
+export type GroupPostComment = typeof groupPostComments.$inferSelect;
+export type GroupPostPrayer = typeof groupPostPrayers.$inferSelect;
+export type GroupingEvent = typeof groupingEvents.$inferSelect;
+export type EventParticipant = typeof eventParticipants.$inferSelect;
+export type BibleStudySession = typeof bibleStudySessions.$inferSelect;
+export type BibleStudyResponse = typeof bibleStudyResponses.$inferSelect;
+export type BibleStudyReport = typeof bibleStudyReports.$inferSelect;
+export type UserRole = typeof userRoles.$inferSelect;
+export type ReadingPlanTemplate = typeof readingPlanTemplates.$inferSelect;
+export type ReadingPlanTemplateItem = typeof readingPlanTemplateItems.$inferSelect;
+export type UserReadingPlan = typeof userReadingPlans.$inferSelect;
+export type UserReadingProgress = typeof userReadingProgress.$inferSelect;
+
+// Export Replit Auth schema
+export * from "./models/auth";
