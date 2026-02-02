@@ -90,6 +90,14 @@ npm run db:push # Push database schema
 - Configured PostgreSQL database
 - Fixed CSS import order for Google Fonts
 - **Data Migration Completed**: Imported 1,170 records from Supabase CSV exports
+- **History Browser Enhanced**:
+  - Personal notes now grouped by 組別 (group number)
+  - Added search functionality for notes and AI reports
+  - Groups are now collapsible with expand/collapse toggle
+  - Added delete functionality for individual study responses
+  - Added delete functionality for AI reports (hover to show delete button)
+  - Removed "教練控制台" header text from admin page
+  - New endpoint: DELETE /api/study-responses/:id
 - **Icebreaker Game Migration**: Fully migrated from Supabase to Express API
   - useIcebreakerGame hook converted to API calls with polling (3s intervals)
   - TurnBasedCardGame and IcebreakerGame components migrated

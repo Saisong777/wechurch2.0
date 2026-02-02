@@ -47,6 +47,7 @@ export interface IStorage {
   
   getStudyResponse(sessionId: string, participantId: string): Promise<StudyResponse | undefined>;
   upsertStudyResponse(response: InsertStudyResponse & { sessionId: string; userId: string }): Promise<StudyResponse>;
+  deleteStudyResponse(id: string): Promise<void>;
   
   getPrayers(): Promise<Prayer[]>;
   createPrayer(prayer: InsertPrayer): Promise<Prayer>;
@@ -256,6 +257,10 @@ export class DatabaseStorage implements IStorage {
     }
     const [newResponse] = await db.insert(studyResponses).values(response).returning();
     return newResponse;
+  }
+
+  async deleteStudyResponse(id: string): Promise<void> {
+    await db.delete(studyResponses).where(eq(studyResponses.id, id));
   }
 
   async getPrayers(): Promise<Prayer[]> {

@@ -470,6 +470,16 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.delete("/api/study-responses/:id", async (req, res) => {
+    try {
+      await storage.deleteStudyResponse(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting study response:", error);
+      res.status(500).json({ error: "Failed to delete study response" });
+    }
+  });
+
   app.get("/api/prayers", async (req, res) => {
     try {
       const prayers = await storage.getPrayers();

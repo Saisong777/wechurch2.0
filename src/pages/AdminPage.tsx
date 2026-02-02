@@ -312,14 +312,6 @@ export const AdminPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Header - hide on mobile to save space */}
-      <div className="hidden sm:block">
-        <Header 
-          variant="compact" 
-          title="教練控制台"
-          subtitle="Coach Dashboard"
-        />
-      </div>
 
       <main className="container mx-auto max-w-7xl">
         {/* Progress indicator - only show during session flow */}

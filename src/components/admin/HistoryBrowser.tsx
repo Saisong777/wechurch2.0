@@ -33,6 +33,7 @@ import {
   Brain,
   FileText,
   ChevronRight,
+  ChevronDown,
   BarChart3,
   Clock,
   CheckCircle2,
@@ -41,6 +42,11 @@ import {
   Copy,
   Trash2
 } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { format, startOfMonth, isThisMonth, subMonths, isSameMonth } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { INSIGHT_CATEGORIES, InsightCategory } from '@/types/spiritual-fitness';
@@ -95,6 +101,14 @@ export const HistoryBrowser: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<SessionWithResponses | null>(null);
   const [activeTab, setActiveTab] = useState<'notes' | 'reports'>('notes');
   const [notesSearchTerm, setNotesSearchTerm] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (groupNum: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupNum]: !prev[groupNum]
+    }));
+  };
 
   // Fetch all sessions with their responses using API
   const { data: sessions, isLoading } = useQuery({
@@ -259,10 +273,24 @@ export const HistoryBrowser: React.FC = () => {
       if (!res.ok) throw new Error('刪除失敗');
       
       toast.success('報告已刪除');
-      // Invalidate query to refresh data
       queryClient.invalidateQueries({ queryKey: ['admin_history'] });
     } catch (err) {
       console.error('Error deleting report:', err);
+      toast.error('刪除失敗');
+    }
+  };
+
+  const handleDeleteResponse = async (responseId: string) => {
+    if (!confirm('確定要刪除此筆記嗎？此操作無法復原。')) return;
+    
+    try {
+      const res = await fetch(`/api/study-responses/${responseId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('刪除失敗');
+      
+      toast.success('筆記已刪除');
+      queryClient.invalidateQueries({ queryKey: ['admin_history'] });
+    } catch (err) {
+      console.error('Error deleting response:', err);
       toast.error('刪除失敗');
     }
   };
@@ -420,26 +448,47 @@ export const HistoryBrowser: React.FC = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-6 pr-4">
+                <div className="space-y-4 pr-4">
                   {Object.entries(groupedResponses)
                     .sort(([a], [b]) => Number(a) - Number(b))
                     .map(([groupNum, responses]) => (
-                      <div key={`group-notes-${groupNum}`} className="space-y-3">
-                        <div className="flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
-                          <Users className="w-4 h-4 text-secondary" />
-                          <h3 className="font-semibold text-sm">
-                            {groupNum === '0' ? '未分組' : `第 ${groupNum} 組`}
-                          </h3>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {responses.length} 筆
-                          </Badge>
-                        </div>
-                        <div className="grid gap-3">
-                          {responses.map((response) => (
-                            <ResponseCard key={response.id} response={response} />
-                          ))}
-                        </div>
-                      </div>
+                      <Collapsible
+                        key={`group-notes-${groupNum}`}
+                        open={!collapsedGroups[groupNum]}
+                        onOpenChange={() => toggleGroup(groupNum)}
+                      >
+                        <Card className="overflow-hidden">
+                          <CollapsibleTrigger asChild>
+                            <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover-elevate bg-muted/30">
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-secondary" />
+                                <h3 className="font-semibold text-sm">
+                                  {groupNum === '0' ? '未分組' : `第 ${groupNum} 組`}
+                                </h3>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {responses.length} 筆
+                                </Badge>
+                              </div>
+                              {collapsedGroups[groupNum] ? (
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                              )}
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="grid gap-3 p-4 pt-2">
+                              {responses.map((response) => (
+                                <ResponseCard 
+                                  key={response.id} 
+                                  response={response}
+                                  onDelete={handleDeleteResponse}
+                                />
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Card>
+                      </Collapsible>
                     ))}
                 </div>
               )}
@@ -692,13 +741,14 @@ const SessionCard: React.FC<{
 // Response Card Component
 const ResponseCard: React.FC<{
   response: StudyResponseWithParticipant;
-}> = ({ response }) => {
+  onDelete?: (responseId: string) => void;
+}> = ({ response, onDelete }) => {
   const selectedCategory = INSIGHT_CATEGORIES.find(
     c => c.value === response.coreInsightCategory
   );
 
   return (
-    <Card className="bg-muted/30">
+    <Card className="bg-muted/30 group relative">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
@@ -709,6 +759,19 @@ const ResponseCard: React.FC<{
             <Badge variant="outline" className="text-xs">
               第 {response.groupNumber} 組
             </Badge>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(response.id);
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
           )}
         </div>
       </CardHeader>
@@ -766,9 +829,11 @@ const ResponseCard: React.FC<{
 // History Reports with Charts Wrapper
 interface HistoryReportsWithChartsProps {
   reports: AIReport[];
+  sessionId: string;
+  onDelete?: (reportId: string, sessionId: string) => void;
 }
 
-const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ reports }) => {
+const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ reports, sessionId, onDelete }) => {
   const groupReports = reports.filter(r => r.reportType === 'group' && r.groupNumber !== 0);
   const overallReport = reports.find(r => r.reportType === 'overall' || r.groupNumber === 0);
   
@@ -831,11 +896,25 @@ const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ rep
       {reports
         .filter(r => r.reportType === 'overall' || r.groupNumber === 0)
         .map(report => (
-          <HistoryReportSection 
-            key={report.id}
-            report={report}
-            variant="overall"
-          />
+          <div key={report.id} className="relative group/report">
+            <HistoryReportSection 
+              report={report}
+              variant="overall"
+            />
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 opacity-0 group-hover/report:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(report.id, sessionId);
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         ))}
 
       {/* Separator if both overall and group reports exist */}
@@ -853,11 +932,25 @@ const HistoryReportsWithCharts: React.FC<HistoryReportsWithChartsProps> = ({ rep
       {reports
         .filter(r => r.reportType === 'group' && r.groupNumber !== 0)
         .map(report => (
-          <HistoryReportSection 
-            key={report.id}
-            report={report}
-            variant="group"
-          />
+          <div key={report.id} className="relative group/report">
+            <HistoryReportSection 
+              report={report}
+              variant="group"
+            />
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 opacity-0 group-hover/report:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(report.id, sessionId);
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         ))}
     </div>
   );
