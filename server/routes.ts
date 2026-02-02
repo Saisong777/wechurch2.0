@@ -308,6 +308,36 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/sessions/:sessionId/reports", async (req, res) => {
+    try {
+      const { reportType, groupNumber, fastMode, filledOnly } = req.body;
+      const submissions = await storage.getSubmissions(req.params.sessionId);
+      
+      const groupSubmissions = groupNumber 
+        ? submissions.filter(s => s.groupNumber === groupNumber)
+        : submissions;
+      
+      const content = JSON.stringify({
+        summary: `Generated ${reportType} report for ${groupSubmissions.length} submissions`,
+        submissions: groupSubmissions.map(s => ({ name: s.name, theme: s.theme })),
+        fastMode,
+        filledOnly
+      });
+      
+      const report = await storage.createAiReport({
+        sessionId: req.params.sessionId,
+        reportType,
+        groupNumber,
+        content,
+        status: "COMPLETED"
+      });
+      
+      res.status(201).json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate report" });
+    }
+  });
+
   app.post("/api/sessions/:sessionId/reports/generate", async (req, res) => {
     try {
       const { reportType, groupNumber } = req.body;
