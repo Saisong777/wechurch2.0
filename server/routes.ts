@@ -311,15 +311,32 @@ export async function registerRoutes(app: Express) {
   app.post("/api/sessions/:sessionId/reports", async (req, res) => {
     try {
       const { reportType, groupNumber, fastMode, filledOnly } = req.body;
-      const submissions = await storage.getSubmissions(req.params.sessionId);
+      const studyResponses = await storage.getStudyResponses(req.params.sessionId);
       
-      const groupSubmissions = groupNumber 
-        ? submissions.filter(s => s.groupNumber === groupNumber)
-        : submissions;
+      let filteredResponses = studyResponses;
+      if (groupNumber !== undefined && groupNumber !== null) {
+        filteredResponses = studyResponses.filter(r => r.groupNumber === groupNumber);
+      }
+      if (filledOnly) {
+        filteredResponses = filteredResponses.filter(r => 
+          r.observation || r.coreInsightNote || r.actionPlan
+        );
+      }
       
       const content = JSON.stringify({
-        summary: `Generated ${reportType} report for ${groupSubmissions.length} submissions`,
-        submissions: groupSubmissions.map(s => ({ name: s.name, theme: s.theme })),
+        summary: `Generated ${reportType} report for ${filteredResponses.length} study responses`,
+        responses: filteredResponses.map(r => ({
+          participantName: r.participantName || 'Anonymous',
+          groupNumber: r.groupNumber,
+          titlePhrase: r.titlePhrase,
+          heartbeatVerse: r.heartbeatVerse,
+          observation: r.observation,
+          coreInsightCategory: r.coreInsightCategory,
+          coreInsightNote: r.coreInsightNote,
+          scholarsNote: r.scholarsNote,
+          actionPlan: r.actionPlan,
+          coolDownNote: r.coolDownNote
+        })),
         fastMode,
         filledOnly
       });
