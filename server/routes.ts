@@ -916,51 +916,69 @@ export async function registerRoutes(app: Express) {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Profile notification endpoint (requires RESEND_API_KEY to be configured)
+  // Profile notification endpoint using Resend integration
   app.post("/api/send-profile-notification", async (req, res) => {
     try {
       const { email, name, type, redirectUrl } = req.body;
       
-      // Check if email service is configured
-      if (!process.env.RESEND_API_KEY) {
-        return res.status(503).json({ 
-          error: "Email service not configured",
-          message: "請設定 RESEND_API_KEY 以啟用郵件發送功能"
-        });
+      const { sendEmail } = await import('./resend');
+      
+      let subject = '';
+      let html = '';
+      
+      switch (type) {
+        case 'welcome':
+          subject = '歡迎加入 WeChurch';
+          html = `
+            <h1>歡迎 ${name}!</h1>
+            <p>感謝您加入 WeChurch 社群。</p>
+            <p>點擊下方連結開始您的信仰之旅：</p>
+            <a href="${redirectUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0ea5e9; color: white; text-decoration: none; border-radius: 8px;">開始使用</a>
+          `;
+          break;
+        case 'session_invite':
+          subject = '您收到了一個聚會邀請';
+          html = `
+            <h1>Hi ${name}!</h1>
+            <p>您被邀請參加一個新的聚會。</p>
+            <a href="${redirectUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0ea5e9; color: white; text-decoration: none; border-radius: 8px;">查看詳情</a>
+          `;
+          break;
+        default:
+          subject = 'WeChurch 通知';
+          html = `
+            <h1>Hi ${name}!</h1>
+            <p>您有一則新通知。</p>
+            <a href="${redirectUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0ea5e9; color: white; text-decoration: none; border-radius: 8px;">查看</a>
+          `;
       }
-
-      // TODO: Implement email sending with Resend API
-      res.json({
-        success: true,
-        message: "郵件功能尚未完全遷移，請稍後再試"
+      
+      await sendEmail({
+        to: email,
+        subject,
+        html
       });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to send notification" });
+      
+      res.json({ success: true, message: "郵件已發送" });
+    } catch (error: any) {
+      console.error('Error sending notification:', error);
+      res.status(500).json({ error: "Failed to send notification", message: error.message });
     }
   });
 
-  // Bulk email endpoint (requires RESEND_API_KEY to be configured)
+  // Bulk email endpoint using Resend integration
   app.post("/api/send-bulk-email", async (req, res) => {
     try {
-      const { recipients, subject, body, isHtml, attachments } = req.body;
+      const { recipients, subject, body, isHtml } = req.body;
       
-      // Check if email service is configured
-      if (!process.env.RESEND_API_KEY) {
-        return res.status(503).json({ 
-          error: "Email service not configured",
-          message: "請設定 RESEND_API_KEY 以啟用郵件發送功能"
-        });
-      }
-
-      // TODO: Implement email sending with Resend API
-      // For now, return a placeholder response
-      res.json({
-        sent: recipients.length,
-        failed: 0,
-        message: "郵件功能尚未完全遷移，請稍後再試"
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to send emails" });
+      const { sendBulkEmail } = await import('./resend');
+      
+      const result = await sendBulkEmail(recipients, subject, body, isHtml !== false);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error sending bulk email:', error);
+      res.status(500).json({ error: "Failed to send emails", message: error.message });
     }
   });
 }
