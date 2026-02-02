@@ -47,6 +47,33 @@ const BACKGROUND_PRESETS = [
   { id: 'gradient6', name: '星夜', style: 'linear-gradient(135deg, #0c3483 0%, #a2b6df 100%)' },
 ];
 
+const TEXT_POSITIONS = [
+  { id: 'top-left', name: '左上', align: 'items-start justify-start', textAlign: 'text-left' },
+  { id: 'top-center', name: '上', align: 'items-start justify-center', textAlign: 'text-center' },
+  { id: 'top-right', name: '右上', align: 'items-start justify-end', textAlign: 'text-right' },
+  { id: 'center-left', name: '左', align: 'items-center justify-start', textAlign: 'text-left' },
+  { id: 'center', name: '中', align: 'items-center justify-center', textAlign: 'text-center' },
+  { id: 'center-right', name: '右', align: 'items-center justify-end', textAlign: 'text-right' },
+  { id: 'bottom-left', name: '左下', align: 'items-end justify-start', textAlign: 'text-left' },
+  { id: 'bottom-center', name: '下', align: 'items-end justify-center', textAlign: 'text-center' },
+  { id: 'bottom-right', name: '右下', align: 'items-end justify-end', textAlign: 'text-right' },
+];
+
+const ASPECT_RATIOS = [
+  { id: 'square', name: '正方形', ratio: 'aspect-square', width: 400, height: 400 },
+  { id: 'portrait', name: '直式 3:4', ratio: 'aspect-[3/4]', width: 400, height: 533 },
+  { id: 'story', name: '限時動態 9:16', ratio: 'aspect-[9/16]', width: 360, height: 640 },
+  { id: 'landscape', name: '橫式 4:3', ratio: 'aspect-[4/3]', width: 480, height: 360 },
+  { id: 'wide', name: '寬螢幕 16:9', ratio: 'aspect-[16/9]', width: 480, height: 270 },
+];
+
+const FONT_SIZES = [
+  { id: 'sm', name: '小', verse: 'text-base', ref: 'text-sm', message: 'text-sm' },
+  { id: 'md', name: '中', verse: 'text-lg', ref: 'text-base', message: 'text-base' },
+  { id: 'lg', name: '大', verse: 'text-xl', ref: 'text-lg', message: 'text-lg' },
+  { id: 'xl', name: '特大', verse: 'text-2xl', ref: 'text-xl', message: 'text-xl' },
+];
+
 const BiblePage = () => {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
@@ -56,6 +83,10 @@ const BiblePage = () => {
   const [showCardModal, setShowCardModal] = useState(false);
   const [cardBackground, setCardBackground] = useState(BACKGROUND_PRESETS[0].style);
   const [customImage, setCustomImage] = useState<string | null>(null);
+  const [personalMessage, setPersonalMessage] = useState('');
+  const [textPosition, setTextPosition] = useState(TEXT_POSITIONS[4]);
+  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[0]);
+  const [fontSize, setFontSize] = useState(FONT_SIZES[1]);
   const cardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -680,77 +711,153 @@ const BiblePage = () => {
       </main>
 
       <Dialog open={showCardModal} onOpenChange={setShowCardModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>製作經文圖卡</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-3">選擇背景</p>
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                {BACKGROUND_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    className={`h-16 rounded-lg transition-all ${
-                      cardBackground === preset.style && !customImage
-                        ? 'ring-2 ring-primary ring-offset-2'
-                        : ''
-                    }`}
-                    style={{ background: preset.style }}
-                    onClick={() => { setCardBackground(preset.style); setCustomImage(null); }}
-                    data-testid={`bg-preset-${preset.id}`}
-                  >
-                    <span className="text-white text-xs font-medium drop-shadow-lg">{preset.name}</span>
-                  </button>
-                ))}
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium mb-2">個人寄語</p>
+                <textarea
+                  className="w-full p-3 rounded-lg border bg-background text-sm resize-none"
+                  rows={2}
+                  placeholder="親愛的，我今天讀經讀到這個，跟你分享，願主平安..."
+                  value={personalMessage}
+                  onChange={(e) => setPersonalMessage(e.target.value)}
+                  data-testid="input-personal-message"
+                />
               </div>
-              
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageUpload}
-              />
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="button-upload-image"
+
+              <div>
+                <p className="text-sm font-medium mb-2">選擇背景</p>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {BACKGROUND_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      className={`h-12 rounded-lg transition-all ${
+                        cardBackground === preset.style && !customImage
+                          ? 'ring-2 ring-primary ring-offset-2'
+                          : ''
+                      }`}
+                      style={{ background: preset.style }}
+                      onClick={() => { setCardBackground(preset.style); setCustomImage(null); }}
+                      data-testid={`bg-preset-${preset.id}`}
+                    >
+                      <span className="text-white text-xs font-medium drop-shadow-lg">{preset.name}</span>
+                    </button>
+                  ))}
+                </div>
+                
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid="button-upload-image"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  上傳圖片
+                </Button>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium mb-2">圖卡比例</p>
+                <div className="flex flex-wrap gap-1">
+                  {ASPECT_RATIOS.map((ratio) => (
+                    <Button
+                      key={ratio.id}
+                      variant={aspectRatio.id === ratio.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setAspectRatio(ratio)}
+                      data-testid={`ratio-${ratio.id}`}
+                    >
+                      {ratio.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium mb-2">字體大小</p>
+                <div className="flex gap-1">
+                  {FONT_SIZES.map((size) => (
+                    <Button
+                      key={size.id}
+                      variant={fontSize.id === size.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFontSize(size)}
+                      data-testid={`font-${size.id}`}
+                    >
+                      {size.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium mb-2">文字位置</p>
+                <div className="grid grid-cols-3 gap-1">
+                  {TEXT_POSITIONS.map((pos) => (
+                    <Button
+                      key={pos.id}
+                      variant={textPosition.id === pos.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTextPosition(pos)}
+                      data-testid={`pos-${pos.id}`}
+                    >
+                      {pos.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div
+                ref={cardRef}
+                className={`relative ${aspectRatio.ratio} rounded-lg overflow-hidden flex p-6`}
+                style={{
+                  background: customImage ? `url(${customImage}) center/cover` : cardBackground,
+                  maxHeight: '400px',
+                }}
               >
-                <Upload className="w-4 h-4 mr-2" />
-                上傳自己的圖片
-              </Button>
-            </div>
-
-            <div
-              ref={cardRef}
-              className="relative aspect-square rounded-lg overflow-hidden flex items-center justify-center p-8"
-              style={{
-                background: customImage ? `url(${customImage}) center/cover` : cardBackground,
-              }}
-            >
-              <div className="absolute inset-0 bg-black/30" />
-              <div className="relative text-center text-white z-10">
-                <p className="text-xl leading-relaxed mb-4 drop-shadow-lg font-medium">
-                  {getCardVerseText().text}
-                </p>
-                <p className="text-base opacity-90 drop-shadow-lg">
-                  — {getCardVerseText().header}
-                </p>
+                <div className="absolute inset-0 bg-black/30" />
+                <div className={`relative text-white z-10 flex flex-col w-full ${textPosition.align}`}>
+                  <div className={`max-w-full ${textPosition.textAlign}`}>
+                    {personalMessage && (
+                      <p className={`${fontSize.message} leading-relaxed mb-3 drop-shadow-lg opacity-90 italic`}>
+                        {personalMessage}
+                      </p>
+                    )}
+                    <p className={`${fontSize.verse} leading-relaxed mb-3 drop-shadow-lg font-medium`}>
+                      {getCardVerseText().text}
+                    </p>
+                    <p className={`${fontSize.ref} opacity-90 drop-shadow-lg`}>
+                      — {getCardVerseText().header}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="flex gap-2">
-              <Button className="flex-1" onClick={downloadCard} data-testid="button-download-card">
-                <Download className="w-4 h-4 mr-2" />
-                下載圖卡
-              </Button>
-              <Button className="flex-1" variant="outline" onClick={shareCard} data-testid="button-share-card">
-                <Share2 className="w-4 h-4 mr-2" />
-                分享圖卡
-              </Button>
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={downloadCard} data-testid="button-download-card">
+                  <Download className="w-4 h-4 mr-2" />
+                  下載圖卡
+                </Button>
+                <Button className="flex-1" variant="outline" onClick={shareCard} data-testid="button-share-card">
+                  <Share2 className="w-4 h-4 mr-2" />
+                  分享圖卡
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

@@ -181,7 +181,7 @@ npm run db:push # Push database schema
     - Added visual checkmark indicator for selected verses
     - Added "取消選取" button to clear all selections
     - Better verse range formatting (e.g., "1-3,5,7-9")
-  - **Verse Card Creator**:
+  - **Verse Card Creator** (Enhanced):
     - Modal dialog for creating shareable image cards
     - 6 preset gradient backgrounds (晨曦, 夕陽, 大海, 森林, 天空, 星夜)
     - Custom image upload support
@@ -189,6 +189,10 @@ npm run db:push # Push database schema
     - Download button to save image locally
     - Share button using Web Share API (with download fallback)
     - Dark overlay on images for text readability
+    - Personal message field for warm greetings (個人寄語)
+    - 4 font size options (小/中/大/特大)
+    - 9 text position options (左上/上/右上/左/中/右/左下/下/右下)
+    - 5 aspect ratio options (正方形/直式3:4/限時動態9:16/橫式4:3/寬螢幕16:9)
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |
