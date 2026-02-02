@@ -12,23 +12,24 @@ import { ArrowLeft, Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book } from 
 interface JesusEvent {
   id: number;
   season: string;
-  eventNumber: number;
-  eventTitle: string;
-  eventDescription: string | null;
+  displayOrder: number;
+  eventName: string;
+  eventCategory: string | null;
+  theologicalTheme: string | null;
   location: string | null;
-  scriptureReference: string | null;
-  sortOrder: number;
+  scriptureOverview: string | null;
+  approximateDate: string | null;
 }
 
 const seasonInfo = {
-  spring: { label: '春季 - 開始', icon: Sprout, color: 'bg-green-500', textColor: 'text-green-600' },
-  summer: { label: '夏季 - 事工', icon: Sun, color: 'bg-amber-500', textColor: 'text-amber-600' },
-  autumn: { label: '秋季 - 衝突', icon: Leaf, color: 'bg-orange-500', textColor: 'text-orange-600' },
-  winter: { label: '冬季 - 受難', icon: Snowflake, color: 'bg-blue-500', textColor: 'text-blue-600' },
+  '春': { label: '春季 - 開始', icon: Sprout, color: 'bg-green-500', textColor: 'text-green-600' },
+  '夏': { label: '夏季 - 事工', icon: Sun, color: 'bg-amber-500', textColor: 'text-amber-600' },
+  '秋': { label: '秋季 - 衝突', icon: Leaf, color: 'bg-orange-500', textColor: 'text-orange-600' },
+  '冬': { label: '冬季 - 受難', icon: Snowflake, color: 'bg-blue-500', textColor: 'text-blue-600' },
 };
 
 const JesusTimelinePage = () => {
-  const [selectedSeason, setSelectedSeason] = useState<string>('spring');
+  const [selectedSeason, setSelectedSeason] = useState<string>('春');
 
   const { data: events = [], isLoading } = useQuery<JesusEvent[]>({
     queryKey: ['/api/jesus/timeline', { season: selectedSeason }],
@@ -95,16 +96,16 @@ const JesusTimelinePage = () => {
                       {events.map((event, index) => (
                         <div key={event.id} className="relative pl-10">
                           <div className={`absolute left-2 top-2 w-5 h-5 rounded-full ${currentSeason.color} flex items-center justify-center text-white text-xs font-bold`}>
-                            {event.eventNumber}
+                            {index + 1}
                           </div>
                           <Card className="bg-muted/30">
                             <CardContent className="py-3">
                               <h4 className="font-semibold text-foreground mb-1">
-                                {event.eventTitle}
+                                {event.eventName}
                               </h4>
-                              {event.eventDescription && (
+                              {event.theologicalTheme && (
                                 <p className="text-sm text-muted-foreground mb-2">
-                                  {event.eventDescription}
+                                  {event.theologicalTheme}
                                 </p>
                               )}
                               <div className="flex flex-wrap gap-2">
@@ -114,10 +115,10 @@ const JesusTimelinePage = () => {
                                     {event.location}
                                   </Badge>
                                 )}
-                                {event.scriptureReference && (
+                                {event.scriptureOverview && (
                                   <Badge variant="outline" className="text-xs">
                                     <Book className="w-3 h-3 mr-1" />
-                                    {event.scriptureReference}
+                                    {event.scriptureOverview}
                                   </Badge>
                                 )}
                               </div>

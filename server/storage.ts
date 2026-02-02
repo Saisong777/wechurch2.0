@@ -107,8 +107,8 @@ export interface IStorage {
   getJesusDailyContent(season?: string): Promise<JesusDailyContent[]>;
   
   getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]>;
-  getReadingPlanTemplate(id: number): Promise<ReadingPlanTemplate | undefined>;
-  getReadingPlanItems(templateId: number): Promise<ReadingPlanTemplateItem[]>;
+  getReadingPlanTemplate(id: string): Promise<ReadingPlanTemplate | undefined>;
+  getReadingPlanItems(templateId: string): Promise<ReadingPlanTemplateItem[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -602,11 +602,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getJesus4Seasons(): Promise<Jesus4Season[]> {
-    return db.select().from(jesus4Seasons).orderBy(asc(jesus4Seasons.sortOrder));
+    return db.select().from(jesus4Seasons).orderBy(asc(jesus4Seasons.displayOrder));
   }
 
   async getJesus4SeasonsBySeason(season: string): Promise<Jesus4Season[]> {
-    return db.select().from(jesus4Seasons).where(eq(jesus4Seasons.season, season)).orderBy(asc(jesus4Seasons.sortOrder));
+    return db.select().from(jesus4Seasons).where(eq(jesus4Seasons.season, season)).orderBy(asc(jesus4Seasons.displayOrder));
   }
 
   async getJesusDailyContent(season?: string): Promise<JesusDailyContent[]> {
@@ -617,15 +617,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]> {
-    return db.select().from(readingPlanTemplates).orderBy(asc(readingPlanTemplates.sortOrder));
+    return db.select().from(readingPlanTemplates).orderBy(asc(readingPlanTemplates.name));
   }
 
-  async getReadingPlanTemplate(id: number): Promise<ReadingPlanTemplate | undefined> {
+  async getReadingPlanTemplate(id: string): Promise<ReadingPlanTemplate | undefined> {
     const [template] = await db.select().from(readingPlanTemplates).where(eq(readingPlanTemplates.id, id)).limit(1);
     return template;
   }
 
-  async getReadingPlanItems(templateId: number): Promise<ReadingPlanTemplateItem[]> {
+  async getReadingPlanItems(templateId: string): Promise<ReadingPlanTemplateItem[]> {
     return db.select().from(readingPlanTemplateItems).where(eq(readingPlanTemplateItems.templateId, templateId)).orderBy(asc(readingPlanTemplateItems.dayNumber));
   }
 }

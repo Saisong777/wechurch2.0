@@ -9,22 +9,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, BookOpen, Clock, ChevronRight, X, CheckCircle2 } from 'lucide-react';
 
 interface ReadingPlan {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   durationDays: number;
   category: string | null;
-  difficulty: string | null;
-  sortOrder: number;
+  isPublic: boolean;
 }
 
 interface ReadingPlanItem {
   id: number;
-  templateId: number;
+  templateId: string;
   dayNumber: number;
   title: string | null;
   scriptureReference: string | null;
-  reflection: string | null;
+  notes: string | null;
 }
 
 const difficultyColors: Record<string, string> = {
@@ -40,7 +39,7 @@ const difficultyLabels: Record<string, string> = {
 };
 
 const ReadingPlansPage = () => {
-  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
   const { data: plans = [], isLoading: plansLoading } = useQuery<ReadingPlan[]>({
     queryKey: ['/api/reading-plans'],
@@ -105,8 +104,8 @@ const ReadingPlansPage = () => {
                                       {item.scriptureReference}
                                     </p>
                                   )}
-                                  {item.reflection && (
-                                    <p className="text-sm text-muted-foreground">{item.reflection}</p>
+                                  {item.notes && (
+                                    <p className="text-sm text-muted-foreground">{item.notes}</p>
                                   )}
                                 </div>
                               </div>
@@ -165,11 +164,6 @@ const ReadingPlansPage = () => {
                           {plan.category && (
                             <Badge variant="outline" className="text-xs">
                               {plan.category}
-                            </Badge>
-                          )}
-                          {plan.difficulty && (
-                            <Badge className={`text-xs ${difficultyColors[plan.difficulty] || ''}`}>
-                              {difficultyLabels[plan.difficulty] || plan.difficulty}
                             </Badge>
                           )}
                         </div>

@@ -1107,8 +1107,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/reading-plans/:id", async (req, res) => {
     try {
-      const id = parseInt(req.params.id, 10);
-      const template = await storage.getReadingPlanTemplate(id);
+      const template = await storage.getReadingPlanTemplate(req.params.id);
       if (!template) {
         return res.status(404).json({ error: "Reading plan not found" });
       }
@@ -1121,8 +1120,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/reading-plans/:id/items", async (req, res) => {
     try {
-      const id = parseInt(req.params.id, 10);
-      const items = await storage.getReadingPlanItems(id);
+      const items = await storage.getReadingPlanItems(req.params.id);
       res.json(items);
     } catch (error) {
       console.error('Error fetching reading plan items:', error);
