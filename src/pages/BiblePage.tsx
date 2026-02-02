@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Search, Book, ChevronRight, X, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Search, Book, ChevronRight, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 interface BibleBook {
   bookName: string;
@@ -28,11 +30,21 @@ interface BibleVerse {
   text: string;
 }
 
+interface SavedVerse {
+  id: string;
+  bookName: string;
+  chapter: number;
+  verseStart: number;
+}
+
 const BiblePage = () => {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: books = [], isError: booksError } = useQuery<BibleBook[]>({
     queryKey: ['/api/bible/books'],
@@ -68,6 +80,68 @@ const BiblePage = () => {
     enabled: isSearching && searchQuery.length >= 2,
   });
 
+  const { data: savedVerses = [] } = useQuery<SavedVerse[]>({
+    queryKey: ['/api/saved-verses'],
+  });
+
+  const saveVerseMutation = useMutation({
+    mutationFn: async (verse: BibleVerse) => {
+      return apiRequest('/api/saved-verses', {
+        method: 'POST',
+        body: JSON.stringify({
+          verseReference: `${verse.bookName} ${verse.chapter}:${verse.verse}`,
+          verseText: verse.text,
+          bookName: verse.bookName,
+          chapter: verse.chapter,
+          verseStart: verse.verse,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-verses'] });
+      toast({
+        title: "已收藏",
+        description: "經文已加入收藏",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "收藏失敗",
+        description: "請先登入以使用收藏功能",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteVerseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/saved-verses/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-verses'] });
+      toast({
+        title: "已取消收藏",
+      });
+    },
+  });
+
+  const isVerseSaved = (verse: BibleVerse) => {
+    return savedVerses.some(sv => 
+      sv.bookName === verse.bookName && 
+      sv.chapter === verse.chapter && 
+      sv.verseStart === verse.verse
+    );
+  };
+
+  const getSavedVerseId = (verse: BibleVerse) => {
+    const saved = savedVerses.find(sv => 
+      sv.bookName === verse.bookName && 
+      sv.chapter === verse.chapter && 
+      sv.verseStart === verse.verse
+    );
+    return saved?.id;
+  };
+
   const handleSearch = () => {
     if (searchQuery.length >= 2) {
       setIsSearching(true);
@@ -81,8 +155,146 @@ const BiblePage = () => {
     setIsSearching(false);
   };
 
+  const toggleVerseSelection = (verseId: number) => {
+    setSelectedVerses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(verseId)) {
+        newSet.delete(verseId);
+      } else {
+        newSet.add(verseId);
+      }
+      return newSet;
+    });
+  };
+
+  const copyVerse = async (verse: BibleVerse) => {
+    const text = `${verse.bookName} ${verse.chapter}:${verse.verse}\n${verse.text}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "已複製",
+        description: `${verse.bookName} ${verse.chapter}:${verse.verse}`,
+      });
+    } catch (err) {
+      toast({
+        title: "複製失敗",
+        description: "請手動選取複製",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const copySelectedVerses = async () => {
+    const selectedVersesList = verses.filter(v => selectedVerses.has(v.id));
+    if (selectedVersesList.length === 0) return;
+    
+    const text = selectedVersesList
+      .map(v => `${v.verse} ${v.text}`)
+      .join('\n');
+    const header = `${selectedBook} ${selectedChapter}:${selectedVersesList.map(v => v.verse).join(',')}`;
+    
+    try {
+      await navigator.clipboard.writeText(`${header}\n${text}`);
+      toast({
+        title: "已複製",
+        description: `${selectedVersesList.length} 節經文`,
+      });
+    } catch (err) {
+      toast({
+        title: "複製失敗",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const shareVerse = async (verse: BibleVerse) => {
+    const text = `${verse.bookName} ${verse.chapter}:${verse.verse}\n${verse.text}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${verse.bookName} ${verse.chapter}:${verse.verse}`,
+          text: text,
+        });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          await copyVerse(verse);
+        }
+      }
+    } else {
+      await copyVerse(verse);
+    }
+  };
+
+  const shareSelectedVerses = async () => {
+    const selectedVersesList = verses.filter(v => selectedVerses.has(v.id));
+    if (selectedVersesList.length === 0) return;
+    
+    const text = selectedVersesList.map(v => `${v.verse} ${v.text}`).join('\n');
+    const header = `${selectedBook} ${selectedChapter}:${selectedVersesList.map(v => v.verse).join(',')}`;
+    const fullText = `${header}\n${text}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: header,
+          text: fullText,
+        });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          await copySelectedVerses();
+        }
+      }
+    } else {
+      await copySelectedVerses();
+    }
+  };
+
+  const toggleSaveVerse = async (verse: BibleVerse) => {
+    const savedId = getSavedVerseId(verse);
+    if (savedId) {
+      deleteVerseMutation.mutate(savedId);
+    } else {
+      saveVerseMutation.mutate(verse);
+    }
+  };
+
   const oldTestamentBooks = books.filter(b => b.bookNumber <= 39);
   const newTestamentBooks = books.filter(b => b.bookNumber > 39);
+
+  const VerseActions = ({ verse }: { verse: BibleVerse }) => {
+    const isSaved = isVerseSaved(verse);
+    return (
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={(e) => { e.stopPropagation(); copyVerse(verse); }}
+          data-testid={`button-copy-${verse.id}`}
+        >
+          <Copy className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={(e) => { e.stopPropagation(); shareVerse(verse); }}
+          data-testid={`button-share-${verse.id}`}
+        >
+          <Share2 className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-7 w-7 ${isSaved ? 'text-primary' : ''}`}
+          onClick={(e) => { e.stopPropagation(); toggleSaveVerse(verse); }}
+          data-testid={`button-save-${verse.id}`}
+        >
+          {isSaved ? <BookmarkCheck className="w-3.5 h-3.5" /> : <Bookmark className="w-3.5 h-3.5" />}
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -147,10 +359,13 @@ const BiblePage = () => {
                   <ScrollArea className="h-[500px]">
                     <div className="space-y-3">
                       {searchResults.map((v) => (
-                        <div key={v.id} className="p-3 rounded-lg bg-muted/50">
-                          <p className="text-sm text-primary font-medium mb-1">
-                            {v.bookName} {v.chapter}:{v.verse}
-                          </p>
+                        <div key={v.id} className="p-3 rounded-lg bg-muted/50 group">
+                          <div className="flex justify-between items-start">
+                            <p className="text-sm text-primary font-medium mb-1">
+                              {v.bookName} {v.chapter}:{v.verse}
+                            </p>
+                            <VerseActions verse={v} />
+                          </div>
                           <p className="text-foreground">{v.text}</p>
                         </div>
                       ))}
@@ -164,9 +379,23 @@ const BiblePage = () => {
               <CardContent className="py-4">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-semibold text-lg">{selectedBook} 第 {selectedChapter} 章</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedChapter(null)}>
-                    返回章節
-                  </Button>
+                  <div className="flex gap-2">
+                    {selectedVerses.size > 0 && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={copySelectedVerses}>
+                          <Copy className="w-4 h-4 mr-1" />
+                          複製 ({selectedVerses.size})
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={shareSelectedVerses}>
+                          <Share2 className="w-4 h-4 mr-1" />
+                          分享
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerses(new Set()); }}>
+                      返回章節
+                    </Button>
+                  </div>
                 </div>
                 {versesLoading ? (
                   <div className="text-center py-8 text-muted-foreground">載入中...</div>
@@ -177,11 +406,19 @@ const BiblePage = () => {
                   </div>
                 ) : (
                   <ScrollArea className="h-[500px]">
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {verses.map((v) => (
-                        <div key={v.id} className="flex gap-2" data-testid={`verse-${v.chapter}-${v.verse}`}>
+                        <div 
+                          key={v.id} 
+                          className={`flex gap-2 p-2 rounded-lg cursor-pointer group transition-colors ${
+                            selectedVerses.has(v.id) ? 'bg-primary/10' : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => toggleVerseSelection(v.id)}
+                          data-testid={`verse-${v.chapter}-${v.verse}`}
+                        >
                           <span className="text-primary font-medium min-w-[2rem] text-right">{v.verse}</span>
-                          <span className="text-foreground">{v.text}</span>
+                          <span className="text-foreground flex-1">{v.text}</span>
+                          <VerseActions verse={v} />
                         </div>
                       ))}
                     </div>
@@ -198,68 +435,84 @@ const BiblePage = () => {
                     返回書卷
                   </Button>
                 </div>
-                <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
-                  {chapters.map((c) => (
-                    <Button
-                      key={c.chapter}
-                      variant="outline"
-                      className="h-10"
-                      onClick={() => setSelectedChapter(c.chapter)}
-                      data-testid={`button-chapter-${c.chapter}`}
-                    >
-                      {c.chapter}
-                    </Button>
-                  ))}
-                </div>
+                {chaptersError ? (
+                  <div className="text-center py-8 text-destructive flex flex-col items-center gap-2">
+                    <AlertCircle className="w-6 h-6" />
+                    <span>載入章節時發生錯誤</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
+                    {chapters.map((c) => (
+                      <Button
+                        key={c.chapter}
+                        variant="outline"
+                        className="h-10"
+                        onClick={() => setSelectedChapter(c.chapter)}
+                        data-testid={`button-chapter-${c.chapter}`}
+                      >
+                        {c.chapter}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-6">
-              <Card>
-                <CardContent className="py-4">
-                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                    <Book className="w-5 h-5 text-amber-600" />
-                    舊約聖經
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {oldTestamentBooks.map((book) => (
-                      <Button
-                        key={book.bookNumber}
-                        variant="ghost"
-                        className="justify-between h-auto py-2"
-                        onClick={() => setSelectedBook(book.bookName)}
-                        data-testid={`button-book-${book.bookNumber}`}
-                      >
-                        <span>{book.bookName}</span>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              {booksError ? (
+                <div className="text-center py-8 text-destructive flex flex-col items-center gap-2">
+                  <AlertCircle className="w-6 h-6" />
+                  <span>載入書卷時發生錯誤</span>
+                </div>
+              ) : (
+                <>
+                  <Card>
+                    <CardContent className="py-4">
+                      <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                        <Book className="w-5 h-5 text-amber-600" />
+                        舊約聖經
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {oldTestamentBooks.map((book) => (
+                          <Button
+                            key={book.bookNumber}
+                            variant="ghost"
+                            className="justify-between h-auto py-2"
+                            onClick={() => setSelectedBook(book.bookName)}
+                            data-testid={`button-book-${book.bookNumber}`}
+                          >
+                            <span>{book.bookName}</span>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardContent className="py-4">
-                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                    <Book className="w-5 h-5 text-sky-600" />
-                    新約聖經
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {newTestamentBooks.map((book) => (
-                      <Button
-                        key={book.bookNumber}
-                        variant="ghost"
-                        className="justify-between h-auto py-2"
-                        onClick={() => setSelectedBook(book.bookName)}
-                        data-testid={`button-book-${book.bookNumber}`}
-                      >
-                        <span>{book.bookName}</span>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                  <Card>
+                    <CardContent className="py-4">
+                      <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                        <Book className="w-5 h-5 text-sky-600" />
+                        新約聖經
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {newTestamentBooks.map((book) => (
+                          <Button
+                            key={book.bookNumber}
+                            variant="ghost"
+                            className="justify-between h-auto py-2"
+                            onClick={() => setSelectedBook(book.bookName)}
+                            data-testid={`button-book-${book.bookNumber}`}
+                          >
+                            <span>{book.bookName}</span>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           )}
         </div>

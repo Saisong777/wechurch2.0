@@ -151,6 +151,25 @@ npm run db:push # Push database schema
   - **Learn Hub** (LearnPage.tsx): Main hub with random blessing verse display and feature navigation cards
   - New API endpoints: /api/bible/books, /api/bible/chapters/:book, /api/bible/verses/:book/:chapter, /api/bible/search, /api/bible/blessing/random, /api/jesus/timeline, /api/reading-plans, /api/reading-plans/:id/items
   - All pages include proper error handling, loading states, and data-testid attributes
+- **We Learn Enhanced Features** (2026-02-02): Enhanced all three We Learn pages with interactive features
+  - **Bible Reader Enhancements**:
+    - Verse selection with multi-select support
+    - Copy to clipboard (single verse or selected verses)
+    - Share functionality (Web Share API with clipboard fallback)
+    - Bookmark/save verses with API persistence (saved_verses table)
+    - Visual indicators for saved verses (BookmarkCheck icon)
+    - New API endpoints: GET/POST/DELETE /api/saved-verses
+  - **Jesus Timeline Enhancements**:
+    - Collapsible season prefaces with theological context
+    - Expandable event cards showing jesusCharacter, focus, and gospelCenter fields
+    - Event count display per season
+    - Improved UI with colored vertical indicator bars
+  - **Reading Plans Enhancements**:
+    - localStorage-based progress tracking
+    - Start/pause/reset plan functionality
+    - Day completion toggling with visual feedback
+    - "My Plans" view with progress bars and completion badges
+    - Remove plan from My Plans list
 
 ### Data Migration Summary (2026-02-02)
 | Table                   | Records |

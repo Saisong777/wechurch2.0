@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema } from "@shared/schema";
+import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
 // Configure multer for file uploads
@@ -1125,6 +1125,68 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching reading plan items:', error);
       res.status(500).json({ error: "Failed to get reading plan items" });
+    }
+  });
+
+  // ============ Saved Verses API Routes ============
+  app.get("/api/saved-verses", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const verses = await storage.getSavedVerses(user.id);
+      res.json(verses);
+    } catch (error) {
+      console.error('Error fetching saved verses:', error);
+      res.status(500).json({ error: "Failed to get saved verses" });
+    }
+  });
+
+  app.get("/api/saved-verses/check", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { bookName, chapter, verse } = req.query;
+      if (!bookName || !chapter || !verse) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+      const saved = await storage.getSavedVerse(user.id, bookName as string, parseInt(chapter as string), parseInt(verse as string));
+      res.json({ saved: !!saved, id: saved?.id });
+    } catch (error) {
+      console.error('Error checking saved verse:', error);
+      res.status(500).json({ error: "Failed to check saved verse" });
+    }
+  });
+
+  app.post("/api/saved-verses", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const data = insertSavedVerseSchema.parse({ ...req.body, userId: user.id });
+      const saved = await storage.createSavedVerse(data);
+      res.status(201).json(saved);
+    } catch (error) {
+      console.error('Error saving verse:', error);
+      res.status(500).json({ error: "Failed to save verse" });
+    }
+  });
+
+  app.delete("/api/saved-verses/:id", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      await storage.deleteSavedVerse(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting saved verse:', error);
+      res.status(500).json({ error: "Failed to delete saved verse" });
     }
   });
 }

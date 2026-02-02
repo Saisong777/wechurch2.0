@@ -5,12 +5,12 @@ import {
   studyResponses, prayers, prayerAmens, prayerComments,
   featureToggles, potentialMembers, icebreakerGames, icebreakerPlayers,
   cardQuestions, messageCards, messageCardDownloads, userRoles,
-  chineseUnionTrad, jesus4Seasons, jesusDailyContent, readingPlanTemplates, readingPlanTemplateItems, blessingVerses,
+  chineseUnionTrad, jesus4Seasons, jesusDailyContent, readingPlanTemplates, readingPlanTemplateItems, blessingVerses, savedVerses,
   User, InsertUser, Session, InsertSession, Participant, InsertParticipant,
   Submission, InsertSubmission, Prayer, InsertPrayer, StudyResponse, InsertStudyResponse,
   FeatureToggle, PotentialMember, IcebreakerGame, IcebreakerPlayer, CardQuestion,
   AiReport, MessageCard, MessageCardDownload,
-  ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse
+  ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse, SavedVerse, InsertSavedVerse
 } from "@shared/schema";
 
 export interface IStorage {
@@ -109,6 +109,11 @@ export interface IStorage {
   getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]>;
   getReadingPlanTemplate(id: string): Promise<ReadingPlanTemplate | undefined>;
   getReadingPlanItems(templateId: string): Promise<ReadingPlanTemplateItem[]>;
+  
+  getSavedVerses(userId: string): Promise<SavedVerse[]>;
+  getSavedVerse(userId: string, bookName: string, chapter: number, verse: number): Promise<SavedVerse | undefined>;
+  createSavedVerse(data: InsertSavedVerse): Promise<SavedVerse>;
+  deleteSavedVerse(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -627,6 +632,31 @@ export class DatabaseStorage implements IStorage {
 
   async getReadingPlanItems(templateId: string): Promise<ReadingPlanTemplateItem[]> {
     return db.select().from(readingPlanTemplateItems).where(eq(readingPlanTemplateItems.templateId, templateId)).orderBy(asc(readingPlanTemplateItems.dayNumber));
+  }
+
+  async getSavedVerses(userId: string): Promise<SavedVerse[]> {
+    return db.select().from(savedVerses).where(eq(savedVerses.userId, userId)).orderBy(desc(savedVerses.createdAt));
+  }
+
+  async getSavedVerse(userId: string, bookName: string, chapter: number, verse: number): Promise<SavedVerse | undefined> {
+    const [saved] = await db.select().from(savedVerses).where(
+      and(
+        eq(savedVerses.userId, userId),
+        eq(savedVerses.bookName, bookName),
+        eq(savedVerses.chapter, chapter),
+        eq(savedVerses.verseStart, verse)
+      )
+    ).limit(1);
+    return saved;
+  }
+
+  async createSavedVerse(data: InsertSavedVerse): Promise<SavedVerse> {
+    const [saved] = await db.insert(savedVerses).values(data).returning();
+    return saved;
+  }
+
+  async deleteSavedVerse(id: string): Promise<void> {
+    await db.delete(savedVerses).where(eq(savedVerses.id, id));
   }
 }
 
