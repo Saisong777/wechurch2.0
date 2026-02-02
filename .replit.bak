@@ -1,4 +1,10 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
+[agent]
+expertMode = true
+
+[[ports]]
+localPort = 5000
+externalPort = 80
 
 [workflows]
 runButton = "Project"
@@ -16,14 +22,13 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
 
-[[ports]]
-localPort = 5000
-externalPort = 80
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd B && npm run dev"
+waitForPort = 5000
+
+[nix]
+channel = "stable-25_05"
