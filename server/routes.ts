@@ -761,24 +761,21 @@ export async function registerRoutes(app: Express) {
   // Get message card image
   app.get("/api/message-cards/image/:filename", (req, res) => {
     const filename = req.params.filename;
-    const filePath = path.join(process.cwd(), 'public', 'message-cards', filename);
     
-    if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
-    } else {
-      res.status(404).json({ error: "Image not found" });
+    // Check if filename is a full URL (to handle redirected requests or database entries with full URLs)
+    if (filename.startsWith('http')) {
+      return res.redirect(filename);
     }
-  });
-
-  // Get message card image
-  app.get("/api/message-cards/image/:filename", (req, res) => {
-    const filename = req.params.filename;
+    
     const filePath = path.join(process.cwd(), 'public', 'message-cards', filename);
     
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
     } else {
-      res.status(404).json({ error: "Image not found" });
+      // Fallback for migrated data: redirect to legacy Supabase storage
+      // This ensures images from the old environment still work by redirecting to the original source
+      const legacyUrl = `https://evyfzgrkvpwyvwmiajtx.supabase.co/storage/v1/object/public/card-images/${filename}`;
+      return res.redirect(legacyUrl);
     }
   });
 
