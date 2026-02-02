@@ -1,148 +1,106 @@
-# WeChurch - Bible Study & Prayer Platform
+# WeChurch - Bible Study & Community Platform
 
 ## Overview
-WeChurch is a comprehensive Christian community platform migrated from Lovable/Supabase to Replit. It features Bible study sessions with group management, AI-powered study reports, prayer walls, icebreaker games, and message card sharing.
 
-## Current State
-- **Status**: Migrated from Lovable/Supabase to Replit
+WeChurch is a comprehensive Christian community platform designed for Bible study sessions, prayer sharing, and small group engagement. The application supports high-concurrency scenarios (500+ users) with features including real-time Bible study sessions with group management, AI-powered study reports, prayer walls, icebreaker games, and message card sharing.
+
+The platform is built as a full-stack TypeScript application with a React frontend and Express backend, using PostgreSQL with Drizzle ORM for data persistence.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite for fast development and optimized production builds
+- **Routing**: React Router DOM for client-side navigation
+- **State Management**: TanStack Query for server state, React Context for local state (AuthContext, SessionContext)
+- **UI Components**: Shadcn/UI component library built on Radix UI primitives
+- **Styling**: Tailwind CSS with custom WeChurch theme (Sky Blue primary, Coral/Peach secondary accents)
+- **Rich Text**: TipTap editor for content creation
+- **Code Splitting**: Lazy loading for all page components to improve initial load performance
+
+### Backend Architecture
+- **Runtime**: Node.js with Express.js
+- **Language**: TypeScript with tsx for development
+- **API Design**: RESTful endpoints under `/api/*` prefix
+- **Authentication**: Session-based auth with Replit Auth integration, supporting both registered users and guest participants
+- **File Uploads**: Multer for handling message card image uploads
+
+### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
-- **Backend**: Express.js with API routes
-- **Frontend**: React with Vite, React Router, TanStack Query, Shadcn UI
-- **Styling**: Tailwind CSS with custom WeChurch theme (Sky Blue + Coral accents)
+- **Schema Location**: `shared/schema.ts` contains all table definitions
+- **Migrations**: Drizzle Kit for schema migrations (`drizzle-kit push`)
+- **Key Tables**:
+  - `users` / `auth_users` - User accounts (dual table for Replit Auth compatibility)
+  - `user_roles` - Role-based access control (member, leader, future_leader, admin)
+  - `sessions` - Bible study sessions with status tracking
+  - `participants` - Session participants with group assignments
+  - `study_responses` - 7-step spiritual fitness study responses
+  - `ai_reports` - AI-generated study summaries (group and overall)
+  - `prayers` / `prayer_amens` / `prayer_comments` - Prayer wall interactions
+  - `icebreaker_games` / `icebreaker_players` - Game state management
+  - `message_cards` - Shareable image cards with download tracking
 
-## Key Features
-1. **We Live (靈魂健身房)** - Bible study sessions with group management
-2. **We Learn (學習成長)** - Learning resources and materials
-3. **We Play (破冰遊戲)** - Icebreaker card games for small groups
-4. **We Share (分享)** - Prayer wall and message card sharing
-
-## Project Architecture
+### High-Concurrency Design
+The application is optimized for 500+ concurrent users with:
+- Staggered request initialization (random 0-1.5s delays)
+- Exponential backoff with jitter for retries
+- Extended polling intervals (5-10 seconds) to reduce server load
+- Debounced auto-save (1.5 second delay)
+- Non-blocking background operations
 
 ### Directory Structure
 ```
 ├── server/              # Express backend
-│   ├── index.ts        # Entry point
-│   ├── routes.ts       # API routes
-│   ├── storage.ts      # Database storage layer
-│   ├── db.ts           # Database connection
-│   └── vite.ts         # Vite dev server setup
-├── shared/             # Shared types/schemas
-│   └── schema.ts       # Drizzle database schema
-├── src/                # React frontend
-│   ├── components/     # UI components
-│   ├── pages/          # Page components
-│   ├── hooks/          # Custom hooks
-│   ├── lib/            # Utilities
-│   └── contexts/       # React contexts
-└── public/             # Static assets
+│   ├── index.ts         # Server entry point
+│   ├── routes.ts        # API route definitions
+│   ├── storage.ts       # Database access layer (IStorage interface)
+│   ├── db.ts            # Drizzle database connection
+│   ├── vite.ts          # Vite dev server integration
+│   └── resend.ts        # Email service integration
+├── shared/              # Shared code between frontend/backend
+│   ├── schema.ts        # Drizzle database schema
+│   └── models/          # Shared type definitions
+├── src/                 # React frontend
+│   ├── components/      # UI components (admin/, user/, prayer/, icebreaker/, layout/, ui/)
+│   ├── pages/           # Page components (lazy loaded)
+│   ├── hooks/           # Custom React hooks
+│   ├── contexts/        # React context providers
+│   ├── lib/             # Utility functions
+│   └── types/           # TypeScript type definitions
+├── public/              # Static assets
+└── migrations/          # Database migrations
 ```
 
-### Database Schema
-The application uses PostgreSQL with the following main tables:
-- `users` - User accounts and profiles
-- `sessions` - Bible study sessions
-- `participants` - Session participants
-- `submissions` - Bible study submissions
-- `ai_reports` - AI-generated study reports
-- `study_responses` - Individual study responses
-- `prayers` - Prayer wall entries
-- `prayer_amens` / `prayer_comments` - Prayer interactions
-- `icebreaker_games` / `icebreaker_players` - Game state
-- `card_questions` - Icebreaker card questions
-- `feature_toggles` - Feature flags
-- `potential_members` - CRM tracking
-- `message_cards` - Shareable message cards
+## External Dependencies
 
-### API Endpoints
-- `GET/POST /api/sessions` - Session management
-- `GET/POST /api/sessions/:sessionId/participants` - Participant management
-- `GET/POST /api/sessions/:sessionId/submissions` - Submissions
-- `GET/POST /api/sessions/:sessionId/reports` - AI reports
-- `GET/POST /api/prayers` - Prayer wall
-- `GET/PATCH /api/feature-toggles` - Feature flags
-- `GET/POST /api/icebreaker/games` - Icebreaker games
-- `GET/POST /api/message-cards` - Message cards
+### Database
+- **PostgreSQL**: Primary data store, connected via `DATABASE_URL` environment variable
+- **Drizzle ORM**: Type-safe database queries and schema management
 
-## Development
+### Authentication
+- **Replit Auth**: Primary authentication system with session storage in PostgreSQL
+- **Express Session**: Session management with `connect-pg-simple` for PostgreSQL session store
 
-### Running the Application
-```bash
-npm run dev    # Start dev server (port 5000)
-npm run build  # Build for production
-npm run db:push # Push database schema
-```
+### Email Service
+- **Resend**: Transactional email service for notifications, accessed via Replit connector
+- **Domain**: Emails sent from `noreply@wechurch.online`
 
-### Environment Variables
-- `DATABASE_URL` - PostgreSQL connection string (auto-provisioned)
-- `RESEND_API_KEY` - For email sending (optional)
-- `LOVABLE_API_KEY` - For AI report generation (optional)
+### Third-Party Integrations
+- **Supabase Client**: Legacy integration present in codebase (migration in progress)
+- **OpenAI/AI Services**: Used for generating study reports (AI report generation)
 
-## Migration Notes
-- Migrated from Supabase Edge Functions to Express routes
-- Database schema converted from Supabase to Drizzle ORM
-- Frontend still uses some Supabase client code (being migrated)
-- Realtime features need alternative implementation
+### Frontend Libraries
+- **TanStack Query**: Server state management with caching
+- **Radix UI**: Accessible UI primitives
+- **TipTap**: Rich text editor
+- **Sonner**: Toast notifications
+- **Zod**: Schema validation
 
-## Recent Changes
-- 2026-02-02: Initial migration from Lovable to Replit
-- Set up Express server with full-stack template
-- Created Drizzle schema with all tables (20+ tables)
-- Configured PostgreSQL database
-- Fixed CSS import order for Google Fonts
-- **Data Migration Completed**: Imported 1,170 records from Supabase CSV exports
-- **History Browser Enhanced**:
-  - Personal notes now grouped by 組別 (group number)
-  - Added search functionality for notes and AI reports
-  - Groups are now collapsible with expand/collapse toggle
-  - Added delete functionality for individual study responses
-  - Added delete functionality for AI reports (hover to show delete button)
-  - Removed "教練控制台" header text from admin page
-  - New endpoint: DELETE /api/study-responses/:id
-- **Bottom Navigation Bar**: Added fixed bottom navigation for easy feature switching
-  - 5 nav items: 首頁, 健身房, 學習, 破冰, 分享
-  - Hidden on admin/login pages
-  - Active state highlighting with icons
-  - Components: src/components/layout/BottomNav.tsx, AppLayout.tsx
-- **Icebreaker Game Migration**: Fully migrated from Supabase to Express API
-  - useIcebreakerGame hook converted to API calls with polling (3s intervals)
-  - TurnBasedCardGame and IcebreakerGame components migrated
-  - New API endpoints: /api/icebreaker/session-game, /api/icebreaker/games/:gameId/draw-card, /api/icebreaker/games/:gameId/reset
-  - Card drawing now tracks usedCardIds to prevent repeat cards
-- **Message Card System Migration**: Fully migrated from Supabase to Express API
-  - Added multer for file uploads (10MB limit, images only)
-  - New endpoints: POST /upload, PATCH /:id, DELETE /:id, GET /by-card/:cardId
-  - MessageCardManager component now uses fetch API
-  - Files stored in public/message-cards folder
-- **AdminWaitingRoom Migration**: Converted fetchParticipants to Express API
-  - Replaced Supabase client call with fetch to /api/sessions/:id/participants
-- **StressTestSimulator Migration**: Fully migrated to Express API
-  - Participant/submission generation now uses fetch to Express endpoints
-  - Added DELETE /api/sessions/:sessionId/submissions and DELETE /api/sessions/:sessionId/participants
-  - Added storage methods: deleteParticipantsBySession, deleteSubmissionsBySession
-- **setParticipantReady Migration**: Converted RPC to Express API
-  - New endpoint: POST /api/participants/:id/set-ready with Zod validation
-  - GroupVerification component updated to use fetch API
-  - supabase-helpers.ts updateParticipantReady function migrated
-
-### Data Migration Summary (2026-02-02)
-| Table                   | Records |
-|------------------------|---------|
-| users                  | 106     |
-| user_roles             | 106     |
-| potential_members      | 117     |
-| sessions               | 11      |
-| study_responses        | 253     |
-| ai_reports             | 72      |
-| feature_toggles        | 7       |
-| card_questions         | 52      |
-| icebreaker_games       | 273     |
-| message_cards          | 1       |
-| message_card_downloads | 172     |
-| **Total**              | **1,170**|
-
-Note: Some tables (participants, submissions, prayers, prayer_amens, prayer_comments, prayer_notifications) were empty in the original Supabase export.
-
-## User Preferences
-- Interface language: Traditional Chinese (繁體中文)
-- Theme: Sky Blue primary + Coral accents
-- Font: Nunito (headings) + Inter (body)
+### Development Tools
+- **Vitest**: Unit testing framework
+- **ESLint**: Code linting with TypeScript support
+- **TypeScript**: Full type safety across frontend and backend

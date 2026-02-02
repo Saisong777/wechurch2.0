@@ -1,15 +1,10 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "postgresql-16"]
 [agent]
 expertMode = true
-integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "resend:1.0.0"]
 
-[nix]
-channel = "stable-25_05"
-
-[deployment]
-deploymentTarget = "autoscale"
-run = ["node", "./dist/index.cjs"]
-build = ["npm", "run", "build"]
+[[ports]]
+localPort = 5000
+externalPort = 80
 
 [workflows]
 runButton = "Project"
@@ -27,14 +22,13 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
 
-[[ports]]
-localPort = 5000
-externalPort = 80
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd B && npm run dev"
+waitForPort = 5000
+
+[nix]
+channel = "stable-25_05"
