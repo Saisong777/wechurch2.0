@@ -262,6 +262,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
         });
 
         if (response.ok) {
+          const newParticipant = await response.json();
           insertedCount++;
         }
       }
