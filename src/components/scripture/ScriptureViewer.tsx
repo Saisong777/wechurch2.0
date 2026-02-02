@@ -221,7 +221,7 @@ export const ScriptureViewer = ({ verses, className = '' }: ScriptureViewerProps
 
   return (
     <div className={className}>
-      {hasSelection && (
+      {hasSelection && !showCardModal && (
         <div className="sticky top-0 z-[100] bg-background/95 backdrop-blur border-b border-border p-2 mb-3 flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">已選 {selectedList.length} 節</span>
           <Button variant="outline" size="sm" onClick={handleCopySelected} data-testid="button-copy-selected">
