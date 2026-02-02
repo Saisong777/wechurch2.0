@@ -175,6 +175,34 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/participants/batch-assign-groups", async (req, res) => {
+    try {
+      const batchAssignSchema = z.object({
+        assignments: z.array(z.object({
+          participantIds: z.array(z.string().uuid()),
+          groupNumber: z.number().int().positive(),
+        })),
+      });
+      
+      const parsed = batchAssignSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data", success: false, details: parsed.error.errors });
+      }
+      
+      const { assignments } = parsed.data;
+      
+      for (const { participantIds, groupNumber } of assignments) {
+        for (const participantId of participantIds) {
+          await storage.updateParticipant(participantId, { groupNumber, readyConfirmed: false });
+        }
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to batch assign groups", success: false });
+    }
+  });
+
   app.get("/api/sessions/:sessionId/submissions", async (req, res) => {
     try {
       const submissions = await storage.getSubmissions(req.params.sessionId);

@@ -28,16 +28,24 @@ export const createSession = async (verseReference: string): Promise<Session | n
 };
 
 export const updateSessionStatus = async (sessionId: string, status: string): Promise<boolean> => {
-  const { error } = await supabase
-    .from("sessions")
-    .update({ status })
-    .eq("id", sessionId);
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ status }),
+    });
 
-  if (error) {
-    console.error("[updateSessionStatus] Failed to update session status:", error.message);
+    if (!response.ok) {
+      console.error("[updateSessionStatus] Failed to update session status");
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("[updateSessionStatus] Error:", error);
+    return false;
   }
-  
-  return !error;
 };
 
 // Fetch public session info (without owner_id) for participants
@@ -484,7 +492,7 @@ export const assignGroupsToParticipants = async (
     }
   }
 
-  // Step 4: Batch update all participants by group number (one query per group)
+  // Step 4: Batch update all participants by group number via Express API
   const groupedAssignments = new Map<number, string[]>();
   for (const { participantId, groupNumber: gn } of groupAssignments) {
     if (!groupedAssignments.has(gn)) {
@@ -493,15 +501,23 @@ export const assignGroupsToParticipants = async (
     groupedAssignments.get(gn)!.push(participantId);
   }
 
-  // Execute batch updates in parallel (one request per group, not per participant)
-  const updatePromises = Array.from(groupedAssignments.entries()).map(([gn, ids]) =>
-    supabase
-      .from("participants")
-      .update({ group_number: gn, ready_confirmed: false })
-      .in("id", ids)
-  );
-  
-  await Promise.all(updatePromises);
+  // Convert to API format
+  const assignments = Array.from(groupedAssignments.entries()).map(([groupNumber, participantIds]) => ({
+    groupNumber,
+    participantIds,
+  }));
+
+  // Execute batch update via Express API
+  const response = await fetch('/api/participants/batch-assign-groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ assignments }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to assign groups');
+  }
 
   // Update session status to 'grouping' (verification phase)
   await updateSessionStatus(sessionId, "grouping");
