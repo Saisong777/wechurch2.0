@@ -34,6 +34,9 @@ export interface IStorage {
   createParticipant(participant: InsertParticipant): Promise<Participant>;
   updateParticipant(id: string, data: Partial<Participant>): Promise<Participant | undefined>;
   deleteParticipantsBySession(sessionId: string): Promise<void>;
+  forceVerifyAllParticipants(sessionId: string): Promise<number>;
+  resetAllReadyStatus(sessionId: string): Promise<number>;
+  clearAllGroupAssignments(sessionId: string): Promise<number>;
   
   getSubmissions(sessionId: string): Promise<Submission[]>;
   createSubmission(submission: InsertSubmission): Promise<Submission>;
@@ -189,6 +192,30 @@ export class DatabaseStorage implements IStorage {
 
   async deleteParticipantsBySession(sessionId: string): Promise<void> {
     await db.delete(participants).where(eq(participants.sessionId, sessionId));
+  }
+
+  async forceVerifyAllParticipants(sessionId: string): Promise<number> {
+    const result = await db.update(participants)
+      .set({ readyConfirmed: true })
+      .where(eq(participants.sessionId, sessionId))
+      .returning({ id: participants.id });
+    return result.length;
+  }
+
+  async resetAllReadyStatus(sessionId: string): Promise<number> {
+    const result = await db.update(participants)
+      .set({ readyConfirmed: false })
+      .where(eq(participants.sessionId, sessionId))
+      .returning({ id: participants.id });
+    return result.length;
+  }
+
+  async clearAllGroupAssignments(sessionId: string): Promise<number> {
+    const result = await db.update(participants)
+      .set({ groupNumber: null, readyConfirmed: false })
+      .where(eq(participants.sessionId, sessionId))
+      .returning({ id: participants.id });
+    return result.length;
   }
 
   async getSubmissions(sessionId: string): Promise<Submission[]> {

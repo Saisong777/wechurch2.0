@@ -246,6 +246,39 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Force verify all participants (set ready_confirmed = true)
+  app.post("/api/sessions/:sessionId/force-verify-all", async (req, res) => {
+    try {
+      const count = await storage.forceVerifyAllParticipants(req.params.sessionId);
+      res.json({ success: true, count });
+    } catch (error) {
+      console.error("[force-verify-all] Error:", error);
+      res.status(500).json({ error: "Failed to force verify participants", success: false });
+    }
+  });
+
+  // Reset all participants' ready_confirmed status to false
+  app.post("/api/sessions/:sessionId/reset-ready-status", async (req, res) => {
+    try {
+      const count = await storage.resetAllReadyStatus(req.params.sessionId);
+      res.json({ success: true, count });
+    } catch (error) {
+      console.error("[reset-ready-status] Error:", error);
+      res.status(500).json({ error: "Failed to reset ready status", success: false });
+    }
+  });
+
+  // Clear all group assignments (set group_number to null)
+  app.post("/api/sessions/:sessionId/clear-groups", async (req, res) => {
+    try {
+      const count = await storage.clearAllGroupAssignments(req.params.sessionId);
+      res.json({ success: true, count });
+    } catch (error) {
+      console.error("[clear-groups] Error:", error);
+      res.status(500).json({ error: "Failed to clear group assignments", success: false });
+    }
+  });
+
   app.get("/api/sessions/:sessionId/reports", async (req, res) => {
     try {
       const reports = await storage.getAiReports(req.params.sessionId);

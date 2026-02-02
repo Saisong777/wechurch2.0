@@ -1,5 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
-
 /**
  * Force all participants in a session to be marked as ready.
  * This is useful for testing when mock users cannot click checkboxes.
@@ -9,18 +7,23 @@ export const forceVerifyAllParticipants = async (sessionId: string): Promise<{
   count?: number;
   error?: string;
 }> => {
-  const { data, error } = await supabase
-    .from("participants")
-    .update({ ready_confirmed: true })
-    .eq("session_id", sessionId)
-    .select("id");
-
-  if (error) {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/force-verify-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      return { success: false, error: data.error || "Failed to force verify" };
+    }
+    
+    const data = await response.json();
+    return { success: true, count: data.count || 0 };
+  } catch (error) {
     console.error("Force verify error:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
-
-  return { success: true, count: data?.length || 0 };
 };
 
 /**
@@ -33,23 +36,24 @@ export const fetchParticipantsWithReadyStatus = async (sessionId: string): Promi
   readyConfirmed: boolean;
   location: string;
 }[]> => {
-  const { data, error } = await supabase
-    .from("participants")
-    .select("id, name, group_number, ready_confirmed, location")
-    .eq("session_id", sessionId)
-    .order("group_number", { ascending: true });
-
-  if (error) {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/participants`);
+    if (!response.ok) {
+      return [];
+    }
+    
+    const data = await response.json();
+    return data.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      groupNumber: p.groupNumber || undefined,
+      readyConfirmed: p.readyConfirmed,
+      location: p.location,
+    }));
+  } catch (error) {
+    console.error("Fetch participants error:", error);
     return [];
   }
-
-  return data.map((p) => ({
-    id: p.id,
-    name: p.name,
-    groupNumber: p.group_number || undefined,
-    readyConfirmed: p.ready_confirmed,
-    location: p.location,
-  }));
 };
 
 /**
@@ -101,7 +105,6 @@ export const calculateGroupReadyStatus = (
     });
   }
 
-  // Calculate allReady for each group
   for (const group of groupMap.values()) {
     group.allReady = group.readyCount === group.totalMembers && group.totalMembers > 0;
   }
@@ -118,18 +121,23 @@ export const resetAllReadyStatus = async (sessionId: string): Promise<{
   count?: number;
   error?: string;
 }> => {
-  const { data, error } = await supabase
-    .from("participants")
-    .update({ ready_confirmed: false })
-    .eq("session_id", sessionId)
-    .select("id");
-
-  if (error) {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/reset-ready-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      return { success: false, error: data.error || "Failed to reset ready status" };
+    }
+    
+    const data = await response.json();
+    return { success: true, count: data.count || 0 };
+  } catch (error) {
     console.error("Reset ready status error:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
-
-  return { success: true, count: data?.length || 0 };
 };
 
 /**
@@ -141,18 +149,23 @@ export const clearAllGroupAssignments = async (sessionId: string): Promise<{
   count?: number;
   error?: string;
 }> => {
-  const { data, error } = await supabase
-    .from("participants")
-    .update({ group_number: null, ready_confirmed: false })
-    .eq("session_id", sessionId)
-    .select("id");
-
-  if (error) {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/clear-groups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      return { success: false, error: data.error || "Failed to clear groups" };
+    }
+    
+    const data = await response.json();
+    return { success: true, count: data.count || 0 };
+  } catch (error) {
     console.error("Clear group assignments error:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
-
-  return { success: true, count: data?.length || 0 };
 };
 
 /**
@@ -164,20 +177,7 @@ export const regroupParticipants = async (sessionId: string): Promise<{
   count?: number;
   error?: string;
 }> => {
-  // This is essentially the same as clearAllGroupAssignments
-  // but semantically represents the "re-group" action
-  const { data, error } = await supabase
-    .from("participants")
-    .update({ group_number: null, ready_confirmed: false })
-    .eq("session_id", sessionId)
-    .select("id");
-
-  if (error) {
-    console.error("Regroup participants error:", error);
-    return { success: false, error: error.message };
-  }
-
-  return { success: true, count: data?.length || 0 };
+  return clearAllGroupAssignments(sessionId);
 };
 
 /**
@@ -188,15 +188,21 @@ export const endStudySession = async (sessionId: string): Promise<{
   success: boolean;
   error?: string;
 }> => {
-  const { error } = await supabase
-    .from("sessions")
-    .update({ status: "completed" })
-    .eq("id", sessionId);
-
-  if (error) {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      return { success: false, error: data.error || "Failed to end session" };
+    }
+    
+    return { success: true };
+  } catch (error) {
     console.error("End study session error:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
-
-  return { success: true };
 };
