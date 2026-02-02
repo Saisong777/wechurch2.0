@@ -21,6 +21,9 @@ const PrayerWallPage = lazy(() => import("./pages/PrayerWallPage"));
 const MessageCardPage = lazy(() => import("./pages/MessageCardPage"));
 const SharePage = lazy(() => import("./pages/SharePage"));
 const LearnPage = lazy(() => import("./pages/LearnPage"));
+const BiblePage = lazy(() => import("./pages/BiblePage"));
+const JesusTimelinePage = lazy(() => import("./pages/JesusTimelinePage"));
+const ReadingPlansPage = lazy(() => import("./pages/ReadingPlansPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -55,6 +58,9 @@ const App = () => (
                   <Route path="/card" element={<MessageCardPage />} />
                   <Route path="/share" element={<SharePage />} />
                   <Route path="/learn" element={<LearnPage />} />
+                  <Route path="/learn/bible" element={<BiblePage />} />
+                  <Route path="/learn/jesus-timeline" element={<JesusTimelinePage />} />
+                  <Route path="/learn/reading-plans" element={<ReadingPlansPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
