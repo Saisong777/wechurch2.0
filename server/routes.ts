@@ -1,8 +1,11 @@
 import type { Express } from "express";
 import { storage } from "./storage";
 import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema } from "@shared/schema";
+import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
 export async function registerRoutes(app: Express) {
+  await setupAuth(app);
+  registerAuthRoutes(app);
   app.get("/api/sessions/:shortCode", async (req, res) => {
     try {
       const session = await storage.getSessionByShortCode(req.params.shortCode);
