@@ -160,6 +160,24 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.delete("/api/sessions/:sessionId/submissions", async (req, res) => {
+    try {
+      await storage.deleteSubmissionsBySession(req.params.sessionId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete submissions" });
+    }
+  });
+
+  app.delete("/api/sessions/:sessionId/participants", async (req, res) => {
+    try {
+      await storage.deleteParticipantsBySession(req.params.sessionId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete participants" });
+    }
+  });
+
   app.get("/api/sessions/:sessionId/reports", async (req, res) => {
     try {
       const reports = await storage.getAiReports(req.params.sessionId);

@@ -3,11 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useSession } from '@/contexts/SessionContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { FlaskConical, Trash2, Users, Loader2, FileText, Wand2 } from 'lucide-react';
+import { FlaskConical, Trash2, Users, Loader2, Wand2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -140,22 +138,22 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
   const [isGeneratingSubmissions, setIsGeneratingSubmissions] = useState(false);
   const [autoGenerateSubmissions, setAutoGenerateSubmissions] = useState(true);
 
-  const generateMockSubmissions = async (participants: Array<{ id: string; name: string; email: string; group_number: number | null }>, verseReference: string) => {
+  const generateMockSubmissions = async (participants: Array<{ id: string; name: string; email: string; groupNumber: number | null }>, verseReference: string) => {
     const submissions = participants
-      .filter(p => p.group_number !== null)
+      .filter(p => p.groupNumber !== null)
       .map(p => ({
-        session_id: currentSession!.id,
-        participant_id: p.id,
-        group_number: p.group_number!,
+        sessionId: currentSession!.id,
+        participantId: p.id,
+        groupNumber: p.groupNumber!,
         name: p.name,
         email: p.email,
-        bible_verse: verseReference,
+        bibleVerse: verseReference,
         theme: getRandomItem(MOCK_THEMES),
-        moving_verse: getRandomItem(MOCK_MOVING_VERSES),
-        facts_discovered: getRandomItem(MOCK_FACTS),
-        traditional_exegesis: getRandomItem(MOCK_EXEGESIS),
-        inspiration_from_god: getRandomItem(MOCK_INSPIRATIONS),
-        application_in_life: getRandomItem(MOCK_APPLICATIONS),
+        movingVerse: getRandomItem(MOCK_MOVING_VERSES),
+        factsDiscovered: getRandomItem(MOCK_FACTS),
+        traditionalExegesis: getRandomItem(MOCK_EXEGESIS),
+        inspirationFromGod: getRandomItem(MOCK_INSPIRATIONS),
+        applicationInLife: getRandomItem(MOCK_APPLICATIONS),
         others: getRandomItem(MOCK_OTHERS) || null,
       }));
 
@@ -163,15 +161,20 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
       return 0;
     }
 
-    // Insert in chunks
-    const chunkSize = 50;
+    // Insert via Express API
     let insertedCount = 0;
-    for (let i = 0; i < submissions.length; i += chunkSize) {
-      const chunk = submissions.slice(i, i + chunkSize);
-      const { error } = await supabase.from('submissions').insert(chunk);
-      if (!error) {
-        insertedCount += chunk.length;
-      } else {
+    for (const submission of submissions) {
+      try {
+        const response = await fetch(`/api/sessions/${currentSession!.id}/submissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(submission),
+        });
+        if (response.ok) {
+          insertedCount++;
+        }
+      } catch (error) {
         console.error('Submission insert error:', error);
       }
     }
@@ -188,27 +191,33 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
     setIsGeneratingSubmissions(true);
 
     try {
-      // Get current participants with group assignments
-      const { data: participants, error: pError } = await supabase
-        .from('participants')
-        .select('id, name, email, group_number')
-        .eq('session_id', currentSession.id);
+      // Get current participants with group assignments via Express API
+      const response = await fetch(`/api/sessions/${currentSession.id}/participants`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch participants');
+      const participantsData = await response.json();
 
-      if (pError) throw pError;
+      const participants = participantsData.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email || '',
+        groupNumber: p.groupNumber,
+      }));
 
       if (!participants || participants.length === 0) {
         toast.error('沒有參與者可以生成查經資料');
         return;
       }
 
-      const withGroups = participants.filter(p => p.group_number !== null);
+      const withGroups = participants.filter((p: any) => p.groupNumber !== null);
       if (withGroups.length === 0) {
         toast.error('請先進行分組，才能生成查經資料');
         return;
       }
 
       const count = await generateMockSubmissions(
-        participants as Array<{ id: string; name: string; email: string; group_number: number | null }>,
+        participants as Array<{ id: string; name: string; email: string; groupNumber: number | null }>,
         currentSession.verseReference || '約翰福音 3:16'
       );
 
@@ -230,14 +239,8 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
     setIsGenerating(true);
 
     try {
-      const mockParticipants: Array<{
-        session_id: string;
-        name: string;
-        email: string;
-        gender: string;
-        location: string;
-      }> = [];
-
+      let insertedCount = 0;
+      
       for (let i = 0; i < userCount; i++) {
         // 50/50 gender split
         const gender: 'male' | 'female' = i % 2 === 0 ? 'male' : 'female';
@@ -250,50 +253,41 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
           ? REMOTE_LOCATIONS[Math.floor(Math.random() * REMOTE_LOCATIONS.length)]
           : 'On-site';
 
-        mockParticipants.push({
-          session_id: currentSession.id,
-          name,
-          email,
-          gender,
-          location,
+        // Insert via Express API
+        const response = await fetch(`/api/sessions/${currentSession.id}/participants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name, email, gender, location }),
         });
-      }
 
-      // Batch insert in chunks of 50 to avoid timeout
-      const chunkSize = 50;
-      for (let i = 0; i < mockParticipants.length; i += chunkSize) {
-        const chunk = mockParticipants.slice(i, i + chunkSize);
-        const { error } = await supabase.from('participants').insert(chunk);
-
-        if (error) {
-          console.error('Insert error:', error);
-          throw error;
+        if (response.ok) {
+          insertedCount++;
         }
       }
 
-      // Refresh participants list
-      const { data: updatedParticipants } = await supabase
-        .from('participants')
-        .select('*')
-        .eq('session_id', currentSession.id)
-        .order('joined_at', { ascending: true });
-
-      if (updatedParticipants) {
+      // Refresh participants list via API
+      const response = await fetch(`/api/sessions/${currentSession.id}/participants`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const updatedParticipants = await response.json();
         setUsers(
-          updatedParticipants.map((p) => ({
+          updatedParticipants.map((p: any) => ({
             id: p.id,
             name: p.name,
-            email: p.email,
+            email: p.email || '',
             gender: p.gender as 'male' | 'female',
-            groupNumber: p.group_number || undefined,
-            joinedAt: new Date(p.joined_at),
-            location: p.location,
-            readyConfirmed: p.ready_confirmed,
+            groupNumber: p.groupNumber || undefined,
+            joinedAt: p.joinedAt ? new Date(p.joinedAt) : undefined,
+            location: p.location || 'On-site',
+            readyConfirmed: p.readyConfirmed || false,
           }))
         );
       }
 
-      toast.success(`已新增 ${userCount} 位模擬使用者進行壓力測試！`);
+      toast.success(`已新增 ${insertedCount} 位模擬使用者進行壓力測試！`);
       onParticipantsGenerated?.();
     } catch (error: any) {
       console.error('Error generating mock participants:', error);
@@ -312,18 +306,19 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
     setIsClearing(true);
 
     try {
-      // Also clear submissions for this session
-      await supabase
-        .from('submissions')
-        .delete()
-        .eq('session_id', currentSession.id);
+      // Clear submissions via Express API
+      await fetch(`/api/sessions/${currentSession.id}/submissions`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
 
-      const { error } = await supabase
-        .from('participants')
-        .delete()
-        .eq('session_id', currentSession.id);
+      // Clear participants via Express API
+      const response = await fetch(`/api/sessions/${currentSession.id}/participants`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to clear participants');
 
       setUsers([]);
       toast.success('已清除所有參與者和查經資料！');

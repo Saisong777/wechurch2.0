@@ -33,9 +33,11 @@ export interface IStorage {
   getParticipant(id: string): Promise<Participant | undefined>;
   createParticipant(participant: InsertParticipant): Promise<Participant>;
   updateParticipant(id: string, data: Partial<Participant>): Promise<Participant | undefined>;
+  deleteParticipantsBySession(sessionId: string): Promise<void>;
   
   getSubmissions(sessionId: string): Promise<Submission[]>;
   createSubmission(submission: InsertSubmission): Promise<Submission>;
+  deleteSubmissionsBySession(sessionId: string): Promise<void>;
   
   getAiReports(sessionId: string): Promise<AiReport[]>;
   createAiReport(report: { sessionId: string; reportType: string; groupNumber?: number; content: string; status?: string }): Promise<AiReport>;
@@ -185,6 +187,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteParticipantsBySession(sessionId: string): Promise<void> {
+    await db.delete(participants).where(eq(participants.sessionId, sessionId));
+  }
+
   async getSubmissions(sessionId: string): Promise<Submission[]> {
     return db.select().from(submissions).where(eq(submissions.sessionId, sessionId));
   }
@@ -192,6 +198,10 @@ export class DatabaseStorage implements IStorage {
   async createSubmission(submission: InsertSubmission): Promise<Submission> {
     const [newSubmission] = await db.insert(submissions).values(submission).returning();
     return newSubmission;
+  }
+
+  async deleteSubmissionsBySession(sessionId: string): Promise<void> {
+    await db.delete(submissions).where(eq(submissions.sessionId, sessionId));
   }
 
   async getAiReports(sessionId: string): Promise<AiReport[]> {
