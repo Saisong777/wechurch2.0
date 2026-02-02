@@ -57,6 +57,8 @@ export interface SendEmailOptions {
 export async function sendEmail(options: SendEmailOptions) {
   const { client, fromEmail } = await getResendClient();
   
+  console.log('[Resend] Sending email from:', options.from || fromEmail, 'to:', options.to);
+  
   const result = await client.emails.send({
     from: options.from || fromEmail,
     to: options.to,
@@ -64,6 +66,13 @@ export async function sendEmail(options: SendEmailOptions) {
     html: options.html,
     text: options.text
   });
+  
+  console.log('[Resend] Send result:', JSON.stringify(result));
+  
+  // Check if there's an error in the response
+  if ('error' in result && result.error) {
+    throw new Error((result.error as any).message || 'Failed to send email');
+  }
   
   return result;
 }
@@ -87,16 +96,27 @@ export async function sendBulkEmail(
     errors: [] as string[]
   };
   
+  console.log('[Resend] Bulk sending to', recipients.length, 'recipients from:', fromEmail);
+  
   for (const recipient of recipients) {
     try {
-      await client.emails.send({
+      const sendResult = await client.emails.send({
         from: fromEmail,
         to: recipient.email,
         subject: subject,
         ...(isHtml ? { html: body } : { text: body })
       });
+      
+      console.log('[Resend] Sent to', recipient.email, ':', JSON.stringify(sendResult));
+      
+      // Check for error in response
+      if ('error' in sendResult && sendResult.error) {
+        throw new Error((sendResult.error as any).message || 'Unknown error');
+      }
+      
       results.sent++;
     } catch (error: any) {
+      console.error('[Resend] Failed to send to', recipient.email, ':', error.message);
       results.failed++;
       results.errors.push(`${recipient.email}: ${error.message}`);
     }
