@@ -198,7 +198,14 @@ npm run db:push # Push database schema
   - **Scripture Expanded by Default**: Events show full scripture content, click to collapse
   - **Gospel Names as Badges**: Shows 馬太/馬可/路加/約翰 instead of "X 福音書"
   - **Side-by-Side Gospel Display**: Multiple gospels in grid layout with colored backgrounds
-  - **SelectableVerse Component**: New reusable component for copy/share on hover
+  - **ScriptureViewer Component**: New reusable component with:
+    - Multi-select verses (click to select/deselect)
+    - Batch copy all selected verses together
+    - Share selected verses via Web Share API
+    - Create image cards (圖文卡) with customizable backgrounds, positions, sizes
+    - Sticky action bar when verses are selected
+  - Removed "經文內容" header and "焦點" section for cleaner display
+  - Kept "耶穌的品格" and "福音中心" sections
   - **New API Endpoint**: /api/bible/by-reference parses refs like "Mt 1:1-17"
   - All 208 events filterable by season with full scripture content
 

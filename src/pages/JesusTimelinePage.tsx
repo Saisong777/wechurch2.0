@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronDown, ChevronUp, BookOpen, FileText } from 'lucide-react';
-import { SelectableVerse } from '@/components/scripture/SelectableVerse';
+import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
 
 interface JesusEvent {
   id: number;
@@ -117,23 +117,20 @@ const ScriptureDisplay = ({ reference, gospelName }: { reference: string; gospel
     );
   }
 
+  const formattedVerses = data.verses.map(v => ({
+    bookName: gospelName,
+    chapter: v.chapter,
+    verse: v.verse,
+    text: v.text,
+  }));
+
   return (
     <div className="mb-2">
       <h6 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
         <Book className="w-4 h-4" />
         {gospelName} {data.chapter} 章
       </h6>
-      <div className="space-y-1 pl-2 border-l-2 border-primary/20">
-        {data.verses.map((v) => (
-          <SelectableVerse
-            key={`${v.chapter}-${v.verse}`}
-            bookName={gospelName}
-            chapter={v.chapter}
-            verse={v.verse}
-            text={v.text}
-          />
-        ))}
-      </div>
+      <ScriptureViewer verses={formattedVerses} />
     </div>
   );
 };
@@ -310,7 +307,7 @@ const JesusTimelinePage = () => {
                               </div>
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" data-testid={`button-expand-${event.id}`}>
+                          <Button variant="ghost" size="icon" className="flex-shrink-0" data-testid={`button-expand-${event.id}`}>
                             {isExpanded ? (
                               <ChevronUp className="w-4 h-4" />
                             ) : (
@@ -322,21 +319,15 @@ const JesusTimelinePage = () => {
                         {isExpanded && (
                           <div className="mt-4 pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
                             {gospels.length > 0 && (
-                              <div className="mb-4">
-                                <h5 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                                  <BookOpen className="w-4 h-4" />
-                                  經文內容
-                                </h5>
-                                <div className={`grid gap-3 ${gospels.length > 1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                                  {gospels.map((g, idx) => {
-                                    const bgColors = ['bg-blue-50 dark:bg-blue-950/30', 'bg-green-50 dark:bg-green-950/30', 'bg-amber-50 dark:bg-amber-950/30', 'bg-purple-50 dark:bg-purple-950/30'];
-                                    return (
-                                      <div key={g.key} className={`rounded-lg p-3 ${bgColors[idx % bgColors.length]}`}>
-                                        <ScriptureDisplay reference={g.ref} gospelName={g.name} />
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                              <div className={`grid gap-3 mb-4 ${gospels.length > 1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                                {gospels.map((g, idx) => {
+                                  const bgColors = ['bg-blue-50 dark:bg-blue-950/30', 'bg-green-50 dark:bg-green-950/30', 'bg-amber-50 dark:bg-amber-950/30', 'bg-purple-50 dark:bg-purple-950/30'];
+                                  return (
+                                    <div key={g.key} className={`rounded-lg p-3 ${bgColors[idx % bgColors.length]}`}>
+                                      <ScriptureDisplay reference={g.ref} gospelName={g.name} />
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                             
@@ -344,12 +335,6 @@ const JesusTimelinePage = () => {
                               <div className="mb-3">
                                 <h5 className="text-xs font-semibold text-muted-foreground mb-1">耶穌的品格</h5>
                                 <p className="text-sm">{event.jesusCharacter}</p>
-                              </div>
-                            )}
-                            {event.focus && (
-                              <div className="mb-3">
-                                <h5 className="text-xs font-semibold text-muted-foreground mb-1">焦點</h5>
-                                <p className="text-sm">{event.focus}</p>
                               </div>
                             )}
                             {event.gospelCenter && (
