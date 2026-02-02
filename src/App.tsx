@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 // Lazy load pages for better code splitting and FCP
 const Index = lazy(() => import("./pages/Index"));
@@ -40,22 +41,24 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/user" element={<UserPage />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="/admin/crm" element={<CRMPage />} />
-                <Route path="/notebook" element={<NotebookPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/icebreaker" element={<IcebreakerPage />} />
-                <Route path="/prayer-wall" element={<PrayerWallPage />} />
-                <Route path="/card" element={<MessageCardPage />} />
-                <Route path="/share" element={<SharePage />} />
-                <Route path="/learn" element={<LearnPage />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <AppLayout>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/user" element={<UserPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/admin/crm" element={<CRMPage />} />
+                  <Route path="/notebook" element={<NotebookPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/icebreaker" element={<IcebreakerPage />} />
+                  <Route path="/prayer-wall" element={<PrayerWallPage />} />
+                  <Route path="/card" element={<MessageCardPage />} />
+                  <Route path="/share" element={<SharePage />} />
+                  <Route path="/learn" element={<LearnPage />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </AppLayout>
             </Suspense>
           </BrowserRouter>
         </TooltipProvider>

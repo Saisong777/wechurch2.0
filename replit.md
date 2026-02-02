@@ -98,6 +98,11 @@ npm run db:push # Push database schema
   - Added delete functionality for AI reports (hover to show delete button)
   - Removed "教練控制台" header text from admin page
   - New endpoint: DELETE /api/study-responses/:id
+- **Bottom Navigation Bar**: Added fixed bottom navigation for easy feature switching
+  - 5 nav items: 首頁, 健身房, 學習, 破冰, 分享
+  - Hidden on admin/login pages
+  - Active state highlighting with icons
+  - Components: src/components/layout/BottomNav.tsx, AppLayout.tsx
 - **Icebreaker Game Migration**: Fully migrated from Supabase to Express API
   - useIcebreakerGame hook converted to API calls with polling (3s intervals)
   - TurnBasedCardGame and IcebreakerGame components migrated
