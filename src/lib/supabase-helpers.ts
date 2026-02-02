@@ -657,7 +657,15 @@ export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string =
     s.groupNumber, s.name, s.email, s.bibleVerse, s.theme, s.movingVerse,
     s.factsDiscovered, s.traditionalExegesis, s.inspirationFromGod,
     s.applicationInLife, s.others, s.submittedAt.toISOString(),
-  ]);
+  ];
+  const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+  return csvContent;
+};
+
+// Export study responses as CSV (legacy support)
+export const exportStudyResponsesAsCSV = (responses: any[]): string => {
+  const headers = ["User ID", "Response", "Created At"];
+  const rows = responses.map(r => [r.userId, r.response, r.createdAt]);
   const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
   return csvContent;
 };
