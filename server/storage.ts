@@ -1,14 +1,16 @@
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, asc, like, or } from "drizzle-orm";
 import {
   users, sessions, participants, submissions, aiReports,
   studyResponses, prayers, prayerAmens, prayerComments,
   featureToggles, potentialMembers, icebreakerGames, icebreakerPlayers,
   cardQuestions, messageCards, messageCardDownloads, userRoles,
+  chineseUnionTrad, jesus4Seasons, jesusDailyContent, readingPlanTemplates, readingPlanTemplateItems, blessingVerses,
   User, InsertUser, Session, InsertSession, Participant, InsertParticipant,
   Submission, InsertSubmission, Prayer, InsertPrayer, StudyResponse, InsertStudyResponse,
   FeatureToggle, PotentialMember, IcebreakerGame, IcebreakerPlayer, CardQuestion,
-  AiReport, MessageCard, MessageCardDownload
+  AiReport, MessageCard, MessageCardDownload,
+  ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse
 } from "@shared/schema";
 
 export interface IStorage {
@@ -92,6 +94,21 @@ export interface IStorage {
   createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard>;
   updateMessageCard(id: string, data: Partial<{ title: string; imagePath: string; isActive: boolean }>): Promise<MessageCard | undefined>;
   deleteAiReport(id: string): Promise<void>;
+  
+  getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]>;
+  getBibleChapters(bookName: string): Promise<{ chapter: number; verseCount: number }[]>;
+  getBibleVerses(bookName: string, chapter: number): Promise<ChineseUnionTrad[]>;
+  searchBibleVerses(query: string, limit?: number): Promise<ChineseUnionTrad[]>;
+  getBlessingVerses(type?: string): Promise<BlessingVerse[]>;
+  getRandomBlessingVerse(): Promise<BlessingVerse | undefined>;
+  
+  getJesus4Seasons(): Promise<Jesus4Season[]>;
+  getJesus4SeasonsBySeason(season: string): Promise<Jesus4Season[]>;
+  getJesusDailyContent(season?: string): Promise<JesusDailyContent[]>;
+  
+  getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]>;
+  getReadingPlanTemplate(id: number): Promise<ReadingPlanTemplate | undefined>;
+  getReadingPlanItems(templateId: number): Promise<ReadingPlanTemplateItem[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -528,6 +545,88 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAiReport(id: string): Promise<void> {
     await db.delete(aiReports).where(eq(aiReports.id, id));
+  }
+
+  async getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]> {
+    const result = await db
+      .select({
+        bookName: chineseUnionTrad.bookName,
+        bookNumber: chineseUnionTrad.bookNumber,
+        chapterCount: sql<number>`MAX(${chineseUnionTrad.chapter})`.as('chapterCount'),
+      })
+      .from(chineseUnionTrad)
+      .groupBy(chineseUnionTrad.bookName, chineseUnionTrad.bookNumber)
+      .orderBy(asc(chineseUnionTrad.bookNumber));
+    return result;
+  }
+
+  async getBibleChapters(bookName: string): Promise<{ chapter: number; verseCount: number }[]> {
+    const result = await db
+      .select({
+        chapter: chineseUnionTrad.chapter,
+        verseCount: sql<number>`MAX(${chineseUnionTrad.verse})`.as('verseCount'),
+      })
+      .from(chineseUnionTrad)
+      .where(eq(chineseUnionTrad.bookName, bookName))
+      .groupBy(chineseUnionTrad.chapter)
+      .orderBy(asc(chineseUnionTrad.chapter));
+    return result;
+  }
+
+  async getBibleVerses(bookName: string, chapter: number): Promise<ChineseUnionTrad[]> {
+    return db
+      .select()
+      .from(chineseUnionTrad)
+      .where(and(eq(chineseUnionTrad.bookName, bookName), eq(chineseUnionTrad.chapter, chapter)))
+      .orderBy(asc(chineseUnionTrad.verse));
+  }
+
+  async searchBibleVerses(query: string, limit = 50): Promise<ChineseUnionTrad[]> {
+    return db
+      .select()
+      .from(chineseUnionTrad)
+      .where(like(chineseUnionTrad.text, `%${query}%`))
+      .limit(limit);
+  }
+
+  async getBlessingVerses(type?: string): Promise<BlessingVerse[]> {
+    if (type) {
+      return db.select().from(blessingVerses).where(eq(blessingVerses.blessingType, type));
+    }
+    return db.select().from(blessingVerses);
+  }
+
+  async getRandomBlessingVerse(): Promise<BlessingVerse | undefined> {
+    const [verse] = await db.select().from(blessingVerses).orderBy(sql`RANDOM()`).limit(1);
+    return verse;
+  }
+
+  async getJesus4Seasons(): Promise<Jesus4Season[]> {
+    return db.select().from(jesus4Seasons).orderBy(asc(jesus4Seasons.sortOrder));
+  }
+
+  async getJesus4SeasonsBySeason(season: string): Promise<Jesus4Season[]> {
+    return db.select().from(jesus4Seasons).where(eq(jesus4Seasons.season, season)).orderBy(asc(jesus4Seasons.sortOrder));
+  }
+
+  async getJesusDailyContent(season?: string): Promise<JesusDailyContent[]> {
+    if (season) {
+      return db.select().from(jesusDailyContent).where(eq(jesusDailyContent.season, season));
+    }
+    return db.select().from(jesusDailyContent);
+  }
+
+  async getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]> {
+    return db.select().from(readingPlanTemplates).orderBy(asc(readingPlanTemplates.sortOrder));
+  }
+
+  async getReadingPlanTemplate(id: number): Promise<ReadingPlanTemplate | undefined> {
+    const [template] = await db.select().from(readingPlanTemplates).where(eq(readingPlanTemplates.id, id)).limit(1);
+    return template;
+  }
+
+  async getReadingPlanItems(templateId: number): Promise<ReadingPlanTemplateItem[]> {
+    return db.select().from(readingPlanTemplateItems).where(eq(readingPlanTemplateItems.templateId, templateId)).orderBy(asc(readingPlanTemplateItems.dayNumber));
   }
 }
 

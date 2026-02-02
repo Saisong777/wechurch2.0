@@ -1000,4 +1000,133 @@ export async function registerRoutes(app: Express) {
       res.status(500).json({ error: "Failed to send emails", message: error.message });
     }
   });
+
+  // ============ Bible API Routes ============
+  app.get("/api/bible/books", async (req, res) => {
+    try {
+      const books = await storage.getBibleBooks();
+      res.json(books);
+    } catch (error) {
+      console.error('Error fetching Bible books:', error);
+      res.status(500).json({ error: "Failed to get Bible books" });
+    }
+  });
+
+  app.get("/api/bible/chapters/:bookName", async (req, res) => {
+    try {
+      const chapters = await storage.getBibleChapters(req.params.bookName);
+      res.json(chapters);
+    } catch (error) {
+      console.error('Error fetching chapters:', error);
+      res.status(500).json({ error: "Failed to get chapters" });
+    }
+  });
+
+  app.get("/api/bible/verses/:bookName/:chapter", async (req, res) => {
+    try {
+      const chapter = parseInt(req.params.chapter, 10);
+      const verses = await storage.getBibleVerses(req.params.bookName, chapter);
+      res.json(verses);
+    } catch (error) {
+      console.error('Error fetching verses:', error);
+      res.status(500).json({ error: "Failed to get verses" });
+    }
+  });
+
+  app.get("/api/bible/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+      if (!query) {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+      const verses = await storage.searchBibleVerses(query, limit);
+      res.json(verses);
+    } catch (error) {
+      console.error('Error searching Bible:', error);
+      res.status(500).json({ error: "Failed to search Bible" });
+    }
+  });
+
+  app.get("/api/bible/blessing", async (req, res) => {
+    try {
+      const type = req.query.type as string | undefined;
+      const verses = await storage.getBlessingVerses(type);
+      res.json(verses);
+    } catch (error) {
+      console.error('Error fetching blessing verses:', error);
+      res.status(500).json({ error: "Failed to get blessing verses" });
+    }
+  });
+
+  app.get("/api/bible/blessing/random", async (req, res) => {
+    try {
+      const verse = await storage.getRandomBlessingVerse();
+      res.json(verse || null);
+    } catch (error) {
+      console.error('Error fetching random blessing verse:', error);
+      res.status(500).json({ error: "Failed to get random blessing verse" });
+    }
+  });
+
+  // ============ Jesus 4 Seasons API Routes ============
+  app.get("/api/jesus/timeline", async (req, res) => {
+    try {
+      const season = req.query.season as string | undefined;
+      const events = season 
+        ? await storage.getJesus4SeasonsBySeason(season)
+        : await storage.getJesus4Seasons();
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching Jesus timeline:', error);
+      res.status(500).json({ error: "Failed to get Jesus timeline" });
+    }
+  });
+
+  app.get("/api/jesus/daily-content", async (req, res) => {
+    try {
+      const season = req.query.season as string | undefined;
+      const content = await storage.getJesusDailyContent(season);
+      res.json(content);
+    } catch (error) {
+      console.error('Error fetching daily content:', error);
+      res.status(500).json({ error: "Failed to get daily content" });
+    }
+  });
+
+  // ============ Reading Plans API Routes ============
+  app.get("/api/reading-plans", async (req, res) => {
+    try {
+      const templates = await storage.getReadingPlanTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error('Error fetching reading plans:', error);
+      res.status(500).json({ error: "Failed to get reading plans" });
+    }
+  });
+
+  app.get("/api/reading-plans/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const template = await storage.getReadingPlanTemplate(id);
+      if (!template) {
+        return res.status(404).json({ error: "Reading plan not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error('Error fetching reading plan:', error);
+      res.status(500).json({ error: "Failed to get reading plan" });
+    }
+  });
+
+  app.get("/api/reading-plans/:id/items", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const items = await storage.getReadingPlanItems(id);
+      res.json(items);
+    } catch (error) {
+      console.error('Error fetching reading plan items:', error);
+      res.status(500).json({ error: "Failed to get reading plan items" });
+    }
+  });
 }
