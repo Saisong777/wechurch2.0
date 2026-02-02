@@ -6,8 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronDown, ChevronUp, BookOpen, FileText } from 'lucide-react';
+import { SelectableVerse } from '@/components/scripture/SelectableVerse';
 
 interface JesusEvent {
   id: number;
@@ -44,12 +44,12 @@ interface ScriptureData {
 
 const seasonInfo = {
   '後設': {
-    label: '後設資料',
-    shortLabel: '後設',
+    label: '前後言',
+    shortLabel: '前後言',
     icon: FileText,
     color: 'bg-gray-500',
     textColor: 'text-gray-600',
-    preface: '後設資料包含福音書的序言、家譜等背景資料，幫助讀者理解耶穌生平的歷史和神學背景。'
+    preface: '前後言包含福音書的序言、家譜等背景資料，幫助讀者理解耶穌生平的歷史和神學背景。'
   },
   '春': { 
     label: '春季 - 開始', 
@@ -118,17 +118,20 @@ const ScriptureDisplay = ({ reference, gospelName }: { reference: string; gospel
   }
 
   return (
-    <div className="mb-4">
+    <div className="mb-2">
       <h6 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
         <Book className="w-4 h-4" />
         {gospelName} {data.chapter} 章
       </h6>
       <div className="space-y-1 pl-2 border-l-2 border-primary/20">
         {data.verses.map((v) => (
-          <p key={v.id} className="text-sm leading-relaxed" data-testid={`verse-${v.chapter}-${v.verse}`}>
-            <span className="text-primary font-medium mr-2">{v.verse}</span>
-            {v.text}
-          </p>
+          <SelectableVerse
+            key={`${v.chapter}-${v.verse}`}
+            bookName={gospelName}
+            chapter={v.chapter}
+            verse={v.verse}
+            text={v.text}
+          />
         ))}
       </div>
     </div>
@@ -137,8 +140,7 @@ const ScriptureDisplay = ({ reference, gospelName }: { reference: string; gospel
 
 const JesusTimelinePage = () => {
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
-  const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
-  const [showPrefaceModal, setShowPrefaceModal] = useState(false);
+  const [collapsedEvents, setCollapsedEvents] = useState<Set<number>>(new Set());
 
   const { data: allEvents = [], isLoading, isError } = useQuery<JesusEvent[]>({
     queryKey: ['/api/jesus/timeline'],
@@ -149,8 +151,8 @@ const JesusTimelinePage = () => {
     },
   });
 
-  const toggleEventExpand = (eventId: number) => {
-    setExpandedEvents(prev => {
+  const toggleEventCollapse = (eventId: number) => {
+    setCollapsedEvents(prev => {
       const newSet = new Set(prev);
       if (newSet.has(eventId)) {
         newSet.delete(eventId);
@@ -206,16 +208,6 @@ const JesusTimelinePage = () => {
               </div>
               
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPrefaceModal(true)}
-                  data-testid="button-preface-modal"
-                >
-                  <BookOpen className="w-4 h-4 mr-1" />
-                  前後之言
-                </Button>
-                <div className="w-px h-6 bg-border" />
                 {seasonOrder.map((season) => {
                   const info = getSeasonInfo(season);
                   const SeasonIcon = info.icon;
@@ -265,13 +257,13 @@ const JesusTimelinePage = () => {
                   const info = getSeasonInfo(event.season);
                   const SeasonIcon = info.icon;
                   const gospels = getGospelScriptures(event);
-                  const isExpanded = expandedEvents.has(event.id);
+                  const isExpanded = !collapsedEvents.has(event.id);
                   
                   return (
                     <Card 
                       key={event.id}
                       className="bg-muted/30 cursor-pointer hover-elevate"
-                      onClick={() => toggleEventExpand(event.id)}
+                      onClick={() => toggleEventCollapse(event.id)}
                       data-testid={`event-${event.id}`}
                     >
                       <CardContent className="py-3">
@@ -309,12 +301,12 @@ const JesusTimelinePage = () => {
                                     {event.approximateDate}
                                   </Badge>
                                 )}
-                                {gospels.length > 0 && (
-                                  <Badge variant="outline" className="text-xs" data-testid={`scripture-count-${event.id}`}>
+                                {gospels.length > 0 && gospels.map((g) => (
+                                  <Badge key={g.key} variant="outline" className="text-xs" data-testid={`scripture-${event.id}-${g.key}`}>
                                     <Book className="w-3 h-3 mr-1" />
-                                    {gospels.length} 福音書
+                                    {g.name.replace('福音', '')}
                                   </Badge>
-                                )}
+                                ))}
                               </div>
                             </div>
                           </div>
@@ -335,10 +327,15 @@ const JesusTimelinePage = () => {
                                   <BookOpen className="w-4 h-4" />
                                   經文內容
                                 </h5>
-                                <div className="space-y-4">
-                                  {gospels.map((g) => (
-                                    <ScriptureDisplay key={g.key} reference={g.ref} gospelName={g.name} />
-                                  ))}
+                                <div className={`grid gap-3 ${gospels.length > 1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                                  {gospels.map((g, idx) => {
+                                    const bgColors = ['bg-blue-50 dark:bg-blue-950/30', 'bg-green-50 dark:bg-green-950/30', 'bg-amber-50 dark:bg-amber-950/30', 'bg-purple-50 dark:bg-purple-950/30'];
+                                    return (
+                                      <div key={g.key} className={`rounded-lg p-3 ${bgColors[idx % bgColors.length]}`}>
+                                        <ScriptureDisplay reference={g.ref} gospelName={g.name} />
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -373,37 +370,6 @@ const JesusTimelinePage = () => {
         </div>
       </main>
 
-      <Dialog open={showPrefaceModal} onOpenChange={setShowPrefaceModal}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5" />
-              前後之言
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            {seasonOrder.map(season => {
-              const info = getSeasonInfo(season);
-              const SeasonIcon = info.icon;
-              
-              return (
-                <div key={season} className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className={`w-6 h-6 rounded-full ${info.color} flex items-center justify-center`}>
-                      <SeasonIcon className="w-3 h-3 text-white" />
-                    </div>
-                    <h4 className={`font-semibold ${info.textColor}`}>{info.label}</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed pl-8">
-                    {info.preface}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
