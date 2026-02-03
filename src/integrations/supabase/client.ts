@@ -4,14 +4,14 @@
 const mockAuth = {
   getSession: async () => ({ data: { session: null }, error: null }),
   getUser: async () => ({ data: { user: null }, error: null }),
-  signUp: async () => { window.location.href = '/api/login'; return { data: null, error: null }; },
-  signInWithPassword: async () => { window.location.href = '/api/login'; return { data: null, error: null }; },
-  signInWithOAuth: async () => ({ data: null, error: { message: 'Google登入暫時無法使用，請直接填寫資料加入' } }),
+  signUp: async (_options?: any) => { window.location.href = '/api/login'; return { data: null, error: null }; },
+  signInWithPassword: async (_options?: any) => { window.location.href = '/api/login'; return { data: null, error: null }; },
+  signInWithOAuth: async (_options?: any) => ({ data: null, error: { message: 'Google登入暫時無法使用，請直接填寫資料加入' } }),
   signInAnonymously: async () => ({ data: { session: { user: { id: 'anonymous' } } }, error: null }),
   signOut: async () => { window.location.href = '/api/logout'; return { error: null }; },
-  onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-  updateUser: async () => ({ data: null, error: null }),
-  resetPasswordForEmail: async () => ({ data: null, error: null }),
+  onAuthStateChange: (_callback?: any) => ({ data: { subscription: { unsubscribe: () => {} } } }),
+  updateUser: async (_options?: any) => ({ data: null, error: null }),
+  resetPasswordForEmail: async (_email?: string) => ({ data: null, error: null }),
 };
 
 const mockStorage = {

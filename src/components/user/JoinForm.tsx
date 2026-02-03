@@ -45,9 +45,9 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
       setLocationName(savedLocation);
     }
     
-    // If user is logged in via Google, override with their Google profile data
+    // If user is logged in via Replit Auth, use their profile data
     if (user) {
-      const displayName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+      const displayName = user.user_metadata?.display_name || user.displayName || '';
       const userEmail = user.email || '';
       if (displayName) {
         setName(displayName);
