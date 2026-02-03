@@ -834,18 +834,52 @@ export async function registerRoutes(app: Express) {
 
   // ========== Grouping Activities (神的安排) ==========
   
-  // Get active grouping activity
-  app.get("/api/grouping/active", async (req, res) => {
+  // Get user's own active grouping activities
+  app.get("/api/grouping/my-activities", async (req, res) => {
     try {
-      const activities = await storage.getGroupingActivities();
-      const activeActivity = activities.find(a => a.status === 'joining');
-      if (!activeActivity) {
-        return res.json({ activity: null });
+      if (!req.user) {
+        return res.json({ activities: [] });
       }
-      const participants = await storage.getGroupingParticipants(activeActivity.id);
-      res.json({ activity: activeActivity, participants });
+      
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      if (!userId) {
+        return res.json({ activities: [] });
+      }
+      
+      const activities = await storage.getActiveGroupingActivitiesByOwner(userId);
+      const activitiesWithParticipants = await Promise.all(
+        activities.map(async (activity) => {
+          const participants = await storage.getGroupingParticipants(activity.id);
+          return { activity, participants };
+        })
+      );
+      res.json({ activities: activitiesWithParticipants });
     } catch (error) {
-      res.status(500).json({ error: "Failed to get active activity" });
+      res.status(500).json({ error: "Failed to get activities" });
+    }
+  });
+
+  // Get grouping activity by short code (for joining)
+  app.get("/api/grouping/code/:code", async (req, res) => {
+    try {
+      const activity = await storage.getGroupingActivityByCode(req.params.code);
+      if (!activity) {
+        return res.status(404).json({ error: "Activity not found or already closed" });
+      }
+      const participants = await storage.getGroupingParticipants(activity.id);
+      res.json({ activity, participants });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get activity" });
     }
   });
 
@@ -898,7 +932,12 @@ export async function registerRoutes(app: Express) {
       }
 
       const { title, groupingMode, groupSize, groupCount, genderMode } = req.body;
+      
+      // Generate unique short code for this activity
+      const shortCode = await storage.generateUniqueShortCode();
+      
       const activity = await storage.createGroupingActivity({
+        shortCode,
         title: title || '神的安排',
         groupingMode: groupingMode || 'bySize',
         groupSize: groupSize || 4,

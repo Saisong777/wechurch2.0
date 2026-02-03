@@ -417,6 +417,7 @@ export const userReadingProgress = pgTable("user_reading_progress", {
 
 export const groupingActivities = pgTable("grouping_activities", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  shortCode: text("short_code").notNull().unique(), // 4-digit code for joining
   title: text("title").notNull(),
   status: text("status").notNull().default("joining"), // joining, finished
   groupingMode: text("grouping_mode").notNull().default("bySize"),

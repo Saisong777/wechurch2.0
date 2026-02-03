@@ -100,12 +100,15 @@ export interface IStorage {
   // Grouping Activities
   getGroupingActivities(): Promise<GroupingActivity[]>;
   getGroupingActivity(id: string): Promise<GroupingActivity | undefined>;
+  getGroupingActivityByCode(shortCode: string): Promise<GroupingActivity | undefined>;
+  getActiveGroupingActivitiesByOwner(ownerId: string): Promise<GroupingActivity[]>;
   createGroupingActivity(activity: InsertGroupingActivity): Promise<GroupingActivity>;
   updateGroupingActivity(id: string, data: Partial<GroupingActivity>): Promise<GroupingActivity | undefined>;
   getGroupingParticipants(activityId: string): Promise<GroupingParticipant[]>;
   addGroupingParticipant(participant: InsertGroupingParticipant): Promise<GroupingParticipant>;
   updateGroupingParticipants(activityId: string, updates: { id: string; groupNumber: number }[]): Promise<void>;
   deleteGroupingActivity(id: string): Promise<void>;
+  generateUniqueShortCode(): Promise<string>;
 
   deleteAiReport(id: string): Promise<void>;
   
@@ -573,6 +576,41 @@ export class DatabaseStorage implements IStorage {
   async getGroupingActivity(id: string): Promise<GroupingActivity | undefined> {
     const [activity] = await db.select().from(groupingActivities).where(eq(groupingActivities.id, id)).limit(1);
     return activity;
+  }
+
+  async getGroupingActivityByCode(shortCode: string): Promise<GroupingActivity | undefined> {
+    const [activity] = await db.select().from(groupingActivities)
+      .where(and(eq(groupingActivities.shortCode, shortCode.toUpperCase()), eq(groupingActivities.status, 'joining')))
+      .limit(1);
+    return activity;
+  }
+
+  async getActiveGroupingActivitiesByOwner(ownerId: string): Promise<GroupingActivity[]> {
+    return db.select().from(groupingActivities)
+      .where(and(eq(groupingActivities.ownerId, ownerId), eq(groupingActivities.status, 'joining')));
+  }
+
+  async generateUniqueShortCode(): Promise<string> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid confusing chars like 0/O, 1/I
+    let code: string = '';
+    let attempts = 0;
+    const maxAttempts = 100;
+    
+    while (attempts < maxAttempts) {
+      code = '';
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const existing = await db.select().from(groupingActivities)
+        .where(eq(groupingActivities.shortCode, code))
+        .limit(1);
+      if (existing.length === 0) {
+        return code;
+      }
+      attempts++;
+    }
+    
+    throw new Error('Failed to generate unique short code after maximum attempts');
   }
 
   async createGroupingActivity(activity: InsertGroupingActivity): Promise<GroupingActivity> {
