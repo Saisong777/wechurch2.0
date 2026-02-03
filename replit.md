@@ -58,8 +58,16 @@ The random grouper feature allows leaders to create grouping activities with:
 The app features unified scripture sharing components used across the platform. **RULE: All Bible scripture displays across the entire site must have copy/share/card functionality.**
 
 Components:
-- **ScriptureCardCreator**: Create shareable images with scripture verses, custom backgrounds (6 gradient presets + image upload), personal messages, and 9 text positioning options
-- **FloatingToolbar**: Appears near selected text with copy/share/card actions; fixed bottom bar on mobile, floating near selection on desktop
+- **ScriptureCardCreator**: Unified card creation modal used site-wide. Features:
+  - 6 gradient background presets + custom image upload (max 5MB)
+  - 4 aspect ratios: square, portrait (3:4), story (9:16), landscape (4:3)
+  - 3 font sizes and 9 text positioning options (3x3 grid)
+  - Personal message field
+  - Mobile-optimized scrollable dialog with touch support
+  - Smart download: opens image viewer on mobile (long-press to save), direct download on desktop
+  - Loading states during image generation
+  - Uses html2canvas for image generation
+- **FloatingToolbar**: Appears near selected text with copy/share/card actions; fixed bottom bar on mobile (z-index 9999), floating near selection on desktop
 - **ClickableVerse**: Single verse display with tap-to-share functionality for the homepage daily scripture
 - **ScriptureViewer**: Multi-verse selection with floating toolbar for passage sharing; used in JesusTimelinePage
 
@@ -68,6 +76,7 @@ When adding new scripture displays:
 2. Use `ScriptureViewer` for multi-verse passages (e.g., timeline events, study content)
 3. Both components include copy, share, and card creation functionality
 4. If inside a clickable parent container, ensure `e.stopPropagation()` is used on verse clicks
+5. ScriptureCardCreator is the ONLY card creation component - do not create alternatives
 
 ### High-Concurrency Design
 The application is optimized for 500+ concurrent users with:
