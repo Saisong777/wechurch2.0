@@ -870,17 +870,20 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      // Try legacyUserId first, then look up by email if not available
-      let userId = (req.user as any).legacyUserId;
+      // Get user info from OIDC claims
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      
+      // Look up the full user info from auth storage (which includes legacyUserId)
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
       let role: string | undefined;
-      const email = (req.user as any).email;
       
-      console.log("[Grouping] User info:", { legacyUserId: userId, email });
-      
-      if (!userId && email) {
-        // Look up legacy user by email
-        const legacyUser = await storage.getUserByEmail(email);
-        console.log("[Grouping] Legacy user lookup:", legacyUser);
+      if (!userId && fullUser?.email) {
+        // Fallback: look up legacy user by email
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) {
           userId = legacyUser.id;
         }
@@ -888,11 +891,9 @@ export async function registerRoutes(app: Express) {
       
       if (userId) {
         role = await storage.getUserRole(userId);
-        console.log("[Grouping] Role lookup:", { userId, role });
       }
       
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
-        console.log("[Grouping] Access denied:", { role, allowed: ['leader', 'future_leader', 'admin'] });
         return res.status(403).json({ error: "Only leaders and admins can create grouping activities" });
       }
 
