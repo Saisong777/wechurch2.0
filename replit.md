@@ -42,7 +42,17 @@ Preferred communication style: Simple, everyday language.
   - `ai_reports` - AI-generated study summaries (group and overall)
   - `prayers` / `prayer_amens` / `prayer_comments` - Prayer wall interactions
   - `icebreaker_games` / `icebreaker_players` - Game state management
+  - `grouping_activities` / `grouping_participants` - Random grouper with unique short codes
   - `message_cards` - Shareable image cards with download tracking
+
+### Random Grouper ("神的安排")
+The random grouper feature allows leaders to create grouping activities with:
+- **Unique 4-digit codes**: Each activity gets a unique short code (e.g., "A3B7") for easy sharing
+- **QR code generation**: Automatic QR codes via api.qrserver.com for mobile scanning
+- **Multiple concurrent activities**: Each leader can run independent activities simultaneously
+- **Privacy-focused**: Activity data and participants are deleted when the activity is closed
+- **Role-based access**: Only leader/future_leader/admin can create activities; all users can join with code
+- **Real-time updates**: 3-second polling for participant lists during active sessions
 
 ### High-Concurrency Design
 The application is optimized for 500+ concurrent users with:
