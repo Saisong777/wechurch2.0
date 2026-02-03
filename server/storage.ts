@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { eq, and, desc, sql, asc, like, or } from "drizzle-orm";
+import { bibleCache, timelineCache, cacheKeys } from "./cache";
 import {
   users, sessions, participants, submissions, aiReports,
   studyResponses, prayers, prayerAmens, prayerComments,
@@ -553,6 +554,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]> {
+    const cacheKey = cacheKeys.bibleBooks();
+    const cached = bibleCache.get<{ bookName: string; bookNumber: number; chapterCount: number }[]>(cacheKey);
+    if (cached) return cached;
+
     const result = await db
       .select({
         bookName: chineseUnionTrad.bookName,
@@ -562,10 +567,16 @@ export class DatabaseStorage implements IStorage {
       .from(chineseUnionTrad)
       .groupBy(chineseUnionTrad.bookName, chineseUnionTrad.bookNumber)
       .orderBy(asc(chineseUnionTrad.bookNumber));
+    
+    bibleCache.set(cacheKey, result);
     return result;
   }
 
   async getBibleChapters(bookName: string): Promise<{ chapter: number; verseCount: number }[]> {
+    const cacheKey = cacheKeys.bibleChapters(bookName);
+    const cached = bibleCache.get<{ chapter: number; verseCount: number }[]>(cacheKey);
+    if (cached) return cached;
+
     const result = await db
       .select({
         chapter: chineseUnionTrad.chapter,
@@ -575,15 +586,24 @@ export class DatabaseStorage implements IStorage {
       .where(eq(chineseUnionTrad.bookName, bookName))
       .groupBy(chineseUnionTrad.chapter)
       .orderBy(asc(chineseUnionTrad.chapter));
+    
+    bibleCache.set(cacheKey, result);
     return result;
   }
 
   async getBibleVerses(bookName: string, chapter: number): Promise<ChineseUnionTrad[]> {
-    return db
+    const cacheKey = cacheKeys.bibleVerses(bookName, chapter);
+    const cached = bibleCache.get<ChineseUnionTrad[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await db
       .select()
       .from(chineseUnionTrad)
       .where(and(eq(chineseUnionTrad.bookName, bookName), eq(chineseUnionTrad.chapter, chapter)))
       .orderBy(asc(chineseUnionTrad.verse));
+    
+    bibleCache.set(cacheKey, result);
+    return result;
   }
 
   async searchBibleVerses(query: string, limit = 50): Promise<ChineseUnionTrad[]> {
@@ -607,11 +627,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getJesus4Seasons(): Promise<Jesus4Season[]> {
-    return db.select().from(jesus4Seasons).orderBy(asc(jesus4Seasons.displayOrder));
+    const cacheKey = cacheKeys.timelineSeasons();
+    const cached = timelineCache.get<Jesus4Season[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await db.select().from(jesus4Seasons).orderBy(asc(jesus4Seasons.displayOrder));
+    timelineCache.set(cacheKey, result);
+    return result;
   }
 
   async getJesus4SeasonsBySeason(season: string): Promise<Jesus4Season[]> {
-    return db.select().from(jesus4Seasons).where(eq(jesus4Seasons.season, season)).orderBy(asc(jesus4Seasons.displayOrder));
+    const cacheKey = cacheKeys.timelineEvents(season);
+    const cached = timelineCache.get<Jesus4Season[]>(cacheKey);
+    if (cached) return cached;
+
+    const result = await db.select().from(jesus4Seasons).where(eq(jesus4Seasons.season, season)).orderBy(asc(jesus4Seasons.displayOrder));
+    timelineCache.set(cacheKey, result);
+    return result;
   }
 
   async getJesusDailyContent(season?: string): Promise<JesusDailyContent[]> {

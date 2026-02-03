@@ -51,6 +51,9 @@ The application is optimized for 500+ concurrent users with:
 - Extended polling intervals (5-10 seconds) to reduce server load
 - Debounced auto-save (1.5 second delay)
 - Non-blocking background operations
+- **Database connection pool**: Configured with max 20 connections, min 5 idle connections
+- **In-memory caching**: Bible data and timeline events cached for 1 hour
+- **Health monitoring endpoints**: `/api/health`, `/api/health/detailed`, `/api/health/db`
 
 ### Directory Structure
 ```

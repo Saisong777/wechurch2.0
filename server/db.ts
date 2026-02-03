@@ -10,5 +10,39 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Connection pool configuration optimized for 500+ concurrent users
+const poolConfig = {
+  connectionString: process.env.DATABASE_URL,
+  // Maximum number of clients in the pool
+  max: 20,
+  // Minimum number of idle clients maintained
+  min: 5,
+  // How long a client can sit idle before being closed (30 seconds)
+  idleTimeoutMillis: 30000,
+  // How long to wait for a connection (10 seconds)
+  connectionTimeoutMillis: 10000,
+  // Maximum times a connection can be reused
+  maxUses: 7500,
+};
+
+export const pool = new Pool(poolConfig);
+
+// Connection pool event handlers for monitoring
+pool.on('error', (err) => {
+  console.error('[DB Pool] Unexpected error on idle client:', err.message);
+});
+
+pool.on('connect', () => {
+  console.log('[DB Pool] New client connected');
+});
+
+// Get current pool statistics
+export function getPoolStats() {
+  return {
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount,
+  };
+}
+
 export const db = drizzle(pool, { schema });

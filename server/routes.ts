@@ -6,6 +6,8 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
+import { pool, getPoolStats } from "./db";
+import { bibleCache, timelineCache, apiCache } from "./cache";
 
 // Configure multer for file uploads
 const messageCardStorage = multer.diskStorage({
@@ -38,6 +40,82 @@ const uploadMessageCard = multer({
 export async function registerRoutes(app: Express) {
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  // Health check endpoint - basic
+  app.get("/api/health", (req, res) => {
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+        unit: "MB"
+      }
+    });
+  });
+
+  // Health check endpoint - detailed with database
+  app.get("/api/health/detailed", async (req, res) => {
+    const startTime = Date.now();
+    let dbStatus = "ok";
+    let dbLatency = 0;
+
+    try {
+      const dbStart = Date.now();
+      await pool.query("SELECT 1");
+      dbLatency = Date.now() - dbStart;
+    } catch (error) {
+      dbStatus = "error";
+    }
+
+    const poolStats = getPoolStats();
+    
+    res.json({
+      status: dbStatus === "ok" ? "healthy" : "degraded",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      responseTime: Date.now() - startTime,
+      database: {
+        status: dbStatus,
+        latency: dbLatency,
+        pool: poolStats
+      },
+      cache: {
+        bible: bibleCache.getStats(),
+        timeline: timelineCache.getStats(),
+        api: apiCache.getStats()
+      },
+      memory: {
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        unit: "MB"
+      }
+    });
+  });
+
+  // Database connection check endpoint
+  app.get("/api/health/db", async (req, res) => {
+    try {
+      const start = Date.now();
+      await pool.query("SELECT 1");
+      const latency = Date.now() - start;
+      
+      res.json({
+        status: "ok",
+        latency,
+        pool: getPoolStats()
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: "error",
+        message: "Database connection failed",
+        pool: getPoolStats()
+      });
+    }
+  });
+
   app.get("/api/sessions", async (req, res) => {
     try {
       const sessions = await storage.getSessions();
