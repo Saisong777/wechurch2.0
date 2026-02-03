@@ -7,11 +7,13 @@ import {
   featureToggles, potentialMembers, icebreakerGames, icebreakerPlayers,
   cardQuestions, messageCards, messageCardDownloads, userRoles,
   chineseUnionTrad, jesus4Seasons, jesusDailyContent, readingPlanTemplates, readingPlanTemplateItems, blessingVerses, savedVerses,
+  groupingActivities, groupingParticipants,
   User, InsertUser, Session, InsertSession, Participant, InsertParticipant,
   Submission, InsertSubmission, Prayer, InsertPrayer, StudyResponse, InsertStudyResponse,
   FeatureToggle, PotentialMember, IcebreakerGame, IcebreakerPlayer, CardQuestion,
   AiReport, MessageCard, MessageCardDownload,
-  ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse, SavedVerse, InsertSavedVerse
+  ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse, SavedVerse, InsertSavedVerse,
+  GroupingActivity, GroupingParticipant, InsertGroupingActivity, InsertGroupingParticipant
 } from "@shared/schema";
 
 export interface IStorage {
@@ -562,6 +564,47 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAiReport(id: string): Promise<void> {
     await db.delete(aiReports).where(eq(aiReports.id, id));
+  }
+
+  async getGroupingActivities(): Promise<GroupingActivity[]> {
+    return db.select().from(groupingActivities).orderBy(desc(groupingActivities.createdAt));
+  }
+
+  async getGroupingActivity(id: string): Promise<GroupingActivity | undefined> {
+    const [activity] = await db.select().from(groupingActivities).where(eq(groupingActivities.id, id)).limit(1);
+    return activity;
+  }
+
+  async createGroupingActivity(activity: InsertGroupingActivity): Promise<GroupingActivity> {
+    const [newActivity] = await db.insert(groupingActivities).values(activity).returning();
+    return newActivity;
+  }
+
+  async updateGroupingActivity(id: string, data: Partial<GroupingActivity>): Promise<GroupingActivity | undefined> {
+    const [updated] = await db.update(groupingActivities).set(data).where(eq(groupingActivities.id, id)).returning();
+    return updated;
+  }
+
+  async getGroupingParticipants(activityId: string): Promise<GroupingParticipant[]> {
+    return db.select().from(groupingParticipants).where(eq(groupingParticipants.activityId, activityId)).orderBy(asc(groupingParticipants.joinedAt));
+  }
+
+  async addGroupingParticipant(participant: InsertGroupingParticipant): Promise<GroupingParticipant> {
+    const [newParticipant] = await db.insert(groupingParticipants).values(participant).returning();
+    return newParticipant;
+  }
+
+  async updateGroupingParticipants(activityId: string, updates: { id: string; groupNumber: number }[]): Promise<void> {
+    for (const update of updates) {
+      await db.update(groupingParticipants)
+        .set({ groupNumber: update.groupNumber })
+        .where(and(eq(groupingParticipants.id, update.id), eq(groupingParticipants.activityId, activityId)));
+    }
+  }
+
+  async deleteGroupingActivity(id: string): Promise<void> {
+    await db.delete(groupingParticipants).where(eq(groupingParticipants.activityId, id));
+    await db.delete(groupingActivities).where(eq(groupingActivities.id, id));
   }
 
   async getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]> {

@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { z } from "zod";
 import { storage } from "./storage";
-import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema } from "@shared/schema";
+import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { pool, getPoolStats } from "./db";
 import { bibleCache, timelineCache, apiCache } from "./cache";
@@ -829,6 +829,203 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to reset deck" });
+    }
+  });
+
+  // ========== Grouping Activities (神的安排) ==========
+  
+  // Get active grouping activity
+  app.get("/api/grouping/active", async (req, res) => {
+    try {
+      const activities = await storage.getGroupingActivities();
+      const activeActivity = activities.find(a => a.status === 'joining');
+      if (!activeActivity) {
+        return res.json({ activity: null });
+      }
+      const participants = await storage.getGroupingParticipants(activeActivity.id);
+      res.json({ activity: activeActivity, participants });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get active activity" });
+    }
+  });
+
+  // Get grouping activity by ID
+  app.get("/api/grouping/:id", async (req, res) => {
+    try {
+      const activity = await storage.getGroupingActivity(req.params.id);
+      if (!activity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+      const participants = await storage.getGroupingParticipants(activity.id);
+      res.json({ activity, participants });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get activity" });
+    }
+  });
+
+  // Create grouping activity (requires leader/admin role)
+  app.post("/api/grouping", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const userId = (req.user as any).legacyUserId || (req.user as any).id;
+      const role = await storage.getUserRole(userId);
+      
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Only leaders and admins can create grouping activities" });
+      }
+
+      const { title, groupingMode, groupSize, groupCount, genderMode } = req.body;
+      const activity = await storage.createGroupingActivity({
+        title: title || '神的安排',
+        groupingMode: groupingMode || 'bySize',
+        groupSize: groupSize || 4,
+        groupCount: groupCount || 3,
+        genderMode: genderMode || 'mixed',
+        ownerId: userId,
+        status: 'joining',
+      });
+      res.json(activity);
+    } catch (error) {
+      console.error("[Grouping] Failed to create activity:", error);
+      res.status(500).json({ error: "Failed to create activity" });
+    }
+  });
+
+  // Join grouping activity (no auth required)
+  app.post("/api/grouping/:id/join", async (req, res) => {
+    try {
+      const activity = await storage.getGroupingActivity(req.params.id);
+      if (!activity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+      if (activity.status !== 'joining') {
+        return res.status(400).json({ error: "Activity is not accepting participants" });
+      }
+
+      const { name, gender } = req.body;
+      if (!name || !gender) {
+        return res.status(400).json({ error: "Name and gender are required" });
+      }
+
+      const participant = await storage.addGroupingParticipant({
+        activityId: activity.id,
+        name,
+        gender,
+      });
+      res.json(participant);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to join activity" });
+    }
+  });
+
+  // Execute grouping (requires owner)
+  app.post("/api/grouping/:id/execute", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const activity = await storage.getGroupingActivity(req.params.id);
+      if (!activity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+
+      const userId = (req.user as any).legacyUserId || (req.user as any).id;
+      if (activity.ownerId !== userId) {
+        const role = await storage.getUserRole(userId);
+        if (role !== 'admin') {
+          return res.status(403).json({ error: "Only the activity owner can execute grouping" });
+        }
+      }
+
+      const participants = await storage.getGroupingParticipants(activity.id);
+      if (participants.length === 0) {
+        return res.status(400).json({ error: "No participants to group" });
+      }
+
+      // Shuffle participants
+      const shuffled = [...participants].sort(() => Math.random() - 0.5);
+      
+      let numGroups: number;
+      if (activity.groupingMode === 'bySize') {
+        numGroups = Math.ceil(shuffled.length / (activity.groupSize || 4));
+      } else {
+        numGroups = Math.min(activity.groupCount || 3, shuffled.length);
+      }
+
+      // Assign groups based on gender mode
+      let updates: { id: string; groupNumber: number }[] = [];
+      
+      if (activity.genderMode === 'split') {
+        // Split by gender
+        const males = shuffled.filter(p => p.gender === 'M');
+        const females = shuffled.filter(p => p.gender === 'F');
+        
+        const assignGroups = (list: typeof participants, startGroup: number) => {
+          const groupCount = Math.max(1, Math.ceil(list.length / (activity.groupSize || 4)));
+          list.forEach((p, i) => {
+            updates.push({ id: p.id, groupNumber: startGroup + (i % groupCount) });
+          });
+          return groupCount;
+        };
+        
+        const maleGroups = assignGroups(males, 1);
+        assignGroups(females, maleGroups + 1);
+      } else {
+        // Mixed - interleave genders for balance
+        const males = shuffled.filter(p => p.gender === 'M');
+        const females = shuffled.filter(p => p.gender === 'F');
+        const interleaved: typeof participants = [];
+        
+        const maxLen = Math.max(males.length, females.length);
+        for (let i = 0; i < maxLen; i++) {
+          if (i < males.length) interleaved.push(males[i]);
+          if (i < females.length) interleaved.push(females[i]);
+        }
+        
+        interleaved.forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: (i % numGroups) + 1 });
+        });
+      }
+
+      await storage.updateGroupingParticipants(activity.id, updates);
+      await storage.updateGroupingActivity(activity.id, { status: 'finished' });
+
+      const updatedParticipants = await storage.getGroupingParticipants(activity.id);
+      res.json({ activity: { ...activity, status: 'finished' }, participants: updatedParticipants });
+    } catch (error) {
+      console.error("[Grouping] Failed to execute grouping:", error);
+      res.status(500).json({ error: "Failed to execute grouping" });
+    }
+  });
+
+  // Close grouping activity
+  app.post("/api/grouping/:id/close", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const activity = await storage.getGroupingActivity(req.params.id);
+      if (!activity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+
+      const userId = (req.user as any).legacyUserId || (req.user as any).id;
+      if (activity.ownerId !== userId) {
+        const role = await storage.getUserRole(userId);
+        if (role !== 'admin') {
+          return res.status(403).json({ error: "Only the activity owner can close it" });
+        }
+      }
+
+      await storage.deleteGroupingActivity(activity.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to close activity" });
     }
   });
 

@@ -1,183 +1,313 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { Shuffle, Copy, Check, Users, Sparkles, RefreshCw } from 'lucide-react';
+import { Shuffle, Copy, Check, Users, Sparkles, RefreshCw, UserPlus, Crown, Heart, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiRequest } from '@/lib/queryClient';
 
-interface Person {
-  name: string;
-  gender: 'M' | 'F' | 'U';
+interface GroupingActivity {
+  id: string;
+  title: string;
+  status: string;
+  groupingMode: string;
+  groupSize: number | null;
+  groupCount: number | null;
+  genderMode: string;
+  ownerId: string | null;
+  createdAt: string;
 }
 
-interface Group {
-  id: number;
-  members: Person[];
+interface GroupingParticipant {
+  id: string;
+  activityId: string;
+  name: string;
+  gender: string;
+  groupNumber: number | null;
+  joinedAt: string;
 }
 
 type GroupingMode = 'bySize' | 'byCount';
 type GenderMode = 'mixed' | 'split';
 
+const GROUP_COLORS = [
+  'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700',
+  'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700',
+  'bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700',
+  'bg-orange-100 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700',
+  'bg-pink-100 dark:bg-pink-900/40 border-pink-300 dark:border-pink-700',
+  'bg-cyan-100 dark:bg-cyan-900/40 border-cyan-300 dark:border-cyan-700',
+  'bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700',
+  'bg-rose-100 dark:bg-rose-900/40 border-rose-300 dark:border-rose-700',
+];
+
 export const RandomGrouper = () => {
-  const [namesInput, setNamesInput] = useState('');
+  const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
+  
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('bySize');
   const [groupSize, setGroupSize] = useState(4);
   const [groupCount, setGroupCount] = useState(3);
   const [genderMode, setGenderMode] = useState<GenderMode>('mixed');
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [copiedGroup, setCopiedGroup] = useState<number | null>(null);
+  
+  const [joinName, setJoinName] = useState('');
+  const [joinGender, setJoinGender] = useState<'M' | 'F' | ''>('');
+  const [hasJoined, setHasJoined] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
 
-  const parseNames = (input: string): Person[] => {
-    return input
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .map(line => {
-        const parts = line.split(/\s+/);
-        const lastPart = parts[parts.length - 1]?.toUpperCase();
-        
-        let gender: 'M' | 'F' | 'U' = 'U';
-        let name = line;
-        
-        if (lastPart === 'M' || lastPart === '男') {
-          gender = 'M';
-          name = parts.slice(0, -1).join(' ');
-        } else if (lastPart === 'F' || lastPart === '女') {
-          gender = 'F';
-          name = parts.slice(0, -1).join(' ');
-        }
-        
-        return { name: name.trim(), gender };
-      })
-      .filter(p => p.name.length > 0);
-  };
+  const isLeaderOrAbove = user?.role && ['leader', 'future_leader', 'admin'].includes(user.role);
 
-  const people = useMemo(() => parseNames(namesInput), [namesInput]);
+  const { data: activeData, isLoading: loadingActive, refetch: refetchActive } = useQuery<{ activity: GroupingActivity | null; participants: GroupingParticipant[] }>({
+    queryKey: ['/api/grouping/active'],
+    refetchInterval: 3000,
+  });
 
-  const shuffle = <T,>(array: T[]): T[] => {
-    const result = [...array];
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-  };
+  const activity = activeData?.activity;
+  const participants = activeData?.participants || [];
+  const isOwner = activity?.ownerId === user?.id;
+  const isFinished = activity?.status === 'finished';
 
-  const createGroups = () => {
-    if (people.length === 0) {
-      toast.error('請先輸入名單');
-      return;
-    }
-
-    const effectiveGroupCount = Math.min(groupCount, people.length);
-    if (groupingMode === 'byCount' && groupCount > people.length) {
-      toast.info(`人數不足，已調整為 ${effectiveGroupCount} 組`);
-    }
-
-    let result: Group[] = [];
-    const shuffledPeople = shuffle(people);
-
-    if (genderMode === 'split') {
-      const males = shuffledPeople.filter(p => p.gender === 'M');
-      const females = shuffledPeople.filter(p => p.gender === 'F');
-      const unknowns = shuffledPeople.filter(p => p.gender === 'U');
-
-      const createGroupsFromList = (list: Person[], startId: number): Group[] => {
-        if (list.length === 0) return [];
-        
-        const numGroups = groupingMode === 'bySize' 
-          ? Math.ceil(list.length / groupSize)
-          : Math.min(effectiveGroupCount, list.length);
-        
-        const groups: Group[] = Array.from({ length: numGroups }, (_, i) => ({
-          id: startId + i,
-          members: []
-        }));
-
-        list.forEach((person, index) => {
-          groups[index % numGroups].members.push(person);
-        });
-
-        return groups.filter(g => g.members.length > 0);
-      };
-
-      const maleGroups = createGroupsFromList(males, 1);
-      const femaleGroups = createGroupsFromList(females, maleGroups.length + 1);
-      const unknownGroups = unknowns.length > 0 
-        ? createGroupsFromList(unknowns, maleGroups.length + femaleGroups.length + 1)
-        : [];
-      
-      result = [...maleGroups, ...femaleGroups, ...unknownGroups];
-    } else {
-      const numGroups = groupingMode === 'bySize'
-        ? Math.ceil(people.length / groupSize)
-        : effectiveGroupCount;
-
-      result = Array.from({ length: numGroups }, (_, i) => ({
-        id: i + 1,
-        members: []
-      }));
-
-      const males = shuffle(shuffledPeople.filter(p => p.gender === 'M'));
-      const females = shuffle(shuffledPeople.filter(p => p.gender === 'F'));
-      const unknowns = shuffle(shuffledPeople.filter(p => p.gender === 'U'));
-
-      let allPeople: Person[] = [];
-      const maxLen = Math.max(males.length, females.length, unknowns.length);
-      
-      for (let i = 0; i < maxLen; i++) {
-        if (i < males.length) allPeople.push(males[i]);
-        if (i < females.length) allPeople.push(females[i]);
-        if (i < unknowns.length) allPeople.push(unknowns[i]);
+  useEffect(() => {
+    if (activity && hasJoined) {
+      const participantExists = participants.some(p => p.name === joinName);
+      if (!participantExists) {
+        setHasJoined(false);
       }
-
-      allPeople.forEach((person, index) => {
-        result[index % numGroups].members.push(person);
-      });
-
-      result = result.filter(g => g.members.length > 0);
     }
+  }, [activity, participants, hasJoined, joinName]);
 
-    result.forEach((g, i) => g.id = i + 1);
-    setGroups(result);
-    toast.success(`已分成 ${result.length} 組！`);
-  };
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', '/api/grouping', {
+        title: '神的安排',
+        groupingMode,
+        groupSize,
+        groupCount,
+        genderMode,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/grouping/active'] });
+      toast.success('活動已建立，等待大家加入！');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || '建立活動失敗');
+    },
+  });
 
-  const copyGroup = (group: Group) => {
-    const text = `第 ${group.id} 組：\n${group.members.map(m => m.name).join('\n')}`;
-    navigator.clipboard.writeText(text);
-    setCopiedGroup(group.id);
-    toast.success(`已複製第 ${group.id} 組`);
-    setTimeout(() => setCopiedGroup(null), 2000);
-  };
+  const joinMutation = useMutation({
+    mutationFn: async () => {
+      if (!activity) throw new Error('No active activity');
+      return apiRequest('POST', `/api/grouping/${activity.id}/join`, { name: joinName, gender: joinGender });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/grouping/active'] });
+      setHasJoined(true);
+      toast.success('加入成功！');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || '加入失敗');
+    },
+  });
 
-  const copyAllGroups = () => {
-    const text = groups
-      .map(g => `【第 ${g.id} 組】\n${g.members.map(m => m.name).join('\n')}`)
+  const executeMutation = useMutation({
+    mutationFn: async () => {
+      if (!activity) throw new Error('No active activity');
+      return apiRequest('POST', `/api/grouping/${activity.id}/execute`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/grouping/active'] });
+      toast.success('分組完成！');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || '分組失敗');
+    },
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: async () => {
+      if (!activity) throw new Error('No active activity');
+      return apiRequest('POST', `/api/grouping/${activity.id}/close`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/grouping/active'] });
+      setHasJoined(false);
+      toast.success('活動已結束');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || '結束活動失敗');
+    },
+  });
+
+  const copyResults = useCallback(() => {
+    if (!isFinished || participants.length === 0) return;
+    
+    const groups: { [key: number]: GroupingParticipant[] } = {};
+    participants.forEach(p => {
+      if (p.groupNumber) {
+        if (!groups[p.groupNumber]) groups[p.groupNumber] = [];
+        groups[p.groupNumber].push(p);
+      }
+    });
+
+    const text = Object.entries(groups)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([num, members]) => `【第 ${num} 組】\n${members.map(m => `${m.name} (${m.gender === 'M' ? '男' : '女'})`).join('\n')}`)
       .join('\n\n');
+
     navigator.clipboard.writeText(text);
     setCopiedAll(true);
-    toast.success('已複製所有分組結果');
+    toast.success('已複製分組結果');
     setTimeout(() => setCopiedAll(false), 2000);
-  };
+  }, [isFinished, participants]);
 
-  const getGenderBadge = (gender: 'M' | 'F' | 'U') => {
-    if (gender === 'M') return <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">男</Badge>;
-    if (gender === 'F') return <Badge variant="outline" className="text-xs bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800">女</Badge>;
-    return null;
-  };
+  if (authLoading || loadingActive) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full gradient-gold flex items-center justify-center animate-pulse">
+            <Sparkles className="w-8 h-8 text-secondary-foreground" />
+          </div>
+          <p className="text-muted-foreground">載入中...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const getGroupStats = (group: Group) => {
-    const males = group.members.filter(m => m.gender === 'M').length;
-    const females = group.members.filter(m => m.gender === 'F').length;
-    return { males, females, total: group.members.length };
-  };
+  if (!activity && !isLeaderOrAbove) {
+    return (
+      <div className="w-full max-w-lg mx-auto px-4 py-8">
+        <Card className="text-center">
+          <CardContent className="py-12 space-y-4">
+            <div className="w-20 h-20 mx-auto rounded-full bg-muted flex items-center justify-center">
+              <Heart className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-semibold">等待組長開啟分組活動</h2>
+            <p className="text-muted-foreground">
+              目前沒有進行中的分組活動。<br />
+              請等待組長或管理員開啟「神的安排」活動。
+            </p>
+            <Button variant="outline" onClick={() => refetchActive()} className="mt-4">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              重新整理
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!activity && isLeaderOrAbove) {
+    return (
+      <div className="w-full max-w-lg mx-auto px-4 py-6 space-y-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
+            <Sparkles className="w-6 h-6 text-primary" />
+            神的安排
+          </h1>
+          <p className="text-muted-foreground text-sm">建立隨機分組活動</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Crown className="w-4 h-4 text-amber-500" />
+              組長設定
+            </CardTitle>
+            <CardDescription>設定分組方式，然後開啟活動讓大家加入</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">分組方式</Label>
+                <RadioGroup
+                  value={groupingMode}
+                  onValueChange={(v) => setGroupingMode(v as GroupingMode)}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="bySize" id="bySize" data-testid="radio-by-size" />
+                    <Label htmlFor="bySize" className="text-sm cursor-pointer">每組人數</Label>
+                    {groupingMode === 'bySize' && (
+                      <Input
+                        type="number"
+                        min={2}
+                        max={20}
+                        value={groupSize}
+                        onChange={(e) => setGroupSize(parseInt(e.target.value) || 4)}
+                        className="w-16 text-center"
+                        data-testid="input-group-size"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="byCount" id="byCount" data-testid="radio-by-count" />
+                    <Label htmlFor="byCount" className="text-sm cursor-pointer">總組數</Label>
+                    {groupingMode === 'byCount' && (
+                      <Input
+                        type="number"
+                        min={2}
+                        max={50}
+                        value={groupCount}
+                        onChange={(e) => setGroupCount(parseInt(e.target.value) || 3)}
+                        className="w-16 text-center"
+                        data-testid="input-group-count"
+                      />
+                    )}
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">性別選項</Label>
+                <RadioGroup
+                  value={genderMode}
+                  onValueChange={(v) => setGenderMode(v as GenderMode)}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="mixed" id="mixed" data-testid="radio-mixed" />
+                    <Label htmlFor="mixed" className="text-sm cursor-pointer">男女混合</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="split" id="split" data-testid="radio-split" />
+                    <Label htmlFor="split" className="text-sm cursor-pointer">男女分開</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+
+            <Button 
+              onClick={() => createMutation.mutate()}
+              className="w-full"
+              size="lg"
+              disabled={createMutation.isPending}
+              data-testid="button-create-activity"
+            >
+              <UserPlus className="w-5 h-5 mr-2" />
+              開啟分組活動
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const groups: { [key: number]: GroupingParticipant[] } = {};
+  if (isFinished) {
+    participants.forEach(p => {
+      if (p.groupNumber) {
+        if (!groups[p.groupNumber]) groups[p.groupNumber] = [];
+        groups[p.groupNumber].push(p);
+      }
+    });
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 py-6 space-y-6">
@@ -186,193 +316,204 @@ export const RandomGrouper = () => {
           <Sparkles className="w-6 h-6 text-primary" />
           神的安排
         </h1>
-        <p className="text-muted-foreground text-sm">快速隨機分組器</p>
+        <p className="text-muted-foreground text-sm">
+          {isFinished ? '分組結果' : '隨機分組活動進行中'}
+        </p>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            輸入名單
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Textarea
-              placeholder="請輸入名單，每行一人&#10;可選擇加註性別：&#10;王小明 男&#10;李小華 女&#10;張三"
-              value={namesInput}
-              onChange={(e) => setNamesInput(e.target.value)}
-              className="min-h-[150px] font-mono text-sm"
-              data-testid="input-names"
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              已輸入 <span className="font-bold text-foreground">{people.length}</span> 人
-              {people.filter(p => p.gender !== 'U').length > 0 && (
-                <span className="ml-2">
-                  (男 {people.filter(p => p.gender === 'M').length} / 女 {people.filter(p => p.gender === 'F').length})
-                </span>
+      {!isFinished && (
+        <>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                目前參與者 ({participants.length} 人)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {participants.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">
+                  <Clock className="w-5 h-5 inline-block mr-2" />
+                  等待參與者加入...
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {participants.map((p) => (
+                    <Badge
+                      key={p.id}
+                      variant="secondary"
+                      className={cn(
+                        "text-sm",
+                        p.gender === 'M' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-pink-100 dark:bg-pink-900/30'
+                      )}
+                    >
+                      {p.name}
+                      <span className="ml-1 text-xs opacity-60">
+                        {p.gender === 'M' ? '♂' : '♀'}
+                      </span>
+                    </Badge>
+                  ))}
+                </div>
               )}
-            </p>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">分組方式</Label>
-              <RadioGroup
-                value={groupingMode}
-                onValueChange={(v) => setGroupingMode(v as GroupingMode)}
-                className="space-y-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="bySize" id="bySize" data-testid="radio-by-size" />
-                  <Label htmlFor="bySize" className="text-sm cursor-pointer">每組人數</Label>
-                  {groupingMode === 'bySize' && (
-                    <Input
-                      type="number"
-                      min={2}
-                      max={20}
-                      value={groupSize}
-                      onChange={(e) => setGroupSize(parseInt(e.target.value) || 4)}
-                      className="w-16 text-center"
-                      data-testid="input-group-size"
-                    />
-                  )}
+          {!hasJoined && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">加入活動</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="join-name">姓名</Label>
+                  <Input
+                    id="join-name"
+                    placeholder="請輸入您的姓名"
+                    value={joinName}
+                    onChange={(e) => setJoinName(e.target.value)}
+                    data-testid="input-join-name"
+                  />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="byCount" id="byCount" data-testid="radio-by-count" />
-                  <Label htmlFor="byCount" className="text-sm cursor-pointer">總組數</Label>
-                  {groupingMode === 'byCount' && (
-                    <Input
-                      type="number"
-                      min={2}
-                      max={50}
-                      value={groupCount}
-                      onChange={(e) => setGroupCount(parseInt(e.target.value) || 3)}
-                      className="w-16 text-center"
-                      data-testid="input-group-count"
-                    />
-                  )}
+                <div className="space-y-2">
+                  <Label>性別</Label>
+                  <RadioGroup
+                    value={joinGender}
+                    onValueChange={(v) => setJoinGender(v as 'M' | 'F')}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="M" id="gender-m" data-testid="radio-gender-m" />
+                      <Label htmlFor="gender-m" className="cursor-pointer">男</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="F" id="gender-f" data-testid="radio-gender-f" />
+                      <Label htmlFor="gender-f" className="cursor-pointer">女</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
-              </RadioGroup>
-            </div>
+                <Button
+                  onClick={() => joinMutation.mutate()}
+                  className="w-full"
+                  disabled={!joinName.trim() || !joinGender || joinMutation.isPending}
+                  data-testid="button-join"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  加入活動
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">性別選項</Label>
-              <RadioGroup
-                value={genderMode}
-                onValueChange={(v) => setGenderMode(v as GenderMode)}
-                className="space-y-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="mixed" id="mixed" data-testid="radio-mixed" />
-                  <Label htmlFor="mixed" className="text-sm cursor-pointer">男女混合（平衡比例）</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="split" id="split" data-testid="radio-split" />
-                  <Label htmlFor="split" className="text-sm cursor-pointer">男女分開</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
+          {hasJoined && (
+            <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+              <CardContent className="py-4 text-center">
+                <Check className="w-8 h-8 mx-auto text-green-600 dark:text-green-400 mb-2" />
+                <p className="font-medium">您已加入活動</p>
+                <p className="text-sm text-muted-foreground">請等待組長開始分組</p>
+              </CardContent>
+            </Card>
+          )}
 
-          <Button 
-            onClick={createGroups} 
-            className="w-full"
-            size="lg"
-            disabled={people.length === 0}
-            data-testid="button-shuffle"
-          >
-            <Shuffle className="w-5 h-5 mr-2" />
-            開始分組
-          </Button>
-        </CardContent>
-      </Card>
-
-      {groups.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">分組結果</h2>
-            <div className="flex gap-2">
+          {(isOwner || user?.role === 'admin') && (
+            <div className="flex gap-3">
               <Button
-                variant="outline"
-                size="sm"
-                onClick={createGroups}
-                data-testid="button-reshuffle"
+                onClick={() => executeMutation.mutate()}
+                className="flex-1"
+                size="lg"
+                disabled={participants.length < 2 || executeMutation.isPending}
+                data-testid="button-execute"
               >
-                <RefreshCw className="w-4 h-4 mr-1" />
-                重新分組
+                <Shuffle className="w-5 h-5 mr-2" />
+                開始分組 ({participants.length} 人)
               </Button>
               <Button
                 variant="outline"
-                size="sm"
-                onClick={copyAllGroups}
-                data-testid="button-copy-all"
+                onClick={() => closeMutation.mutate()}
+                disabled={closeMutation.isPending}
+                data-testid="button-close"
               >
-                {copiedAll ? (
-                  <Check className="w-4 h-4 mr-1 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4 mr-1" />
-                )}
-                複製全部
+                取消
               </Button>
             </div>
+          )}
+        </>
+      )}
+
+      {isFinished && Object.keys(groups).length > 0 && (
+        <>
+          <div className="flex items-center justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyResults}
+              data-testid="button-copy-all"
+            >
+              {copiedAll ? (
+                <Check className="w-4 h-4 mr-1 text-green-500" />
+              ) : (
+                <Copy className="w-4 h-4 mr-1" />
+              )}
+              複製結果
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {groups.map((group) => {
-              const stats = getGroupStats(group);
-              return (
+            {Object.entries(groups)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([num, members]) => (
                 <Card 
-                  key={group.id} 
-                  className={cn(
-                    "hover-elevate transition-all",
-                    genderMode === 'split' && stats.males > 0 && stats.females === 0 && "border-blue-200 dark:border-blue-800",
-                    genderMode === 'split' && stats.females > 0 && stats.males === 0 && "border-pink-200 dark:border-pink-800"
-                  )}
-                  data-testid={`card-group-${group.id}`}
+                  key={num}
+                  className={cn("border-2", GROUP_COLORS[(Number(num) - 1) % GROUP_COLORS.length])}
+                  data-testid={`card-group-${num}`}
                 >
                   <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      第 {group.id} 組
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      第 {num} 組
                       <Badge variant="secondary" className="text-xs">
-                        {stats.total} 人
+                        {members.length} 人
                       </Badge>
                     </CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => copyGroup(group)}
-                      data-testid={`button-copy-group-${group.id}`}
-                    >
-                      {copiedGroup === group.id ? (
-                        <Check className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </Button>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-1">
-                      {group.members.map((member, idx) => (
+                      {members.map((member) => (
                         <li 
-                          key={idx} 
+                          key={member.id}
                           className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
                         >
                           <span>{member.name}</span>
-                          {getGenderBadge(member.gender)}
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-xs",
+                              member.gender === 'M' 
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+                                : 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300'
+                            )}
+                          >
+                            {member.gender === 'M' ? '男' : '女'}
+                          </Badge>
                         </li>
                       ))}
                     </ul>
                   </CardContent>
                 </Card>
-              );
-            })}
+              ))}
           </div>
 
-          <p className="text-xs text-center text-muted-foreground">
-            此分組結果不會被儲存，重新整理頁面後將會消失
-          </p>
-        </div>
+          {(isOwner || user?.role === 'admin') && (
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => closeMutation.mutate()}
+                disabled={closeMutation.isPending}
+                data-testid="button-finish"
+              >
+                結束活動
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
