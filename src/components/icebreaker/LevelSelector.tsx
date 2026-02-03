@@ -1,8 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import type { Database } from '@/integrations/supabase/types';
 
-type CardLevel = Database['public']['Enums']['card_level'];
+type CardLevel = 'L1' | 'L2' | 'L3';
 
 interface LevelSelectorProps {
   currentLevel: CardLevel;
