@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,20 +44,15 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const { data: entries, isLoading } = useQuery({
-    queryKey: ['my_notebook', userEmail],
+    queryKey: ['/api/notebook', userEmail],
     queryFn: async () => {
-      // Use edge function to fetch user's historical notes securely
-      const { data, error } = await supabase.functions.invoke('get-user-notebook', {
-        body: { email: userEmail },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      
+      const res = await fetch(`/api/notebook?email=${encodeURIComponent(userEmail)}`);
+      if (!res.ok) throw new Error('Failed to fetch notebook');
+      const data = await res.json();
       return (data?.entries || []) as NotebookEntry[];
     },
     enabled: !!userEmail,
-    staleTime: 60000, // 1 minute
+    staleTime: 60000,
   });
 
   const toggleExpand = (id: string) => {
@@ -87,165 +81,136 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
     return (
       <Card className="text-center py-12">
         <CardContent>
-          <BookMarked className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium text-muted-foreground mb-2">
-            尚無筆記
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            參加查經課程後，您的筆記會自動保存在這裡
+          <BookMarked className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">尚無筆記記錄</h3>
+          <p className="text-muted-foreground text-sm">
+            參加靈魂健身房後，您的查經筆記會自動儲存在這裡
           </p>
         </CardContent>
       </Card>
     );
   }
 
+  const getCategoryInfo = (category: InsightCategory | null) => {
+    if (!category) return null;
+    return INSIGHT_CATEGORIES.find(c => c.value === category);
+  };
+
   return (
-    <div className="space-y-4 pb-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-secondary" />
-          <h2 className="text-lg font-semibold">我的筆記本</h2>
-        </div>
-        <Badge variant="secondary">{entries.length} 篇筆記</Badge>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <BookOpen className="w-5 h-5 text-primary" />
+        <h2 className="text-lg font-semibold">我的查經筆記</h2>
+        <Badge variant="secondary">{entries.length} 篇</Badge>
       </div>
 
-      {/* Removed fixed-height ScrollArea - use natural document flow for mobile */}
-      <div className="space-y-3">
-          {entries.map((entry) => {
-            const isExpanded = expandedIds.has(entry.id);
-            const selectedCategory = INSIGHT_CATEGORIES.find(
-              c => c.value === entry.core_insight_category
-            );
-
-            return (
-              <Card 
-                key={entry.id} 
-                className="cursor-pointer transition-all hover:shadow-md"
-                onClick={() => toggleExpand(entry.id)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-base font-medium flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-secondary" />
-                        {entry.verse_reference}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
-                        {format(new Date(entry.session_date), 'yyyy/MM/dd (EEEE)', { locale: zhTW })}
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" className="p-1">
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                    </Button>
+      {entries.map((entry) => {
+        const isExpanded = expandedIds.has(entry.id);
+        const categoryInfo = getCategoryInfo(entry.core_insight_category);
+        
+        return (
+          <Card 
+            key={entry.id} 
+            className="overflow-hidden hover-elevate cursor-pointer"
+            onClick={() => toggleExpand(entry.id)}
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <Calendar className="w-4 h-4" />
+                    {format(new Date(entry.session_date), 'yyyy年M月d日', { locale: zhTW })}
                   </div>
-
-                  {/* Preview when collapsed */}
-                  {!isExpanded && entry.title_phrase && (
-                    <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
-                      📌 {entry.title_phrase}
+                  <CardTitle className="text-base font-medium truncate">
+                    {entry.verse_reference}
+                  </CardTitle>
+                  {entry.title_phrase && (
+                    <p className="text-sm text-muted-foreground mt-1 truncate">
+                      {entry.title_phrase}
                     </p>
                   )}
-                </CardHeader>
+                </div>
+                <Button variant="ghost" size="icon" className="shrink-0">
+                  {isExpanded ? (
+                    <ChevronUp className="w-5 h-5" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5" />
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
 
-                {/* Expanded content */}
-                {isExpanded && (
-                  <CardContent className="pt-0 space-y-4" onClick={e => e.stopPropagation()}>
-                    {/* Phase 1: Warm-up */}
-                    {(entry.title_phrase || entry.heartbeat_verse || entry.observation) && (
-                      <div className="rounded-lg border-l-4 border-green-500 bg-green-50/10 p-3 space-y-2">
-                        <h4 className="font-medium text-sm text-green-600">🟢 暖身</h4>
-                        {entry.title_phrase && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <Sparkles className="w-4 h-4 text-secondary mt-0.5" />
-                            <div>
-                              <span className="font-medium">定標題：</span>
-                              <span className="text-muted-foreground">{entry.title_phrase}</span>
-                            </div>
-                          </div>
-                        )}
-                        {entry.heartbeat_verse && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <Heart className="w-4 h-4 text-secondary mt-0.5" />
-                            <div>
-                              <span className="font-medium">抓心跳：</span>
-                              <span className="text-muted-foreground">{entry.heartbeat_verse}</span>
-                            </div>
-                          </div>
-                        )}
-                        {entry.observation && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <Eye className="w-4 h-4 text-secondary mt-0.5" />
-                            <div>
-                              <span className="font-medium">看現場：</span>
-                              <span className="text-muted-foreground">{entry.observation}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Phase 2: Core Training */}
-                    {(entry.core_insight_note || entry.scholars_note) && (
-                      <div className="rounded-lg border-l-4 border-yellow-500 bg-yellow-50/10 p-3 space-y-2">
-                        <h4 className="font-medium text-sm text-yellow-600">🟡 重訓</h4>
-                        {entry.core_insight_note && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <Dumbbell className="w-4 h-4 text-secondary mt-0.5" />
-                            <div>
-                              <span className="font-medium">
-                                練核心{selectedCategory ? ` (${selectedCategory.emoji} ${selectedCategory.label})` : ''}：
-                              </span>
-                              <span className="text-muted-foreground">{entry.core_insight_note}</span>
-                            </div>
-                          </div>
-                        )}
-                        {entry.scholars_note && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <BookOpen className="w-4 h-4 text-secondary mt-0.5" />
-                            <div>
-                              <span className="font-medium">學長姐的話：</span>
-                              <span className="text-muted-foreground">{entry.scholars_note}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Phase 3: Stretch */}
-                    {(entry.action_plan || entry.cool_down_note) && (
-                      <div className="rounded-lg border-l-4 border-blue-500 bg-blue-50/10 p-3 space-y-2">
-                        <h4 className="font-medium text-sm text-blue-600">🔵 伸展</h4>
-                        {entry.action_plan && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <Target className="w-4 h-4 text-secondary mt-0.5" />
-                            <div>
-                              <span className="font-medium">帶一招：</span>
-                              <span className="text-muted-foreground">{entry.action_plan}</span>
-                            </div>
-                          </div>
-                        )}
-                        {entry.cool_down_note && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <MessageCircle className="w-4 h-4 text-secondary mt-0.5" />
-                            <div>
-                              <span className="font-medium">自由發揮：</span>
-                              <span className="text-muted-foreground">{entry.cool_down_note}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
+            {isExpanded && (
+              <CardContent className="pt-0 space-y-4 border-t">
+                {entry.heartbeat_verse && (
+                  <div className="flex gap-2">
+                    <Heart className="w-4 h-4 text-red-500 shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-medium mb-1">心動經文</p>
+                      <p className="text-sm text-muted-foreground">{entry.heartbeat_verse}</p>
+                    </div>
+                  </div>
                 )}
-              </Card>
-          );
-        })}
-      </div>
+
+                {entry.observation && (
+                  <div className="flex gap-2">
+                    <Eye className="w-4 h-4 text-blue-500 shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-medium mb-1">觀察</p>
+                      <p className="text-sm text-muted-foreground">{entry.observation}</p>
+                    </div>
+                  </div>
+                )}
+
+                {categoryInfo && (
+                  <div className="flex gap-2">
+                    <Dumbbell className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-medium mb-1">核心訓練</p>
+                      <Badge variant="outline" className="mb-1">
+                        {categoryInfo.emoji} {categoryInfo.label}
+                      </Badge>
+                      {entry.core_insight_note && (
+                        <p className="text-sm text-muted-foreground">{entry.core_insight_note}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {entry.scholars_note && (
+                  <div className="flex gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-500 shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-medium mb-1">學者分享</p>
+                      <p className="text-sm text-muted-foreground">{entry.scholars_note}</p>
+                    </div>
+                  </div>
+                )}
+
+                {entry.action_plan && (
+                  <div className="flex gap-2">
+                    <Target className="w-4 h-4 text-green-500 shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-medium mb-1">行動計劃</p>
+                      <p className="text-sm text-muted-foreground">{entry.action_plan}</p>
+                    </div>
+                  </div>
+                )}
+
+                {entry.cool_down_note && (
+                  <div className="flex gap-2">
+                    <MessageCircle className="w-4 h-4 text-teal-500 shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-medium mb-1">緩和心得</p>
+                      <p className="text-sm text-muted-foreground">{entry.cool_down_note}</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 };

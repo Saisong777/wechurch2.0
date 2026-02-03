@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle, Circle, Users, Loader2, MessageCircle, ArrowRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -51,23 +50,16 @@ export const SharingRound: React.FC<SharingRoundProps> = ({
   // Fetch or create icebreaker game for sharing state
   const loadSharingState = useCallback(async () => {
     try {
-      // Find existing game for this group
-      const { data: existingGame, error: fetchError } = await supabase
-        .from('icebreaker_games')
-        .select('id, sharing_mode, shared_member_ids')
-        .eq('bible_study_session_id', sessionId)
-        .eq('group_number', groupNumber)
-        .eq('mode', 'session')
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-
-      if (existingGame) {
-        setSharingState({
-          gameId: existingGame.id,
-          sharingMode: existingGame.sharing_mode || false,
-          sharedMemberIds: existingGame.shared_member_ids || [],
-        });
+      const res = await fetch(`/api/sessions/${sessionId}/groups/${groupNumber}/sharing-state`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data) {
+          setSharingState({
+            gameId: data.id,
+            sharingMode: data.sharing_mode || false,
+            sharedMemberIds: data.shared_member_ids || [],
+          });
+        }
       }
     } catch (error) {
       console.error('[SharingRound] Failed to load sharing state:', error);
@@ -81,43 +73,37 @@ export const SharingRound: React.FC<SharingRoundProps> = ({
     loadSharingState();
   }, [loadMembers, loadSharingState]);
 
-  // Subscribe to realtime updates
+  // Poll for updates instead of realtime
   useEffect(() => {
     if (!sharingState.gameId) return;
 
-    const channel = supabase
-      .channel(`sharing-round-${sharingState.gameId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'icebreaker_games',
-          filter: `id=eq.${sharingState.gameId}`,
-        },
-        (payload) => {
-          const newData = payload.new as any;
-          const newSharedIds = newData.shared_member_ids || [];
-          
-          setSharingState(prev => ({
-            ...prev,
-            sharingMode: newData.sharing_mode || false,
-            sharedMemberIds: newSharedIds,
-          }));
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/groups/${groupNumber}/sharing-state`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            const newSharedIds = data.shared_member_ids || [];
+            setSharingState(prev => ({
+              ...prev,
+              sharingMode: data.sharing_mode || false,
+              sharedMemberIds: newSharedIds,
+            }));
 
-          // Check if everyone has shared
-          if (newSharedIds.length >= members.length && members.length > 0) {
-            toast.success('全員分享完成！準備進入查經筆記', { duration: 2000 });
-            setTimeout(onComplete, 1500);
+            if (newSharedIds.length >= members.length && members.length > 0) {
+              toast.success('全員分享完成！準備進入查經筆記', { duration: 2000 });
+              setTimeout(onComplete, 1500);
+              clearInterval(pollInterval);
+            }
           }
         }
-      )
-      .subscribe();
+      } catch (error) {
+        console.error('[SharingRound] Poll error:', error);
+      }
+    }, 5000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [sharingState.gameId, members.length, onComplete]);
+    return () => clearInterval(pollInterval);
+  }, [sharingState.gameId, sessionId, groupNumber, members.length, onComplete]);
 
   // Mark self as shared
   const markAsShared = async () => {
@@ -130,12 +116,13 @@ export const SharingRound: React.FC<SharingRoundProps> = ({
         newSharedIds.push(currentUserId);
       }
 
-      const { error } = await supabase
-        .from('icebreaker_games')
-        .update({ shared_member_ids: newSharedIds })
-        .eq('id', sharingState.gameId);
+      const res = await fetch(`/api/icebreaker-games/${sharingState.gameId}/shared`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shared_member_ids: newSharedIds }),
+      });
 
-      if (error) throw error;
+      if (!res.ok) throw new Error('Update failed');
 
       setSharingState(prev => ({
         ...prev,
@@ -159,12 +146,13 @@ export const SharingRound: React.FC<SharingRoundProps> = ({
     try {
       const newSharedIds = sharingState.sharedMemberIds.filter(id => id !== currentUserId);
 
-      const { error } = await supabase
-        .from('icebreaker_games')
-        .update({ shared_member_ids: newSharedIds })
-        .eq('id', sharingState.gameId);
+      const res = await fetch(`/api/icebreaker-games/${sharingState.gameId}/shared`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shared_member_ids: newSharedIds }),
+      });
 
-      if (error) throw error;
+      if (!res.ok) throw new Error('Update failed');
 
       setSharingState(prev => ({
         ...prev,

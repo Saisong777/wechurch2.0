@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { Loader2, User, Camera, X } from 'lucide-react';
 import { AvatarCropDialog } from './AvatarCropDialog';
-import { getAvatarUrl } from '@/lib/storage-helpers';
 
 interface ProfileSettingsDialogProps {
   open: boolean;
@@ -33,20 +31,16 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Crop dialog state
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [selectedImageSrc, setSelectedImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && user) {
-      // Load from user metadata first, then try profiles table
-      const metaDisplayName = user.user_metadata?.display_name;
+      const metaDisplayName = user.user_metadata?.display_name || user.displayName;
       const metaAvatarUrl = user.user_metadata?.avatar_url;
       
       setDisplayName(metaDisplayName || user.email?.split('@')[0] || '');
       setAvatarUrl(metaAvatarUrl || null);
-
-      // Also fetch from profiles table for consistency
       fetchProfile();
     }
   }, [user, open]);
@@ -54,15 +48,15 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   const fetchProfile = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('display_name, avatar_url')
-      .eq('user_id', user.id)
-      .single();
-
-    if (data && !error) {
-      if (data.display_name) setDisplayName(data.display_name);
-      if (data.avatar_url) setAvatarUrl(data.avatar_url);
+    try {
+      const res = await fetch(`/api/users/${user.id}/profile`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.displayName) setDisplayName(data.displayName);
+        if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
     }
   };
 
@@ -74,19 +68,16 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('請選擇圖片檔案');
       return;
     }
 
-    // Validate file size (max 5MB for cropping source)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('圖片大小不能超過 5MB');
       return;
     }
 
-    // Convert file to data URL for cropping
     const reader = new FileReader();
     reader.onload = () => {
       setSelectedImageSrc(reader.result as string);
@@ -94,7 +85,6 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
     };
     reader.readAsDataURL(file);
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -105,29 +95,22 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
 
     setIsUploading(true);
     try {
-      // Create a unique file path
-      const fileName = `avatar.jpg`;
-      const filePath = `${user.id}/${fileName}`;
+      const formData = new FormData();
+      formData.append('avatar', croppedBlob, 'avatar.jpg');
 
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, croppedBlob, { 
-          upsert: true,
-          contentType: 'image/jpeg'
-        });
+      const res = await fetch(`/api/users/${user.id}/avatar`, {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (uploadError) throw uploadError;
+      if (!res.ok) throw new Error('Upload failed');
 
-      // Use proxied URL to hide Supabase Storage URL
-      const proxiedUrl = getAvatarUrl(filePath);
-      // Add cache-busting query param
-      const urlWithCacheBust = `${proxiedUrl}&t=${Date.now()}`;
-      setAvatarUrl(urlWithCacheBust);
+      const data = await res.json();
+      setAvatarUrl(`${data.avatarUrl}?t=${Date.now()}`);
       toast.success('頭像已上傳');
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error(error.message || '上傳失敗，請重試');
+      toast.error('上傳失敗，請重試');
     } finally {
       setIsUploading(false);
       setSelectedImageSrc(null);
@@ -139,15 +122,11 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
     
     setIsUploading(true);
     try {
-      // List and delete all files in user's folder
-      const { data: files } = await supabase.storage
-        .from('avatars')
-        .list(user.id);
+      const res = await fetch(`/api/users/${user.id}/avatar`, {
+        method: 'DELETE',
+      });
 
-      if (files && files.length > 0) {
-        const filePaths = files.map(f => `${user.id}/${f.name}`);
-        await supabase.storage.from('avatars').remove(filePaths);
-      }
+      if (!res.ok) throw new Error('Delete failed');
 
       setAvatarUrl(null);
       toast.success('頭像已移除');
@@ -168,35 +147,21 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
 
     setIsLoading(true);
     try {
-      // Update auth user metadata
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { 
-          display_name: displayName.trim(),
-          avatar_url: avatarUrl 
-        }
+      const res = await fetch(`/api/users/${user.id}/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: displayName.trim(),
+          avatarUrl,
+        }),
       });
 
-      if (authError) throw authError;
-
-      // Sync to profiles table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          display_name: displayName.trim(),
-          avatar_url: avatarUrl,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
-
-      if (profileError) {
-        console.error('Profile sync error:', profileError);
-        // Don't throw - auth update succeeded
-      }
+      if (!res.ok) throw new Error('Update failed');
 
       toast.success('個人設定已更新');
       onOpenChange(false);
     } catch (error: any) {
-      toast.error(error.message || '更新失敗，請重試');
+      toast.error('更新失敗，請重試');
     } finally {
       setIsLoading(false);
     }
@@ -222,22 +187,19 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Avatar Section */}
             <div className="flex flex-col items-center gap-3">
               <div className="relative">
                 <Avatar className="w-24 h-24 cursor-pointer" onClick={handleAvatarClick}>
                   <AvatarImage src={avatarUrl || undefined} />
-                  <AvatarFallback className="bg-secondary/20 text-secondary text-2xl font-medium">
+                  <AvatarFallback className="text-2xl bg-primary/10 text-primary">
                     {getInitials(user?.email)}
                   </AvatarFallback>
                 </Avatar>
-                
-                {/* Upload overlay */}
                 <button
                   type="button"
                   onClick={handleAvatarClick}
                   disabled={isUploading}
-                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
+                  className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90 transition-colors"
                 >
                   {isUploading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -245,20 +207,20 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
                     <Camera className="w-4 h-4" />
                   )}
                 </button>
-
-                {/* Remove button */}
-                {avatarUrl && !isUploading && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveAvatar}
-                    className="absolute top-0 right-0 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg hover:bg-destructive/90 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
               </div>
               
-              <p className="text-xs text-muted-foreground">點擊更換頭像（支援裁剪）</p>
+              {avatarUrl && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveAvatar}
+                  disabled={isUploading}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  移除頭像
+                </Button>
+              )}
               
               <input
                 ref={fileInputRef}
@@ -269,19 +231,6 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
               />
             </div>
 
-            {/* Email (readonly) */}
-            <div className="space-y-2">
-              <Label htmlFor="email">電子郵件</Label>
-              <Input
-                id="email"
-                value={user?.email || ''}
-                disabled
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground">電子郵件無法修改</p>
-            </div>
-
-            {/* Display Name */}
             <div className="space-y-2">
               <Label htmlFor="displayName">顯示名稱</Label>
               <Input
@@ -289,23 +238,33 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="輸入您的顯示名稱"
-                maxLength={50}
+                className="h-11"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>電子郵件</Label>
+              <Input
+                value={user?.email || ''}
+                disabled
+                className="h-11 bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">
+                電子郵件無法修改
+              </p>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isLoading || isUploading}
             >
               取消
             </Button>
             <Button
-              variant="gold"
               onClick={handleSave}
-              disabled={isLoading || isUploading}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <>
@@ -313,25 +272,19 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
                   儲存中...
                 </>
               ) : (
-                '儲存'
+                '儲存變更'
               )}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Crop Dialog */}
-      {selectedImageSrc && (
-        <AvatarCropDialog
-          open={cropDialogOpen}
-          onOpenChange={(open) => {
-            setCropDialogOpen(open);
-            if (!open) setSelectedImageSrc(null);
-          }}
-          imageSrc={selectedImageSrc}
-          onCropComplete={handleCropComplete}
-        />
-      )}
+      <AvatarCropDialog
+        open={cropDialogOpen}
+        onOpenChange={setCropDialogOpen}
+        imageSrc={selectedImageSrc}
+        onCropComplete={handleCropComplete}
+      />
     </>
   );
 };

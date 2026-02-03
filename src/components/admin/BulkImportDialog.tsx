@@ -12,13 +12,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Upload, FileText, CheckCircle, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Database } from '@/integrations/supabase/types';
 
-type CardLevel = Database['public']['Enums']['card_level'];
+type CardLevel = 'L1' | 'L2' | 'L3';
 
 interface ParsedQuestion {
   level: CardLevel;
@@ -145,19 +143,21 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
 
     setIsImporting(true);
     try {
-      const { error } = await supabase
-        .from('card_questions')
-        .insert(
-          validQuestions.map((q, index) => ({
+      const res = await fetch('/api/icebreaker-questions/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questions: validQuestions.map((q, index) => ({
             level: q.level,
             content_text: q.content_text,
             content_text_en: q.content_text_en || null,
             is_active: true,
             sort_order: index,
-          }))
-        );
+          })),
+        }),
+      });
 
-      if (error) throw error;
+      if (!res.ok) throw new Error('Import failed');
 
       toast.success(`成功匯入 ${validQuestions.length} 個問題！`);
       onSuccess();

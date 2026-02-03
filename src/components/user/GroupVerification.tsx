@@ -5,7 +5,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSession } from '@/contexts/SessionContext';
 import { fetchGroupMembers } from '@/lib/supabase-helpers';
-import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/bible-study';
 import { Users, CheckCircle, Loader2, MapPin, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -71,12 +70,9 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     setErrorState('none');
 
     try {
-      const { data, error } = await supabase
-        .from('participant_names')
-        .select('*')
-        .eq('session_id', currentSession.id)
-        .eq('id', currentUser.id)
-        .single();
+      const res = await fetch(`/api/sessions/${currentSession.id}/participants/${currentUser.id}`);
+      const data = res.ok ? await res.json() : null;
+      const error = res.ok ? null : { message: 'Failed to fetch' };
 
       if (error || !data) {
         console.error('[GroupVerification] Failed to resync user:', error);
@@ -156,58 +152,28 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     load();
   }, [fetchMembers]);
 
-  // Real-time subscription for instant sync + fallback polling
+  // Poll for updates instead of realtime
   useEffect(() => {
     if (!currentSession?.id || !globalGroupNumber) return;
 
-    // Subscribe to participant_names view for real-time updates
-    const channel = supabase
-      .channel(`group-verification-${currentSession.id}-${globalGroupNumber}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'participants',
-          filter: `session_id=eq.${currentSession.id}`,
-        },
-        async (payload) => {
-          console.log('[GroupVerification] Realtime update received:', payload);
-          // Immediately refetch members when any participant changes
-          await fetchMembers();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'sessions',
-          filter: `id=eq.${currentSession.id}`,
-        },
-        (payload) => {
-          console.log('[GroupVerification] Session update received:', payload);
-          const newStatus = (payload.new as any).status;
-          if (newStatus === 'completed' && onSessionEnded) {
+    const pollInterval = setInterval(async () => {
+      await fetchMembers();
+      
+      // Also check session status
+      try {
+        const res = await fetch(`/api/sessions/${currentSession.id}`);
+        if (res.ok) {
+          const session = await res.json();
+          if (session.status === 'completed' && onSessionEnded) {
             onSessionEnded();
           }
         }
-      )
-      .subscribe((status) => {
-        console.log('[GroupVerification] Realtime subscription status:', status);
-        // Silent subscription - no toast to avoid notification spam during transitions
-      });
-
-    // HIGH CONCURRENCY OPTIMIZED: 10-second polling (was 5s)
-    // WebSocket is primary, this is fallback only
-    const pollInterval = setInterval(async () => {
-      await fetchMembers();
+      } catch (error) {
+        console.error('[GroupVerification] Poll error:', error);
+      }
     }, HIGH_CONCURRENCY_CONFIG.GROUP_VERIFICATION_POLL_MS);
 
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(pollInterval);
-    };
+    return () => clearInterval(pollInterval);
   }, [currentSession?.id, globalGroupNumber, fetchMembers, onSessionEnded]);
 
   const handleCheckMember = (memberId: string, checked: boolean) => {
