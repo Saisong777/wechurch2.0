@@ -6,6 +6,8 @@ const mockAuth = {
   getUser: async () => ({ data: { user: null }, error: null }),
   signUp: async () => { window.location.href = '/api/login'; return { data: null, error: null }; },
   signInWithPassword: async () => { window.location.href = '/api/login'; return { data: null, error: null }; },
+  signInWithOAuth: async () => ({ data: null, error: { message: 'Google登入暫時無法使用，請直接填寫資料加入' } }),
+  signInAnonymously: async () => ({ data: { session: { user: { id: 'anonymous' } } }, error: null }),
   signOut: async () => { window.location.href = '/api/logout'; return { error: null }; },
   onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
   updateUser: async () => ({ data: null, error: null }),
