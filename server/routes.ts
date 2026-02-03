@@ -870,8 +870,24 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      const userId = (req.user as any).legacyUserId || (req.user as any).id;
-      const role = await storage.getUserRole(userId);
+      // Try legacyUserId first, then look up by email if not available
+      let userId = (req.user as any).legacyUserId;
+      let role: string | undefined;
+      
+      if (!userId) {
+        // Look up legacy user by email
+        const email = (req.user as any).email;
+        if (email) {
+          const legacyUser = await storage.getUserByEmail(email);
+          if (legacyUser) {
+            userId = legacyUser.id;
+          }
+        }
+      }
+      
+      if (userId) {
+        role = await storage.getUserRole(userId);
+      }
       
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
         return res.status(403).json({ error: "Only leaders and admins can create grouping activities" });
