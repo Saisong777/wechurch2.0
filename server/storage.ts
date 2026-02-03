@@ -94,6 +94,17 @@ export interface IStorage {
   getMessageCardById(id: string): Promise<MessageCard | undefined>;
   createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard>;
   updateMessageCard(id: string, data: Partial<{ title: string; imagePath: string; isActive: boolean }>): Promise<MessageCard | undefined>;
+  
+  // Grouping Activities
+  getGroupingActivities(): Promise<GroupingActivity[]>;
+  getGroupingActivity(id: string): Promise<GroupingActivity | undefined>;
+  createGroupingActivity(activity: InsertGroupingActivity): Promise<GroupingActivity>;
+  updateGroupingActivity(id: string, data: Partial<GroupingActivity>): Promise<GroupingActivity | undefined>;
+  getGroupingParticipants(activityId: string): Promise<GroupingParticipant[]>;
+  addGroupingParticipant(participant: InsertGroupingParticipant): Promise<GroupingParticipant>;
+  updateGroupingParticipants(activityId: string, updates: { id: string; groupNumber: number }[]): Promise<void>;
+  deleteGroupingActivity(id: string): Promise<void>;
+
   deleteAiReport(id: string): Promise<void>;
   
   getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]>;

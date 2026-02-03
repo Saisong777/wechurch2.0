@@ -415,6 +415,35 @@ export const userReadingProgress = pgTable("user_reading_progress", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const groupingActivities = pgTable("grouping_activities", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("joining"), // joining, finished
+  groupingMode: text("grouping_mode").notNull().default("bySize"),
+  groupSize: integer("group_size").default(4),
+  groupCount: integer("group_count").default(3),
+  genderMode: text("gender_mode").notNull().default("mixed"),
+  ownerId: uuid("owner_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const groupingParticipants = pgTable("grouping_participants", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  activityId: uuid("activity_id").references(() => groupingActivities.id).notNull(),
+  name: text("name").notNull(),
+  gender: text("gender").notNull(), // M, F
+  groupNumber: integer("group_number"),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+export const insertGroupingActivitySchema = createInsertSchema(groupingActivities).omit({ id: true, createdAt: true });
+export const insertGroupingParticipantSchema = createInsertSchema(groupingParticipants).omit({ id: true, joinedAt: true });
+
+export type GroupingActivity = typeof groupingActivities.$inferSelect;
+export type GroupingParticipant = typeof groupingParticipants.$inferSelect;
+export type InsertGroupingActivity = z.infer<typeof insertGroupingActivitySchema>;
+export type InsertGroupingParticipant = z.infer<typeof insertGroupingParticipantSchema>;
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });
 export const insertParticipantSchema = createInsertSchema(participants).omit({ id: true, joinedAt: true, updatedAt: true });
