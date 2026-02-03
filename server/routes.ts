@@ -873,23 +873,26 @@ export async function registerRoutes(app: Express) {
       // Try legacyUserId first, then look up by email if not available
       let userId = (req.user as any).legacyUserId;
       let role: string | undefined;
+      const email = (req.user as any).email;
       
-      if (!userId) {
+      console.log("[Grouping] User info:", { legacyUserId: userId, email });
+      
+      if (!userId && email) {
         // Look up legacy user by email
-        const email = (req.user as any).email;
-        if (email) {
-          const legacyUser = await storage.getUserByEmail(email);
-          if (legacyUser) {
-            userId = legacyUser.id;
-          }
+        const legacyUser = await storage.getUserByEmail(email);
+        console.log("[Grouping] Legacy user lookup:", legacyUser);
+        if (legacyUser) {
+          userId = legacyUser.id;
         }
       }
       
       if (userId) {
         role = await storage.getUserRole(userId);
+        console.log("[Grouping] Role lookup:", { userId, role });
       }
       
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        console.log("[Grouping] Access denied:", { role, allowed: ['leader', 'future_leader', 'admin'] });
         return res.status(403).json({ error: "Only leaders and admins can create grouping activities" });
       }
 
