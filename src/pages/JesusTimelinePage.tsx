@@ -308,7 +308,12 @@ const JesusTimelinePage = () => {
                         </div>
                         
                         {isExpanded && (
-                          <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
+                          <div 
+                            className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-border" 
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                          >
                             {gospels.length > 0 && (
                               <div className="grid gap-2 sm:gap-3 grid-cols-1">
                                 {gospels.map((g, idx) => {

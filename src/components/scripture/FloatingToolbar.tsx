@@ -25,9 +25,11 @@ export const FloatingToolbar = ({
   copied,
 }: FloatingToolbarProps) => {
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setMounted(true);
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 640);
     };
@@ -36,12 +38,12 @@ export const FloatingToolbar = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  if (!visible) return null;
+  if (!visible || !mounted) return null;
 
-  const mobileToolbar = (
+  const toolbarContent = isMobile ? (
     <div
       ref={toolbarRef}
-      className="fixed bottom-0 left-0 right-0 z-[1000] bg-background border-t border-border shadow-lg p-2 pb-safe animate-in slide-in-from-bottom duration-200"
+      className="fixed bottom-0 left-0 right-0 z-[9999] bg-background border-t border-border shadow-lg p-2 pb-safe animate-in slide-in-from-bottom duration-200"
       data-testid="floating-toolbar"
     >
       <div className="flex items-center justify-center gap-2">
@@ -88,9 +90,7 @@ export const FloatingToolbar = ({
         </Button>
       </div>
     </div>
-  );
-
-  const desktopToolbar = (
+  ) : (
     <DesktopToolbar
       getAnchorRect={getAnchorRect}
       selectedCount={selectedCount}
@@ -102,11 +102,7 @@ export const FloatingToolbar = ({
     />
   );
 
-  // Use portal to render outside of any overflow:hidden containers
-  return createPortal(
-    isMobile ? mobileToolbar : desktopToolbar,
-    document.body
-  );
+  return createPortal(toolbarContent, document.body);
 };
 
 const DesktopToolbar = ({
@@ -154,11 +150,11 @@ const DesktopToolbar = ({
 
     updatePosition();
     
-    window.addEventListener('scroll', handleScrollOrResize, { passive: true });
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true, capture: true });
     window.addEventListener('resize', handleScrollOrResize, { passive: true });
 
     return () => {
-      window.removeEventListener('scroll', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, { capture: true });
       window.removeEventListener('resize', handleScrollOrResize);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
@@ -168,7 +164,7 @@ const DesktopToolbar = ({
 
   return (
     <div
-      className="fixed z-[1000] bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg p-1.5 flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150"
+      className="fixed z-[9999] bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg p-1.5 flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150"
       style={{
         top: position.top,
         left: position.left,

@@ -174,13 +174,19 @@ export const ScriptureViewer = ({ verses, className = '' }: ScriptureViewerProps
                 if (el) verseRefs.current.set(key, el);
                 else verseRefs.current.delete(key);
               }}
-              className={`flex gap-2 p-2 rounded cursor-pointer transition-colors ${
-                isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50'
+              className={`flex gap-2 p-2 rounded cursor-pointer transition-colors select-none ${
+                isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50 active:bg-muted'
               }`}
               onClick={(e) => {
                 e.stopPropagation();
+                e.preventDefault();
                 toggleVerseSelection(v);
               }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+              }}
+              role="button"
+              tabIndex={0}
               data-testid={`verse-${v.chapter}-${v.verse}`}
             >
               {isSelected && <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />}
