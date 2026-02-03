@@ -66,31 +66,31 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={cn(
       'w-full',
-      variant === 'default' ? 'py-5 sm:py-6' : 'py-3 sm:py-4',
+      variant === 'default' ? 'py-3 sm:py-5' : 'py-2 sm:py-3',
       className
     )}>
-      <div className="container mx-auto px-3 sm:px-4">
+      <div className="container mx-auto px-2 sm:px-4">
         <div className="flex items-center justify-between">
           {/* Left spacer for balance */}
-          <div className="w-10 sm:w-12" />
+          <div className="w-8 sm:w-12" />
           
           {/* Center: Logo and Title - Clickable to go home */}
-          <Link to="/" className="flex items-center justify-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity group">
+          <Link to="/" className="flex items-center justify-center gap-1.5 sm:gap-3 hover:opacity-80 transition-opacity group">
             {showLogo && (
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse-soft" />
-                <WeChurchLogo size={variant === 'default' ? 48 : 40} className="relative group-hover:scale-105 transition-transform" />
+                <WeChurchLogo size={variant === 'default' ? 36 : 32} className="relative group-hover:scale-105 transition-transform sm:w-12 sm:h-12" />
               </div>
             )}
             <div className="text-center">
               <h1 className={cn(
                 'font-bold text-foreground',
-                variant === 'default' ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'
+                variant === 'default' ? 'text-lg sm:text-2xl' : 'text-base sm:text-xl'
               )}>
                 {title}
               </h1>
               {subtitle && variant === 'default' && (
-                <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 sm:mt-1 tracking-wide">
+                <p className="text-muted-foreground text-[10px] sm:text-sm mt-0 sm:mt-1 tracking-wide">
                   {subtitle}
                 </p>
               )}
@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
 
           {/* Right: Auth Status */}
-          <div className="w-10 sm:w-12 flex justify-end">
+          <div className="w-8 sm:w-12 flex justify-end">
             {loading ? (
               <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
             ) : user ? (

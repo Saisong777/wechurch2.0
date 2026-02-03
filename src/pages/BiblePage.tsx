@@ -469,76 +469,79 @@ const BiblePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header title="聖經閱讀" subtitle="和合本" />
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header title="聖經閱讀" subtitle="和合本" variant="compact" />
       
-      <main className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto">
-          <Button variant="ghost" size="sm" asChild className="mb-4">
-            <Link to="/learn" className="gap-2" data-testid="link-back-learn">
-              <ArrowLeft className="w-4 h-4" />
-              返回學習
-            </Link>
-          </Button>
-
-          <div className="flex gap-2 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="搜尋經文..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10"
-                data-testid="input-bible-search"
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                  onClick={clearSearch}
-                  data-testid="button-clear-search"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-            <Button onClick={handleSearch} data-testid="button-search">
-              搜尋
+      <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
+        <div className="max-w-4xl mx-auto w-full flex flex-col flex-1">
+          <div className="flex items-center gap-2 mb-2 sm:mb-4">
+            <Button variant="ghost" size="sm" asChild className="h-8 px-2 sm:px-3">
+              <Link to="/learn" className="gap-1 sm:gap-2" data-testid="link-back-learn">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">返回學習</span>
+              </Link>
             </Button>
+            
+            <div className="flex gap-1 sm:gap-2 flex-1">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜尋經文..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="pl-8 sm:pl-10 h-8 sm:h-9 text-sm"
+                  data-testid="input-bible-search"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                    onClick={clearSearch}
+                    data-testid="button-clear-search"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+              <Button onClick={handleSearch} size="sm" className="h-8 px-2 sm:px-3" data-testid="button-search">
+                <Search className="w-4 h-4 sm:hidden" />
+                <span className="hidden sm:inline">搜尋</span>
+              </Button>
+            </div>
           </div>
 
           {isSearching ? (
-            <Card>
-              <CardContent className="py-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-semibold text-lg">搜尋結果: "{searchQuery}"</h3>
-                  <Button variant="ghost" size="sm" onClick={clearSearch}>
-                    返回書卷列表
+            <Card className="flex-1 flex flex-col">
+              <CardContent className="py-3 sm:py-6 flex-1 flex flex-col">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-3 sm:mb-6">
+                  <h3 className="font-semibold text-sm sm:text-lg">搜尋: "{searchQuery}"</h3>
+                  <Button variant="ghost" size="sm" onClick={clearSearch} className="h-7 sm:h-8 text-xs sm:text-sm">
+                    返回書卷
                   </Button>
                 </div>
                 {searchLoading ? (
-                  <div className="text-center py-12 text-muted-foreground">搜尋中...</div>
+                  <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">搜尋中...</div>
                 ) : searchError ? (
-                  <div className="text-center py-12 text-destructive flex flex-col items-center gap-2">
-                    <AlertCircle className="w-6 h-6" />
-                    <span>搜尋時發生錯誤</span>
+                  <div className="text-center py-8 sm:py-12 text-destructive flex flex-col items-center gap-2">
+                    <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-sm">搜尋時發生錯誤</span>
                   </div>
                 ) : searchResults.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">找不到相關經文</div>
+                  <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">找不到相關經文</div>
                 ) : (
-                  <ScrollArea className="h-[600px]">
-                    <div className="space-y-4 pr-4">
+                  <ScrollArea className="flex-1 h-[calc(100vh-220px)] sm:h-[calc(100vh-280px)]">
+                    <div className="space-y-2 sm:space-y-4 pr-2 sm:pr-4">
                       {searchResults.map((v) => (
-                        <div key={v.id} className="p-4 rounded-lg bg-muted/50 group">
-                          <div className="flex justify-between items-start mb-2">
-                            <p className="text-base text-primary font-medium">
+                        <div key={v.id} className="p-2 sm:p-4 rounded-lg bg-muted/50 group">
+                          <div className="flex justify-between items-start mb-1 sm:mb-2">
+                            <p className="text-sm sm:text-base text-primary font-medium">
                               {v.bookName} {v.chapter}:{v.verse}
                             </p>
                             <VerseActions verse={v} />
                           </div>
-                          <p className="text-lg leading-relaxed">{v.text}</p>
+                          <p className="text-base sm:text-lg leading-relaxed">{v.text}</p>
                         </div>
                       ))}
                     </div>
@@ -547,70 +550,68 @@ const BiblePage = () => {
               </CardContent>
             </Card>
           ) : selectedBook && selectedChapter ? (
-            <Card>
-              <CardContent className="py-6">
-                <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-                  <h3 className="font-semibold text-xl">{selectedBook} 第 {selectedChapter} 章</h3>
-                  <div className="flex flex-wrap gap-2">
+            <Card className="flex-1 flex flex-col">
+              <CardContent className="py-2 sm:py-4 flex-1 flex flex-col">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-2 sm:mb-4">
+                  <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
                     {selectedVerseNums.size > 0 && (
                       <>
-                        <Button variant="outline" size="sm" onClick={copySelectedVerses} data-testid="button-copy-selected">
-                          <Copy className="w-4 h-4 mr-1" />
-                          複製 ({selectedVerseNums.size})
+                        <Button variant="outline" size="sm" onClick={copySelectedVerses} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-copy-selected">
+                          <Copy className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                          <span className="hidden sm:inline">複製</span> ({selectedVerseNums.size})
                         </Button>
-                        <Button variant="outline" size="sm" onClick={shareSelectedVerses} data-testid="button-share-selected">
-                          <Share2 className="w-4 h-4 mr-1" />
-                          分享
+                        <Button variant="outline" size="sm" onClick={shareSelectedVerses} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-share-selected">
+                          <Share2 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                          <span className="hidden sm:inline">分享</span>
                         </Button>
-                        <Button variant="default" size="sm" onClick={openCardCreator} data-testid="button-create-card">
-                          <Image className="w-4 h-4 mr-1" />
-                          製作圖卡
+                        <Button variant="default" size="sm" onClick={openCardCreator} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-create-card">
+                          <Image className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                          <span className="hidden sm:inline">圖卡</span>
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedVerseNums(new Set())} data-testid="button-clear-selection">
-                          <X className="w-4 h-4 mr-1" />
-                          取消選取
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedVerseNums(new Set())} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-clear-selection">
+                          <X className="w-3 h-3 sm:w-4 sm:h-4" />
                         </Button>
                       </>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }}>
-                      返回章節
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm">
+                      返回
                     </Button>
                   </div>
                 </div>
                 
-                <p className="text-sm text-muted-foreground mb-4">
-                  點擊經文可選取，選取後可複製、分享或製作圖卡
+                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4">
+                  點擊經文可選取
                 </p>
                 
                 {versesLoading ? (
-                  <div className="text-center py-12 text-muted-foreground">載入中...</div>
+                  <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">載入中...</div>
                 ) : versesError ? (
-                  <div className="text-center py-12 text-destructive flex flex-col items-center gap-2">
-                    <AlertCircle className="w-6 h-6" />
-                    <span>載入經文時發生錯誤</span>
+                  <div className="text-center py-8 sm:py-12 text-destructive flex flex-col items-center gap-2">
+                    <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="text-sm">載入經文時發生錯誤</span>
                   </div>
                 ) : (
-                  <ScrollArea className="h-[600px]">
-                    <div className="space-y-2 pr-4">
+                  <ScrollArea className="flex-1 h-[calc(100vh-240px)] sm:h-[calc(100vh-300px)]">
+                    <div className="space-y-1 sm:space-y-2 pr-2 sm:pr-4">
                       {verses.map((v) => (
                         <div 
                           key={v.verse} 
-                          className={`flex gap-4 p-3 rounded-lg cursor-pointer group transition-colors ${
+                          className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${
                             selectedVerseNums.has(v.verse) 
-                              ? 'bg-primary/10 ring-2 ring-primary/30' 
+                              ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30' 
                               : 'hover:bg-muted/50'
                           }`}
                           onClick={() => toggleVerseSelection(v.verse)}
                           data-testid={`verse-${v.chapter}-${v.verse}`}
                         >
-                          <div className="flex items-start gap-2">
+                          <div className="flex items-start gap-1 sm:gap-2">
                             {selectedVerseNums.has(v.verse) && (
-                              <Check className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
+                              <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
                             )}
-                            <span className="text-primary font-bold text-lg min-w-[2rem] text-right">{v.verse}</span>
+                            <span className="text-primary font-bold text-sm sm:text-lg min-w-[1.5rem] sm:min-w-[2rem] text-right">{v.verse}</span>
                           </div>
-                          <span className="text-lg leading-relaxed flex-1">{v.text}</span>
-                          <VerseActions verse={v} />
+                          <span className="text-base sm:text-lg leading-relaxed flex-1">{v.text}</span>
                         </div>
                       ))}
                     </div>

@@ -183,28 +183,28 @@ const JesusTimelinePage = () => {
     : allEvents;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header title="耶穌四季" subtitle="生平時間軸" />
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header title="耶穌四季" subtitle="生平時間軸" variant="compact" />
       
-      <main className="container mx-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex flex-wrap items-center gap-3 mb-4">
+      <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
+        <div className="max-w-3xl mx-auto w-full flex flex-col flex-1">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
             <Link to="/learn">
-              <Button variant="ghost" size="sm" data-testid="link-back-learn">
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                返回學習
+              <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3" data-testid="link-back-learn">
+                <ArrowLeft className="w-4 h-4 sm:mr-1" />
+                <span className="hidden sm:inline">返回學習</span>
               </Button>
             </Link>
           </div>
 
-          <Card className="mb-6">
-            <CardContent className="py-4">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <Calendar className="w-5 h-5 text-primary" />
-                <span className="text-muted-foreground">探索耶穌的一生，共 {allEvents.length} 個事件</span>
+          <Card className="mb-2 sm:mb-4">
+            <CardContent className="py-2 sm:py-4">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                <span className="text-xs sm:text-sm text-muted-foreground">共 {allEvents.length} 個事件</span>
               </div>
               
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 {seasonOrder.map((season) => {
                   const info = getSeasonInfo(season);
                   const SeasonIcon = info.icon;
@@ -216,10 +216,10 @@ const JesusTimelinePage = () => {
                       variant={isSelected ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => handleSeasonClick(season)}
-                      className="gap-1"
+                      className="gap-1 h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
                       data-testid={`button-season-${season}`}
                     >
-                      <SeasonIcon className="w-4 h-4" />
+                      <SeasonIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                       {info.shortLabel}
                     </Button>
                   );
@@ -229,9 +229,10 @@ const JesusTimelinePage = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedSeason(null)}
+                    className="h-7 sm:h-8 px-2 text-xs sm:text-sm"
                     data-testid="button-clear-filter"
                   >
-                    顯示全部
+                    全部
                   </Button>
                 )}
               </div>
@@ -246,10 +247,10 @@ const JesusTimelinePage = () => {
               <span>載入時間軸事件時發生錯誤</span>
             </div>
           ) : filteredEvents.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">沒有找到事件</div>
+            <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">沒有找到事件</div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-320px)]">
-              <div className="space-y-3 pr-4">
+            <ScrollArea className="flex-1 h-[calc(100vh-200px)] sm:h-[calc(100vh-280px)]">
+              <div className="space-y-2 sm:space-y-3 pr-2 sm:pr-4">
                 {filteredEvents.map((event, index) => {
                   const info = getSeasonInfo(event.season);
                   const SeasonIcon = info.icon;
@@ -263,67 +264,66 @@ const JesusTimelinePage = () => {
                       onClick={() => toggleEventCollapse(event.id)}
                       data-testid={`event-${event.id}`}
                     >
-                      <CardContent className="py-3">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <div className={`w-8 h-8 rounded-full ${info.color} flex items-center justify-center flex-shrink-0`}>
-                              <SeasonIcon className="w-4 h-4 text-white" />
+                      <CardContent className="py-2 sm:py-3 px-2 sm:px-4">
+                        <div className="flex items-start justify-between gap-1 sm:gap-2">
+                          <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
+                            <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full ${info.color} flex items-center justify-center flex-shrink-0`}>
+                              <SeasonIcon className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2 mb-1">
-                                <Badge variant="secondary" className="text-xs" data-testid={`season-badge-${event.id}`}>
+                              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-0.5 sm:mb-1">
+                                <Badge variant="secondary" className="text-[10px] sm:text-xs h-5 sm:h-auto px-1.5 sm:px-2" data-testid={`season-badge-${event.id}`}>
                                   {info.shortLabel}
                                 </Badge>
-                                <span className="text-xs text-muted-foreground">#{event.displayOrder}</span>
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">#{event.displayOrder}</span>
                               </div>
-                              <h4 className="font-semibold text-foreground mb-1" data-testid={`event-title-${event.id}`}>
+                              <h4 className="font-semibold text-sm sm:text-base text-foreground mb-0.5 sm:mb-1 leading-tight" data-testid={`event-title-${event.id}`}>
                                 {event.eventName}
                               </h4>
                               {event.theologicalTheme && (
-                                <p className="text-sm text-muted-foreground mb-2">
+                                <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2 line-clamp-2">
                                   {event.theologicalTheme}
                                 </p>
                               )}
                               
-                              <div className="flex flex-wrap gap-2">
+                              <div className="flex flex-wrap gap-1 sm:gap-2">
                                 {event.location && (
-                                  <Badge variant="outline" className="text-xs" data-testid={`location-${event.id}`}>
-                                    <MapPin className="w-3 h-3 mr-1" />
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs h-5 sm:h-auto px-1 sm:px-2" data-testid={`location-${event.id}`}>
+                                    <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
                                     {event.location}
                                   </Badge>
                                 )}
-                                {event.approximateDate && (
-                                  <Badge variant="outline" className="text-xs" data-testid={`date-${event.id}`}>
-                                    <Calendar className="w-3 h-3 mr-1" />
-                                    {event.approximateDate}
-                                  </Badge>
-                                )}
-                                {gospels.length > 0 && gospels.map((g) => (
-                                  <Badge key={g.key} variant="outline" className="text-xs" data-testid={`scripture-${event.id}-${g.key}`}>
-                                    <Book className="w-3 h-3 mr-1" />
+                                {gospels.length > 0 && gospels.slice(0, 2).map((g) => (
+                                  <Badge key={g.key} variant="outline" className="text-[10px] sm:text-xs h-5 sm:h-auto px-1 sm:px-2" data-testid={`scripture-${event.id}-${g.key}`}>
+                                    <Book className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
                                     {g.name.replace('福音', '')}
                                   </Badge>
                                 ))}
+                                {gospels.length > 2 && (
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs h-5 sm:h-auto px-1 sm:px-2">
+                                    +{gospels.length - 2}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" className="flex-shrink-0" data-testid={`button-expand-${event.id}`}>
+                          <Button variant="ghost" size="icon" className="flex-shrink-0 w-7 h-7 sm:w-9 sm:h-9" data-testid={`button-expand-${event.id}`}>
                             {isExpanded ? (
-                              <ChevronUp className="w-4 h-4" />
+                              <ChevronUp className="w-3 h-3 sm:w-4 sm:h-4" />
                             ) : (
-                              <ChevronDown className="w-4 h-4" />
+                              <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                             )}
                           </Button>
                         </div>
                         
                         {isExpanded && (
-                          <div className="mt-4 pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
+                          <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
                             {gospels.length > 0 && (
-                              <div className={`grid gap-3 mb-4 ${gospels.length > 1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                              <div className="grid gap-2 sm:gap-3 grid-cols-1">
                                 {gospels.map((g, idx) => {
                                   const bgColors = ['bg-blue-50 dark:bg-blue-950/30', 'bg-green-50 dark:bg-green-950/30', 'bg-amber-50 dark:bg-amber-950/30', 'bg-purple-50 dark:bg-purple-950/30'];
                                   return (
-                                    <div key={g.key} className={`rounded-lg p-3 ${bgColors[idx % bgColors.length]}`}>
+                                    <div key={g.key} className={`rounded-lg p-2 sm:p-3 ${bgColors[idx % bgColors.length]}`}>
                                       <ScriptureDisplay reference={g.ref} gospelName={g.name} />
                                     </div>
                                   );
