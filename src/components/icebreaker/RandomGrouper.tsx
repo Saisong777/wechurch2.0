@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -55,7 +55,7 @@ const getGroupColor = (groupNumber: number) => GROUP_COLORS[(groupNumber - 1) % 
 export const RandomGrouper = () => {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
-  const navigate = useLocation()[1];
+  const navigate = useNavigate();
   
   const [viewMode, setViewMode] = useState<ViewMode>('home');
   const [currentActivityId, setCurrentActivityId] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export const RandomGrouper = () => {
   const [joinName, setJoinName] = useState('');
   const [joinGender, setJoinGender] = useState<'M' | 'F' | ''>('');
   const [hasJoined, setHasJoined] = useState(false);
-  const [myJoinedName, setMyJoinedName] = useState<string | null>(null);
+  const [myParticipantId, setMyParticipantId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [activityDeleted, setActivityDeleted] = useState(false);
@@ -96,19 +96,23 @@ export const RandomGrouper = () => {
 
   // Detect when activity is deleted by leader and redirect to homepage
   useEffect(() => {
-    if (activityError && viewMode === 'activity' && currentActivityId) {
-      setActivityDeleted(true);
-      toast.info('活動已結束，返回首頁');
-      setTimeout(() => {
-        setViewMode('home');
-        setCurrentActivityId(null);
-        setHasJoined(false);
-        setMyJoinedName(null);
-        setActivityDeleted(false);
-        navigate('/');
-      }, 1500);
+    if (activityError && viewMode === 'activity' && currentActivityId && !activityDeleted) {
+      const errorMessage = (activityError as Error)?.message || '';
+      const isNotFound = errorMessage.startsWith('404') || errorMessage.includes('not found') || errorMessage.includes('Not Found');
+      if (isNotFound) {
+        setActivityDeleted(true);
+        toast.info('活動已結束，返回首頁');
+        setTimeout(() => {
+          setViewMode('home');
+          setCurrentActivityId(null);
+          setHasJoined(false);
+          setMyParticipantId(null);
+          setActivityDeleted(false);
+          navigate('/');
+        }, 1500);
+      }
     }
-  }, [activityError, viewMode, currentActivityId, navigate]);
+  }, [activityError, viewMode, currentActivityId, navigate, activityDeleted]);
 
   useEffect(() => {
     if (!activity && viewMode === 'activity' && !activityError && !activityDeleted) {
@@ -121,7 +125,7 @@ export const RandomGrouper = () => {
     setHasJoined(false);
     setJoinName('');
     setJoinGender('');
-    setMyJoinedName(null);
+    setMyParticipantId(null);
   }, [currentActivityId]);
 
   const createMutation = useMutation({
@@ -165,12 +169,13 @@ export const RandomGrouper = () => {
   const joinMutation = useMutation({
     mutationFn: async () => {
       if (!currentActivityId) throw new Error('No activity');
-      return apiRequest('POST', `/api/grouping/${currentActivityId}/join`, { name: joinName, gender: joinGender });
+      const response = await apiRequest('POST', `/api/grouping/${currentActivityId}/join`, { name: joinName, gender: joinGender });
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/grouping/${currentActivityId}`] });
       setHasJoined(true);
-      setMyJoinedName(joinName);
+      setMyParticipantId(data?.id || null);
       toast.success('加入成功！');
     },
     onError: (error: any) => {
@@ -733,9 +738,10 @@ export const RandomGrouper = () => {
             ) : (
               /* Participant view - shows only their own group with large number */
               (() => {
-                const myGroup = myJoinedName 
-                  ? participants.find(p => p.name === myJoinedName)?.groupNumber
+                const myParticipant = myParticipantId 
+                  ? participants.find(p => p.id === myParticipantId)
                   : null;
+                const myGroup = myParticipant?.groupNumber || null;
                 const myGroupMembers = myGroup ? groups[myGroup] || [] : [];
                 const color = myGroup ? getGroupColor(myGroup) : GROUP_COLORS[0];
 
@@ -790,38 +796,41 @@ export const RandomGrouper = () => {
                       </CardHeader>
                       <CardContent>
                         <ul className="space-y-2">
-                          {myGroupMembers.map((member) => (
-                            <li 
-                              key={member.id}
-                              className={cn(
-                                "flex items-center justify-between py-2 px-3 rounded-lg",
-                                member.name === myJoinedName 
-                                  ? "bg-primary/10 border border-primary/30" 
-                                  : "bg-muted/50"
-                              )}
-                            >
-                              <span className={cn(
-                                "font-medium",
-                                member.name === myJoinedName && "text-primary"
-                              )}>
-                                {member.name}
-                                {member.name === myJoinedName && (
-                                  <span className="ml-2 text-xs text-muted-foreground">(你)</span>
-                                )}
-                              </span>
-                              <Badge 
-                                variant="outline" 
+                          {myGroupMembers.map((member) => {
+                            const isMe = member.id === myParticipantId;
+                            return (
+                              <li 
+                                key={member.id}
                                 className={cn(
-                                  "text-xs",
-                                  member.gender === 'M' 
-                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
-                                    : 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300'
+                                  "flex items-center justify-between py-2 px-3 rounded-lg",
+                                  isMe 
+                                    ? "bg-primary/10 border border-primary/30" 
+                                    : "bg-muted/50"
                                 )}
                               >
-                                {member.gender === 'M' ? '男' : '女'}
-                              </Badge>
-                            </li>
-                          ))}
+                                <span className={cn(
+                                  "font-medium",
+                                  isMe && "text-primary"
+                                )}>
+                                  {member.name}
+                                  {isMe && (
+                                    <span className="ml-2 text-xs text-muted-foreground">(你)</span>
+                                  )}
+                                </span>
+                                <Badge 
+                                  variant="outline" 
+                                  className={cn(
+                                    "text-xs",
+                                    member.gender === 'M' 
+                                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+                                      : 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300'
+                                  )}
+                                >
+                                  {member.gender === 'M' ? '男' : '女'}
+                                </Badge>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </CardContent>
                     </Card>

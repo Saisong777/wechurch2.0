@@ -53,6 +53,11 @@ The random grouper feature allows leaders to create grouping activities with:
 - **Privacy-focused**: Activity data and participants are deleted when the activity is closed
 - **Role-based access**: Only leader/future_leader/admin can create activities; all users can join with code
 - **Real-time updates**: 3-second polling for participant lists during active sessions
+- **Group display modes**:
+  - Participants see only their own group with large colored group number and member list
+  - Leaders see all groups with complete participant lists for verification
+  - Groups distinguished by 8 distinct colors for easy identification
+- **Activity deletion handling**: When leader closes activity, all participants are redirected to homepage with notification
 
 ### Scripture Sharing System
 The app features unified scripture sharing components used across the platform. **RULE: All Bible scripture displays across the entire site must have copy/share/card functionality.**
