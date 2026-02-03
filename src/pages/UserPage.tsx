@@ -162,7 +162,7 @@ export const UserPage: React.FC = () => {
       
       if (sessionData.status === 'studying') {
         // Check if icebreaker is enabled and user hasn't completed it yet
-        if (sessionData.icebreaker_enabled && participant.group_number) {
+        if (sessionData.icebreakerEnabled && participant.groupNumber) {
           // Check localStorage if user already completed icebreaker
           const completedIcebreaker = localStorage.getItem(`icebreaker_completed_${storedSessionId}_${participant.id}`);
           restoredStep = completedIcebreaker ? 'study' : 'icebreaker';
@@ -170,15 +170,15 @@ export const UserPage: React.FC = () => {
           restoredStep = 'study';
         }
       } else if (sessionData.status === 'grouping') {
-        if (participant.ready_confirmed) {
+        if (participant.readyConfirmed) {
           restoredStep = 'study'; // All confirmed, waiting for others
-        } else if (participant.group_number) {
+        } else if (participant.groupNumber) {
           restoredStep = 'verification';
         } else {
           restoredStep = 'waiting';
         }
       } else if (sessionData.status === 'waiting') {
-        if (participant.group_number) {
+        if (participant.groupNumber) {
           restoredStep = 'group-reveal';
         } else {
           restoredStep = 'waiting';
@@ -269,31 +269,29 @@ export const UserPage: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  // Listen for session completion globally
+  // Poll for session status changes (replaces Supabase realtime)
   useEffect(() => {
     if (!currentSession?.id) return;
     
-    const channel = supabase
-      .channel(`user-session-status-${currentSession.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'sessions',
-          filter: `id=eq.${currentSession.id}`,
-        },
-        (payload) => {
-          const newStatus = (payload.new as any).status;
-          if (newStatus === 'completed') {
+    const checkSessionStatus = async () => {
+      try {
+        const res = await fetch(`/api/sessions/${currentSession.id}`);
+        if (res.ok) {
+          const session = await res.json();
+          if (session.status === 'completed') {
             handleSessionEnded();
           }
         }
-      )
-      .subscribe();
+      } catch (error) {
+        console.error('[UserPage] Error polling session status:', error);
+      }
+    };
+
+    // Poll every 10 seconds
+    const interval = setInterval(checkSessionStatus, 10000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [currentSession?.id, handleSessionEnded]);
 
@@ -302,54 +300,45 @@ export const UserPage: React.FC = () => {
     
     const trimmedInput = idOrCode.trim().toUpperCase();
     
-    // Determine if input is a short code or UUID
-    let sessionData;
-    let sessionError;
-    
-    if (isShortCode(trimmedInput)) {
-      // Query by short_code
-      const result = await supabase
-        .from('sessions_public')
-        .select('*')
-        .eq('short_code', trimmedInput)
-        .maybeSingle();
-      sessionData = result.data;
-      sessionError = result.error;
-    } else {
-      // Query by UUID (for backwards compatibility and QR code deep links)
-      const result = await supabase
-        .from('sessions_public')
-        .select('*')
-        .eq('id', trimmedInput)
-        .maybeSingle();
-      sessionData = result.data;
-      sessionError = result.error;
-    }
+    try {
+      // Try short code first, then UUID
+      let res;
+      if (isShortCode(trimmedInput)) {
+        res = await fetch(`/api/sessions/by-code/${trimmedInput}`);
+      } else {
+        res = await fetch(`/api/sessions/${trimmedInput}`);
+      }
 
-    if (sessionError || !sessionData) {
-      toast.error('找不到此課程，請確認代碼是否正確');
+      if (!res.ok) {
+        toast.error('找不到此課程，請確認代碼是否正確');
+        setIsLoading(false);
+        setStep('enter-session');
+        return;
+      }
+
+      const sessionData = await res.json();
+
+      // Store the actual session UUID for internal use
+      localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionData.id);
+
+      setCurrentSession({
+        id: sessionData.id,
+        bibleVerse: '',
+        verseReference: sessionData.verseReference,
+        status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
+        createdAt: new Date(sessionData.createdAt),
+        groups: [],
+        icebreakerEnabled: sessionData.icebreakerEnabled || false,
+      });
+
+      setIsLoading(false);
+      setStep('join');
+    } catch (error) {
+      console.error('[UserPage] Error loading session:', error);
+      toast.error('載入課程失敗，請稍後再試');
       setIsLoading(false);
       setStep('enter-session');
-      return;
     }
-
-    // Store the actual session UUID for internal use
-    localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionData.id);
-
-    setCurrentSession({
-      id: sessionData.id,
-      bibleVerse: '',
-      verseReference: sessionData.verse_reference,
-      status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-      createdAt: new Date(sessionData.created_at),
-      groups: [],
-      icebreakerEnabled: sessionData.icebreaker_enabled || false,
-    });
-
-    setIsLoading(false);
-    
-    // QR code scanning goes directly to join form
-    setStep('join');
   };
 
   // Watch for user group number changes (real-time grouping)
