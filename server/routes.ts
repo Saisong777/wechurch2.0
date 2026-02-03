@@ -124,6 +124,23 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Cache clear endpoint - useful for refreshing stale cached data
+  app.post("/api/cache/clear", async (req, res) => {
+    try {
+      bibleCache.clear();
+      timelineCache.clear();
+      apiCache.clear();
+      console.log("[Cache] All caches cleared");
+      res.json({ 
+        status: "ok", 
+        message: "All caches cleared successfully",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear cache" });
+    }
+  });
+
   app.get("/api/sessions", async (req, res) => {
     try {
       const sessions = await storage.getSessions();

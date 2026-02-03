@@ -556,7 +556,7 @@ export class DatabaseStorage implements IStorage {
   async getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]> {
     const cacheKey = cacheKeys.bibleBooks();
     const cached = bibleCache.get<{ bookName: string; bookNumber: number; chapterCount: number }[]>(cacheKey);
-    if (cached) return cached;
+    if (cached && cached.length > 0) return cached;
 
     const result = await db
       .select({
@@ -568,7 +568,10 @@ export class DatabaseStorage implements IStorage {
       .groupBy(chineseUnionTrad.bookName, chineseUnionTrad.bookNumber)
       .orderBy(asc(chineseUnionTrad.bookNumber));
     
-    bibleCache.set(cacheKey, result);
+    // Only cache non-empty results
+    if (result.length > 0) {
+      bibleCache.set(cacheKey, result);
+    }
     return result;
   }
 
@@ -629,20 +632,26 @@ export class DatabaseStorage implements IStorage {
   async getJesus4Seasons(): Promise<Jesus4Season[]> {
     const cacheKey = cacheKeys.timelineSeasons();
     const cached = timelineCache.get<Jesus4Season[]>(cacheKey);
-    if (cached) return cached;
+    if (cached && cached.length > 0) return cached;
 
     const result = await db.select().from(jesus4Seasons).orderBy(asc(jesus4Seasons.displayOrder));
-    timelineCache.set(cacheKey, result);
+    // Only cache non-empty results
+    if (result.length > 0) {
+      timelineCache.set(cacheKey, result);
+    }
     return result;
   }
 
   async getJesus4SeasonsBySeason(season: string): Promise<Jesus4Season[]> {
     const cacheKey = cacheKeys.timelineEvents(season);
     const cached = timelineCache.get<Jesus4Season[]>(cacheKey);
-    if (cached) return cached;
+    if (cached && cached.length > 0) return cached;
 
     const result = await db.select().from(jesus4Seasons).where(eq(jesus4Seasons.season, season)).orderBy(asc(jesus4Seasons.displayOrder));
-    timelineCache.set(cacheKey, result);
+    // Only cache non-empty results
+    if (result.length > 0) {
+      timelineCache.set(cacheKey, result);
+    }
     return result;
   }
 
