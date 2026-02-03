@@ -17,7 +17,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className={showNav ? "pb-16" : ""}>
+      <div className={showNav ? "pb-12 sm:pb-14" : ""}>
         {children}
       </div>
       {showNav && <BottomNav />}
