@@ -29,6 +29,7 @@ import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { useQuery } from '@tanstack/react-query';
+import { ClickableVerse } from '@/components/scripture/ClickableVerse';
 
 interface BlessingVerse {
   verseId: number;
@@ -222,11 +223,11 @@ const Index = () => {
                 <div className="flex items-start gap-2">
                   <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground mb-1">今日經文</p>
-                    <p className="text-sm text-foreground leading-relaxed">{randomVerse.text}</p>
-                    <p className="text-xs text-primary mt-1.5 font-medium">
-                      {randomVerse.bookName} {randomVerse.chapter}:{randomVerse.verse}
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-1">今日經文（點擊可複製分享）</p>
+                    <ClickableVerse
+                      text={randomVerse.text}
+                      reference={`${randomVerse.bookName} ${randomVerse.chapter}:${randomVerse.verse}`}
+                    />
                   </div>
                 </div>
               </CardContent>
