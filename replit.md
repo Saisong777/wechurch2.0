@@ -132,7 +132,6 @@ The application is optimized for 500+ concurrent users with:
 - **Domain**: Emails sent from `noreply@wechurch.online`
 
 ### Third-Party Integrations
-- **Supabase Client**: Legacy integration present in codebase (migration in progress)
 - **OpenAI/AI Services**: Used for generating study reports (AI report generation)
 
 ### Frontend Libraries
