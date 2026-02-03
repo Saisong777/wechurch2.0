@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { Shuffle, Copy, Check, Users, Sparkles, UserPlus, Crown, Clock, QrCode, Search } from 'lucide-react';
+import { Shuffle, Copy, Check, Users, Sparkles, UserPlus, Crown, Clock, QrCode, Search, Home } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,19 +40,22 @@ type GenderMode = 'mixed' | 'split';
 type ViewMode = 'home' | 'host' | 'join' | 'activity';
 
 const GROUP_COLORS = [
-  'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700',
-  'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700',
-  'bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700',
-  'bg-orange-100 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700',
-  'bg-pink-100 dark:bg-pink-900/40 border-pink-300 dark:border-pink-700',
-  'bg-cyan-100 dark:bg-cyan-900/40 border-cyan-300 dark:border-cyan-700',
-  'bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700',
-  'bg-rose-100 dark:bg-rose-900/40 border-rose-300 dark:border-rose-700',
+  { bg: 'bg-blue-100 dark:bg-blue-900/40', border: 'border-blue-400 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-300', accent: 'bg-blue-500' },
+  { bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400 dark:border-green-600', text: 'text-green-700 dark:text-green-300', accent: 'bg-green-500' },
+  { bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-400 dark:border-purple-600', text: 'text-purple-700 dark:text-purple-300', accent: 'bg-purple-500' },
+  { bg: 'bg-orange-100 dark:bg-orange-900/40', border: 'border-orange-400 dark:border-orange-600', text: 'text-orange-700 dark:text-orange-300', accent: 'bg-orange-500' },
+  { bg: 'bg-pink-100 dark:bg-pink-900/40', border: 'border-pink-400 dark:border-pink-600', text: 'text-pink-700 dark:text-pink-300', accent: 'bg-pink-500' },
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/40', border: 'border-cyan-400 dark:border-cyan-600', text: 'text-cyan-700 dark:text-cyan-300', accent: 'bg-cyan-500' },
+  { bg: 'bg-amber-100 dark:bg-amber-900/40', border: 'border-amber-400 dark:border-amber-600', text: 'text-amber-700 dark:text-amber-300', accent: 'bg-amber-500' },
+  { bg: 'bg-rose-100 dark:bg-rose-900/40', border: 'border-rose-400 dark:border-rose-600', text: 'text-rose-700 dark:text-rose-300', accent: 'bg-rose-500' },
 ];
+
+const getGroupColor = (groupNumber: number) => GROUP_COLORS[(groupNumber - 1) % GROUP_COLORS.length];
 
 export const RandomGrouper = () => {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useLocation()[1];
   
   const [viewMode, setViewMode] = useState<ViewMode>('home');
   const [currentActivityId, setCurrentActivityId] = useState<string | null>(null);
@@ -65,8 +69,10 @@ export const RandomGrouper = () => {
   const [joinName, setJoinName] = useState('');
   const [joinGender, setJoinGender] = useState<'M' | 'F' | ''>('');
   const [hasJoined, setHasJoined] = useState(false);
+  const [myJoinedName, setMyJoinedName] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [activityDeleted, setActivityDeleted] = useState(false);
 
   const isLeaderOrAbove = user?.role && ['leader', 'future_leader', 'admin'].includes(user.role);
 
@@ -76,10 +82,11 @@ export const RandomGrouper = () => {
     refetchInterval: viewMode === 'host' ? 3000 : false,
   });
 
-  const { data: activityData, refetch: refetchActivity } = useQuery<{ activity: GroupingActivity; participants: GroupingParticipant[] }>({
+  const { data: activityData, refetch: refetchActivity, error: activityError } = useQuery<{ activity: GroupingActivity; participants: GroupingParticipant[] }>({
     queryKey: [`/api/grouping/${currentActivityId}`],
     enabled: !!currentActivityId && viewMode === 'activity',
     refetchInterval: 3000,
+    retry: false,
   });
 
   const activity = activityData?.activity;
@@ -87,17 +94,34 @@ export const RandomGrouper = () => {
   const isOwner = activity?.ownerId === user?.id;
   const isFinished = activity?.status === 'finished';
 
+  // Detect when activity is deleted by leader and redirect to homepage
   useEffect(() => {
-    if (!activity && viewMode === 'activity') {
+    if (activityError && viewMode === 'activity' && currentActivityId) {
+      setActivityDeleted(true);
+      toast.info('活動已結束，返回首頁');
+      setTimeout(() => {
+        setViewMode('home');
+        setCurrentActivityId(null);
+        setHasJoined(false);
+        setMyJoinedName(null);
+        setActivityDeleted(false);
+        navigate('/');
+      }, 1500);
+    }
+  }, [activityError, viewMode, currentActivityId, navigate]);
+
+  useEffect(() => {
+    if (!activity && viewMode === 'activity' && !activityError && !activityDeleted) {
       setViewMode('home');
       setCurrentActivityId(null);
     }
-  }, [activity, viewMode]);
+  }, [activity, viewMode, activityError, activityDeleted]);
 
   useEffect(() => {
     setHasJoined(false);
     setJoinName('');
     setJoinGender('');
+    setMyJoinedName(null);
   }, [currentActivityId]);
 
   const createMutation = useMutation({
@@ -146,6 +170,7 @@ export const RandomGrouper = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/grouping/${currentActivityId}`] });
       setHasJoined(true);
+      setMyJoinedName(joinName);
       toast.success('加入成功！');
     },
     onError: (error: any) => {
@@ -611,87 +636,212 @@ export const RandomGrouper = () => {
 
         {isFinished && Object.keys(groups).length > 0 && (
           <>
-            <div className="flex items-center justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyResults}
-                data-testid="button-copy-all"
-              >
-                {copiedAll ? (
-                  <Check className="w-4 h-4 mr-1 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4 mr-1" />
-                )}
-                複製結果
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {Object.entries(groups)
-                .sort(([a], [b]) => Number(a) - Number(b))
-                .map(([num, members]) => (
-                  <Card 
-                    key={num}
-                    className={cn("border-2", GROUP_COLORS[(Number(num) - 1) % GROUP_COLORS.length])}
-                    data-testid={`card-group-${num}`}
+            {/* Leader view - shows all groups */}
+            {(isOwner || user?.role === 'admin') ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <Badge variant="secondary" className="text-xs">
+                    <Crown className="w-3 h-3 mr-1" />
+                    組長檢視模式
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyResults}
+                    data-testid="button-copy-all"
                   >
-                    <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        第 {num} 組
-                        <Badge variant="secondary" className="text-xs">
-                          {members.length} 人
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-1">
-                        {members.map((member) => (
-                          <li 
-                            key={member.id}
-                            className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
-                          >
-                            <span>{member.name}</span>
-                            <Badge 
-                              variant="outline" 
+                    {copiedAll ? (
+                      <Check className="w-4 h-4 mr-1 text-green-500" />
+                    ) : (
+                      <Copy className="w-4 h-4 mr-1" />
+                    )}
+                    複製結果
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {Object.entries(groups)
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([num, members]) => {
+                      const color = getGroupColor(Number(num));
+                      return (
+                        <Card 
+                          key={num}
+                          className={cn("border-2", color.bg, color.border)}
+                          data-testid={`card-group-${num}`}
+                        >
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center gap-3">
+                              <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl", color.accent)}>
+                                {num}
+                              </div>
+                              <div>
+                                <CardTitle className={cn("text-lg", color.text)}>第 {num} 組</CardTitle>
+                                <p className="text-sm text-muted-foreground">{members.length} 人</p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <ul className="space-y-1">
+                              {members.map((member) => (
+                                <li 
+                                  key={member.id}
+                                  className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
+                                >
+                                  <span>{member.name}</span>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={cn(
+                                      "text-xs",
+                                      member.gender === 'M' 
+                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+                                        : 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300'
+                                    )}
+                                  >
+                                    {member.gender === 'M' ? '男' : '女'}
+                                  </Badge>
+                                </li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                </div>
+
+                <div className="flex justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setViewMode('home');
+                      setCurrentActivityId(null);
+                    }}
+                  >
+                    <Home className="w-4 h-4 mr-2" />
+                    返回首頁
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => closeMutation.mutate()}
+                    disabled={closeMutation.isPending}
+                    data-testid="button-finish"
+                  >
+                    結束活動
+                  </Button>
+                </div>
+              </>
+            ) : (
+              /* Participant view - shows only their own group with large number */
+              (() => {
+                const myGroup = myJoinedName 
+                  ? participants.find(p => p.name === myJoinedName)?.groupNumber
+                  : null;
+                const myGroupMembers = myGroup ? groups[myGroup] || [] : [];
+                const color = myGroup ? getGroupColor(myGroup) : GROUP_COLORS[0];
+
+                if (!myGroup) {
+                  return (
+                    <Card>
+                      <CardContent className="py-8 text-center">
+                        <p className="text-muted-foreground">找不到您的分組資料</p>
+                        <Button
+                          variant="outline"
+                          className="mt-4"
+                          onClick={() => {
+                            setViewMode('home');
+                            setCurrentActivityId(null);
+                          }}
+                        >
+                          <Home className="w-4 h-4 mr-2" />
+                          返回首頁
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {/* Large group number display */}
+                    <Card className={cn("border-4", color.bg, color.border)}>
+                      <CardContent className="py-8">
+                        <div className="text-center space-y-4">
+                          <div className={cn(
+                            "w-32 h-32 mx-auto rounded-full flex items-center justify-center text-white font-bold shadow-lg",
+                            color.accent
+                          )}>
+                            <span className="text-6xl">{myGroup}</span>
+                          </div>
+                          <div>
+                            <h2 className={cn("text-3xl font-bold", color.text)}>第 {myGroup} 組</h2>
+                            <p className="text-muted-foreground mt-1">請找到同組的組員！</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Group members list */}
+                    <Card className={cn("border-2", color.bg, color.border)}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          組員名單 ({myGroupMembers.length} 人)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="space-y-2">
+                          {myGroupMembers.map((member) => (
+                            <li 
+                              key={member.id}
                               className={cn(
-                                "text-xs",
-                                member.gender === 'M' 
-                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
-                                  : 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300'
+                                "flex items-center justify-between py-2 px-3 rounded-lg",
+                                member.name === myJoinedName 
+                                  ? "bg-primary/10 border border-primary/30" 
+                                  : "bg-muted/50"
                               )}
                             >
-                              {member.gender === 'M' ? '男' : '女'}
-                            </Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                ))}
-            </div>
+                              <span className={cn(
+                                "font-medium",
+                                member.name === myJoinedName && "text-primary"
+                              )}>
+                                {member.name}
+                                {member.name === myJoinedName && (
+                                  <span className="ml-2 text-xs text-muted-foreground">(你)</span>
+                                )}
+                              </span>
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-xs",
+                                  member.gender === 'M' 
+                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+                                    : 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300'
+                                )}
+                              >
+                                {member.gender === 'M' ? '男' : '女'}
+                              </Badge>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
 
-            <div className="flex justify-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setViewMode('home');
-                  setCurrentActivityId(null);
-                }}
-              >
-                返回首頁
-              </Button>
-              {(isOwner || user?.role === 'admin') && (
-                <Button
-                  variant="outline"
-                  onClick={() => closeMutation.mutate()}
-                  disabled={closeMutation.isPending}
-                  data-testid="button-finish"
-                >
-                  結束活動
-                </Button>
-              )}
-            </div>
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setViewMode('home');
+                          setCurrentActivityId(null);
+                        }}
+                      >
+                        <Home className="w-4 h-4 mr-2" />
+                        返回首頁
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()
+            )}
           </>
         )}
       </div>
