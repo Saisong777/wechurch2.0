@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiRequest } from '@/lib/queryClient';
 import { toast } from 'sonner';
 
 export interface PrayerComment {
@@ -16,17 +16,7 @@ export interface PrayerComment {
 
 export const usePrayerComments = (prayerId: string) => {
   return useQuery({
-    queryKey: ['prayer-comments', prayerId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('v_prayer_comments')
-        .select('*')
-        .eq('prayer_id', prayerId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      return data as PrayerComment[];
-    },
+    queryKey: ['/api/prayers', prayerId, 'comments'],
     enabled: !!prayerId,
   });
 };
@@ -38,19 +28,10 @@ export const useCreateComment = () => {
   return useMutation({
     mutationFn: async ({ prayerId, content }: { prayerId: string; content: string }) => {
       if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('prayer_comments')
-        .insert({
-          prayer_id: prayerId,
-          user_id: user.id,
-          content: content.trim(),
-        });
-
-      if (error) throw error;
+      await apiRequest('POST', `/api/prayers/${prayerId}/comments`, { content: content.trim() });
     },
     onSuccess: (_, { prayerId }) => {
-      queryClient.invalidateQueries({ queryKey: ['prayer-comments', prayerId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/prayers', prayerId, 'comments'] });
       toast.success('留言已發布');
     },
     onError: (error) => {
@@ -65,16 +46,11 @@ export const useDeleteComment = () => {
 
   return useMutation({
     mutationFn: async ({ commentId, prayerId }: { commentId: string; prayerId: string }) => {
-      const { error } = await supabase
-        .from('prayer_comments')
-        .delete()
-        .eq('id', commentId);
-
-      if (error) throw error;
+      await apiRequest('DELETE', `/api/prayers/${prayerId}/comments/${commentId}`);
       return prayerId;
     },
     onSuccess: (prayerId) => {
-      queryClient.invalidateQueries({ queryKey: ['prayer-comments', prayerId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/prayers', prayerId, 'comments'] });
       toast.success('留言已刪除');
     },
     onError: (error) => {

@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { withRetry } from '@/lib/retry-utils';
 
 interface UserProfile {
   display_name: string | null;
@@ -26,36 +24,24 @@ export const useUserProfile = () => {
     const fetchProfile = async () => {
       setLoading(true);
       try {
-        const data = await withRetry(
-          async () => {
-            const res = await supabase
-              .from('profiles')
-              .select('display_name, avatar_url')
-              .eq('user_id', user.id)
-              .maybeSingle();
-
-            // Retry only on network-ish errors
-            if (res.error) throw res.error;
-            return res.data;
-          },
-          { maxRetries: 2, baseDelayMs: 600, maxDelayMs: 4000, jitterFactor: 0.4 }
-        );
-
-        if (data) {
-          setProfile(data);
-        } else {
-          // Fallback to user metadata
+        const res = await fetch(`/api/users/${user.id}/profile`);
+        if (res.ok) {
+          const data = await res.json();
           setProfile({
-            display_name: user.user_metadata?.display_name || null,
+            display_name: data.displayName || null,
+            avatar_url: data.avatarUrl || null,
+          });
+        } else {
+          setProfile({
+            display_name: user.user_metadata?.display_name || user.displayName || null,
             avatar_url: user.user_metadata?.avatar_url || null,
           });
         }
         lastFetchedUserIdRef.current = user.id;
         hasFetchedRef.current = true;
       } catch {
-        // Fallback to user metadata on any failure
         setProfile({
-          display_name: user.user_metadata?.display_name || null,
+          display_name: user.user_metadata?.display_name || user.displayName || null,
           avatar_url: user.user_metadata?.avatar_url || null,
         });
       } finally {
@@ -63,17 +49,13 @@ export const useUserProfile = () => {
       }
     };
 
-    // Avoid double-fetch on quick auth transitions.
-    // (We still refetch if user changes, or if profile hasn't been fetched yet.)
     if (lastFetchedUserIdRef.current === user.id && hasFetchedRef.current) {
       setLoading(false);
       return;
     }
 
-    // HIGH CONCURRENCY: Additional stagger AFTER auth completes
-    // Combined with AuthContext stagger, total spread is up to 3.5s
     let cancelled = false;
-    const delay = Math.random() * 1500; // 0-1.5s additional delay
+    const delay = Math.random() * 1500;
     const timeoutId = setTimeout(() => {
       if (!cancelled) fetchProfile();
     }, delay);
