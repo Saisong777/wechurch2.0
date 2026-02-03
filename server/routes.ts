@@ -1248,7 +1248,7 @@ export async function registerRoutes(app: Express) {
   app.post("/api/message-cards", async (req, res) => {
     try {
       // Generate short code if not provided
-      const shortCode = req.body.shortCode || Math.random().toString(36).substring(2, 8).toUpperCase();
+      const shortCode = req.body.shortCode || Math.random().toString(36).substring(2, 6).toUpperCase();
       const card = await storage.createMessageCard({
         ...req.body,
         shortCode,

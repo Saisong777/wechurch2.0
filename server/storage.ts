@@ -191,7 +191,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSession(session: InsertSession): Promise<Session> {
-    const shortCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const shortCode = Math.random().toString(36).substring(2, 6).toUpperCase();
     const [newSession] = await db.insert(sessions).values({ ...session, shortCode }).returning();
     return newSession;
   }
