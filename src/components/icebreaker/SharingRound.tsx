@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { CheckCircle, Circle, Users, Loader2, MessageCircle, ArrowRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { fetchGroupMembers } from '@/lib/supabase-helpers';
+import { fetchGroupMembers } from '@/lib/api-helpers';
 import type { User } from '@/types/bible-study';
 
 interface SharingRoundProps {

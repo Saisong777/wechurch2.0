@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { joinSession, findSmallestGroup, assignLatecomerToGroup } from '@/lib/supabase-helpers';
+import { joinSession, findSmallestGroup, assignLatecomerToGroup } from '@/lib/api-helpers';
 import { Users, Mail, User as UserIcon, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 

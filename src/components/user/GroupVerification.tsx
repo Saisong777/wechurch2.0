@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSession } from '@/contexts/SessionContext';
-import { fetchGroupMembers } from '@/lib/supabase-helpers';
+import { fetchGroupMembers } from '@/lib/api-helpers';
 import { User } from '@/types/bible-study';
 import { Users, CheckCircle, Loader2, MapPin, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';

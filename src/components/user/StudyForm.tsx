@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useSession } from '@/contexts/SessionContext';
-import { submitStudyNotes } from '@/lib/supabase-helpers';
+import { submitStudyNotes } from '@/lib/api-helpers';
 import { BookOpen, Send, Sparkles, Heart, Lightbulb, CheckCircle, Cloud, CloudOff } from 'lucide-react';
 import { toast } from 'sonner';
 

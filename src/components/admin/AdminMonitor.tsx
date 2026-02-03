@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
-import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/supabase-helpers';
+import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/api-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants, endStudySession } from '@/lib/admin-helpers';
 import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye } from 'lucide-react';
 import { toast } from 'sonner';

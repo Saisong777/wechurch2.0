@@ -6,7 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
-import { assignGroupsToParticipants } from '@/lib/supabase-helpers';
+import { assignGroupsToParticipants } from '@/lib/api-helpers';
 import { Users, UserCheck, Settings, Shuffle, Scale, Copy, UserX, Share2 } from 'lucide-react';
 import { GroupingSettings, User } from '@/types/bible-study';
 import { toast } from 'sonner';
