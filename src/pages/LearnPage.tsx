@@ -1,26 +1,10 @@
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGate } from '@/components/ui/feature-gate';
-import { Book, Calendar, BookOpen, Sparkles } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-
-interface BlessingVerse {
-  verseId: number;
-  bookName: string;
-  chapter: number;
-  verse: number;
-  text: string;
-  blessingType: string | null;
-}
+import { Book, Calendar, BookOpen } from 'lucide-react';
 
 const LearnPage = () => {
-  const { data: randomVerse } = useQuery<BlessingVerse>({
-    queryKey: ['/api/bible/blessing/random'],
-    refetchOnWindowFocus: false,
-  });
-
   const features = [
     {
       title: '聖經閱讀',
@@ -56,23 +40,6 @@ const LearnPage = () => {
         
         <main className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
           <div className="max-w-3xl mx-auto">
-            {randomVerse && (
-              <Card className="mb-3 sm:mb-6 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-                <CardContent className="py-3 sm:py-4">
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-1">今日祝福經文</p>
-                      <p className="text-sm sm:text-base text-foreground leading-relaxed">{randomVerse.text}</p>
-                      <p className="text-xs sm:text-sm text-primary mt-1.5 sm:mt-2 font-medium">
-                        {randomVerse.bookName} {randomVerse.chapter}:{randomVerse.verse}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             <div className="grid gap-2 sm:gap-4">
               {features.map((feature) => (
                 <Link 
