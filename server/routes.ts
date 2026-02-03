@@ -124,6 +124,30 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Debug endpoint to check database table counts
+  app.get("/api/debug/db-counts", async (req, res) => {
+    try {
+      const bibleCount = await pool.query("SELECT COUNT(*) as count FROM chinese_union_trad");
+      const timelineCount = await pool.query("SELECT COUNT(*) as count FROM jesus_4seasons");
+      const usersCount = await pool.query("SELECT COUNT(*) as count FROM users");
+      
+      res.json({
+        status: "ok",
+        counts: {
+          chinese_union_trad: bibleCount.rows[0]?.count || 0,
+          jesus_4seasons: timelineCount.rows[0]?.count || 0,
+          users: usersCount.rows[0]?.count || 0,
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: "Failed to query database counts",
+        message: error.message 
+      });
+    }
+  });
+
   // Cache clear endpoint - useful for refreshing stale cached data
   app.post("/api/cache/clear", async (req, res) => {
     try {
