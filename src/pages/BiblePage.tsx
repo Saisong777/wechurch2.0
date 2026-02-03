@@ -475,13 +475,6 @@ const BiblePage = () => {
       <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
         <div className="max-w-4xl mx-auto w-full flex flex-col flex-1">
           <div className="flex items-center gap-2 mb-2 sm:mb-4">
-            <Button variant="ghost" size="sm" asChild className="h-8 px-2 sm:px-3">
-              <Link to="/learn" className="gap-1 sm:gap-2" data-testid="link-back-learn">
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">返回學習</span>
-              </Link>
-            </Button>
-            
             <div className="flex gap-1 sm:gap-2 flex-1">
               <div className="relative flex-1">
                 <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

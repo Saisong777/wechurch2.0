@@ -188,15 +188,6 @@ const JesusTimelinePage = () => {
       
       <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
         <div className="max-w-3xl mx-auto w-full flex flex-col flex-1">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
-            <Link to="/learn">
-              <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3" data-testid="link-back-learn">
-                <ArrowLeft className="w-4 h-4 sm:mr-1" />
-                <span className="hidden sm:inline">返回學習</span>
-              </Button>
-            </Link>
-          </div>
-
           <Card className="mb-2 sm:mb-4">
             <CardContent className="py-2 sm:py-4">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2 sm:mb-4">

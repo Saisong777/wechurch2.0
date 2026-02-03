@@ -508,12 +508,6 @@ export const MessageCardPage: React.FC = () => {
             )}
           </Button>
 
-          <Link to="/" className="block">
-            <Button variant="outline" size="lg" className="w-full">
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              返回首頁
-            </Button>
-          </Link>
         </CardContent>
       </Card>
     </div>

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, BookOpen, Clock, ChevronRight, X, CheckCircle2, AlertCircle, Play, Pause, RotateCcw, Check } from 'lucide-react';
+import { BookOpen, Clock, ChevronRight, X, CheckCircle2, AlertCircle, Play, Pause, RotateCcw, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ReadingPlan {
@@ -168,17 +168,10 @@ const ReadingPlansPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="讀經計劃" subtitle="每日靈修" />
+      <Header title="讀經計劃" subtitle="每日靈修" variant="compact" />
       
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
         <div className="max-w-3xl mx-auto">
-          <Button variant="ghost" size="sm" asChild className="mb-4">
-            <Link to="/learn" className="gap-2" data-testid="link-back-learn">
-              <ArrowLeft className="w-4 h-4" />
-              返回學習
-            </Link>
-          </Button>
-
           {selectedPlan ? (
             <div>
               <div className="flex items-center justify-between mb-4">

@@ -3,7 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FeatureGate } from '@/components/ui/feature-gate';
-import { Book, Calendar, BookOpen, ArrowLeft, Sparkles } from 'lucide-react';
+import { Book, Calendar, BookOpen, Sparkles } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 interface BlessingVerse {
@@ -56,13 +56,6 @@ const LearnPage = () => {
         
         <main className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
           <div className="max-w-3xl mx-auto">
-            <Button variant="ghost" size="sm" asChild className="mb-3 sm:mb-6 h-8 px-2 sm:px-3">
-              <Link to="/" className="gap-1 sm:gap-2" data-testid="link-back-home">
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">返回首頁</span>
-              </Link>
-            </Button>
-
             {randomVerse && (
               <Card className="mb-3 sm:mb-6 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
                 <CardContent className="py-3 sm:py-4">

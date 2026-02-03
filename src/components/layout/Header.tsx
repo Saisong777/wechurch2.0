@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {title}
               </h1>
               {subtitle && variant === 'default' && (
-                <p className="text-muted-foreground text-[10px] sm:text-sm mt-0 sm:mt-1 tracking-wide">
+                <p className="hidden sm:block text-muted-foreground text-sm mt-1 tracking-wide">
                   {subtitle}
                 </p>
               )}
