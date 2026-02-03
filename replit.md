@@ -55,11 +55,19 @@ The random grouper feature allows leaders to create grouping activities with:
 - **Real-time updates**: 3-second polling for participant lists during active sessions
 
 ### Scripture Sharing System
-The app features unified scripture sharing components used across the platform:
+The app features unified scripture sharing components used across the platform. **RULE: All Bible scripture displays across the entire site must have copy/share/card functionality.**
+
+Components:
 - **ScriptureCardCreator**: Create shareable images with scripture verses, custom backgrounds (6 gradient presets + image upload), personal messages, and 9 text positioning options
-- **FloatingToolbar**: Appears near selected text with copy/share/card actions, dynamically repositions on scroll/resize
+- **FloatingToolbar**: Appears near selected text with copy/share/card actions; fixed bottom bar on mobile, floating near selection on desktop
 - **ClickableVerse**: Single verse display with tap-to-share functionality for the homepage daily scripture
-- **ScriptureViewer**: Multi-verse selection with floating toolbar for passage sharing
+- **ScriptureViewer**: Multi-verse selection with floating toolbar for passage sharing; used in JesusTimelinePage
+
+When adding new scripture displays:
+1. Use `ClickableVerse` for single verses (e.g., daily verse)
+2. Use `ScriptureViewer` for multi-verse passages (e.g., timeline events, study content)
+3. Both components include copy, share, and card creation functionality
+4. If inside a clickable parent container, ensure `e.stopPropagation()` is used on verse clicks
 
 ### High-Concurrency Design
 The application is optimized for 500+ concurrent users with:
