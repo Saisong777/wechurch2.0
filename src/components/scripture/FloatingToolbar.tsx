@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Copy, Share2, Image, Check, X } from 'lucide-react';
 
@@ -37,61 +38,59 @@ export const FloatingToolbar = ({
 
   if (!visible) return null;
 
-  if (isMobile) {
-    return (
-      <div
-        ref={toolbarRef}
-        className="fixed bottom-0 left-0 right-0 z-[1000] bg-background border-t border-border shadow-lg p-2 pb-safe animate-in slide-in-from-bottom duration-200"
-        data-testid="floating-toolbar"
-      >
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            已選 {selectedCount} 節
-          </span>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="gap-1.5"
-            onClick={onCopy}
-            data-testid="button-toolbar-copy"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="text-xs">複製</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="gap-1.5"
-            onClick={onShare}
-            data-testid="button-toolbar-share"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span className="text-xs">分享</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="gap-1.5"
-            onClick={onCreateCard}
-            data-testid="button-toolbar-card"
-          >
-            <Image className="w-3.5 h-3.5" />
-            <span className="text-xs">圖卡</span>
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onClear}
-            data-testid="button-toolbar-clear"
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
+  const mobileToolbar = (
+    <div
+      ref={toolbarRef}
+      className="fixed bottom-0 left-0 right-0 z-[1000] bg-background border-t border-border shadow-lg p-2 pb-safe animate-in slide-in-from-bottom duration-200"
+      data-testid="floating-toolbar"
+    >
+      <div className="flex items-center justify-center gap-2">
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          已選 {selectedCount} 節
+        </span>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-1.5"
+          onClick={onCopy}
+          data-testid="button-toolbar-copy"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+          <span className="text-xs">複製</span>
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-1.5"
+          onClick={onShare}
+          data-testid="button-toolbar-share"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          <span className="text-xs">分享</span>
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-1.5"
+          onClick={onCreateCard}
+          data-testid="button-toolbar-card"
+        >
+          <Image className="w-3.5 h-3.5" />
+          <span className="text-xs">圖卡</span>
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={onClear}
+          data-testid="button-toolbar-clear"
+        >
+          <X className="w-4 h-4" />
+        </Button>
       </div>
-    );
-  }
+    </div>
+  );
 
-  return (
+  const desktopToolbar = (
     <DesktopToolbar
       getAnchorRect={getAnchorRect}
       selectedCount={selectedCount}
@@ -101,6 +100,12 @@ export const FloatingToolbar = ({
       onClear={onClear}
       copied={copied}
     />
+  );
+
+  // Use portal to render outside of any overflow:hidden containers
+  return createPortal(
+    isMobile ? mobileToolbar : desktopToolbar,
+    document.body
   );
 };
 
