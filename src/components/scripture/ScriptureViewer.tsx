@@ -177,7 +177,10 @@ export const ScriptureViewer = ({ verses, className = '' }: ScriptureViewerProps
               className={`flex gap-2 p-2 rounded cursor-pointer transition-colors ${
                 isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50'
               }`}
-              onClick={() => toggleVerseSelection(v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleVerseSelection(v);
+              }}
               data-testid={`verse-${v.chapter}-${v.verse}`}
             >
               {isSelected && <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />}
