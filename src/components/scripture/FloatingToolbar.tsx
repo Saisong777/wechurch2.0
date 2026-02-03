@@ -23,13 +23,100 @@ export const FloatingToolbar = ({
   selectedCount,
   copied,
 }: FloatingToolbarProps) => {
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  if (!visible) return null;
+
+  if (isMobile) {
+    return (
+      <div
+        ref={toolbarRef}
+        className="fixed bottom-0 left-0 right-0 z-[1000] bg-background border-t border-border shadow-lg p-2 pb-safe animate-in slide-in-from-bottom duration-200"
+        data-testid="floating-toolbar"
+      >
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            已選 {selectedCount} 節
+          </span>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1.5"
+            onClick={onCopy}
+            data-testid="button-toolbar-copy"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+            <span className="text-xs">複製</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1.5"
+            onClick={onShare}
+            data-testid="button-toolbar-share"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="text-xs">分享</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1.5"
+            onClick={onCreateCard}
+            data-testid="button-toolbar-card"
+          >
+            <Image className="w-3.5 h-3.5" />
+            <span className="text-xs">圖卡</span>
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={onClear}
+            data-testid="button-toolbar-clear"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <DesktopToolbar
+      getAnchorRect={getAnchorRect}
+      selectedCount={selectedCount}
+      onCopy={onCopy}
+      onShare={onShare}
+      onCreateCard={onCreateCard}
+      onClear={onClear}
+      copied={copied}
+    />
+  );
+};
+
+const DesktopToolbar = ({
+  getAnchorRect,
+  selectedCount,
+  onCopy,
+  onShare,
+  onCreateCard,
+  onClear,
+  copied,
+}: Omit<FloatingToolbarProps, 'visible'>) => {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const rafRef = useRef<number>();
 
   const updatePosition = useCallback(() => {
-    if (!visible) return;
-    
     const anchorRect = getAnchorRect();
     if (!anchorRect) return;
 
@@ -50,11 +137,9 @@ export const FloatingToolbar = ({
     }
 
     setPosition({ top, left });
-  }, [visible, getAnchorRect]);
+  }, [getAnchorRect]);
 
   useEffect(() => {
-    if (!visible) return;
-
     const handleScrollOrResize = () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
@@ -74,13 +159,10 @@ export const FloatingToolbar = ({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [visible, updatePosition]);
-
-  if (!visible) return null;
+  }, [updatePosition]);
 
   return (
     <div
-      ref={toolbarRef}
       className="fixed z-[1000] bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg p-1.5 flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150"
       style={{
         top: position.top,
@@ -94,7 +176,7 @@ export const FloatingToolbar = ({
       <Button 
         variant="ghost" 
         size="sm" 
-        className="h-7 px-2 gap-1"
+        className="gap-1"
         onClick={onCopy}
         data-testid="button-toolbar-copy"
       >
@@ -104,7 +186,7 @@ export const FloatingToolbar = ({
       <Button 
         variant="ghost" 
         size="sm" 
-        className="h-7 px-2 gap-1"
+        className="gap-1"
         onClick={onShare}
         data-testid="button-toolbar-share"
       >
@@ -114,7 +196,7 @@ export const FloatingToolbar = ({
       <Button 
         variant="ghost" 
         size="sm" 
-        className="h-7 px-2 gap-1"
+        className="gap-1"
         onClick={onCreateCard}
         data-testid="button-toolbar-card"
       >
@@ -124,7 +206,6 @@ export const FloatingToolbar = ({
       <Button 
         variant="ghost" 
         size="icon"
-        className="h-7 w-7"
         onClick={onClear}
         data-testid="button-toolbar-clear"
       >

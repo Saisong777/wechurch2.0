@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
@@ -6,10 +6,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Search, Book, ChevronRight, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Image, Download, Upload, Check } from 'lucide-react';
+import { Search, Book, ChevronRight, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { FloatingToolbar } from '@/components/scripture/FloatingToolbar';
+import { ScriptureCardCreator } from '@/components/scripture/ScriptureCardCreator';
 
 interface BibleBook {
   bookName: string;
@@ -38,42 +39,6 @@ interface SavedVerse {
   verseStart: number;
 }
 
-const BACKGROUND_PRESETS = [
-  { id: 'gradient1', name: '晨曦', style: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-  { id: 'gradient2', name: '夕陽', style: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
-  { id: 'gradient3', name: '大海', style: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
-  { id: 'gradient4', name: '森林', style: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' },
-  { id: 'gradient5', name: '天空', style: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)' },
-  { id: 'gradient6', name: '星夜', style: 'linear-gradient(135deg, #0c3483 0%, #a2b6df 100%)' },
-];
-
-const TEXT_POSITIONS = [
-  { id: 'top-left', name: '左上', align: 'items-start justify-start', textAlign: 'text-left' },
-  { id: 'top-center', name: '上', align: 'items-start justify-center', textAlign: 'text-center' },
-  { id: 'top-right', name: '右上', align: 'items-start justify-end', textAlign: 'text-right' },
-  { id: 'center-left', name: '左', align: 'items-center justify-start', textAlign: 'text-left' },
-  { id: 'center', name: '中', align: 'items-center justify-center', textAlign: 'text-center' },
-  { id: 'center-right', name: '右', align: 'items-center justify-end', textAlign: 'text-right' },
-  { id: 'bottom-left', name: '左下', align: 'items-end justify-start', textAlign: 'text-left' },
-  { id: 'bottom-center', name: '下', align: 'items-end justify-center', textAlign: 'text-center' },
-  { id: 'bottom-right', name: '右下', align: 'items-end justify-end', textAlign: 'text-right' },
-];
-
-const ASPECT_RATIOS = [
-  { id: 'square', name: '正方形', ratio: 'aspect-square', width: 400, height: 400 },
-  { id: 'portrait', name: '直式 3:4', ratio: 'aspect-[3/4]', width: 400, height: 533 },
-  { id: 'story', name: '限時動態 9:16', ratio: 'aspect-[9/16]', width: 360, height: 640 },
-  { id: 'landscape', name: '橫式 4:3', ratio: 'aspect-[4/3]', width: 480, height: 360 },
-  { id: 'wide', name: '寬螢幕 16:9', ratio: 'aspect-[16/9]', width: 480, height: 270 },
-];
-
-const FONT_SIZES = [
-  { id: 'sm', name: '小', verse: 'text-base', ref: 'text-sm', message: 'text-sm' },
-  { id: 'md', name: '中', verse: 'text-lg', ref: 'text-base', message: 'text-base' },
-  { id: 'lg', name: '大', verse: 'text-xl', ref: 'text-lg', message: 'text-lg' },
-  { id: 'xl', name: '特大', verse: 'text-2xl', ref: 'text-xl', message: 'text-xl' },
-];
-
 const BiblePage = () => {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
@@ -81,14 +46,8 @@ const BiblePage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVerseNums, setSelectedVerseNums] = useState<Set<number>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
-  const [cardBackground, setCardBackground] = useState(BACKGROUND_PRESETS[0].style);
-  const [customImage, setCustomImage] = useState<string | null>(null);
-  const [personalMessage, setPersonalMessage] = useState('');
-  const [textPosition, setTextPosition] = useState(TEXT_POSITIONS[4]);
-  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[0]);
-  const [fontSize, setFontSize] = useState(FONT_SIZES[1]);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
+  const verseRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -345,83 +304,43 @@ const BiblePage = () => {
     setShowCardModal(true);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCustomImage(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const downloadCard = async () => {
-    if (!cardRef.current) return;
+  const getAnchorRect = useCallback((): DOMRect | null => {
+    if (selectedVerseNums.size === 0) return null;
     
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-      });
-      
-      const link = document.createElement('a');
-      link.download = `經文卡-${selectedBook}${selectedChapter}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      
-      toast({
-        title: "下載成功",
-        description: "圖卡已儲存",
-      });
-    } catch (err) {
-      toast({
-        title: "下載失敗",
-        description: "請稍後再試",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const shareCard = async () => {
-    if (!cardRef.current) return;
+    const sortedNums = Array.from(selectedVerseNums).sort((a, b) => a - b);
+    const firstNum = sortedNums[0];
+    const lastNum = sortedNums[sortedNums.length - 1];
     
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-      });
-      
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        
-        const file = new File([blob], `經文卡-${selectedBook}${selectedChapter}.png`, { type: 'image/png' });
-        
-        if (navigator.share && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: `${selectedBook} ${selectedChapter}`,
-            });
-          } catch (err) {
-            if ((err as Error).name !== 'AbortError') {
-              await downloadCard();
-            }
-          }
-        } else {
-          await downloadCard();
-        }
-      }, 'image/png');
-    } catch (err) {
-      toast({
-        title: "分享失敗",
-        variant: "destructive",
-      });
-    }
+    const firstEl = verseRefs.current.get(firstNum);
+    const lastEl = verseRefs.current.get(lastNum);
+    
+    if (!firstEl || !lastEl) return null;
+    
+    const firstRect = firstEl.getBoundingClientRect();
+    const lastRect = lastEl.getBoundingClientRect();
+    
+    return {
+      top: firstRect.top,
+      left: Math.min(firstRect.left, lastRect.left),
+      right: Math.max(firstRect.right, lastRect.right),
+      bottom: lastRect.bottom,
+      width: Math.max(firstRect.width, lastRect.width),
+      height: lastRect.bottom - firstRect.top,
+      x: Math.min(firstRect.left, lastRect.left),
+      y: firstRect.top,
+      toJSON: () => ({}),
+    } as DOMRect;
+  }, [selectedVerseNums]);
+
+  const getCardVerseData = () => {
+    const selectedVersesList = getSelectedVerses();
+    if (selectedVersesList.length === 0) return { text: '', reference: '' };
+    
+    const verseNums = selectedVersesList.map(v => v.verse);
+    const rangeText = formatVerseRange(verseNums);
+    const reference = `${selectedBook} ${selectedChapter}:${rangeText}`;
+    const text = selectedVersesList.map(v => v.text).join(' ');
+    return { text, reference };
   };
 
   const VerseActions = ({ verse }: { verse: BibleVerse }) => {
@@ -459,14 +378,6 @@ const BiblePage = () => {
     );
   };
 
-  const getCardVerseText = () => {
-    const selectedVersesList = getSelectedVerses();
-    const verseNums = selectedVersesList.map(v => v.verse);
-    const rangeText = formatVerseRange(verseNums);
-    const header = `${selectedBook} ${selectedChapter}:${rangeText}`;
-    const text = selectedVersesList.map(v => v.text).join(' ');
-    return { header, text };
-  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -547,34 +458,13 @@ const BiblePage = () => {
               <CardContent className="py-2 sm:py-4 flex-1 flex flex-col">
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-2 sm:mb-4">
                   <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
-                  <div className="flex flex-wrap gap-1 sm:gap-2">
-                    {selectedVerseNums.size > 0 && (
-                      <>
-                        <Button variant="outline" size="sm" onClick={copySelectedVerses} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-copy-selected">
-                          <Copy className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
-                          <span className="hidden sm:inline">複製</span> ({selectedVerseNums.size})
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={shareSelectedVerses} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-share-selected">
-                          <Share2 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
-                          <span className="hidden sm:inline">分享</span>
-                        </Button>
-                        <Button variant="default" size="sm" onClick={openCardCreator} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-create-card">
-                          <Image className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
-                          <span className="hidden sm:inline">圖卡</span>
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedVerseNums(new Set())} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-clear-selection">
-                          <X className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </Button>
-                      </>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm">
-                      返回
-                    </Button>
-                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm">
+                    返回
+                  </Button>
                 </div>
                 
                 <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4">
-                  點擊經文可選取
+                  點擊經文可選取，已選 {selectedVerseNums.size} 節
                 </p>
                 
                 {versesLoading ? (
@@ -590,6 +480,10 @@ const BiblePage = () => {
                       {verses.map((v) => (
                         <div 
                           key={v.verse} 
+                          ref={(el) => {
+                            if (el) verseRefs.current.set(v.verse, el);
+                            else verseRefs.current.delete(v.verse);
+                          }}
                           className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${
                             selectedVerseNums.has(v.verse) 
                               ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30' 
@@ -704,158 +598,28 @@ const BiblePage = () => {
         </div>
       </main>
 
-      <Dialog open={showCardModal} onOpenChange={setShowCardModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>製作經文圖卡</DialogTitle>
-          </DialogHeader>
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium mb-2">個人寄語</p>
-                <textarea
-                  className="w-full p-3 rounded-lg border bg-background text-sm resize-none"
-                  rows={2}
-                  placeholder="親愛的，我今天讀經讀到這個，跟你分享，願主平安..."
-                  value={personalMessage}
-                  onChange={(e) => setPersonalMessage(e.target.value)}
-                  data-testid="input-personal-message"
-                />
-              </div>
+      {selectedBook && selectedChapter && (
+        <FloatingToolbar
+          visible={selectedVerseNums.size > 0}
+          getAnchorRect={getAnchorRect}
+          selectedCount={selectedVerseNums.size}
+          onCopy={async () => {
+            await copySelectedVerses();
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          onShare={shareSelectedVerses}
+          onCreateCard={openCardCreator}
+          onClear={() => setSelectedVerseNums(new Set())}
+          copied={copied}
+        />
+      )}
 
-              <div>
-                <p className="text-sm font-medium mb-2">選擇背景</p>
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                  {BACKGROUND_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      className={`h-12 rounded-lg transition-all ${
-                        cardBackground === preset.style && !customImage
-                          ? 'ring-2 ring-primary ring-offset-2'
-                          : ''
-                      }`}
-                      style={{ background: preset.style }}
-                      onClick={() => { setCardBackground(preset.style); setCustomImage(null); }}
-                      data-testid={`bg-preset-${preset.id}`}
-                    >
-                      <span className="text-white text-xs font-medium drop-shadow-lg">{preset.name}</span>
-                    </button>
-                  ))}
-                </div>
-                
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => fileInputRef.current?.click()}
-                  data-testid="button-upload-image"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  上傳圖片
-                </Button>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium mb-2">圖卡比例</p>
-                <div className="flex flex-wrap gap-1">
-                  {ASPECT_RATIOS.map((ratio) => (
-                    <Button
-                      key={ratio.id}
-                      variant={aspectRatio.id === ratio.id ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setAspectRatio(ratio)}
-                      data-testid={`ratio-${ratio.id}`}
-                    >
-                      {ratio.name}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium mb-2">字體大小</p>
-                <div className="flex gap-1">
-                  {FONT_SIZES.map((size) => (
-                    <Button
-                      key={size.id}
-                      variant={fontSize.id === size.id ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setFontSize(size)}
-                      data-testid={`font-${size.id}`}
-                    >
-                      {size.name}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium mb-2">文字位置</p>
-                <div className="grid grid-cols-3 gap-1">
-                  {TEXT_POSITIONS.map((pos) => (
-                    <Button
-                      key={pos.id}
-                      variant={textPosition.id === pos.id ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setTextPosition(pos)}
-                      data-testid={`pos-${pos.id}`}
-                    >
-                      {pos.name}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div
-                ref={cardRef}
-                className={`relative ${aspectRatio.ratio} rounded-lg overflow-hidden flex p-6`}
-                style={{
-                  background: customImage ? `url(${customImage}) center/cover` : cardBackground,
-                  maxHeight: '400px',
-                }}
-              >
-                <div className="absolute inset-0 bg-black/30" />
-                <div className={`relative text-white z-10 flex flex-col w-full ${textPosition.align}`}>
-                  <div className={`max-w-full ${textPosition.textAlign}`}>
-                    {personalMessage && (
-                      <p className={`${fontSize.message} leading-relaxed mb-3 drop-shadow-lg opacity-90 italic`}>
-                        {personalMessage}
-                      </p>
-                    )}
-                    <p className={`${fontSize.verse} leading-relaxed mb-3 drop-shadow-lg font-medium`}>
-                      {getCardVerseText().text}
-                    </p>
-                    <p className={`${fontSize.ref} opacity-90 drop-shadow-lg`}>
-                      — {getCardVerseText().header}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={downloadCard} data-testid="button-download-card">
-                  <Download className="w-4 h-4 mr-2" />
-                  下載圖卡
-                </Button>
-                <Button className="flex-1" variant="outline" onClick={shareCard} data-testid="button-share-card">
-                  <Share2 className="w-4 h-4 mr-2" />
-                  分享圖卡
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ScriptureCardCreator
+        open={showCardModal}
+        onOpenChange={setShowCardModal}
+        verse={getCardVerseData()}
+      />
     </div>
   );
 };

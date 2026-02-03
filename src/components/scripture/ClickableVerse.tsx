@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Share2, Image, Check, MoreHorizontal } from 'lucide-react';
+import { Copy, Share2, Image, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScriptureCardCreator } from './ScriptureCardCreator';
 
@@ -56,7 +56,6 @@ export const ClickableVerse = ({ text, reference, className = '' }: ClickableVer
       await navigator.clipboard.writeText(fullText);
       toast({ title: '已複製到剪貼簿' });
     }
-    setShowActions(false);
   };
 
   const handleCreateCard = (e: React.MouseEvent) => {
@@ -69,56 +68,73 @@ export const ClickableVerse = ({ text, reference, className = '' }: ClickableVer
     setShowActions(!showActions);
   };
 
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowActions(false);
+  };
+
   return (
     <>
       <div
         ref={containerRef}
-        className={`relative cursor-pointer transition-all ${showActions ? 'ring-2 ring-primary/30 rounded-lg' : ''} ${className}`}
+        className={`cursor-pointer transition-all ${className}`}
         onClick={handleClick}
         data-testid="clickable-verse"
       >
         <div className="select-text">
           <p className="text-sm text-foreground leading-relaxed">{text}</p>
-          <p className="text-xs text-primary mt-1.5 font-medium">{reference}</p>
+          <div className="flex items-center justify-between mt-1.5">
+            <p className="text-xs text-primary font-medium">{reference}</p>
+            {!showActions && (
+              <p className="text-xs text-muted-foreground">點擊可複製分享</p>
+            )}
+          </div>
         </div>
 
         {showActions && (
           <div 
-            className="absolute left-0 right-0 -bottom-1 translate-y-full z-50 animate-in fade-in slide-in-from-top-1 duration-150"
+            className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-1 bg-background/95 backdrop-blur border border-border rounded-lg shadow-lg p-1.5 w-fit">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 gap-1.5"
-                onClick={handleCopy}
-                data-testid="button-verse-copy"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                <span className="text-xs">複製</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 gap-1.5"
-                onClick={handleShare}
-                data-testid="button-verse-share"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span className="text-xs">分享</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 gap-1.5"
-                onClick={handleCreateCard}
-                data-testid="button-verse-card"
-              >
-                <Image className="w-3.5 h-3.5" />
-                <span className="text-xs">圖卡</span>
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleCopy}
+              data-testid="button-verse-copy"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+              <span className="text-xs">複製</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleShare}
+              data-testid="button-verse-share"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="text-xs">分享</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleCreateCard}
+              data-testid="button-verse-card"
+            >
+              <Image className="w-3.5 h-3.5" />
+              <span className="text-xs">圖卡</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-1"
+              onClick={handleClose}
+              data-testid="button-verse-close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
           </div>
         )}
       </div>
