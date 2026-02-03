@@ -38,15 +38,13 @@ const uploadMessageCard = multer({
 });
 
 export async function registerRoutes(app: Express) {
-  await setupAuth(app);
-  registerAuthRoutes(app);
-
-  // Health check endpoint - basic
+  // Register health check FIRST - before any auth setup that might fail
   app.get("/api/health", (req, res) => {
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      env: process.env.NODE_ENV || "development",
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
         total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
@@ -54,6 +52,16 @@ export async function registerRoutes(app: Express) {
       }
     });
   });
+
+  // Setup auth with error handling
+  try {
+    await setupAuth(app);
+    registerAuthRoutes(app);
+    console.log("[Routes] Auth setup completed successfully");
+  } catch (error) {
+    console.error("[Routes] Auth setup failed:", error);
+    // Continue without auth - routes will still work but auth will fail
+  }
 
   // Health check endpoint - detailed with database
   app.get("/api/health/detailed", async (req, res) => {
