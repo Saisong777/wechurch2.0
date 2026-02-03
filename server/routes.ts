@@ -192,6 +192,20 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Get participant by email for session restore
+  app.get("/api/sessions/:sessionId/participants/by-email/:email", async (req, res) => {
+    try {
+      const participants = await storage.getParticipants(req.params.sessionId);
+      const participant = participants.find(p => p.email === decodeURIComponent(req.params.email));
+      if (!participant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+      res.json(participant);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get participant" });
+    }
+  });
+
   app.post("/api/sessions/:sessionId/participants", async (req, res) => {
     try {
       const parsed = insertParticipantSchema.safeParse({ ...req.body, sessionId: req.params.sessionId });

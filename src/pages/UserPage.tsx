@@ -18,7 +18,6 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Home, ArrowRight, QrCode, BookMarked, ChevronLeft, ArrowLeft } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isShortCode } from '@/lib/url-helpers';
 import { FeatureGate } from '@/components/ui/feature-gate';
@@ -97,74 +96,53 @@ export const UserPage: React.FC = () => {
     }
 
     try {
-      // Fetch the session first
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('sessions_public')
-        .select('*')
-        .eq('id', storedSessionId)
-        .maybeSingle();
-
-      if (sessionError || !sessionData) {
+      // Fetch the session first using Express API
+      const sessionRes = await fetch(`/api/sessions/${storedSessionId}`);
+      if (!sessionRes.ok) {
         console.log('[UserPage] Session not found or expired, clearing all stored data');
-        // Clear all session-related data since the session no longer exists
         localStorage.removeItem(STORAGE_KEYS.SESSION_ID);
         localStorage.removeItem(STORAGE_KEYS.PARTICIPANT_ID);
         localStorage.removeItem(STORAGE_KEYS.USER_STEP);
         setIsRestoring(false);
         return false;
       }
+      const sessionData = await sessionRes.json();
 
-      // Try to get the participant data using the RPC function
-      // This RPC function is SECURITY DEFINER and doesn't require auth
-      const { data: participantData, error: participantError } = await supabase.rpc('get_participant_for_reentry', {
-        p_session_id: storedSessionId,
-        p_email: storedEmail,
-      });
+      // Try to get the participant data by email using Express API
+      const participantRes = await fetch(`/api/sessions/${storedSessionId}/participants/by-email/${encodeURIComponent(storedEmail)}`);
 
-      if (participantError) {
-        console.error('[UserPage] RPC error:', participantError);
-        setIsRestoring(false);
-        return false;
-      }
-
-      if (!participantData || participantData.length === 0) {
+      if (!participantRes.ok) {
         console.log('[UserPage] Participant not found for this email, may need to rejoin');
-        // Clear participant data but keep session ID so user can rejoin the same session
         localStorage.removeItem(STORAGE_KEYS.PARTICIPANT_ID);
         localStorage.removeItem(STORAGE_KEYS.USER_STEP);
-        // Keep SESSION_ID so user can rejoin - set session context and go to join step
         setCurrentSession({
           id: sessionData.id,
           bibleVerse: '',
-          verseReference: sessionData.verse_reference,
+          verseReference: sessionData.verseReference,
           status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-          createdAt: new Date(sessionData.created_at),
+          createdAt: new Date(sessionData.createdAt),
           groups: [],
-          allowLatecomers: sessionData.allow_latecomers || false,
+          allowLatecomers: sessionData.allowLatecomers || false,
         });
         setSessionId(storedSessionId);
         setStep('join');
         setIsRestoring(false);
-        return true; // Return true since we're handling the redirect
+        return true;
       }
 
-      const participant = participantData[0];
-
-      // Note: Guest users don't need an auth session - the edge functions (save-study-response, 
-      // get-study-response) use service role to bypass RLS. The RPC get_participant_for_reentry
-      // is SECURITY DEFINER and also works without auth.
-      console.log('[UserPage] Verified participant via RPC, restoring session');
+      const participant = await participantRes.json();
+      console.log('[UserPage] Verified participant via API, restoring session');
 
       // Restore session state
       setCurrentSession({
         id: sessionData.id,
         bibleVerse: '',
-        verseReference: sessionData.verse_reference,
+        verseReference: sessionData.verseReference,
         status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-        createdAt: new Date(sessionData.created_at),
+        createdAt: new Date(sessionData.createdAt),
         groups: [],
-        allowLatecomers: sessionData.allow_latecomers || false,
-        icebreakerEnabled: sessionData.icebreaker_enabled || false,
+        allowLatecomers: sessionData.allowLatecomers || false,
+        icebreakerEnabled: sessionData.icebreakerEnabled || false,
       });
 
       // Restore user state
@@ -173,10 +151,10 @@ export const UserPage: React.FC = () => {
         name: participant.name,
         email: storedEmail,
         gender: participant.gender as 'male' | 'female',
-        groupNumber: participant.group_number || undefined,
-        joinedAt: new Date(participant.joined_at),
+        groupNumber: participant.groupNumber || undefined,
+        joinedAt: new Date(participant.joinedAt),
         location: participant.location,
-        readyConfirmed: participant.ready_confirmed,
+        readyConfirmed: participant.readyConfirmed,
       });
 
       // Determine the correct step based on session status and user state
