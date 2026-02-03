@@ -54,6 +54,13 @@ The random grouper feature allows leaders to create grouping activities with:
 - **Role-based access**: Only leader/future_leader/admin can create activities; all users can join with code
 - **Real-time updates**: 3-second polling for participant lists during active sessions
 
+### Scripture Sharing System
+The app features unified scripture sharing components used across the platform:
+- **ScriptureCardCreator**: Create shareable images with scripture verses, custom backgrounds (6 gradient presets + image upload), personal messages, and 9 text positioning options
+- **FloatingToolbar**: Appears near selected text with copy/share/card actions, dynamically repositions on scroll/resize
+- **ClickableVerse**: Single verse display with tap-to-share functionality for the homepage daily scripture
+- **ScriptureViewer**: Multi-verse selection with floating toolbar for passage sharing
+
 ### High-Concurrency Design
 The application is optimized for 500+ concurrent users with:
 - Staggered request initialization (random 0-1.5s delays)
