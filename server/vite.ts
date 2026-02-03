@@ -68,9 +68,20 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve static assets with long cache (they have content hashes)
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
 
+  // Serve other static files with short cache
+  app.use(express.static(distPath, {
+    maxAge: '1h',
+  }));
+
+  // SPA fallback - always return fresh index.html
   app.use("/{*path}", (_req, res) => {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
