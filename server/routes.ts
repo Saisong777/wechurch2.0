@@ -953,9 +953,20 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Activity not found" });
       }
 
-      const userId = (req.user as any).legacyUserId || (req.user as any).id;
+      // Get user info from OIDC claims
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
       if (activity.ownerId !== userId) {
-        const role = await storage.getUserRole(userId);
+        const role = userId ? await storage.getUserRole(userId) : undefined;
         if (role !== 'admin') {
           return res.status(403).json({ error: "Only the activity owner can execute grouping" });
         }
@@ -1034,9 +1045,20 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Activity not found" });
       }
 
-      const userId = (req.user as any).legacyUserId || (req.user as any).id;
+      // Get user info from OIDC claims
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
       if (activity.ownerId !== userId) {
-        const role = await storage.getUserRole(userId);
+        const role = userId ? await storage.getUserRole(userId) : undefined;
         if (role !== 'admin') {
           return res.status(403).json({ error: "Only the activity owner can close it" });
         }
