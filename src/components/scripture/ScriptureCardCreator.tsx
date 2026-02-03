@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Download, Share2, Upload } from 'lucide-react';
@@ -129,6 +129,9 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>製作經文圖卡</DialogTitle>
+          <DialogDescription>
+            選擇背景、調整文字位置和大小，製作可分享的經文圖卡
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid md:grid-cols-2 gap-4">
