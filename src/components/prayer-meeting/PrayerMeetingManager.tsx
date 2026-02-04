@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, Crown, Shuffle, Presentation, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -36,6 +35,7 @@ interface PrayerMeetingParticipant {
   gender: string;
   groupNumber: number | null;
   prayerRequest: string | null;
+  anonymousPrayer: string | null;
   isAnonymous: boolean;
   prayerCategory: string | null;
   isUrgent: boolean;
@@ -85,8 +85,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
   const [myParticipantId, setMyParticipantId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [meetingDeleted, setMeetingDeleted] = useState(false);
-  const [myPrayerRequest, setMyPrayerRequest] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [myNamedPrayer, setMyNamedPrayer] = useState('');
+  const [myAnonymousPrayer, setMyAnonymousPrayer] = useState('');
   const [presentationGroup, setPresentationGroup] = useState<number>(0);
 
   const isLeaderOrAbove = user?.role && ['leader', 'future_leader', 'admin'].includes(user.role);
@@ -150,6 +150,21 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
       lookupMeeting();
     }
   }, [initialCode]);
+
+  // Load existing prayer data into form for editing
+  useEffect(() => {
+    if (myParticipantId && participants.length > 0) {
+      const myParticipant = participants.find(p => p.id === myParticipantId);
+      if (myParticipant) {
+        if (myParticipant.prayerRequest) {
+          setMyNamedPrayer(myParticipant.prayerRequest);
+        }
+        if (myParticipant.anonymousPrayer) {
+          setMyAnonymousPrayer(myParticipant.anonymousPrayer);
+        }
+      }
+    }
+  }, [myParticipantId, participants]);
 
   const createMeetingMutation = useMutation({
     mutationFn: async () => {
@@ -216,14 +231,25 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
     },
   });
 
-  const updatePrayerRequestMutation = useMutation({
-    mutationFn: async ({ prayerRequest, isAnonymous }: { prayerRequest: string; isAnonymous: boolean }) => {
-      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/participants/${myParticipantId}`, { prayerRequest, isAnonymous });
+  const updateNamedPrayerMutation = useMutation({
+    mutationFn: async (prayerRequest: string) => {
+      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/participants/${myParticipantId}`, { prayerRequest, isAnonymous: false });
       return res.json();
     },
     onSuccess: () => {
       refetchParticipants();
-      toast.success('禱告事項已儲存');
+      toast.success('實名禱告事項已儲存');
+    },
+  });
+
+  const updateAnonymousPrayerMutation = useMutation({
+    mutationFn: async (anonymousPrayer: string) => {
+      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/anonymous-prayer/${myParticipantId}`, { anonymousPrayer });
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchParticipants();
+      toast.success('匿名禱告事項已儲存');
     },
   });
 
@@ -825,40 +851,54 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                   我的禱告事項
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Textarea
-                  value={myPrayerRequest}
-                  onChange={(e) => setMyPrayerRequest(e.target.value)}
-                  placeholder="請輸入您的禱告事項..."
-                  rows={4}
-                />
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <Label className="font-medium">實名代禱事項</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    組員可以看到您的姓名和禱告內容，方便小組代禱
+                  </p>
+                  <Textarea
+                    value={myNamedPrayer}
+                    onChange={(e) => setMyNamedPrayer(e.target.value)}
+                    placeholder="請輸入實名禱告事項..."
+                    rows={3}
+                    data-testid="textarea-named-prayer"
+                  />
+                  <Button
+                    onClick={() => updateNamedPrayerMutation.mutate(myNamedPrayer)}
+                    disabled={updateNamedPrayerMutation.isPending}
+                    className="w-full"
+                    data-testid="button-save-named-prayer"
+                  >
+                    {updateNamedPrayerMutation.isPending ? '儲存中...' : '儲存實名禱告'}
+                  </Button>
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <EyeOff className="w-4 h-4 text-gray-500" />
-                    <Label htmlFor="anonymous-toggle" className="text-sm cursor-pointer">
-                      匿名禱告
-                    </Label>
+                    <Label className="font-medium">匿名代禱事項</Label>
                   </div>
-                  <Switch
-                    id="anonymous-toggle"
-                    checked={isAnonymous}
-                    onCheckedChange={setIsAnonymous}
-                    data-testid="switch-anonymous"
-                  />
-                </div>
-                {isAnonymous && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    匿名禱告不會在小組禱告清單中顯示您的姓名，但會在最後投影禱告時一起禱告。
+                    匿名禱告不會在小組清單中顯示您的姓名，但會在最後投影時一起禱告
                   </p>
-                )}
-                <Button
-                  onClick={() => updatePrayerRequestMutation.mutate({ prayerRequest: myPrayerRequest, isAnonymous })}
-                  disabled={updatePrayerRequestMutation.isPending}
-                  className="w-full"
-                  data-testid="button-save-prayer"
-                >
-                  {updatePrayerRequestMutation.isPending ? '儲存中...' : '儲存禱告事項'}
-                </Button>
+                  <Textarea
+                    value={myAnonymousPrayer}
+                    onChange={(e) => setMyAnonymousPrayer(e.target.value)}
+                    placeholder="請輸入匿名禱告事項..."
+                    rows={3}
+                    data-testid="textarea-anonymous-prayer"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => updateAnonymousPrayerMutation.mutate(myAnonymousPrayer)}
+                    disabled={updateAnonymousPrayerMutation.isPending}
+                    className="w-full"
+                    data-testid="button-save-anonymous-prayer"
+                  >
+                    {updateAnonymousPrayerMutation.isPending ? '儲存中...' : '儲存匿名禱告'}
+                  </Button>
+                </div>
 
                 {myGroupMembers.some(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId) && (
                   <div className="pt-4 border-t space-y-3">

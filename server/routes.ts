@@ -1475,6 +1475,73 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Update anonymous prayer for a participant (stored in separate field)
+  app.patch("/api/prayer-meetings/:id/anonymous-prayer/:participantId", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Validate payload with Zod
+      const anonymousPrayerSchema = z.object({
+        anonymousPrayer: z.string().max(2000).nullable().optional(),
+      });
+      
+      const validation = anonymousPrayerSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid prayer content", details: validation.error.errors });
+      }
+      
+      const { anonymousPrayer } = validation.data;
+      
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      const participant = await storage.getPrayerMeetingParticipantById(req.params.participantId);
+      if (!participant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+
+      // Verify participant belongs to this meeting
+      if (participant.meetingId !== req.params.id) {
+        return res.status(403).json({ error: "Participant does not belong to this meeting" });
+      }
+
+      // Get the current user's ID and verify ownership or leadership
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+
+      // Check if user owns this participant or is a leader/admin
+      const isOwner = participant.userId === userId;
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
+      
+      if (!isOwner && !isLeaderOrAdmin) {
+        return res.status(403).json({ error: "You can only update your own prayer requests" });
+      }
+
+      // Update the participant's anonymous prayer field
+      const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, {
+        anonymousPrayer: anonymousPrayer || null,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to update anonymous prayer:", error);
+      res.status(500).json({ error: "Failed to update anonymous prayer" });
+    }
+  });
+
   // AI-classify prayers for a meeting
   app.post("/api/prayer-meetings/:id/classify-prayers", async (req, res) => {
     try {
@@ -1504,6 +1571,8 @@ export async function registerRoutes(app: Express) {
       }
 
       const participants = await storage.getPrayerMeetingParticipants(meeting.id);
+      
+      // Classify only named prayers (prayerRequest) - anonymous prayers are shown but not categorized
       const prayersToClassify = participants.filter(p => p.prayerRequest && p.prayerRequest.trim());
 
       if (prayersToClassify.length === 0) {
@@ -1519,7 +1588,7 @@ export async function registerRoutes(app: Express) {
       const prayerTexts = prayersToClassify.map((p, i) => `${i + 1}. ${p.prayerRequest}`).join('\n');
       
       const response = await openai.chat.completions.create({
-        model: "gpt-5.1",
+        model: "gpt-4.1-mini",
         messages: [
           {
             role: "system",
@@ -1599,39 +1668,62 @@ export async function registerRoutes(app: Express) {
 
       const participants = await storage.getPrayerMeetingParticipants(meeting.id);
       const groupNumber = req.query.group ? parseInt(req.query.group as string) : null;
-      const includeAnonymous = req.query.includeAnonymous === 'true';
+      const includeAnonymousPrayers = req.query.includeAnonymous === 'true';
 
-      let filtered = participants.filter(p => p.prayerRequest && p.prayerRequest.trim());
+      // Build unified prayer list with both named and anonymous prayers
+      type PrayerItem = {
+        id: string;
+        name: string;
+        prayerRequest: string;
+        category: string;
+        isUrgent: boolean;
+        isAnonymous: boolean;
+        groupNumber: number | null;
+        prayerType: 'named' | 'anonymous';
+      };
       
-      if (groupNumber) {
-        filtered = filtered.filter(p => p.groupNumber === groupNumber);
+      const allPrayers: PrayerItem[] = [];
+      
+      for (const p of participants) {
+        // Filter by group if specified
+        if (groupNumber && p.groupNumber !== groupNumber) continue;
+        
+        // Add named prayer if exists
+        if (p.prayerRequest && p.prayerRequest.trim()) {
+          // Skip if isAnonymous participant and includeAnonymous is false
+          if (!includeAnonymousPrayers && p.isAnonymous) continue;
+          
+          allPrayers.push({
+            id: p.id,
+            name: p.isAnonymous ? '匿名' : p.name,
+            prayerRequest: p.prayerRequest,
+            category: p.prayerCategory || '其他',
+            isUrgent: p.isUrgent || false,
+            isAnonymous: p.isAnonymous || false,
+            groupNumber: p.groupNumber,
+            prayerType: 'named',
+          });
+        }
+        
+        // Add anonymous prayer field if exists and includeAnonymousPrayers is true
+        if (includeAnonymousPrayers && p.anonymousPrayer && p.anonymousPrayer.trim()) {
+          allPrayers.push({
+            id: `${p.id}-anon`,
+            name: '匿名',
+            prayerRequest: p.anonymousPrayer,
+            category: '其他', // Anonymous prayers are not categorized
+            isUrgent: false,
+            isAnonymous: true,
+            groupNumber: p.groupNumber,
+            prayerType: 'anonymous',
+          });
+        }
       }
 
-      if (!includeAnonymous) {
-        filtered = filtered.filter(p => !p.isAnonymous);
-      }
+      const urgentPrayers = allPrayers.filter(p => p.isUrgent);
+      const regularPrayers = allPrayers.filter(p => !p.isUrgent);
 
-      const urgentPrayers = filtered.filter(p => p.isUrgent).map(p => ({
-        id: p.id,
-        name: p.isAnonymous ? '匿名' : p.name,
-        prayerRequest: p.prayerRequest,
-        category: p.prayerCategory || '其他',
-        isUrgent: true,
-        isAnonymous: p.isAnonymous,
-        groupNumber: p.groupNumber,
-      }));
-
-      const regularPrayers = filtered.filter(p => !p.isUrgent).map(p => ({
-        id: p.id,
-        name: p.isAnonymous ? '匿名' : p.name,
-        prayerRequest: p.prayerRequest,
-        category: p.prayerCategory || '其他',
-        isUrgent: false,
-        isAnonymous: p.isAnonymous,
-        groupNumber: p.groupNumber,
-      }));
-
-      const categories: Record<string, typeof regularPrayers> = {};
+      const categories: Record<string, PrayerItem[]> = {};
       for (const prayer of regularPrayers) {
         const cat = prayer.category;
         if (!categories[cat]) categories[cat] = [];
@@ -1644,7 +1736,7 @@ export async function registerRoutes(app: Express) {
         groupNumber,
         urgentPrayers,
         categorizedPrayers: categories,
-        totalCount: urgentPrayers.length + regularPrayers.length,
+        totalCount: allPrayers.length,
       });
     } catch (error) {
       console.error("[PrayerMeeting] Failed to get prayer list:", error);

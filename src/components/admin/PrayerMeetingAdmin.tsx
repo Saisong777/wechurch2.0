@@ -33,6 +33,7 @@ interface PrayerMeetingParticipant {
   gender: string;
   groupNumber: number | null;
   prayerRequest: string | null;
+  anonymousPrayer: string | null;
   isAnonymous: boolean;
   prayerCategory: string | null;
   isUrgent: boolean;
@@ -287,26 +288,41 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
             ))}
           </div>
 
-          <div className="grid gap-6 w-full max-w-4xl">
-            {currentGroupParticipants.map(p => (
-              <Card key={p.id} className="bg-white/10 border-white/20 backdrop-blur">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4 mb-3">
-                    <Badge className={cn(getGroupColor(p.groupNumber || 1).bg, 'text-lg px-3 py-1')}>
-                      {p.name}
-                    </Badge>
-                    {p.groupNumber && (
-                      <Badge variant="outline" className="text-white border-white/30">
-                        第 {p.groupNumber} 組
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-white/90 text-xl leading-relaxed">
-                    {p.prayerRequest || '（尚未填寫代禱事項）'}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="w-full max-w-4xl bg-white/10 backdrop-blur rounded-lg p-8">
+            <ul className="space-y-4">
+              {(() => {
+                const allPrayers: { id: string; name: string; prayer: string; groupNumber: number | null; isAnonymous: boolean }[] = [];
+                currentGroupParticipants.forEach(p => {
+                  if (p.prayerRequest) {
+                    allPrayers.push({ id: p.id + '-named', name: p.name, prayer: p.prayerRequest, groupNumber: p.groupNumber, isAnonymous: false });
+                  }
+                  if (p.anonymousPrayer) {
+                    allPrayers.push({ id: p.id + '-anon', name: '匿名', prayer: p.anonymousPrayer, groupNumber: p.groupNumber, isAnonymous: true });
+                  }
+                });
+                return allPrayers.map((item, index) => (
+                  <li key={item.id} className="flex items-start gap-4 text-white">
+                    <span className="text-2xl font-bold text-white/60 min-w-[2rem]">{index + 1}.</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-semibold text-lg">{item.name}</span>
+                        {item.groupNumber && presentationGroup === 0 && (
+                          <Badge variant="outline" className="text-white/70 border-white/30 text-xs">
+                            第{item.groupNumber}組
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-white/90 text-xl leading-relaxed">
+                        {item.prayer}
+                      </p>
+                    </div>
+                  </li>
+                ));
+              })()}
+            </ul>
+            {currentGroupParticipants.every(p => !p.prayerRequest && !p.anonymousPrayer) && (
+              <p className="text-center text-white/60 text-xl">尚無禱告事項</p>
+            )}
           </div>
         </div>
       </div>

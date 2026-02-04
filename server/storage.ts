@@ -124,6 +124,7 @@ export interface IStorage {
   updatePrayerMeeting(id: string, data: Partial<PrayerMeeting>): Promise<PrayerMeeting | undefined>;
   deletePrayerMeeting(id: string): Promise<void>;
   getPrayerMeetingParticipants(meetingId: string): Promise<PrayerMeetingParticipant[]>;
+  getPrayerMeetingParticipantById(id: string): Promise<PrayerMeetingParticipant | undefined>;
   addPrayerMeetingParticipant(participant: InsertPrayerMeetingParticipant): Promise<PrayerMeetingParticipant>;
   updatePrayerMeetingParticipant(id: string, data: Partial<PrayerMeetingParticipant>): Promise<PrayerMeetingParticipant | undefined>;
   updatePrayerMeetingParticipants(meetingId: string, updates: { id: string; groupNumber: number }[]): Promise<void>;
@@ -738,6 +739,12 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(prayerMeetingParticipants)
       .where(eq(prayerMeetingParticipants.meetingId, meetingId))
       .orderBy(asc(prayerMeetingParticipants.joinedAt));
+  }
+
+  async getPrayerMeetingParticipantById(id: string): Promise<PrayerMeetingParticipant | undefined> {
+    const [participant] = await db.select().from(prayerMeetingParticipants)
+      .where(eq(prayerMeetingParticipants.id, id));
+    return participant;
   }
 
   async addPrayerMeetingParticipant(participant: InsertPrayerMeetingParticipant): Promise<PrayerMeetingParticipant> {
