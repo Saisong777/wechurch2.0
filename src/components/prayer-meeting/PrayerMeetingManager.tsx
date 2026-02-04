@@ -93,7 +93,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
       if (!res.ok) throw new Error('Meeting not found');
       return res.json();
     },
-    enabled: !!currentMeetingId && (viewMode === 'meeting' || viewMode === 'praying' || viewMode === 'presentation'),
+    enabled: !!currentMeetingId && (viewMode === 'host' || viewMode === 'meeting' || viewMode === 'praying' || viewMode === 'presentation'),
     refetchInterval: 3000,
     retry: false,
   });
