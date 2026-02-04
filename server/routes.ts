@@ -1346,11 +1346,13 @@ export async function registerRoutes(app: Express) {
         if (legacyUser) userId = legacyUser.id;
       }
       
-      if (meeting.ownerId !== userId) {
-        const role = userId ? await storage.getUserRole(userId) : undefined;
-        if (role !== 'admin') {
-          return res.status(403).json({ error: "Only the meeting owner can execute grouping" });
-        }
+      // Allow meeting owner, or any leader/admin to execute grouping
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      const isOwner = meeting.ownerId === userId;
+      const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
+      
+      if (!isOwner && !isLeaderOrAdmin) {
+        return res.status(403).json({ error: "Only leaders and admins can execute grouping" });
       }
 
       const participants = await storage.getPrayerMeetingParticipants(meeting.id);
@@ -1417,9 +1419,33 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/prayer-meetings/:id/start-praying", async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
       const meeting = await storage.getPrayerMeeting(req.params.id);
       if (!meeting) {
         return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+      
+      // Verify user is a leader/admin
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      const isOwner = meeting.ownerId === userId;
+      const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
+      
+      if (!isOwner && !isLeaderOrAdmin) {
+        return res.status(403).json({ error: "Only leaders and admins can start praying" });
       }
       
       await storage.updatePrayerMeeting(meeting.id, { status: 'praying' });
