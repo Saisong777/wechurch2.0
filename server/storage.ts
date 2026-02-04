@@ -120,8 +120,10 @@ export interface IStorage {
   getPrayerMeeting(id: string): Promise<PrayerMeeting | undefined>;
   getPrayerMeetingByCode(shortCode: string): Promise<PrayerMeeting | undefined>;
   getActivePrayerMeetingsByOwner(ownerId: string): Promise<PrayerMeeting[]>;
+  getClosedPrayerMeetings(): Promise<PrayerMeeting[]>;
   createPrayerMeeting(meeting: InsertPrayerMeeting): Promise<PrayerMeeting>;
   updatePrayerMeeting(id: string, data: Partial<PrayerMeeting>): Promise<PrayerMeeting | undefined>;
+  updatePrayerMeetingStatus(id: string, status: string): Promise<PrayerMeeting | undefined>;
   deletePrayerMeeting(id: string): Promise<void>;
   getPrayerMeetingParticipants(meetingId: string): Promise<PrayerMeetingParticipant[]>;
   getPrayerMeetingParticipantById(id: string): Promise<PrayerMeetingParticipant | undefined>;
@@ -720,6 +722,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(prayerMeetings.createdAt));
   }
 
+  async getClosedPrayerMeetings(): Promise<PrayerMeeting[]> {
+    return db.select().from(prayerMeetings)
+      .where(eq(prayerMeetings.status, 'closed'))
+      .orderBy(desc(prayerMeetings.createdAt));
+  }
+
   async createPrayerMeeting(meeting: InsertPrayerMeeting): Promise<PrayerMeeting> {
     const [newMeeting] = await db.insert(prayerMeetings).values(meeting).returning();
     return newMeeting;
@@ -727,6 +735,14 @@ export class DatabaseStorage implements IStorage {
 
   async updatePrayerMeeting(id: string, data: Partial<PrayerMeeting>): Promise<PrayerMeeting | undefined> {
     const [updated] = await db.update(prayerMeetings).set(data).where(eq(prayerMeetings.id, id)).returning();
+    return updated;
+  }
+
+  async updatePrayerMeetingStatus(id: string, status: string): Promise<PrayerMeeting | undefined> {
+    const [updated] = await db.update(prayerMeetings)
+      .set({ status })
+      .where(eq(prayerMeetings.id, id))
+      .returning();
     return updated;
   }
 

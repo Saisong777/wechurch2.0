@@ -95,6 +95,8 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
   const [groupCount, setGroupCount] = useState(3);
   const [genderMode, setGenderMode] = useState<GenderMode>('mixed');
 
+  const [showHistory, setShowHistory] = useState(false);
+
   const { data: activeMeetings = [] } = useQuery<PrayerMeeting[]>({
     queryKey: ['/api/prayer-meetings/active'],
     queryFn: async () => {
@@ -103,6 +105,16 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       return res.json();
     },
     refetchInterval: 5000,
+  });
+
+  const { data: closedMeetings = [] } = useQuery<PrayerMeeting[]>({
+    queryKey: ['/api/prayer-meetings/history'],
+    queryFn: async () => {
+      const res = await fetch('/api/prayer-meetings/history');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: showHistory,
   });
 
   const { data: meeting, refetch: refetchMeeting } = useQuery<PrayerMeeting>({
@@ -358,7 +370,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
             禱告清單
           </h1>
 
-          <div className="flex gap-2 mb-6 flex-wrap justify-center">
+          <div className="flex gap-2 mb-6 flex-wrap justify-center items-center">
             <Button
               variant={prayerListGroup === null ? 'default' : 'outline'}
               onClick={() => setPrayerListGroup(null)}
@@ -378,6 +390,20 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                 第 {num} 組
               </Button>
             ))}
+            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPresentationGroup(prayerListGroup || 0);
+                setStep('presentation');
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
+              data-testid="button-ppt-projection"
+            >
+              <Presentation className="w-4 h-4 mr-2" />
+              PPT 投影
+            </Button>
           </div>
 
           {prayerListData?.urgentPrayers && prayerListData.urgentPrayers.length > 0 && (
@@ -735,36 +761,87 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
           </CardTitle>
           <CardDescription>建立和管理禱告會活動</CardDescription>
         </CardHeader>
-        <CardContent>
-          {activeMeetings.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <QrCode className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>目前沒有進行中的禱告會</p>
-              <p className="text-sm">點擊「建立禱告會」開始</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {activeMeetings.map(m => (
-                <div
-                  key={m.id}
-                  className="p-4 border rounded-lg cursor-pointer hover-elevate"
-                  onClick={() => handleSelectMeeting(m.id)}
-                  data-testid={`card-meeting-${m.id}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{m.title}</div>
-                      <div className="text-sm text-gray-500">代碼: {m.shortCode}</div>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              variant={!showHistory ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setShowHistory(false)}
+              data-testid="tab-active-meetings"
+            >
+              進行中 ({activeMeetings.length})
+            </Button>
+            <Button
+              variant={showHistory ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setShowHistory(true)}
+              data-testid="tab-history-meetings"
+            >
+              歷史記錄 ({closedMeetings.length})
+            </Button>
+          </div>
+
+          {!showHistory ? (
+            activeMeetings.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <QrCode className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>目前沒有進行中的禱告會</p>
+                <p className="text-sm">點擊「建立禱告會」開始</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activeMeetings.map(m => (
+                  <div
+                    key={m.id}
+                    className="p-4 border rounded-lg cursor-pointer hover-elevate"
+                    onClick={() => handleSelectMeeting(m.id)}
+                    data-testid={`card-meeting-${m.id}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{m.title}</div>
+                        <div className="text-sm text-gray-500">代碼: {m.shortCode}</div>
+                      </div>
+                      <Badge variant={m.status === 'waiting' ? 'outline' : 'secondary'}>
+                        {m.status === 'waiting' && '等待中'}
+                        {m.status === 'grouped' && '已分組'}
+                        {m.status === 'praying' && '禱告中'}
+                      </Badge>
                     </div>
-                    <Badge variant={m.status === 'waiting' ? 'outline' : 'secondary'}>
-                      {m.status === 'waiting' && '等待中'}
-                      {m.status === 'grouped' && '已分組'}
-                      {m.status === 'praying' && '禱告中'}
-                    </Badge>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
+          ) : (
+            closedMeetings.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <QrCode className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>沒有歷史禱告會記錄</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {closedMeetings.map(m => (
+                  <div
+                    key={m.id}
+                    className="p-4 border rounded-lg cursor-pointer hover-elevate"
+                    onClick={() => handleSelectMeeting(m.id)}
+                    data-testid={`card-history-meeting-${m.id}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{m.title}</div>
+                        <div className="text-sm text-gray-500">
+                          {new Date(m.createdAt).toLocaleDateString('zh-TW')}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                        已結束
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </CardContent>
       </Card>

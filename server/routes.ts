@@ -1168,7 +1168,7 @@ export async function registerRoutes(app: Express) {
   app.get("/api/prayer-meetings/active", async (req, res) => {
     try {
       const meetings = await storage.getPrayerMeetings();
-      const active = meetings.filter(m => m.status !== 'completed' && m.status !== 'cancelled');
+      const active = meetings.filter(m => m.status !== 'completed' && m.status !== 'cancelled' && m.status !== 'closed');
       res.json(active);
     } catch (error) {
       res.status(500).json({ error: "Failed to get active prayer meetings" });
@@ -1744,7 +1744,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Delete/close a prayer meeting
+  // Close a prayer meeting (mark as closed, keep data for history)
   app.delete("/api/prayer-meetings/:id", async (req, res) => {
     try {
       if (!req.user) {
@@ -1770,14 +1770,45 @@ export async function registerRoutes(app: Express) {
       if (meeting.ownerId !== userId) {
         const role = userId ? await storage.getUserRole(userId) : undefined;
         if (role !== 'admin') {
-          return res.status(403).json({ error: "Only the meeting owner can delete it" });
+          return res.status(403).json({ error: "Only the meeting owner can close it" });
         }
       }
 
-      await storage.deletePrayerMeeting(meeting.id);
-      res.json({ success: true });
+      // Mark as closed instead of deleting - preserves prayer data for history
+      await storage.updatePrayerMeetingStatus(meeting.id, 'closed');
+      res.json({ success: true, status: 'closed' });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete prayer meeting" });
+      res.status(500).json({ error: "Failed to close prayer meeting" });
+    }
+  });
+
+  // Get closed/historical prayer meetings for admin
+  app.get("/api/prayer-meetings/history", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Only leaders can view history" });
+      }
+
+      const closedMeetings = await storage.getClosedPrayerMeetings();
+      res.json(closedMeetings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get prayer meeting history" });
     }
   });
 

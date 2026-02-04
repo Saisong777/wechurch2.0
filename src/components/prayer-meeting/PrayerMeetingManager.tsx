@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, Crown, Shuffle, Presentation, EyeOff } from 'lucide-react';
+import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Crown, Shuffle, Presentation, EyeOff, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -88,6 +88,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
   const [myNamedPrayer, setMyNamedPrayer] = useState('');
   const [myAnonymousPrayer, setMyAnonymousPrayer] = useState('');
   const [presentationGroup, setPresentationGroup] = useState<number>(0);
+  const [isEditingPrayer, setIsEditingPrayer] = useState(false);
+  const [isGroupListExpanded, setIsGroupListExpanded] = useState(false);
 
   const isLeaderOrAbove = user?.role && ['leader', 'future_leader', 'admin'].includes(user.role);
 
@@ -123,12 +125,25 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
     if (meetingError && viewMode === 'meeting' && currentMeetingId && !meetingDeleted) {
       setMeetingDeleted(true);
       toast.info('禱告會已結束');
+      navigate('/');
       setViewMode('home');
       setCurrentMeetingId(null);
       setHasJoined(false);
       setMyParticipantId(null);
     }
-  }, [meetingError, viewMode, currentMeetingId, meetingDeleted]);
+  }, [meetingError, viewMode, currentMeetingId, meetingDeleted, navigate]);
+
+  useEffect(() => {
+    if (meeting?.status === 'closed' && (viewMode === 'meeting' || viewMode === 'praying') && !meetingDeleted) {
+      setMeetingDeleted(true);
+      toast.info('禱告會已結束，感謝您的參與！');
+      navigate('/');
+      setViewMode('home');
+      setCurrentMeetingId(null);
+      setHasJoined(false);
+      setMyParticipantId(null);
+    }
+  }, [meeting?.status, viewMode, meetingDeleted, navigate]);
 
   useEffect(() => {
     if (initialCode && viewMode === 'home') {
@@ -238,6 +253,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
     },
     onSuccess: () => {
       refetchParticipants();
+      setIsEditingPrayer(false);
       toast.success('實名禱告事項已儲存');
     },
   });
@@ -249,6 +265,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
     },
     onSuccess: () => {
       refetchParticipants();
+      setIsEditingPrayer(false);
       toast.success('匿名禱告事項已儲存');
     },
   });
@@ -826,21 +843,38 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
           <Card className="mb-4">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">同組成員</CardTitle>
+              <button
+                type="button"
+                onClick={() => setIsGroupListExpanded(!isGroupListExpanded)}
+                className="flex items-center justify-between w-full"
+                data-testid="button-toggle-group-list"
+              >
+                <CardTitle className="text-lg flex items-center gap-2">
+                  同組成員
+                  <Badge variant="secondary">{myGroupMembers.length}人</Badge>
+                </CardTitle>
+                {isGroupListExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {myGroupMembers.map(m => (
-                  <div key={m.id} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium', color.accent)}>
-                      {m.name.charAt(0)}
+            {isGroupListExpanded && (
+              <CardContent>
+                <div className="space-y-2">
+                  {myGroupMembers.map(m => (
+                    <div key={m.id} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium', color.accent)}>
+                        {m.name.charAt(0)}
+                      </div>
+                      <span className="font-medium">{m.name}</span>
+                      {m.id === myParticipantId && <Badge variant="secondary">我</Badge>}
                     </div>
-                    <span className="font-medium">{m.name}</span>
-                    {m.id === myParticipantId && <Badge variant="secondary">我</Badge>}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
+                  ))}
+                </div>
+              </CardContent>
+            )}
           </Card>
 
           {isPraying && (
@@ -852,63 +886,119 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <Label className="font-medium">實名代禱事項</Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    組員可以看到您的姓名和禱告內容，方便小組代禱
-                  </p>
-                  <Textarea
-                    value={myNamedPrayer}
-                    onChange={(e) => setMyNamedPrayer(e.target.value)}
-                    placeholder="請輸入實名禱告事項..."
-                    rows={3}
-                    data-testid="textarea-named-prayer"
-                  />
-                  <Button
-                    onClick={() => updateNamedPrayerMutation.mutate(myNamedPrayer)}
-                    disabled={updateNamedPrayerMutation.isPending}
-                    className="w-full"
-                    data-testid="button-save-named-prayer"
-                  >
-                    {updateNamedPrayerMutation.isPending ? '儲存中...' : '儲存實名禱告'}
-                  </Button>
-                </div>
+                {(!myParticipant?.prayerRequest && !myParticipant?.anonymousPrayer) || isEditingPrayer ? (
+                  <>
+                    <div className="space-y-3">
+                      <Label className="font-medium">實名代禱事項</Label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        組員可以看到您的姓名和禱告內容，方便小組代禱
+                      </p>
+                      <Textarea
+                        value={myNamedPrayer}
+                        onChange={(e) => setMyNamedPrayer(e.target.value)}
+                        placeholder="請輸入實名禱告事項..."
+                        rows={3}
+                        data-testid="textarea-named-prayer"
+                      />
+                      <Button
+                        onClick={() => updateNamedPrayerMutation.mutate(myNamedPrayer)}
+                        disabled={updateNamedPrayerMutation.isPending}
+                        className="w-full"
+                        data-testid="button-save-named-prayer"
+                      >
+                        {updateNamedPrayerMutation.isPending ? '儲存中...' : '儲存實名禱告'}
+                      </Button>
+                    </div>
 
-                <div className="border-t pt-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <EyeOff className="w-4 h-4 text-gray-500" />
-                    <Label className="font-medium">匿名代禱事項</Label>
+                    <div className="border-t pt-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <EyeOff className="w-4 h-4 text-gray-500" />
+                        <Label className="font-medium">匿名代禱事項</Label>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        匿名禱告不會在小組清單中顯示您的姓名，但會在最後投影時一起禱告
+                      </p>
+                      <Textarea
+                        value={myAnonymousPrayer}
+                        onChange={(e) => setMyAnonymousPrayer(e.target.value)}
+                        placeholder="請輸入匿名禱告事項..."
+                        rows={3}
+                        data-testid="textarea-anonymous-prayer"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => updateAnonymousPrayerMutation.mutate(myAnonymousPrayer)}
+                        disabled={updateAnonymousPrayerMutation.isPending}
+                        className="w-full"
+                        data-testid="button-save-anonymous-prayer"
+                      >
+                        {updateAnonymousPrayerMutation.isPending ? '儲存中...' : '儲存匿名禱告'}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    {myParticipant?.prayerRequest && (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">實名禱告：</div>
+                        <p className="text-sm text-gray-700 dark:text-gray-200">
+                          {myParticipant.prayerRequest.length > 50
+                            ? `${myParticipant.prayerRequest.substring(0, 50)}...`
+                            : myParticipant.prayerRequest}
+                        </p>
+                      </div>
+                    )}
+                    {myParticipant?.anonymousPrayer && (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          <EyeOff className="w-3 h-3" />
+                          匿名禱告：
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-200">
+                          {myParticipant.anonymousPrayer.length > 50
+                            ? `${myParticipant.anonymousPrayer.substring(0, 50)}...`
+                            : myParticipant.anonymousPrayer}
+                        </p>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditingPrayer(true)}
+                      className="w-full"
+                      data-testid="button-edit-prayer"
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      編輯
+                    </Button>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    匿名禱告不會在小組清單中顯示您的姓名，但會在最後投影時一起禱告
-                  </p>
-                  <Textarea
-                    value={myAnonymousPrayer}
-                    onChange={(e) => setMyAnonymousPrayer(e.target.value)}
-                    placeholder="請輸入匿名禱告事項..."
-                    rows={3}
-                    data-testid="textarea-anonymous-prayer"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => updateAnonymousPrayerMutation.mutate(myAnonymousPrayer)}
-                    disabled={updateAnonymousPrayerMutation.isPending}
-                    className="w-full"
-                    data-testid="button-save-anonymous-prayer"
-                  >
-                    {updateAnonymousPrayerMutation.isPending ? '儲存中...' : '儲存匿名禱告'}
-                  </Button>
-                </div>
+                )}
 
                 {myGroupMembers.some(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId) && (
-                  <div className="pt-4 border-t space-y-3">
-                    <h4 className="font-medium">組員禱告事項</h4>
-                    {myGroupMembers.filter(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId).map(m => (
-                      <div key={m.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div className="font-medium text-sm mb-1">{m.name}</div>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{m.prayerRequest}</p>
-                      </div>
-                    ))}
+                  <div className="pt-4 border-t space-y-4">
+                    <h4 className="font-medium text-gray-900 dark:text-white">組員禱告事項</h4>
+                    <div className="space-y-3">
+                      {myGroupMembers.filter(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId).map(m => (
+                        <div key={m.id} className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="shrink-0">
+                            <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium', color.accent)}>
+                              {m.name.charAt(0)}
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm text-gray-900 dark:text-white">{m.name}</span>
+                              {m.prayerCategory && (
+                                <Badge variant="outline" className="text-xs">{m.prayerCategory}</Badge>
+                              )}
+                              {m.isUrgent && (
+                                <Badge variant="destructive" className="text-xs">緊急</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">{m.prayerRequest}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
