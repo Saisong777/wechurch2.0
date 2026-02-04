@@ -129,6 +129,42 @@ export async function setupAuth(app: Express) {
       );
     });
   });
+
+  // Development-only login bypass for testing
+  if (process.env.NODE_ENV === "development") {
+    app.get("/api/dev-login", async (req, res) => {
+      const devUserId = "dev-user-001";
+      const devUser = {
+        id: devUserId,
+        email: "dev@wechurch.test",
+        firstName: "開發",
+        lastName: "測試者",
+        profileImageUrl: null,
+      };
+      
+      // Upsert dev user to database
+      await authStorage.upsertUser(devUser);
+      
+      // Create session with dev user claims
+      const user: any = {
+        claims: {
+          sub: devUserId,
+          email: devUser.email,
+          first_name: devUser.firstName,
+          last_name: devUser.lastName,
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7, // 7 days
+      };
+      
+      req.login(user, (err) => {
+        if (err) {
+          console.error("[Dev Login] Error:", err);
+          return res.status(500).json({ message: "Login failed" });
+        }
+        res.redirect("/");
+      });
+    });
+  }
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {

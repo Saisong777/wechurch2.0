@@ -211,6 +211,12 @@ const LoginForm: React.FC = () => {
     window.location.href = '/api/login';
   };
 
+  const handleDevLogin = () => {
+    window.location.href = '/api/dev-login';
+  };
+
+  const isDev = import.meta.env.DEV;
+
   return (
     <Card variant="highlight" className="w-full border-2 shadow-lg">
       <CardHeader className="text-center pb-4">
@@ -222,6 +228,37 @@ const LoginForm: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Development Login - only shown in dev mode */}
+        {isDev && (
+          <div className="space-y-3">
+            <Button
+              type="button"
+              variant="default"
+              size="lg"
+              className="w-full h-12 gap-3 font-medium bg-amber-500 hover:bg-amber-600"
+              onClick={handleDevLogin}
+              data-testid="button-dev-login"
+            >
+              <User className="w-5 h-5" />
+              開發者測試登入
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              僅限開發環境使用
+            </p>
+          </div>
+        )}
+
+        {isDev && (
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">或</span>
+            </div>
+          </div>
+        )}
+
         {/* Social Login Options */}
         <div className="space-y-3">
           <Button
