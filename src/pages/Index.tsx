@@ -40,6 +40,31 @@ interface BlessingVerse {
   blessingType: string | null;
 }
 
+interface UserProgress {
+  planId: string;
+  startDate: string;
+  completedDays: number[];
+  isPaused: boolean;
+}
+
+interface ReadingPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  durationDays: number;
+}
+
+const READING_PROGRESS_KEY = 'wechurch_reading_progress';
+
+const getStoredReadingProgress = (): Record<string, UserProgress> => {
+  try {
+    const stored = localStorage.getItem(READING_PROGRESS_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+};
+
 const featureConfig = [
   {
     id: 'live',
@@ -94,11 +119,28 @@ const Index = () => {
   const { profile } = useUserProfile();
   const { isFeatureEnabled, getDisabledMessage, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [readingProgress, setReadingProgress] = useState<Record<string, UserProgress>>({});
+
+  useEffect(() => {
+    setReadingProgress(getStoredReadingProgress());
+  }, []);
 
   const { data: randomVerse } = useQuery<BlessingVerse>({
     queryKey: ['/api/bible/blessing/random'],
     refetchOnWindowFocus: false,
   });
+
+  const { data: readingPlans = [] } = useQuery<ReadingPlan[]>({
+    queryKey: ['/api/reading-plans'],
+    enabled: Object.keys(readingProgress).length > 0,
+  });
+
+  const activeReadingPlans = readingPlans.filter(plan => {
+    const progress = readingProgress[plan.id];
+    return progress && !progress.isPaused;
+  });
+
+  const hasActiveReadingPlan = activeReadingPlans.length > 0;
   
   useEffect(() => {
     const sessionId = searchParams.get('session');
@@ -204,20 +246,29 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-4 md:py-8">
         <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-6 animate-fade-in">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium mb-3">
-              <Sparkles className="w-3 h-3" />
-              歡迎來到 WeChurch
-            </div>
-            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-              一起經歷信仰生活
-            </h2>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto">
-              連結、學習、遊戲、分享
-            </p>
-          </div>
-
-          {randomVerse && (
+          {hasActiveReadingPlan ? (
+            <Link to="/learn/reading-plans" className="block mb-4 animate-fade-in">
+              <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent hover:shadow-md transition-shadow">
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground mb-0.5">繼續閱讀</p>
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {activeReadingPlans[0].name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        已完成 {readingProgress[activeReadingPlans[0].id]?.completedDays?.length || 0} / {activeReadingPlans[0].durationDays} 天
+                      </p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ) : randomVerse ? (
             <Card className="mb-4 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent animate-fade-in">
               <CardContent className="py-3 px-4">
                 <div className="flex items-start gap-2">
@@ -232,7 +283,7 @@ const Index = () => {
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
           <div className="grid grid-cols-2 gap-2 animate-fade-in" style={{ animationDelay: '100ms' }}>
             {featureConfig.map((feature) => {
