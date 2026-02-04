@@ -5,18 +5,29 @@ import { toast } from 'sonner';
 
 export interface PrayerComment {
   id: string;
-  prayer_id: string;
-  user_id: string;
+  prayerId: string;
+  userId: string;
   content: string;
-  created_at: string;
-  author_name: string;
-  author_avatar: string | null;
-  is_owner: boolean;
+  createdAt: string;
+  authorName: string;
+  authorAvatar: string | null;
+  isOwner: boolean;
 }
 
 export const usePrayerComments = (prayerId: string) => {
-  return useQuery({
+  const { user } = useAuth();
+  const userId = user ? ((user as any).legacyUserId || user.id) : undefined;
+
+  return useQuery<PrayerComment[]>({
     queryKey: ['/api/prayers', prayerId, 'comments'],
+    queryFn: async () => {
+      const url = userId 
+        ? `/api/prayers/${prayerId}/comments?userId=${userId}`
+        : `/api/prayers/${prayerId}/comments`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch comments');
+      return response.json();
+    },
     enabled: !!prayerId,
   });
 };
@@ -28,7 +39,11 @@ export const useCreateComment = () => {
   return useMutation({
     mutationFn: async ({ prayerId, content }: { prayerId: string; content: string }) => {
       if (!user) throw new Error('Not authenticated');
-      await apiRequest('POST', `/api/prayers/${prayerId}/comments`, { content: content.trim() });
+      const userId = (user as any).legacyUserId || user.id;
+      await apiRequest('POST', `/api/prayers/${prayerId}/comments`, { 
+        userId,
+        content: content.trim() 
+      });
     },
     onSuccess: (_, { prayerId }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/prayers', prayerId, 'comments'] });

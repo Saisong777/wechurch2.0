@@ -641,12 +641,20 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/prayers/:id", async (req, res) => {
     try {
-      const prayer = await storage.updatePrayer(req.params.id, req.body);
+      const updateData: Record<string, any> = {};
+      if (req.body.isPinned !== undefined) updateData.isPinned = req.body.isPinned;
+      if (req.body.isAnswered !== undefined) {
+        updateData.isAnswered = req.body.isAnswered;
+        updateData.answeredAt = req.body.isAnswered ? new Date() : null;
+      }
+      
+      const prayer = await storage.updatePrayer(req.params.id, updateData);
       if (!prayer) {
         return res.status(404).json({ error: "Prayer not found" });
       }
       res.json(prayer);
     } catch (error) {
+      console.error("[update-prayer] Error:", error);
       res.status(500).json({ error: "Failed to update prayer" });
     }
   });
@@ -667,6 +675,41 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error("[create-prayer-amen] Error:", error);
       res.status(500).json({ error: "Failed to add amen" });
+    }
+  });
+
+  app.get("/api/prayers/:id/comments", async (req, res) => {
+    try {
+      const currentUserId = req.query.userId as string | undefined;
+      const comments = await storage.getPrayerComments(req.params.id, currentUserId);
+      res.json(comments);
+    } catch (error) {
+      console.error("[get-prayer-comments] Error:", error);
+      res.status(500).json({ error: "Failed to get comments" });
+    }
+  });
+
+  app.post("/api/prayers/:id/comments", async (req, res) => {
+    try {
+      const { userId, content } = req.body;
+      if (!userId || !content) {
+        return res.status(400).json({ error: "userId and content are required" });
+      }
+      const comment = await storage.createPrayerComment(req.params.id, userId, content);
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("[create-prayer-comment] Error:", error);
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  app.delete("/api/prayers/:id/comments/:commentId", async (req, res) => {
+    try {
+      await storage.deletePrayerComment(req.params.commentId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[delete-prayer-comment] Error:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 

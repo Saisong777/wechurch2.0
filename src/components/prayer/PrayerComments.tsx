@@ -91,23 +91,23 @@ export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
           {comments.map((comment) => (
             <div key={comment.id} className="flex gap-2 group">
               <Avatar className="h-8 w-8 flex-shrink-0">
-                {comment.author_avatar && (
-                  <AvatarImage src={comment.author_avatar} alt={comment.author_name} />
+                {comment.authorAvatar && (
+                  <AvatarImage src={comment.authorAvatar} alt={comment.authorName} />
                 )}
                 <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  {comment.author_name.charAt(0).toUpperCase()}
+                  {comment.authorName?.charAt(0).toUpperCase() || '?'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">{comment.author_name}</span>
+                  <span className="text-xs font-medium">{comment.authorName}</span>
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(comment.created_at), {
+                    {formatDistanceToNow(new Date(comment.createdAt), {
                       addSuffix: true,
                       locale: zhTW,
                     })}
                   </span>
-                  {(comment.is_owner || isAdmin) && (
+                  {(comment.isOwner || isAdmin) && (
                     <Button
                       variant="ghost"
                       size="icon"

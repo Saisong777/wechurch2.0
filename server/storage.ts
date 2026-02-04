@@ -59,6 +59,9 @@ export interface IStorage {
   updatePrayer(id: string, data: Partial<Prayer>): Promise<Prayer | undefined>;
   deletePrayer(id: string): Promise<void>;
   createPrayerAmen(prayerId: string, userId: string): Promise<{ prayerId: string; userId: string }>;
+  getPrayerComments(prayerId: string, currentUserId?: string): Promise<{ id: string; prayerId: string; userId: string; content: string; createdAt: Date; authorName: string; authorAvatar: string | null; isOwner: boolean }[]>;
+  createPrayerComment(prayerId: string, userId: string, content: string): Promise<{ id: string; prayerId: string; userId: string; content: string; createdAt: Date }>;
+  deletePrayerComment(commentId: string): Promise<void>;
   
   getFeatureToggles(): Promise<FeatureToggle[]>;
   getFeatureToggle(key: string): Promise<FeatureToggle | undefined>;
@@ -323,6 +326,38 @@ export class DatabaseStorage implements IStorage {
   async createPrayerAmen(prayerId: string, userId: string): Promise<{ prayerId: string; userId: string }> {
     await db.insert(prayerAmens).values({ prayerId, userId }).onConflictDoNothing();
     return { prayerId, userId };
+  }
+
+  async getPrayerComments(prayerId: string, currentUserId?: string): Promise<{ id: string; prayerId: string; userId: string; content: string; createdAt: Date; authorName: string; authorAvatar: string | null; isOwner: boolean }[]> {
+    const comments = await db
+      .select({
+        id: prayerComments.id,
+        prayerId: prayerComments.prayerId,
+        userId: prayerComments.userId,
+        content: prayerComments.content,
+        createdAt: prayerComments.createdAt,
+        authorName: users.displayName,
+        authorAvatar: users.avatarUrl,
+      })
+      .from(prayerComments)
+      .leftJoin(users, eq(prayerComments.userId, users.id))
+      .where(eq(prayerComments.prayerId, prayerId))
+      .orderBy(prayerComments.createdAt);
+    
+    return comments.map(c => ({
+      ...c,
+      authorName: c.authorName || '匿名',
+      isOwner: currentUserId ? c.userId === currentUserId : false,
+    }));
+  }
+
+  async createPrayerComment(prayerId: string, userId: string, content: string): Promise<{ id: string; prayerId: string; userId: string; content: string; createdAt: Date }> {
+    const [comment] = await db.insert(prayerComments).values({ prayerId, userId, content }).returning();
+    return comment;
+  }
+
+  async deletePrayerComment(commentId: string): Promise<void> {
+    await db.delete(prayerComments).where(eq(prayerComments.id, commentId));
   }
 
   async getFeatureToggles(): Promise<FeatureToggle[]> {
