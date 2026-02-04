@@ -75,7 +75,10 @@
     "memoizee": "^0.4.17",
     "multer": "^2.0.2",
     "next-themes": "^0.3.0",
+    "openai": "^6.17.0",
     "openid-client": "^6.8.1",
+    "p-limit": "^7.3.0",
+    "p-retry": "^7.1.1",
     "passport": "^0.7.0",
     "pg": "^8.18.0",
     "pptxgenjs": "^4.0.1",
@@ -95,7 +98,8 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.21.0",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
