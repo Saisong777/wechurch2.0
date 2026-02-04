@@ -1460,14 +1460,195 @@ export async function registerRoutes(app: Express) {
   // Update participant prayer request
   app.patch("/api/prayer-meetings/:meetingId/participants/:participantId", async (req, res) => {
     try {
-      const { prayerRequest } = req.body;
-      const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, { prayerRequest });
+      const { prayerRequest, isAnonymous } = req.body;
+      const updateData: { prayerRequest?: string; isAnonymous?: boolean } = {};
+      if (prayerRequest !== undefined) updateData.prayerRequest = prayerRequest;
+      if (isAnonymous !== undefined) updateData.isAnonymous = isAnonymous;
+      
+      const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, updateData);
       if (!updated) {
         return res.status(404).json({ error: "Participant not found" });
       }
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update prayer request" });
+    }
+  });
+
+  // AI-classify prayers for a meeting
+  app.post("/api/prayer-meetings/:id/classify-prayers", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Only leaders and admins can classify prayers" });
+      }
+
+      const participants = await storage.getPrayerMeetingParticipants(meeting.id);
+      const prayersToClassify = participants.filter(p => p.prayerRequest && p.prayerRequest.trim());
+
+      if (prayersToClassify.length === 0) {
+        return res.json({ message: "No prayers to classify", classified: 0 });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const prayerTexts = prayersToClassify.map((p, i) => `${i + 1}. ${p.prayerRequest}`).join('\n');
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [
+          {
+            role: "system",
+            content: `你是一個禱告分類助手。請分析以下禱告事項，為每個禱告分類並判斷是否緊急。
+
+分類類別（選一個最適合的）：
+- 健康：身體健康、疾病、醫療相關
+- 工作：工作、事業、職場相關
+- 關係：家庭、朋友、人際關係
+- 小孩：子女、教育相關
+- 婚姻：婚姻、配偶相關
+- 財務：經濟、財務相關
+- 學業：學習、考試相關
+- 信仰：靈命、信仰成長相關
+- 事工：教會、服事相關
+- 感恩：感謝、讚美相關
+- 其他：無法歸類
+
+緊急判斷標準：
+- 嚴重疾病（如癌症、重症）
+- 死亡或瀕臨死亡
+- 急難事件（如車禍、災難）
+- 緊急手術或醫療處置
+
+請以JSON格式回覆，格式如下：
+{
+  "classifications": [
+    { "index": 1, "category": "健康", "isUrgent": true },
+    { "index": 2, "category": "工作", "isUrgent": false }
+  ]
+}
+
+只回覆JSON，不要其他文字。`
+          },
+          {
+            role: "user",
+            content: prayerTexts
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1000,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "AI response empty" });
+      }
+
+      const result = JSON.parse(content);
+      const classifications = result.classifications || [];
+
+      for (const classification of classifications) {
+        const idx = classification.index - 1;
+        if (idx >= 0 && idx < prayersToClassify.length) {
+          const participant = prayersToClassify[idx];
+          await storage.updatePrayerMeetingParticipant(participant.id, {
+            prayerCategory: classification.category,
+            isUrgent: classification.isUrgent === true,
+          });
+        }
+      }
+
+      res.json({ message: "Prayers classified successfully", classified: classifications.length });
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to classify prayers:", error);
+      res.status(500).json({ error: "Failed to classify prayers" });
+    }
+  });
+
+  // Get prayer list for a meeting (with AI classification)
+  app.get("/api/prayer-meetings/:id/prayer-list", async (req, res) => {
+    try {
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      const participants = await storage.getPrayerMeetingParticipants(meeting.id);
+      const groupNumber = req.query.group ? parseInt(req.query.group as string) : null;
+      const includeAnonymous = req.query.includeAnonymous === 'true';
+
+      let filtered = participants.filter(p => p.prayerRequest && p.prayerRequest.trim());
+      
+      if (groupNumber) {
+        filtered = filtered.filter(p => p.groupNumber === groupNumber);
+      }
+
+      if (!includeAnonymous) {
+        filtered = filtered.filter(p => !p.isAnonymous);
+      }
+
+      const urgentPrayers = filtered.filter(p => p.isUrgent).map(p => ({
+        id: p.id,
+        name: p.isAnonymous ? '匿名' : p.name,
+        prayerRequest: p.prayerRequest,
+        category: p.prayerCategory || '其他',
+        isUrgent: true,
+        isAnonymous: p.isAnonymous,
+        groupNumber: p.groupNumber,
+      }));
+
+      const regularPrayers = filtered.filter(p => !p.isUrgent).map(p => ({
+        id: p.id,
+        name: p.isAnonymous ? '匿名' : p.name,
+        prayerRequest: p.prayerRequest,
+        category: p.prayerCategory || '其他',
+        isUrgent: false,
+        isAnonymous: p.isAnonymous,
+        groupNumber: p.groupNumber,
+      }));
+
+      const categories: Record<string, typeof regularPrayers> = {};
+      for (const prayer of regularPrayers) {
+        const cat = prayer.category;
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(prayer);
+      }
+
+      res.json({
+        meetingId: meeting.id,
+        meetingTitle: meeting.title,
+        groupNumber,
+        urgentPrayers,
+        categorizedPrayers: categories,
+        totalCount: urgentPrayers.length + regularPrayers.length,
+      });
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to get prayer list:", error);
+      res.status(500).json({ error: "Failed to get prayer list" });
     }
   });
 

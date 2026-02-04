@@ -57,6 +57,21 @@ The prayer wall enables community prayer sharing with:
 - **Comments**: Comment thread on each prayer
 - **Mobile optimized**: Horizontally scrollable tabs with 44px minimum touch targets
 
+### Prayer Meeting (禱告會)
+The prayer meeting feature allows leaders to create prayer sessions with grouping and AI-powered prayer classification:
+- **4-digit short codes**: Each meeting has a unique code for easy joining
+- **QR code generation**: Automatic QR codes for mobile scanning
+- **Flexible grouping modes**: Group by size or by count, with gender separation options
+- **Anonymous prayer option**: Users can submit prayers anonymously (excluded from group displays but included in final lists)
+- **AI prayer classification**: Uses GPT to categorize prayers into 11 categories:
+  - 健康(health), 工作(work), 關係(relationships), 小孩(children), 婚姻(marriage), 財務(finances), 學業(academics), 信仰(faith), 事工(ministry), 感恩(thanksgiving), 其他(other)
+- **Urgent prayer detection**: AI detects severe illness, death/near-death situations, emergency events, urgent medical needs
+- **Prayer list view**: Categorized view with urgent prayers highlighted, filterable by group
+- **Presentation mode**: Full-screen display for projecting prayer requests
+- **Backend routes**:
+  - POST `/api/prayer-meetings/:id/classify-prayers` - Trigger AI classification
+  - GET `/api/prayer-meetings/:id/prayer-list?group=X&includeAnonymous=true` - Retrieve categorized prayer list
+
 ### Random Grouper ("神的安排")
 The random grouper feature allows leaders to create grouping activities with:
 - **Unique 4-digit codes**: Each activity gets a unique short code (e.g., "A3B7") for easy sharing

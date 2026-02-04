@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, Crown, Shuffle, Presentation } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, Crown, Shuffle, Presentation, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +36,9 @@ interface PrayerMeetingParticipant {
   gender: string;
   groupNumber: number | null;
   prayerRequest: string | null;
+  isAnonymous: boolean;
+  prayerCategory: string | null;
+  isUrgent: boolean;
   joinedAt: string;
   updatedAt: string | null;
 }
@@ -82,6 +86,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
   const [copiedCode, setCopiedCode] = useState(false);
   const [meetingDeleted, setMeetingDeleted] = useState(false);
   const [myPrayerRequest, setMyPrayerRequest] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [presentationGroup, setPresentationGroup] = useState<number>(0);
 
   const isLeaderOrAbove = user?.role && ['leader', 'future_leader', 'admin'].includes(user.role);
@@ -212,8 +217,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
   });
 
   const updatePrayerRequestMutation = useMutation({
-    mutationFn: async (prayerRequest: string) => {
-      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/participants/${myParticipantId}`, { prayerRequest });
+    mutationFn: async ({ prayerRequest, isAnonymous }: { prayerRequest: string; isAnonymous: boolean }) => {
+      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/participants/${myParticipantId}`, { prayerRequest, isAnonymous });
       return res.json();
     },
     onSuccess: () => {
@@ -827,18 +832,38 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                   placeholder="請輸入您的禱告事項..."
                   rows={4}
                 />
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <EyeOff className="w-4 h-4 text-gray-500" />
+                    <Label htmlFor="anonymous-toggle" className="text-sm cursor-pointer">
+                      匿名禱告
+                    </Label>
+                  </div>
+                  <Switch
+                    id="anonymous-toggle"
+                    checked={isAnonymous}
+                    onCheckedChange={setIsAnonymous}
+                    data-testid="switch-anonymous"
+                  />
+                </div>
+                {isAnonymous && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    匿名禱告不會在小組禱告清單中顯示您的姓名，但會在最後投影禱告時一起禱告。
+                  </p>
+                )}
                 <Button
-                  onClick={() => updatePrayerRequestMutation.mutate(myPrayerRequest)}
+                  onClick={() => updatePrayerRequestMutation.mutate({ prayerRequest: myPrayerRequest, isAnonymous })}
                   disabled={updatePrayerRequestMutation.isPending}
                   className="w-full"
+                  data-testid="button-save-prayer"
                 >
                   {updatePrayerRequestMutation.isPending ? '儲存中...' : '儲存禱告事項'}
                 </Button>
 
-                {myGroupMembers.some(m => m.prayerRequest && m.id !== myParticipantId) && (
+                {myGroupMembers.some(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId) && (
                   <div className="pt-4 border-t space-y-3">
                     <h4 className="font-medium">組員禱告事項</h4>
-                    {myGroupMembers.filter(m => m.prayerRequest && m.id !== myParticipantId).map(m => (
+                    {myGroupMembers.filter(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId).map(m => (
                       <div key={m.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <div className="font-medium text-sm mb-1">{m.name}</div>
                         <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{m.prayerRequest}</p>

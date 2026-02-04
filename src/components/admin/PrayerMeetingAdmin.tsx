@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, Presentation, X } from 'lucide-react';
+import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, Presentation, X, Sparkles, List, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,12 +33,34 @@ interface PrayerMeetingParticipant {
   gender: string;
   groupNumber: number | null;
   prayerRequest: string | null;
+  isAnonymous: boolean;
+  prayerCategory: string | null;
+  isUrgent: boolean;
   joinedAt: string;
+}
+
+interface PrayerListData {
+  meetingId: string;
+  meetingTitle: string;
+  groupNumber: number | null;
+  urgentPrayers: PrayerItem[];
+  categorizedPrayers: Record<string, PrayerItem[]>;
+  totalCount: number;
+}
+
+interface PrayerItem {
+  id: string;
+  name: string;
+  prayerRequest: string;
+  category: string;
+  isUrgent: boolean;
+  isAnonymous: boolean;
+  groupNumber: number | null;
 }
 
 type GroupingMode = 'bySize' | 'byCount';
 type GenderMode = 'mixed' | 'separate' | 'male_only' | 'female_only';
-type ViewStep = 'list' | 'create' | 'manage' | 'presentation';
+type ViewStep = 'list' | 'create' | 'manage' | 'presentation' | 'prayer-list';
 
 const GROUP_COLORS = [
   { bg: 'bg-blue-100 dark:bg-blue-900/40', border: 'border-blue-400 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-300', accent: 'bg-blue-500' },
@@ -184,6 +206,31 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     },
   });
 
+  const classifyPrayersMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/prayer-meetings/${currentMeetingId}/classify-prayers`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      refetchParticipants();
+      toast.success(`已分類 ${data.classified} 個禱告事項`);
+    },
+    onError: () => {
+      toast.error('分類禱告事項失敗');
+    },
+  });
+
+  const [prayerListGroup, setPrayerListGroup] = useState<number | null>(null);
+
+  const prayerListQueryKey = prayerListGroup !== null
+    ? `/api/prayer-meetings/${currentMeetingId}/prayer-list?group=${prayerListGroup}&includeAnonymous=true`
+    : `/api/prayer-meetings/${currentMeetingId}/prayer-list?includeAnonymous=true`;
+
+  const { data: prayerListData, isLoading: isLoadingPrayerList } = useQuery<PrayerListData>({
+    queryKey: [prayerListQueryKey],
+    enabled: !!currentMeetingId && step === 'prayer-list',
+  });
+
   const handleSelectMeeting = (meetingId: string) => {
     setCurrentMeetingId(meetingId);
     setStep('manage');
@@ -261,6 +308,126 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
               </Card>
             ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'prayer-list') {
+    const categoryColors: Record<string, string> = {
+      '健康': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+      '工作': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+      '關係': 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300',
+      '小孩': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+      '婚姻': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+      '財務': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+      '學業': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
+      '信仰': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
+      '事工': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+      '感恩': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+      '其他': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+    };
+
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 z-50 overflow-auto">
+        <div className="absolute top-4 right-4 flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setStep('manage')}>
+            <X className="w-4 h-4 mr-2" />
+            返回管理
+          </Button>
+        </div>
+
+        <div className="max-w-4xl mx-auto p-6 pt-16">
+          <h1 className="text-3xl font-bold text-center mb-6">
+            禱告清單
+          </h1>
+
+          <div className="flex gap-2 mb-6 flex-wrap justify-center">
+            <Button
+              variant={prayerListGroup === null ? 'default' : 'outline'}
+              onClick={() => setPrayerListGroup(null)}
+              size="sm"
+              data-testid="button-group-all"
+            >
+              全部
+            </Button>
+            {groupNumbers.map(num => (
+              <Button
+                key={num}
+                variant={prayerListGroup === num ? 'default' : 'outline'}
+                onClick={() => setPrayerListGroup(num)}
+                size="sm"
+                data-testid={`button-group-${num}`}
+              >
+                第 {num} 組
+              </Button>
+            ))}
+          </div>
+
+          {prayerListData?.urgentPrayers && prayerListData.urgentPrayers.length > 0 && (
+            <Card className="mb-6 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2 text-red-700 dark:text-red-300">
+                  <AlertTriangle className="w-5 h-5" />
+                  緊急代禱事項
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {prayerListData.urgentPrayers.map(prayer => (
+                  <div key={prayer.id} className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="font-semibold">{prayer.name}</span>
+                      <Badge className={categoryColors[prayer.category] || categoryColors['其他']}>
+                        {prayer.category}
+                      </Badge>
+                      {prayer.groupNumber && (
+                        <Badge variant="outline">第 {prayer.groupNumber} 組</Badge>
+                      )}
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {prayerListData?.categorizedPrayers && Object.entries(prayerListData.categorizedPrayers).map(([category, prayers]) => (
+            <Card key={category} className="mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Badge className={categoryColors[category] || categoryColors['其他']}>
+                    {category}
+                  </Badge>
+                  <span className="text-sm text-gray-500">({prayers.length})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {prayers.map(prayer => (
+                  <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-medium">{prayer.name}</span>
+                      {prayer.groupNumber && (
+                        <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
+                      )}
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+
+          {isLoadingPrayerList && (
+            <div className="text-center py-12 text-gray-500">
+              載入中...
+            </div>
+          )}
+
+          {!isLoadingPrayerList && (!prayerListData || prayerListData.totalCount === 0) && (
+            <div className="text-center py-12 text-gray-500">
+              尚無禱告事項
+            </div>
+          )}
         </div>
       </div>
     );
@@ -490,6 +657,28 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                   <Presentation className="w-4 h-4 mr-2" />
                   簡報模式
                 </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => classifyPrayersMutation.mutate()}
+                    disabled={classifyPrayersMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-classify-prayers"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    {classifyPrayersMutation.isPending ? 'AI分類中...' : 'AI分類禱告'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep('prayer-list')}
+                    className="flex-1"
+                    data-testid="button-view-prayer-list"
+                  >
+                    <List className="w-4 h-4 mr-2" />
+                    禱告清單
+                  </Button>
+                </div>
               </div>
             )}
 
