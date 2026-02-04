@@ -133,7 +133,8 @@ export async function setupAuth(app: Express) {
   // Development-only login bypass for testing
   if (process.env.NODE_ENV === "development") {
     app.get("/api/dev-login", async (req, res) => {
-      const devUserId = "dev-admin-001";
+      // Use a numeric string ID to match existing auth_users format
+      const devUserId = "99999999";
       const devUser = {
         id: devUserId,
         email: "dev@wechurch.test",
@@ -142,8 +143,22 @@ export async function setupAuth(app: Express) {
         profileImageUrl: null,
       };
       
-      // Upsert dev user to database
-      await authStorage.upsertUser(devUser);
+      // Upsert dev user to auth_users database using raw SQL to handle conflicts properly
+      try {
+        const { pool } = await import("../../db");
+        await pool.query(
+          `INSERT INTO auth_users (id, email, first_name, last_name, profile_image_url, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+           ON CONFLICT (id) DO UPDATE SET 
+             email = EXCLUDED.email,
+             first_name = EXCLUDED.first_name,
+             last_name = EXCLUDED.last_name,
+             updated_at = NOW()`,
+          [devUserId, devUser.email, devUser.firstName, devUser.lastName, devUser.profileImageUrl]
+        );
+      } catch (authError) {
+        console.error("[Dev Login] Auth user upsert error:", authError);
+      }
       
       // Also ensure dev user has admin role in user_roles table
       // We'll set the role via a direct database query
