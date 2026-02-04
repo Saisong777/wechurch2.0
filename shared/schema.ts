@@ -135,6 +135,9 @@ export const prayers = pgTable("prayers", {
   category: text("category").default("other").notNull(),
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   isPinned: boolean("is_pinned").default(false).notNull(),
+  isAnswered: boolean("is_answered").default(false).notNull(),
+  answeredAt: timestamp("answered_at"),
+  scriptureReference: text("scripture_reference"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -312,7 +312,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePrayer(id: string, data: Partial<Prayer>): Promise<Prayer | undefined> {
-    const [updated] = await db.update(prayers).set({ ...data, updatedAt: new Date() }).where(eq(prayers.id, id)).returning();
+    const [updated] = await db.update(prayers).set(data).where(eq(prayers.id, id)).returning();
     return updated;
   }
 

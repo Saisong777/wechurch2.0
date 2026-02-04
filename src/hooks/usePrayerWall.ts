@@ -19,6 +19,9 @@ export interface Prayer {
   userId: string;
   category: PrayerCategory;
   isPinned: boolean;
+  isAnswered: boolean;
+  answeredAt: string | null;
+  scriptureReference: string | null;
   authorName: string;
   authorAvatar: string | null;
   amenCount: number;
@@ -44,6 +47,9 @@ export const usePrayerWall = () => {
         userId: p.userId,
         category: p.category as PrayerCategory,
         isPinned: p.isPinned || false,
+        isAnswered: p.isAnswered || false,
+        answeredAt: p.answeredAt || null,
+        scriptureReference: p.scriptureReference || null,
         authorName: p.isAnonymous ? '匿名' : (p.authorName || '未知'),
         authorAvatar: p.authorAvatar,
         amenCount: p.amenCount || 0,
@@ -62,7 +68,7 @@ export const useCreatePrayer = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ content, isAnonymous, category }: { content: string; isAnonymous: boolean; category: PrayerCategory }) => {
+    mutationFn: async ({ content, isAnonymous, category, scriptureReference }: { content: string; isAnonymous: boolean; category: PrayerCategory; scriptureReference?: string }) => {
       if (!user) throw new Error('Not authenticated');
       
       const response = await fetch('/api/prayers', {
@@ -73,6 +79,7 @@ export const useCreatePrayer = () => {
           content: content.trim(),
           isAnonymous,
           category,
+          scriptureReference: scriptureReference || null,
         }),
       });
 
@@ -169,6 +176,52 @@ export const useTogglePinPrayer = () => {
       );
 
       return { previousPrayers };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousPrayers) {
+        queryClient.setQueryData(['prayer-wall'], context.previousPrayers);
+      }
+      toast.error('操作失敗');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
+    },
+  });
+};
+
+export const useMarkPrayerAnswered = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ prayerId, isAnswered }: { prayerId: string; isAnswered: boolean }) => {
+      const response = await fetch(`/api/prayers/${prayerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          isAnswered: !isAnswered, 
+          answeredAt: !isAnswered ? new Date().toISOString() : null 
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to update prayer');
+    },
+    onMutate: async ({ prayerId, isAnswered }) => {
+      await queryClient.cancelQueries({ queryKey: ['prayer-wall'] });
+      const previousPrayers = queryClient.getQueryData<Prayer[]>(['prayer-wall']);
+
+      queryClient.setQueryData<Prayer[]>(['prayer-wall'], (old) =>
+        old?.map((prayer) =>
+          prayer.id === prayerId 
+            ? { ...prayer, isAnswered: !isAnswered, answeredAt: !isAnswered ? new Date().toISOString() : null } 
+            : prayer
+        )
+      );
+
+      return { previousPrayers };
+    },
+    onSuccess: (_, variables) => {
+      if (!variables.isAnswered) {
+        toast.success('感謝神！禱告已蒙應允！');
+      }
     },
     onError: (err, variables, context) => {
       if (context?.previousPrayers) {

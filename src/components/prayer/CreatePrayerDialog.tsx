@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -19,12 +20,13 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Plus, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Plus, Eye, EyeOff, Loader2, BookOpen } from 'lucide-react';
 import { useCreatePrayer, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 
 export const CreatePrayerDialog: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState('');
+  const [scriptureReference, setScriptureReference] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [category, setCategory] = useState<PrayerCategory>('supplication');
   const createMutation = useCreatePrayer();
@@ -36,9 +38,11 @@ export const CreatePrayerDialog: React.FC = () => {
       content: content.trim(),
       isAnonymous,
       category,
+      scriptureReference: scriptureReference.trim() || undefined,
     });
 
     setContent('');
+    setScriptureReference('');
     setIsAnonymous(false);
     setCategory('supplication');
     setOpen(false);
@@ -93,6 +97,23 @@ export const CreatePrayerDialog: React.FC = () => {
             />
             <p className="text-xs text-muted-foreground text-right">
               {content.length}/500
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="scripture-ref" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-primary" />
+              相關經文（選填）
+            </Label>
+            <Input
+              id="scripture-ref"
+              placeholder="例如：詩篇 23:1-3、約翰福音 3:16"
+              value={scriptureReference}
+              onChange={(e) => setScriptureReference(e.target.value)}
+              maxLength={100}
+            />
+            <p className="text-xs text-muted-foreground">
+              可附上支持你禱告的經文章節
             </p>
           </div>
 
