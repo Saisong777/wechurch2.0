@@ -240,10 +240,10 @@ const LoginForm: React.FC = () => {
               data-testid="button-dev-login"
             >
               <User className="w-5 h-5" />
-              開發者測試登入
+              開發者管理員登入
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              僅限開發環境使用
+              僅限開發環境使用（具有管理員權限）
             </p>
           </div>
         )}

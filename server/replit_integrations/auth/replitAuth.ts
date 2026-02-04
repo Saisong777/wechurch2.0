@@ -133,17 +133,57 @@ export async function setupAuth(app: Express) {
   // Development-only login bypass for testing
   if (process.env.NODE_ENV === "development") {
     app.get("/api/dev-login", async (req, res) => {
-      const devUserId = "dev-user-001";
+      const devUserId = "dev-admin-001";
       const devUser = {
         id: devUserId,
         email: "dev@wechurch.test",
         firstName: "開發",
-        lastName: "測試者",
+        lastName: "管理員",
         profileImageUrl: null,
       };
       
       // Upsert dev user to database
       await authStorage.upsertUser(devUser);
+      
+      // Also ensure dev user has admin role in user_roles table
+      // We'll set the role via a direct database query
+      try {
+        const { pool } = await import("../../db");
+        
+        // Check if user exists in users table, if not create them
+        const userCheck = await pool.query(
+          `INSERT INTO users (id, email, password, display_name, created_at, updated_at)
+           VALUES (gen_random_uuid(), $1, 'dev-no-password', $2, NOW(), NOW())
+           ON CONFLICT (email) DO UPDATE SET display_name = $2, updated_at = NOW()
+           RETURNING id`,
+          [devUser.email, `${devUser.firstName}${devUser.lastName}`]
+        );
+        
+        const legacyUserId = userCheck.rows[0].id;
+        
+        // Upsert admin role for this user
+        const existingRole = await pool.query(
+          `SELECT id FROM user_roles WHERE user_id = $1`,
+          [legacyUserId]
+        );
+        
+        if (existingRole.rows.length > 0) {
+          await pool.query(
+            `UPDATE user_roles SET role = 'admin', updated_at = NOW() WHERE user_id = $1`,
+            [legacyUserId]
+          );
+        } else {
+          await pool.query(
+            `INSERT INTO user_roles (id, user_id, role, created_at, updated_at)
+             VALUES (gen_random_uuid(), $1, 'admin', NOW(), NOW())`,
+            [legacyUserId]
+          );
+        }
+        
+        console.log("[Dev Login] Created/updated dev admin user with legacy ID:", legacyUserId);
+      } catch (error) {
+        console.error("[Dev Login] Error setting up admin role:", error);
+      }
       
       // Create session with dev user claims
       const user: any = {
