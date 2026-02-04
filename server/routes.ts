@@ -1153,6 +1153,309 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== Prayer Meeting Routes ====================
+  
+  // Get all prayer meetings
+  app.get("/api/prayer-meetings", async (req, res) => {
+    try {
+      const meetings = await storage.getPrayerMeetings();
+      res.json(meetings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get prayer meetings" });
+    }
+  });
+
+  // Get prayer meeting by ID
+  app.get("/api/prayer-meetings/:id", async (req, res) => {
+    try {
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get prayer meeting" });
+    }
+  });
+
+  // Get prayer meeting by short code
+  app.get("/api/prayer-meetings/code/:code", async (req, res) => {
+    try {
+      const meeting = await storage.getPrayerMeetingByCode(req.params.code);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+      res.json(meeting);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get prayer meeting" });
+    }
+  });
+
+  // Get participants for a prayer meeting
+  app.get("/api/prayer-meetings/:id/participants", async (req, res) => {
+    try {
+      const participants = await storage.getPrayerMeetingParticipants(req.params.id);
+      res.json(participants);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get participants" });
+    }
+  });
+
+  // Create a new prayer meeting (requires leader/admin role)
+  app.post("/api/prayer-meetings", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      let role: string | undefined;
+      if (userId) {
+        role = await storage.getUserRole(userId);
+      }
+      
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Only leaders and admins can create prayer meetings" });
+      }
+
+      const { title, groupingMode, groupSize, groupCount, genderMode } = req.body;
+      const shortCode = await storage.generateUniquePrayerMeetingCode();
+      
+      const meeting = await storage.createPrayerMeeting({
+        shortCode,
+        title: title || '禱告會',
+        groupingMode: groupingMode || 'bySize',
+        groupSize: groupSize || 4,
+        groupCount: groupCount || 3,
+        genderMode: genderMode || 'mixed',
+        ownerId: userId,
+        status: 'joining',
+      });
+      res.json(meeting);
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to create:", error);
+      res.status(500).json({ error: "Failed to create prayer meeting" });
+    }
+  });
+
+  // Join a prayer meeting
+  app.post("/api/prayer-meetings/:id/join", async (req, res) => {
+    try {
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+      if (meeting.status === 'completed') {
+        return res.status(400).json({ error: "Prayer meeting has ended" });
+      }
+
+      const { name, gender, userId } = req.body;
+      if (!name || !gender) {
+        return res.status(400).json({ error: "Name and gender are required" });
+      }
+
+      const participant = await storage.addPrayerMeetingParticipant({
+        meetingId: meeting.id,
+        userId: userId || null,
+        name,
+        gender,
+      });
+      res.json(participant);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to join prayer meeting" });
+    }
+  });
+
+  // Update prayer meeting (status, settings)
+  app.patch("/api/prayer-meetings/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      if (meeting.ownerId !== userId) {
+        const role = userId ? await storage.getUserRole(userId) : undefined;
+        if (role !== 'admin') {
+          return res.status(403).json({ error: "Only the meeting owner can update it" });
+        }
+      }
+
+      const updated = await storage.updatePrayerMeeting(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update prayer meeting" });
+    }
+  });
+
+  // Execute grouping for prayer meeting
+  app.post("/api/prayer-meetings/:id/execute-grouping", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      if (meeting.ownerId !== userId) {
+        const role = userId ? await storage.getUserRole(userId) : undefined;
+        if (role !== 'admin') {
+          return res.status(403).json({ error: "Only the meeting owner can execute grouping" });
+        }
+      }
+
+      const participants = await storage.getPrayerMeetingParticipants(meeting.id);
+      if (participants.length === 0) {
+        return res.status(400).json({ error: "No participants to group" });
+      }
+
+      const shuffled = [...participants].sort(() => Math.random() - 0.5);
+      
+      let numGroups: number;
+      if (meeting.groupingMode === 'bySize') {
+        numGroups = Math.ceil(shuffled.length / (meeting.groupSize || 4));
+      } else {
+        numGroups = Math.min(meeting.groupCount || 3, shuffled.length);
+      }
+
+      let updates: { id: string; groupNumber: number }[] = [];
+      
+      if (meeting.genderMode === 'separate') {
+        const males = shuffled.filter(p => p.gender === 'M');
+        const females = shuffled.filter(p => p.gender === 'F');
+        
+        const maleGroups = Math.max(1, Math.ceil(males.length / (meeting.groupSize || 4)));
+        const femaleGroups = Math.max(1, Math.ceil(females.length / (meeting.groupSize || 4)));
+        
+        males.forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: (i % maleGroups) + 1 });
+        });
+        females.forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: maleGroups + (i % femaleGroups) + 1 });
+        });
+      } else if (meeting.genderMode === 'male_only') {
+        const males = shuffled.filter(p => p.gender === 'M');
+        males.forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: (i % numGroups) + 1 });
+        });
+        shuffled.filter(p => p.gender === 'F').forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: numGroups + 1 });
+        });
+      } else if (meeting.genderMode === 'female_only') {
+        const females = shuffled.filter(p => p.gender === 'F');
+        females.forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: (i % numGroups) + 1 });
+        });
+        shuffled.filter(p => p.gender === 'M').forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: numGroups + 1 });
+        });
+      } else {
+        shuffled.forEach((p, i) => {
+          updates.push({ id: p.id, groupNumber: (i % numGroups) + 1 });
+        });
+      }
+
+      await storage.updatePrayerMeetingParticipants(meeting.id, updates);
+      await storage.updatePrayerMeeting(meeting.id, { status: 'grouped' });
+
+      const updatedParticipants = await storage.getPrayerMeetingParticipants(meeting.id);
+      res.json({ participants: updatedParticipants });
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to execute grouping:", error);
+      res.status(500).json({ error: "Failed to execute grouping" });
+    }
+  });
+
+  // Update participant prayer request
+  app.patch("/api/prayer-meetings/:meetingId/participants/:participantId", async (req, res) => {
+    try {
+      const { prayerRequest } = req.body;
+      const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, { prayerRequest });
+      if (!updated) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update prayer request" });
+    }
+  });
+
+  // Delete/close a prayer meeting
+  app.delete("/api/prayer-meetings/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      if (meeting.ownerId !== userId) {
+        const role = userId ? await storage.getUserRole(userId) : undefined;
+        if (role !== 'admin') {
+          return res.status(403).json({ error: "Only the meeting owner can delete it" });
+        }
+      }
+
+      await storage.deletePrayerMeeting(meeting.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete prayer meeting" });
+    }
+  });
+
   // Card Questions CRUD for admin
   app.get("/api/card-questions", async (req, res) => {
     try {

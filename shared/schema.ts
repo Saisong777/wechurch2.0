@@ -448,6 +448,42 @@ export type GroupingParticipant = typeof groupingParticipants.$inferSelect;
 export type InsertGroupingActivity = z.infer<typeof insertGroupingActivitySchema>;
 export type InsertGroupingParticipant = z.infer<typeof insertGroupingParticipantSchema>;
 
+export const prayerMeetingStatusEnum = pgEnum("prayer_meeting_status", ["joining", "grouped", "praying", "completed"]);
+export const prayerMeetingGenderModeEnum = pgEnum("prayer_meeting_gender_mode", ["mixed", "separate", "male_only", "female_only"]);
+
+export const prayerMeetings = pgTable("prayer_meetings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  shortCode: text("short_code").notNull().unique(),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("joining"),
+  groupingMode: text("grouping_mode").notNull().default("bySize"),
+  groupSize: integer("group_size").default(4),
+  groupCount: integer("group_count").default(3),
+  genderMode: text("gender_mode").notNull().default("mixed"),
+  ownerId: uuid("owner_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const prayerMeetingParticipants = pgTable("prayer_meeting_participants", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  meetingId: uuid("meeting_id").references(() => prayerMeetings.id).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  name: text("name").notNull(),
+  gender: text("gender").notNull(),
+  groupNumber: integer("group_number"),
+  prayerRequest: text("prayer_request"),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrayerMeetingSchema = createInsertSchema(prayerMeetings).omit({ id: true, createdAt: true });
+export const insertPrayerMeetingParticipantSchema = createInsertSchema(prayerMeetingParticipants).omit({ id: true, joinedAt: true, updatedAt: true });
+
+export type PrayerMeeting = typeof prayerMeetings.$inferSelect;
+export type PrayerMeetingParticipant = typeof prayerMeetingParticipants.$inferSelect;
+export type InsertPrayerMeeting = z.infer<typeof insertPrayerMeetingSchema>;
+export type InsertPrayerMeetingParticipant = z.infer<typeof insertPrayerMeetingParticipantSchema>;
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true, createdAt: true });
 export const insertParticipantSchema = createInsertSchema(participants).omit({ id: true, joinedAt: true, updatedAt: true });

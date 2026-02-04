@@ -8,11 +8,13 @@ import {
   cardQuestions, messageCards, messageCardDownloads, userRoles,
   chineseUnionTrad, jesus4Seasons, jesusDailyContent, readingPlanTemplates, readingPlanTemplateItems, blessingVerses, savedVerses,
   groupingActivities, groupingParticipants,
+  prayerMeetings, prayerMeetingParticipants,
   User, InsertUser, Session, InsertSession, Participant, InsertParticipant,
   Submission, InsertSubmission, Prayer, InsertPrayer, StudyResponse, InsertStudyResponse,
   FeatureToggle, PotentialMember, IcebreakerGame, IcebreakerPlayer, CardQuestion,
   AiReport, MessageCard, MessageCardDownload,
   ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse, SavedVerse, InsertSavedVerse,
+  PrayerMeeting, InsertPrayerMeeting, PrayerMeetingParticipant, InsertPrayerMeetingParticipant,
   GroupingActivity, GroupingParticipant, InsertGroupingActivity, InsertGroupingParticipant
 } from "@shared/schema";
 
@@ -112,6 +114,20 @@ export interface IStorage {
   updateGroupingParticipants(activityId: string, updates: { id: string; groupNumber: number }[]): Promise<void>;
   deleteGroupingActivity(id: string): Promise<void>;
   generateUniqueShortCode(): Promise<string>;
+
+  // Prayer Meetings
+  getPrayerMeetings(): Promise<PrayerMeeting[]>;
+  getPrayerMeeting(id: string): Promise<PrayerMeeting | undefined>;
+  getPrayerMeetingByCode(shortCode: string): Promise<PrayerMeeting | undefined>;
+  getActivePrayerMeetingsByOwner(ownerId: string): Promise<PrayerMeeting[]>;
+  createPrayerMeeting(meeting: InsertPrayerMeeting): Promise<PrayerMeeting>;
+  updatePrayerMeeting(id: string, data: Partial<PrayerMeeting>): Promise<PrayerMeeting | undefined>;
+  deletePrayerMeeting(id: string): Promise<void>;
+  getPrayerMeetingParticipants(meetingId: string): Promise<PrayerMeetingParticipant[]>;
+  addPrayerMeetingParticipant(participant: InsertPrayerMeetingParticipant): Promise<PrayerMeetingParticipant>;
+  updatePrayerMeetingParticipant(id: string, data: Partial<PrayerMeetingParticipant>): Promise<PrayerMeetingParticipant | undefined>;
+  updatePrayerMeetingParticipants(meetingId: string, updates: { id: string; groupNumber: number }[]): Promise<void>;
+  generateUniquePrayerMeetingCode(): Promise<string>;
 
   deleteAiReport(id: string): Promise<void>;
   
@@ -678,6 +694,89 @@ export class DatabaseStorage implements IStorage {
   async deleteGroupingActivity(id: string): Promise<void> {
     await db.delete(groupingParticipants).where(eq(groupingParticipants.activityId, id));
     await db.delete(groupingActivities).where(eq(groupingActivities.id, id));
+  }
+
+  // Prayer Meeting methods
+  async getPrayerMeetings(): Promise<PrayerMeeting[]> {
+    return db.select().from(prayerMeetings).orderBy(desc(prayerMeetings.createdAt));
+  }
+
+  async getPrayerMeeting(id: string): Promise<PrayerMeeting | undefined> {
+    const [meeting] = await db.select().from(prayerMeetings).where(eq(prayerMeetings.id, id)).limit(1);
+    return meeting;
+  }
+
+  async getPrayerMeetingByCode(shortCode: string): Promise<PrayerMeeting | undefined> {
+    const [meeting] = await db.select().from(prayerMeetings)
+      .where(eq(prayerMeetings.shortCode, shortCode.toUpperCase()))
+      .limit(1);
+    return meeting;
+  }
+
+  async getActivePrayerMeetingsByOwner(ownerId: string): Promise<PrayerMeeting[]> {
+    return db.select().from(prayerMeetings)
+      .where(and(eq(prayerMeetings.ownerId, ownerId), sql`${prayerMeetings.status} != 'completed'`))
+      .orderBy(desc(prayerMeetings.createdAt));
+  }
+
+  async createPrayerMeeting(meeting: InsertPrayerMeeting): Promise<PrayerMeeting> {
+    const [newMeeting] = await db.insert(prayerMeetings).values(meeting).returning();
+    return newMeeting;
+  }
+
+  async updatePrayerMeeting(id: string, data: Partial<PrayerMeeting>): Promise<PrayerMeeting | undefined> {
+    const [updated] = await db.update(prayerMeetings).set(data).where(eq(prayerMeetings.id, id)).returning();
+    return updated;
+  }
+
+  async deletePrayerMeeting(id: string): Promise<void> {
+    await db.delete(prayerMeetingParticipants).where(eq(prayerMeetingParticipants.meetingId, id));
+    await db.delete(prayerMeetings).where(eq(prayerMeetings.id, id));
+  }
+
+  async getPrayerMeetingParticipants(meetingId: string): Promise<PrayerMeetingParticipant[]> {
+    return db.select().from(prayerMeetingParticipants)
+      .where(eq(prayerMeetingParticipants.meetingId, meetingId))
+      .orderBy(asc(prayerMeetingParticipants.joinedAt));
+  }
+
+  async addPrayerMeetingParticipant(participant: InsertPrayerMeetingParticipant): Promise<PrayerMeetingParticipant> {
+    const [newParticipant] = await db.insert(prayerMeetingParticipants).values(participant).returning();
+    return newParticipant;
+  }
+
+  async updatePrayerMeetingParticipant(id: string, data: Partial<PrayerMeetingParticipant>): Promise<PrayerMeetingParticipant | undefined> {
+    const [updated] = await db.update(prayerMeetingParticipants)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(prayerMeetingParticipants.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updatePrayerMeetingParticipants(meetingId: string, updates: { id: string; groupNumber: number }[]): Promise<void> {
+    for (const update of updates) {
+      await db.update(prayerMeetingParticipants)
+        .set({ groupNumber: update.groupNumber, updatedAt: new Date() })
+        .where(and(eq(prayerMeetingParticipants.id, update.id), eq(prayerMeetingParticipants.meetingId, meetingId)));
+    }
+  }
+
+  async generateUniquePrayerMeetingCode(): Promise<string> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code: string;
+    let exists = true;
+    
+    while (exists) {
+      code = '';
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const existing = await db.select().from(prayerMeetings)
+        .where(eq(prayerMeetings.shortCode, code)).limit(1);
+      exists = existing.length > 0;
+    }
+    
+    return code!;
   }
 
   async getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]> {

@@ -25,6 +25,7 @@ const LearnPage = lazy(() => import("./pages/LearnPage"));
 const BiblePage = lazy(() => import("./pages/BiblePage"));
 const JesusTimelinePage = lazy(() => import("./pages/JesusTimelinePage"));
 const ReadingPlansPage = lazy(() => import("./pages/ReadingPlansPage"));
+const PrayerMeetingPage = lazy(() => import("./pages/PrayerMeetingPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Minimal loading fallback for Suspense
@@ -63,6 +64,7 @@ const App = () => (
                   <Route path="/jesus-timeline" element={<JesusTimelinePage />} />
                   <Route path="/learn/reading-plans" element={<ReadingPlansPage />} />
                   <Route path="/cards" element={<MessageCardPage />} />
+                  <Route path="/prayer-meeting" element={<PrayerMeetingPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
