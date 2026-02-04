@@ -1165,6 +1165,16 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/prayer-meetings/active", async (req, res) => {
+    try {
+      const meetings = await storage.getPrayerMeetings();
+      const active = meetings.filter(m => m.status !== 'completed' && m.status !== 'cancelled');
+      res.json(active);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get active prayer meetings" });
+    }
+  });
+
   // Get prayer meeting by ID
   app.get("/api/prayer-meetings/:id", async (req, res) => {
     try {
@@ -1402,6 +1412,22 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error("[PrayerMeeting] Failed to execute grouping:", error);
       res.status(500).json({ error: "Failed to execute grouping" });
+    }
+  });
+
+  app.post("/api/prayer-meetings/:id/start-praying", async (req, res) => {
+    try {
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+      
+      await storage.updatePrayerMeeting(meeting.id, { status: 'praying' });
+      const updated = await storage.getPrayerMeeting(meeting.id);
+      res.json(updated);
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to start praying:", error);
+      res.status(500).json({ error: "Failed to start praying" });
     }
   });
 

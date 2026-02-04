@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Shuffle, Copy, Check, Users, Sparkles, UserPlus, Crown, Clock, QrCode, Search, Home, PenLine, Presentation, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, Crown, Shuffle, Presentation } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -409,33 +409,17 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
             <p className="text-gray-500 dark:text-gray-400">分組禱告，彼此代禱</p>
           </div>
 
-          <div className="space-y-4">
-            {isLeaderOrAbove && (
-              <Card className="hover-elevate cursor-pointer" onClick={() => setViewMode('host')}>
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/40 rounded-xl flex items-center justify-center">
-                    <Crown className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">主持禱告會</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">建立新的禱告會活動</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="hover-elevate cursor-pointer" onClick={() => setViewMode('join')}>
-              <CardContent className="flex items-center gap-4 p-4">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-xl flex items-center justify-center">
-                  <UserPlus className="w-6 h-6 text-green-600 dark:text-green-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">加入禱告會</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">輸入代碼加入現有活動</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="hover-elevate cursor-pointer" onClick={() => setViewMode('join')}>
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-xl flex items-center justify-center">
+                <UserPlus className="w-6 h-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white">加入禱告會</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">輸入代碼或掃描 QR Code</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
