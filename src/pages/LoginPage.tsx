@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogIn, Mail, Lock, User, ArrowLeft, Sparkles } from 'lucide-react';
+import { LogIn, Mail, Lock, User, ArrowLeft, Sparkles, Chrome } from 'lucide-react';
 import { toast } from 'sonner';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
+import { SiGoogle } from 'react-icons/si';
 
 const LoginPage = () => {
   const { user, loading } = useAuth();
@@ -206,6 +207,10 @@ const LoginForm: React.FC = () => {
     );
   }
 
+  const handleGoogleLogin = () => {
+    window.location.href = '/api/login';
+  };
+
   return (
     <Card variant="highlight" className="w-full border-2 shadow-lg">
       <CardHeader className="text-center pb-4">
@@ -217,6 +222,30 @@ const LoginForm: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Social Login Options */}
+        <div className="space-y-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full h-12 gap-3 font-medium"
+            onClick={handleGoogleLogin}
+            data-testid="button-google-login"
+          >
+            <SiGoogle className="w-5 h-5 text-[#4285F4]" />
+            使用 Google 帳號繼續
+          </Button>
+        </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">或使用電子郵件</span>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div className="space-y-2">

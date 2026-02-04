@@ -125,6 +125,9 @@ The application is optimized for 500+ concurrent users with:
 
 ### Authentication
 - **Replit Auth**: Primary authentication system with session storage in PostgreSQL
+  - Supports Google, GitHub, Apple, and email/password login
+  - Login page at `/login` with prominent "使用 Google 帳號繼續" button
+  - Auth routes: `/api/login` (begin login), `/api/logout` (logout), `/api/auth/user` (get user)
 - **Express Session**: Session management with `connect-pg-simple` for PostgreSQL session store
 
 ### Email Service
