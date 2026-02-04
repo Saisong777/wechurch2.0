@@ -212,6 +212,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       setCurrentMeetingId(null);
       setStep('list');
       queryClient.invalidateQueries({ queryKey: ['/api/prayer-meetings/active'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/prayer-meetings/history'] });
       toast.success('禱告會已結束');
     },
     onError: () => {
@@ -234,10 +235,16 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
   });
 
   const [prayerListGroup, setPrayerListGroup] = useState<number | null>(null);
+  const [prayerListMode, setPrayerListMode] = useState<'all' | 'named' | 'anonymous'>('all');
 
-  const prayerListQueryKey = prayerListGroup !== null
-    ? `/api/prayer-meetings/${currentMeetingId}/prayer-list?group=${prayerListGroup}&includeAnonymous=true`
-    : `/api/prayer-meetings/${currentMeetingId}/prayer-list?includeAnonymous=true`;
+  const buildPrayerListQueryKey = () => {
+    let url = `/api/prayer-meetings/${currentMeetingId}/prayer-list?mode=${prayerListMode}`;
+    if (prayerListMode === 'named' && prayerListGroup !== null) {
+      url += `&group=${prayerListGroup}`;
+    }
+    return url;
+  };
+  const prayerListQueryKey = buildPrayerListQueryKey();
 
   const { data: prayerListData, isLoading: isLoadingPrayerList } = useQuery<PrayerListData>({
     queryKey: [prayerListQueryKey],
@@ -372,24 +379,47 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
 
           <div className="flex gap-2 mb-6 flex-wrap justify-center items-center">
             <Button
-              variant={prayerListGroup === null ? 'default' : 'outline'}
-              onClick={() => setPrayerListGroup(null)}
+              variant={prayerListMode === 'all' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('all'); setPrayerListGroup(null); }}
               size="sm"
-              data-testid="button-group-all"
+              data-testid="button-mode-all"
             >
-              全部
+              全部禱告
             </Button>
-            {groupNumbers.map(num => (
-              <Button
-                key={num}
-                variant={prayerListGroup === num ? 'default' : 'outline'}
-                onClick={() => setPrayerListGroup(num)}
-                size="sm"
-                data-testid={`button-group-${num}`}
-              >
-                第 {num} 組
-              </Button>
-            ))}
+            <Button
+              variant={prayerListMode === 'named' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('named'); setPrayerListGroup(null); }}
+              size="sm"
+              data-testid="button-mode-named"
+            >
+              各組禱告
+            </Button>
+            <Button
+              variant={prayerListMode === 'anonymous' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('anonymous'); setPrayerListGroup(null); }}
+              size="sm"
+              data-testid="button-mode-anonymous"
+            >
+              匿名禱告
+            </Button>
+            
+            {prayerListMode === 'named' && groupNumbers.length > 0 && (
+              <>
+                <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
+                {groupNumbers.map(num => (
+                  <Button
+                    key={num}
+                    variant={prayerListGroup === num ? 'secondary' : 'outline'}
+                    onClick={() => setPrayerListGroup(num)}
+                    size="sm"
+                    data-testid={`button-group-${num}`}
+                  >
+                    第 {num} 組
+                  </Button>
+                ))}
+              </>
+            )}
+            
             <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
             <Button
               variant="outline"

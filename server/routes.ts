@@ -1588,7 +1588,7 @@ export async function registerRoutes(app: Express) {
       const prayerTexts = prayersToClassify.map((p, i) => `${i + 1}. ${p.prayerRequest}`).join('\n');
       
       const response = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -1668,7 +1668,12 @@ export async function registerRoutes(app: Express) {
 
       const participants = await storage.getPrayerMeetingParticipants(meeting.id);
       const groupNumber = req.query.group ? parseInt(req.query.group as string) : null;
-      const includeAnonymousPrayers = req.query.includeAnonymous === 'true';
+      
+      // Support both old (includeAnonymous) and new (mode) parameters for backward compatibility
+      const includeAnonymousLegacy = req.query.includeAnonymous === 'true';
+      let mode = (req.query.mode as string) || (includeAnonymousLegacy ? 'all' : 'named');
+      
+      const excludeParticipantId = req.query.excludeParticipant as string | undefined;
 
       // Build unified prayer list with both named and anonymous prayers
       type PrayerItem = {
@@ -1685,14 +1690,11 @@ export async function registerRoutes(app: Express) {
       const allPrayers: PrayerItem[] = [];
       
       for (const p of participants) {
-        // Filter by group if specified
-        if (groupNumber && p.groupNumber !== groupNumber) continue;
+        // Filter by group if specified (only for named prayers mode)
+        if (mode === 'named' && groupNumber && p.groupNumber !== groupNumber) continue;
         
-        // Add named prayer if exists
-        if (p.prayerRequest && p.prayerRequest.trim()) {
-          // Skip if isAnonymous participant and includeAnonymous is false
-          if (!includeAnonymousPrayers && p.isAnonymous) continue;
-          
+        // Add named prayer if exists and mode includes named prayers
+        if ((mode === 'all' || mode === 'named') && p.prayerRequest && p.prayerRequest.trim()) {
           allPrayers.push({
             id: p.id,
             name: p.isAnonymous ? '匿名' : p.name,
@@ -1705,8 +1707,12 @@ export async function registerRoutes(app: Express) {
           });
         }
         
-        // Add anonymous prayer field if exists and includeAnonymousPrayers is true
-        if (includeAnonymousPrayers && p.anonymousPrayer && p.anonymousPrayer.trim()) {
+        // Add anonymous prayer field if exists and mode includes anonymous prayers
+        // Exclude current user's anonymous prayers so they can't identify themselves
+        if ((mode === 'all' || mode === 'anonymous') && p.anonymousPrayer && p.anonymousPrayer.trim()) {
+          // Skip user's own anonymous prayer to maintain true anonymity
+          if (excludeParticipantId && p.id === excludeParticipantId) continue;
+          
           allPrayers.push({
             id: `${p.id}-anon`,
             name: '匿名',
