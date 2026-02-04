@@ -56,7 +56,11 @@ const GROUP_COLORS = [
 
 const getGroupColor = (groupNumber: number) => GROUP_COLORS[(groupNumber - 1) % GROUP_COLORS.length];
 
-export const PrayerMeetingManager = () => {
+interface PrayerMeetingManagerProps {
+  initialCode?: string;
+}
+
+export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps) => {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -70,7 +74,7 @@ export const PrayerMeetingManager = () => {
   const [groupCount, setGroupCount] = useState(3);
   const [genderMode, setGenderMode] = useState<GenderMode>('mixed');
   
-  const [joinCode, setJoinCode] = useState('');
+  const [joinCode, setJoinCode] = useState(initialCode || '');
   const [joinName, setJoinName] = useState('');
   const [joinGender, setJoinGender] = useState<'M' | 'F' | ''>('');
   const [hasJoined, setHasJoined] = useState(false);
@@ -120,6 +124,27 @@ export const PrayerMeetingManager = () => {
       setMyParticipantId(null);
     }
   }, [meetingError, viewMode, currentMeetingId, meetingDeleted]);
+
+  useEffect(() => {
+    if (initialCode && viewMode === 'home') {
+      const lookupMeeting = async () => {
+        try {
+          const res = await fetch(`/api/prayer-meetings/code/${initialCode.toUpperCase()}`);
+          if (res.ok) {
+            const data = await res.json();
+            setCurrentMeetingId(data.id);
+            setMeetingDeleted(false);
+            setViewMode('meeting');
+          } else {
+            toast.error('找不到此禱告會');
+          }
+        } catch (error) {
+          toast.error('查詢失敗');
+        }
+      };
+      lookupMeeting();
+    }
+  }, [initialCode]);
 
   const createMeetingMutation = useMutation({
     mutationFn: async () => {

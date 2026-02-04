@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, ImageIcon, ChevronRight } from 'lucide-react';
+import { Heart, ImageIcon, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FeatureGate } from '@/components/ui/feature-gate';
 
@@ -17,6 +17,17 @@ const shareFeatures = [
     color: 'from-rose-500 to-pink-600',
     bgColor: 'bg-rose-500/10',
     iconColor: 'text-rose-600',
+  },
+  {
+    id: 'prayer-meeting',
+    title: '禱告會',
+    subtitle: 'Prayer Meeting',
+    description: '分組禱告，彼此代禱',
+    icon: Sparkles,
+    href: '/prayer-meeting',
+    color: 'from-purple-500 to-pink-600',
+    bgColor: 'bg-purple-500/10',
+    iconColor: 'text-purple-600',
   },
   {
     id: 'card',
