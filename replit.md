@@ -45,6 +45,18 @@ Preferred communication style: Simple, everyday language.
   - `grouping_activities` / `grouping_participants` - Random grouper with unique short codes
   - `message_cards` - Shareable image cards with download tracking
 
+### Prayer Wall (禱告牆)
+The prayer wall enables community prayer sharing with:
+- **Three view modes**: All prayers, My prayers (user's own), Answered prayers (celebration view)
+- **Category filtering**: Filter by thanksgiving, supplication, praise, or other
+- **Answered prayer tracking**: Mark prayers as answered with celebration banner UI (emerald theme)
+- **Scripture reference support**: Attach Bible verses to prayers when creating
+- **Anonymous posting**: Option to post prayers anonymously
+- **Pinned prayers**: Admin can pin important prayers to top
+- **Amen/代禱**: React to prayers with amen support
+- **Comments**: Comment thread on each prayer
+- **Mobile optimized**: Horizontally scrollable tabs with 44px minimum touch targets
+
 ### Random Grouper ("神的安排")
 The random grouper feature allows leaders to create grouping activities with:
 - **Unique 4-digit codes**: Each activity gets a unique short code (e.g., "A3B7") for easy sharing
