@@ -1579,6 +1579,8 @@ export async function registerRoutes(app: Express) {
         return res.json({ message: "No prayers to classify", classified: 0 });
       }
 
+      console.log("[PrayerMeeting] Starting AI classification for", prayersToClassify.length, "prayers");
+      
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -1586,6 +1588,7 @@ export async function registerRoutes(app: Express) {
       });
 
       const prayerTexts = prayersToClassify.map((p, i) => `${i + 1}. ${p.prayerRequest}`).join('\n');
+      console.log("[PrayerMeeting] Prayer texts to classify:", prayerTexts);
       
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -1632,18 +1635,23 @@ export async function registerRoutes(app: Express) {
         max_tokens: 1000,
       });
 
+      console.log("[PrayerMeeting] AI response received");
       const content = response.choices[0]?.message?.content;
       if (!content) {
+        console.error("[PrayerMeeting] AI response empty");
         return res.status(500).json({ error: "AI response empty" });
       }
 
+      console.log("[PrayerMeeting] AI response content:", content);
       const result = JSON.parse(content);
       const classifications = result.classifications || [];
+      console.log("[PrayerMeeting] Classifications:", classifications.length);
 
       for (const classification of classifications) {
         const idx = classification.index - 1;
         if (idx >= 0 && idx < prayersToClassify.length) {
           const participant = prayersToClassify[idx];
+          console.log(`[PrayerMeeting] Updating participant ${participant.id} with category=${classification.category}, isUrgent=${classification.isUrgent}`);
           await storage.updatePrayerMeetingParticipant(participant.id, {
             prayerCategory: classification.category,
             isUrgent: classification.isUrgent === true,
@@ -1651,10 +1659,12 @@ export async function registerRoutes(app: Express) {
         }
       }
 
+      console.log("[PrayerMeeting] Classification complete");
       res.json({ message: "Prayers classified successfully", classified: classifications.length });
     } catch (error) {
       console.error("[PrayerMeeting] Failed to classify prayers:", error);
-      res.status(500).json({ error: "Failed to classify prayers" });
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ error: "Failed to classify prayers", details: errorMessage });
     }
   });
 

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, Presentation, X, Sparkles, List, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -406,17 +407,22 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
             {prayerListMode === 'named' && groupNumbers.length > 0 && (
               <>
                 <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
-                {groupNumbers.map(num => (
-                  <Button
-                    key={num}
-                    variant={prayerListGroup === num ? 'secondary' : 'outline'}
-                    onClick={() => setPrayerListGroup(num)}
-                    size="sm"
-                    data-testid={`button-group-${num}`}
-                  >
-                    第 {num} 組
-                  </Button>
-                ))}
+                <Select
+                  value={prayerListGroup?.toString() || 'all'}
+                  onValueChange={(value) => setPrayerListGroup(value === 'all' ? null : parseInt(value))}
+                >
+                  <SelectTrigger className="w-32" data-testid="select-group-filter">
+                    <SelectValue placeholder="選擇組別" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部組別</SelectItem>
+                    {groupNumbers.map(num => (
+                      <SelectItem key={num} value={num.toString()}>
+                        第 {num} 組
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </>
             )}
             

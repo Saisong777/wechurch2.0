@@ -246,27 +246,21 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
     },
   });
 
-  const updateNamedPrayerMutation = useMutation({
-    mutationFn: async (prayerRequest: string) => {
-      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/participants/${myParticipantId}`, { prayerRequest, isAnonymous: false });
-      return res.json();
+  const updateBothPrayersMutation = useMutation({
+    mutationFn: async ({ namedPrayer, anonymousPrayer }: { namedPrayer: string; anonymousPrayer: string }) => {
+      // Always send both requests to allow clearing prayers
+      await Promise.all([
+        apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/participants/${myParticipantId}`, { prayerRequest: namedPrayer || '', isAnonymous: false }),
+        apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/anonymous-prayer/${myParticipantId}`, { anonymousPrayer: anonymousPrayer || '' })
+      ]);
     },
     onSuccess: () => {
       refetchParticipants();
       setIsEditingPrayer(false);
-      toast.success('實名禱告事項已儲存');
+      toast.success('禱告事項已儲存');
     },
-  });
-
-  const updateAnonymousPrayerMutation = useMutation({
-    mutationFn: async (anonymousPrayer: string) => {
-      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/anonymous-prayer/${myParticipantId}`, { anonymousPrayer });
-      return res.json();
-    },
-    onSuccess: () => {
-      refetchParticipants();
-      setIsEditingPrayer(false);
-      toast.success('匿名禱告事項已儲存');
+    onError: () => {
+      toast.error('儲存失敗，請重試');
     },
   });
 
@@ -900,14 +894,6 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                         rows={3}
                         data-testid="textarea-named-prayer"
                       />
-                      <Button
-                        onClick={() => updateNamedPrayerMutation.mutate(myNamedPrayer)}
-                        disabled={updateNamedPrayerMutation.isPending}
-                        className="w-full"
-                        data-testid="button-save-named-prayer"
-                      >
-                        {updateNamedPrayerMutation.isPending ? '儲存中...' : '儲存實名禱告'}
-                      </Button>
                     </div>
 
                     <div className="border-t pt-4 space-y-3">
@@ -925,16 +911,16 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                         rows={3}
                         data-testid="textarea-anonymous-prayer"
                       />
-                      <Button
-                        variant="outline"
-                        onClick={() => updateAnonymousPrayerMutation.mutate(myAnonymousPrayer)}
-                        disabled={updateAnonymousPrayerMutation.isPending}
-                        className="w-full"
-                        data-testid="button-save-anonymous-prayer"
-                      >
-                        {updateAnonymousPrayerMutation.isPending ? '儲存中...' : '儲存匿名禱告'}
-                      </Button>
                     </div>
+
+                    <Button
+                      onClick={() => updateBothPrayersMutation.mutate({ namedPrayer: myNamedPrayer, anonymousPrayer: myAnonymousPrayer })}
+                      disabled={updateBothPrayersMutation.isPending}
+                      className="w-full"
+                      data-testid="button-save-prayers"
+                    >
+                      {updateBothPrayersMutation.isPending ? '儲存中...' : '儲存禱告事項'}
+                    </Button>
                   </>
                 ) : (
                   <div className="space-y-3">
@@ -973,12 +959,17 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                   </div>
                 )}
 
-                {myGroupMembers.some(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId) && (
+                {myGroupMembers.some(m => m.prayerRequest && !m.isAnonymous) && (
                   <div className="pt-4 border-t space-y-4">
                     <h4 className="font-medium text-gray-900 dark:text-white">組員禱告事項</h4>
                     <div className="space-y-3">
-                      {myGroupMembers.filter(m => m.prayerRequest && !m.isAnonymous && m.id !== myParticipantId).map(m => (
-                        <div key={m.id} className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      {myGroupMembers.filter(m => m.prayerRequest && !m.isAnonymous).map(m => (
+                        <div key={m.id} className={cn(
+                          "flex gap-3 p-3 rounded-lg border",
+                          m.id === myParticipantId 
+                            ? "bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-700" 
+                            : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                        )}>
                           <div className="shrink-0">
                             <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium', color.accent)}>
                               {m.name.charAt(0)}
@@ -987,6 +978,9 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-sm text-gray-900 dark:text-white">{m.name}</span>
+                              {m.id === myParticipantId && (
+                                <Badge variant="secondary" className="text-xs">我</Badge>
+                              )}
                               {m.prayerCategory && (
                                 <Badge variant="outline" className="text-xs">{m.prayerCategory}</Badge>
                               )}
