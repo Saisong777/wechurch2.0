@@ -27,6 +27,7 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "auth_sessions",
   });
+  const isDev = process.env.NODE_ENV === "development";
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -34,8 +35,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      secure: !isDev, // Allow non-HTTPS in development
+      sameSite: isDev ? 'lax' : 'lax',
       maxAge: sessionTtl,
     },
   });
@@ -133,90 +134,67 @@ export async function setupAuth(app: Express) {
   // Development-only login bypass for testing
   if (process.env.NODE_ENV === "development") {
     app.get("/api/dev-login", async (req, res) => {
-      // Use a numeric string ID to match existing auth_users format
       const devUserId = "99999999";
-      const devUser = {
-        id: devUserId,
-        email: "dev@wechurch.test",
-        firstName: "開發",
-        lastName: "管理員",
-        profileImageUrl: null,
-      };
+      const devEmail = "dev@wechurch.test";
+      const devFirstName = "開發";
+      const devLastName = "管理員";
       
-      // Upsert dev user to auth_users database using raw SQL to handle conflicts properly
-      try {
-        const { pool } = await import("../../db");
-        await pool.query(
-          `INSERT INTO auth_users (id, email, first_name, last_name, profile_image_url, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-           ON CONFLICT (id) DO UPDATE SET 
-             email = EXCLUDED.email,
-             first_name = EXCLUDED.first_name,
-             last_name = EXCLUDED.last_name,
-             updated_at = NOW()`,
-          [devUserId, devUser.email, devUser.firstName, devUser.lastName, devUser.profileImageUrl]
-        );
-      } catch (authError) {
-        console.error("[Dev Login] Auth user upsert error:", authError);
-      }
-      
-      // Also ensure dev user has admin role in user_roles table
-      // We'll set the role via a direct database query
       try {
         const { pool } = await import("../../db");
         
-        // Check if user exists in users table, if not create them
-        const userCheck = await pool.query(
+        // Step 1: Upsert auth_users - delete first then insert to avoid conflicts
+        await pool.query(`DELETE FROM auth_users WHERE id = $1 OR email = $2`, [devUserId, devEmail]);
+        await pool.query(
+          `INSERT INTO auth_users (id, email, first_name, last_name, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+          [devUserId, devEmail, devFirstName, devLastName]
+        );
+        
+        // Step 2: Upsert users table for role assignment
+        const userResult = await pool.query(
           `INSERT INTO users (id, email, password, display_name, created_at, updated_at)
-           VALUES (gen_random_uuid(), $1, 'dev-no-password', $2, NOW(), NOW())
+           VALUES (gen_random_uuid(), $1, 'dev', $2, NOW(), NOW())
            ON CONFLICT (email) DO UPDATE SET display_name = $2, updated_at = NOW()
            RETURNING id`,
-          [devUser.email, `${devUser.firstName}${devUser.lastName}`]
+          [devEmail, `${devFirstName}${devLastName}`]
         );
+        const legacyUserId = userResult.rows[0].id;
         
-        const legacyUserId = userCheck.rows[0].id;
-        
-        // Upsert admin role for this user
-        const existingRole = await pool.query(
-          `SELECT id FROM user_roles WHERE user_id = $1`,
-          [legacyUserId]
-        );
-        
-        if (existingRole.rows.length > 0) {
-          await pool.query(
-            `UPDATE user_roles SET role = 'admin', updated_at = NOW() WHERE user_id = $1`,
-            [legacyUserId]
-          );
+        // Step 3: Assign admin role
+        const roleCheck = await pool.query(`SELECT id FROM user_roles WHERE user_id = $1`, [legacyUserId]);
+        if (roleCheck.rows.length > 0) {
+          await pool.query(`UPDATE user_roles SET role = 'admin', updated_at = NOW() WHERE user_id = $1`, [legacyUserId]);
         } else {
           await pool.query(
-            `INSERT INTO user_roles (id, user_id, role, created_at, updated_at)
-             VALUES (gen_random_uuid(), $1, 'admin', NOW(), NOW())`,
+            `INSERT INTO user_roles (id, user_id, role, created_at, updated_at) VALUES (gen_random_uuid(), $1, 'admin', NOW(), NOW())`,
             [legacyUserId]
           );
         }
         
-        console.log("[Dev Login] Created/updated dev admin user with legacy ID:", legacyUserId);
+        console.log("[Dev Login] Setup complete. Auth ID:", devUserId, "Legacy ID:", legacyUserId);
       } catch (error) {
-        console.error("[Dev Login] Error setting up admin role:", error);
+        console.error("[Dev Login] Database setup error:", error);
       }
       
-      // Create session with dev user claims
+      // Create session
       const user: any = {
-        claims: {
-          sub: devUserId,
-          email: devUser.email,
-          first_name: devUser.firstName,
-          last_name: devUser.lastName,
-        },
-        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7, // 7 days
+        claims: { sub: devUserId, email: devEmail, first_name: devFirstName, last_name: devLastName },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
       };
       
       req.login(user, (err) => {
         if (err) {
-          console.error("[Dev Login] Error:", err);
+          console.error("[Dev Login] Session error:", err);
           return res.status(500).json({ message: "Login failed" });
         }
-        res.redirect("/");
+        // Force session save before redirect
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("[Dev Login] Session save error:", saveErr);
+          }
+          console.log("[Dev Login] Session saved, redirecting...");
+          res.redirect("/");
+        });
       });
     });
   }
