@@ -3,8 +3,10 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { storage } from "./storage";
-import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema } from "@shared/schema";
+import { db } from "./db";
+import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, prayerMeetings, prayerMeetingParticipants } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { pool, getPoolStats } from "./db";
 import { bibleCache, timelineCache, apiCache } from "./cache";
@@ -1761,71 +1763,108 @@ export async function registerRoutes(app: Express) {
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
-      // Build combined prayer list for classification
+      // Build prayer data for classification with names and group info
+      const prayerData: { index: number; name: string; gender: string; group: number | null; prayer: string; isAnonymous: boolean; participantId: string }[] = [];
       let prayerIndex = 1;
-      const namedPrayerMap: { index: number; participant: typeof namedPrayers[0] }[] = [];
-      const anonymousPrayerMap: { index: number; participant: typeof anonymousPrayers[0] }[] = [];
       
-      let prayerTexts = "";
       for (const p of namedPrayers) {
-        namedPrayerMap.push({ index: prayerIndex, participant: p });
-        prayerTexts += `${prayerIndex}. ${p.prayerRequest}\n`;
+        prayerData.push({
+          index: prayerIndex,
+          name: p.name,
+          gender: p.gender,
+          group: p.groupNumber,
+          prayer: p.prayerRequest!,
+          isAnonymous: false,
+          participantId: p.id
+        });
         prayerIndex++;
       }
       for (const p of anonymousPrayers) {
-        anonymousPrayerMap.push({ index: prayerIndex, participant: p });
-        prayerTexts += `${prayerIndex}. ${p.anonymousPrayer}\n`;
+        prayerData.push({
+          index: prayerIndex,
+          name: p.name,
+          gender: p.gender,
+          group: p.groupNumber,
+          prayer: p.anonymousPrayer!,
+          isAnonymous: true,
+          participantId: p.id
+        });
         prayerIndex++;
       }
-      console.log("[PrayerMeeting] Prayer texts to classify:", prayerTexts);
+
+      // Build input text for AI
+      let prayerInputText = "";
+      for (const p of prayerData) {
+        if (p.isAnonymous) {
+          prayerInputText += `${p.index}. [匿名] ${p.prayer}\n`;
+        } else {
+          prayerInputText += `${p.index}. ${p.name}（${p.gender === 'male' ? '弟兄' : '姊妹'}，第${p.group || '?'}組）：${p.prayer}\n`;
+        }
+      }
       
+      console.log("[PrayerMeeting] Prayer input for AI:", prayerInputText.substring(0, 500) + "...");
+      
+      // Use the enhanced "Church Prayer Secretary" prompt
+      const systemPrompt = `# Role
+你是一位具備高度組織力與同理心的「教會代禱秘書」。你的專長是從大量的感性文字中，精準提取核心需求並進行系統化分類。
+
+# Goal
+請處理以下提供的禱告數據，並依照以下維度輸出整理後的報告。
+
+# Classification Rules
+1. 需求分類：標籤包括「疾病醫治」、「財務供應」、「親子家庭」、「職場工作」、「靈魂得救」、「人際關係」、「婚姻關係」、「學業考試」、「信仰成長」、「事工服事」、「感恩讚美」、「其他」。
+2. 緊急程度：
+   - [緊急]：涉及手術、病危、立即性債務、心理崩潰、家庭變故、自殺傾向、重大疾病（癌症等）。
+   - [一般]：常規生活代禱、感謝讚美。
+3. 匿名原則：在 (c) 清單中，必須將姓名轉為「一位弟兄」或「一位姊妹」，並遮蔽具體公司名稱或路名。
+
+# Output Format (JSON)
+請回傳以下JSON結構：
+
+{
+  "classifications": [
+    { "index": 1, "category": "疾病醫治", "isUrgent": true, "urgentReason": "癌症診斷" },
+    { "index": 2, "category": "職場工作", "isUrgent": false, "urgentReason": null }
+  ],
+  "report": {
+    "summary": [
+      { "name": "張小明", "group": 1, "summary": "為工作面試禱告" },
+      { "name": "李美玲", "group": 2, "summary": "感謝神的恩典" }
+    ],
+    "categories": {
+      "疾病醫治": [
+        { "name": "王大偉", "content": "為父親的健康禱告", "isUrgent": true }
+      ],
+      "職場工作": [
+        { "name": "張小明", "content": "求神帶領工作面試", "isUrgent": false }
+      ]
+    },
+    "anonymousWall": [
+      { "gender": "弟兄", "content": "求主醫治身體的軟弱，賜下平安" },
+      { "gender": "姊妹", "content": "為家庭關係修復禱告" }
+    ],
+    "urgent": [
+      { "name": "王大偉", "reason": "父親確診癌症，需要緊急代禱", "category": "疾病醫治" }
+    ],
+    "hasAlertContent": false,
+    "alertMessage": ""
+  }
+}
+
+# Constraint
+- 語氣必須溫暖且莊重，不可有冷冰冰的機器感。
+- 若內容提及自殺、自殘或重大犯罪，請設置 hasAlertContent 為 true，並在 alertMessage 中說明需要牧長特別關注。
+- 必須使用繁體中文。
+- 只回覆JSON，不要其他文字。`;
+
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          {
-            role: "system",
-            content: `你是一個禱告分類助手。請分析以下禱告事項，為每個禱告分類並判斷是否緊急。
-
-分類類別（選一個最適合的）：
-- 健康：身體健康、疾病、醫療相關
-- 工作：工作、事業、職場相關
-- 關係：家庭、朋友、人際關係
-- 小孩：子女、教育相關
-- 婚姻：婚姻、配偶相關
-- 財務：經濟、財務相關
-- 學業：學習、考試相關
-- 信仰：靈命、信仰成長相關
-- 事工：教會、服事相關
-- 感恩：感謝、讚美相關
-- 其他：無法歸類
-
-緊急判斷標準（只要符合任一條件就標記為緊急）：
-- 嚴重疾病（如癌症、重症、住院）
-- 死亡、瀕臨死亡、想死、自殺傾向
-- 急難事件（如車禍、災難、意外）
-- 緊急手術或醫療處置
-- 精神健康危機（如憂鬱、焦慮、情緒崩潰）
-- 關係危機（如離婚、分居、外遇、墮胎）
-- 嚴重財務危機（如破產、失業、負債）
-- 任何需要立即禱告支持的緊急狀況
-
-請以JSON格式回覆，格式如下：
-{
-  "classifications": [
-    { "index": 1, "category": "健康", "isUrgent": true },
-    { "index": 2, "category": "工作", "isUrgent": false }
-  ]
-}
-
-只回覆JSON，不要其他文字。`
-          },
-          {
-            role: "user",
-            content: prayerTexts
-          }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prayerInputText }
         ],
         response_format: { type: "json_object" },
-        max_tokens: 1000,
+        max_tokens: 8000,
       });
 
       console.log("[PrayerMeeting] AI response received");
@@ -1835,41 +1874,108 @@ export async function registerRoutes(app: Express) {
         return res.status(500).json({ error: "AI response empty" });
       }
 
-      console.log("[PrayerMeeting] AI response content:", content);
+      console.log("[PrayerMeeting] AI response length:", content.length);
       const result = JSON.parse(content);
       const classifications = result.classifications || [];
+      const report = result.report || {};
+      
       console.log("[PrayerMeeting] Classifications:", classifications.length);
 
+      // Update individual participant categories for quick filtering
       let classifiedCount = 0;
       for (const classification of classifications) {
-        const classIndex = classification.index;
-        
-        // Check if this is a named prayer
-        const namedEntry = namedPrayerMap.find(e => e.index === classIndex);
-        if (namedEntry) {
-          console.log(`[PrayerMeeting] Updating named prayer for participant ${namedEntry.participant.id} with category=${classification.category}, isUrgent=${classification.isUrgent}`);
-          await storage.updatePrayerMeetingParticipant(namedEntry.participant.id, {
-            prayerCategory: classification.category,
-            isUrgent: classification.isUrgent === true,
-          });
-          classifiedCount++;
-          continue;
-        }
-        
-        // Check if this is an anonymous prayer
-        const anonymousEntry = anonymousPrayerMap.find(e => e.index === classIndex);
-        if (anonymousEntry) {
-          console.log(`[PrayerMeeting] Updating anonymous prayer for participant ${anonymousEntry.participant.id} with category=${classification.category}, isUrgent=${classification.isUrgent}`);
-          await storage.updatePrayerMeetingParticipant(anonymousEntry.participant.id, {
-            anonymousPrayerCategory: classification.category,
-            isAnonymousPrayerUrgent: classification.isUrgent === true,
-          });
+        const prayerItem = prayerData.find(p => p.index === classification.index);
+        if (prayerItem) {
+          if (prayerItem.isAnonymous) {
+            await storage.updatePrayerMeetingParticipant(prayerItem.participantId, {
+              anonymousPrayerCategory: classification.category,
+              isAnonymousPrayerUrgent: classification.isUrgent === true,
+            });
+          } else {
+            await storage.updatePrayerMeetingParticipant(prayerItem.participantId, {
+              prayerCategory: classification.category,
+              isUrgent: classification.isUrgent === true,
+            });
+          }
           classifiedCount++;
         }
       }
 
-      console.log("[PrayerMeeting] Classification complete");
-      res.json({ message: "Prayers classified successfully", classified: classifiedCount });
+      // Generate Markdown report
+      let markdownReport = `# ${meeting.title} 禱告報告\n\n`;
+      markdownReport += `> 生成時間：${new Date().toLocaleString('zh-TW')}\n`;
+      markdownReport += `> 實名禱告：${namedPrayers.length} 則 | 匿名禱告：${anonymousPrayers.length} 則\n\n`;
+
+      // Alert section if needed
+      if (report.hasAlertContent) {
+        markdownReport += `## ⚠️ 特別關注事項\n\n`;
+        markdownReport += `> **請牧長特別留意：** ${report.alertMessage}\n\n`;
+        markdownReport += `---\n\n`;
+      }
+
+      // Section (a): Summary list
+      markdownReport += `## (a) 各組/個人彙總清單\n\n`;
+      if (report.summary && report.summary.length > 0) {
+        for (const item of report.summary) {
+          markdownReport += `- **${item.name}**（第${item.group || '?'}組）：${item.summary}\n`;
+        }
+      } else {
+        markdownReport += `_無資料_\n`;
+      }
+      markdownReport += `\n`;
+
+      // Section (b): Category report
+      markdownReport += `## (b) 需求類別分類報告\n\n`;
+      if (report.categories) {
+        for (const [category, items] of Object.entries(report.categories)) {
+          if (Array.isArray(items) && items.length > 0) {
+            markdownReport += `### 📂 ${category}\n`;
+            for (const item of items as any[]) {
+              const urgentBadge = item.isUrgent ? ' 🚨' : '';
+              markdownReport += `- **${item.name}**：${item.content}${urgentBadge}\n`;
+            }
+            markdownReport += `\n`;
+          }
+        }
+      }
+
+      // Section (c): Anonymous prayer wall
+      markdownReport += `## (c) 匿名代禱牆\n\n`;
+      markdownReport += `> _適合公開投影使用_\n\n`;
+      if (report.anonymousWall && report.anonymousWall.length > 0) {
+        for (const item of report.anonymousWall) {
+          markdownReport += `- 「一位${item.gender}：${item.content}」\n`;
+        }
+      } else {
+        markdownReport += `_無匿名禱告_\n`;
+      }
+      markdownReport += `\n`;
+
+      // Section (d): Urgent prayers
+      markdownReport += `## (d) 🚨 緊急代禱專區\n\n`;
+      if (report.urgent && report.urgent.length > 0) {
+        markdownReport += `> _需要特別關注的禱告事項_\n\n`;
+        let urgentIndex = 1;
+        for (const item of report.urgent) {
+          markdownReport += `${urgentIndex}. **${item.name}**（${item.category}）：${item.reason}\n`;
+          urgentIndex++;
+        }
+      } else {
+        markdownReport += `_目前沒有緊急代禱事項_\n`;
+      }
+
+      // Save report to database
+      await db.update(prayerMeetings)
+        .set({ prayerReport: markdownReport })
+        .where(eq(prayerMeetings.id, meeting.id));
+
+      console.log("[PrayerMeeting] Classification and report generation complete");
+      res.json({ 
+        message: "Prayers classified successfully", 
+        classified: classifiedCount,
+        report: markdownReport,
+        hasAlertContent: report.hasAlertContent || false
+      });
     } catch (error) {
       console.error("[PrayerMeeting] Failed to classify prayers:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";

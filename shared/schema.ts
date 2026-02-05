@@ -455,12 +455,16 @@ export const prayerMeetings = pgTable("prayer_meetings", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   shortCode: text("short_code").notNull().unique(),
   title: text("title").notNull(),
+  description: text("description"),
   status: text("status").notNull().default("joining"),
   groupingMode: text("grouping_mode").notNull().default("bySize"),
   groupSize: integer("group_size").default(4),
   groupCount: integer("group_count").default(3),
   genderMode: text("gender_mode").notNull().default("mixed"),
+  separateByGender: boolean("separate_by_gender").default(false),
   ownerId: uuid("owner_id").references(() => users.id),
+  prayerReport: text("prayer_report"),
+  createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, ChevronUp, ChevronDown, Presentation, X, Sparkles, List, AlertTriangle, EyeOff, Maximize, Minimize, XCircle } from 'lucide-react';
+import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, ChevronUp, ChevronDown, Presentation, X, Sparkles, List, AlertTriangle, EyeOff, Maximize, Minimize, XCircle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -259,7 +259,12 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     },
     onSuccess: (data) => {
       refetchParticipants();
-      toast.success(`已分類 ${data.classified} 個禱告事項`);
+      refetchMeeting();
+      if (data.hasAlertContent) {
+        toast.warning(`已分類 ${data.classified} 個禱告事項 - 有需要牧長特別關注的內容`, { duration: 8000 });
+      } else {
+        toast.success(`已分類 ${data.classified} 個禱告事項，報告已生成`);
+      }
     },
     onError: () => {
       toast.error('分類禱告事項失敗');
@@ -268,6 +273,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
 
   const [prayerListGroup, setPrayerListGroup] = useState<number | null>(null);
   const [prayerListMode, setPrayerListMode] = useState<'all' | 'named' | 'anonymous'>('all');
+  const [prayerListViewType, setPrayerListViewType] = useState<'report' | 'list'>('report');
 
   const buildPrayerListQueryKey = () => {
     let url = `/api/prayer-meetings/${currentMeetingId}/prayer-list?mode=${prayerListMode}`;
@@ -521,17 +527,30 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
   if (step === 'prayer-list') {
     const categoryColors: Record<string, string> = {
       '健康': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+      '疾病醫治': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
       '工作': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+      '職場工作': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
       '關係': 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300',
+      '人際關係': 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300',
       '小孩': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+      '親子家庭': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
       '婚姻': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+      '婚姻關係': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
       '財務': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+      '財務供應': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
       '學業': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
+      '學業考試': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
       '信仰': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
+      '信仰成長': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
+      '靈魂得救': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
       '事工': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+      '事工服事': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
       '感恩': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+      '感恩讚美': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
       '其他': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
     };
+
+    const hasReport = meeting?.prayerReport && meeting.prayerReport.length > 0;
 
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 z-50 overflow-auto">
@@ -544,56 +563,28 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
 
         <div className="max-w-4xl mx-auto p-6 pt-16">
           <h1 className="text-3xl font-bold text-center mb-6">
-            禱告清單
+            禱告報告
           </h1>
 
           <div className="flex gap-2 mb-6 flex-wrap justify-center items-center">
             <Button
-              variant={prayerListMode === 'all' ? 'default' : 'outline'}
-              onClick={() => { setPrayerListMode('all'); setPrayerListGroup(null); }}
+              variant={prayerListViewType === 'report' ? 'default' : 'outline'}
+              onClick={() => setPrayerListViewType('report')}
               size="sm"
-              data-testid="button-mode-all"
+              data-testid="button-view-report"
             >
-              全部禱告
+              <FileText className="w-4 h-4 mr-2" />
+              報告檢視
             </Button>
             <Button
-              variant={prayerListMode === 'named' ? 'default' : 'outline'}
-              onClick={() => { setPrayerListMode('named'); setPrayerListGroup(null); }}
+              variant={prayerListViewType === 'list' ? 'default' : 'outline'}
+              onClick={() => setPrayerListViewType('list')}
               size="sm"
-              data-testid="button-mode-named"
+              data-testid="button-view-list"
             >
-              各組禱告
+              <List className="w-4 h-4 mr-2" />
+              列表檢視
             </Button>
-            <Button
-              variant={prayerListMode === 'anonymous' ? 'default' : 'outline'}
-              onClick={() => { setPrayerListMode('anonymous'); setPrayerListGroup(null); }}
-              size="sm"
-              data-testid="button-mode-anonymous"
-            >
-              匿名禱告
-            </Button>
-            
-            {prayerListMode === 'named' && groupNumbers.length > 0 && (
-              <>
-                <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
-                <Select
-                  value={prayerListGroup?.toString() || 'all'}
-                  onValueChange={(value) => setPrayerListGroup(value === 'all' ? null : parseInt(value))}
-                >
-                  <SelectTrigger className="w-32" data-testid="select-group-filter">
-                    <SelectValue placeholder="選擇組別" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部組別</SelectItem>
-                    {groupNumbers.map(num => (
-                      <SelectItem key={num} value={num.toString()}>
-                        第 {num} 組
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
             
             <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
             <Button
@@ -612,69 +603,222 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
             </Button>
           </div>
 
-          {prayerListData?.urgentPrayers && prayerListData.urgentPrayers.length > 0 && (
-            <Card className="mb-6 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2 text-red-700 dark:text-red-300">
-                  <AlertTriangle className="w-5 h-5" />
-                  緊急代禱事項
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {prayerListData.urgentPrayers.map(prayer => (
-                  <div key={prayer.id} className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-800">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className="font-semibold">{prayer.name}</span>
-                      <Badge className={categoryColors[prayer.category] || categoryColors['其他']}>
-                        {prayer.category}
+          {prayerListViewType === 'report' ? (
+            <div className="space-y-6">
+              {!hasReport ? (
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <Sparkles className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-gray-500 mb-4">尚未生成禱告報告</p>
+                    <Button 
+                      onClick={() => classifyPrayersMutation.mutate()}
+                      disabled={classifyPrayersMutation.isPending}
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      {classifyPrayersMutation.isPending ? '生成中...' : '生成 AI 禱告報告'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="prose prose-slate dark:prose-invert max-w-none">
+                      {meeting.prayerReport.split('\n').map((line, idx) => {
+                        if (line.startsWith('# ')) {
+                          return <h1 key={idx} className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">{line.substring(2)}</h1>;
+                        }
+                        if (line.startsWith('## ⚠️')) {
+                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-red-600 dark:text-red-400 flex items-center gap-2"><AlertTriangle className="w-5 h-5" />{line.substring(5)}</h2>;
+                        }
+                        if (line.startsWith('## (a)')) {
+                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-sky-600 dark:text-sky-400">{line.substring(3)}</h2>;
+                        }
+                        if (line.startsWith('## (b)')) {
+                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-emerald-600 dark:text-emerald-400">{line.substring(3)}</h2>;
+                        }
+                        if (line.startsWith('## (c)')) {
+                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-purple-600 dark:text-purple-400">{line.substring(3)}</h2>;
+                        }
+                        if (line.startsWith('## (d)')) {
+                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-red-600 dark:text-red-400">{line.substring(3)}</h2>;
+                        }
+                        if (line.startsWith('### 📂')) {
+                          const category = line.substring(7);
+                          return (
+                            <h3 key={idx} className="text-lg font-semibold mt-4 mb-2 flex items-center gap-2">
+                              <Badge className={categoryColors[category] || categoryColors['其他']}>{category}</Badge>
+                            </h3>
+                          );
+                        }
+                        if (line.startsWith('> ')) {
+                          return <blockquote key={idx} className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic text-gray-600 dark:text-gray-400 my-2">{line.substring(2)}</blockquote>;
+                        }
+                        if (line.startsWith('- **')) {
+                          const match = line.match(/^- \*\*(.+?)\*\*[：:](.+)$/);
+                          if (match) {
+                            const hasUrgent = match[2].includes('🚨');
+                            return (
+                              <div key={idx} className={`flex items-start gap-2 py-1 ${hasUrgent ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                <span className="text-gray-400">•</span>
+                                <span><strong className="font-semibold">{match[1]}</strong>：{match[2].replace('🚨', '')}{hasUrgent && <AlertTriangle className="inline w-4 h-4 ml-1 text-red-500" />}</span>
+                              </div>
+                            );
+                          }
+                        }
+                        if (line.startsWith('- 「')) {
+                          return (
+                            <div key={idx} className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg my-2 italic text-gray-700 dark:text-gray-300">
+                              {line.substring(2)}
+                            </div>
+                          );
+                        }
+                        if (line.match(/^\d+\.\s+\*\*/)) {
+                          const match = line.match(/^(\d+)\.\s+\*\*(.+?)\*\*（(.+?)）[：:](.+)$/);
+                          if (match) {
+                            return (
+                              <div key={idx} className="flex items-start gap-2 py-2 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg my-2">
+                                <span className="font-bold text-red-600 dark:text-red-400">{match[1]}.</span>
+                                <div>
+                                  <span className="font-semibold">{match[2]}</span>
+                                  <Badge variant="outline" className="ml-2 text-xs">{match[3]}</Badge>
+                                  <p className="text-gray-600 dark:text-gray-400 mt-1">{match[4]}</p>
+                                </div>
+                              </div>
+                            );
+                          }
+                        }
+                        if (line.startsWith('---')) {
+                          return <hr key={idx} className="my-4 border-gray-200 dark:border-gray-700" />;
+                        }
+                        if (line.trim() === '') {
+                          return <div key={idx} className="h-2" />;
+                        }
+                        if (line.startsWith('_') && line.endsWith('_')) {
+                          return <p key={idx} className="text-gray-500 italic">{line.substring(1, line.length - 1)}</p>;
+                        }
+                        return <p key={idx} className="text-gray-700 dark:text-gray-300">{line}</p>;
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-2 mb-4 flex-wrap justify-center items-center">
+                <Button
+                  variant={prayerListMode === 'all' ? 'default' : 'outline'}
+                  onClick={() => { setPrayerListMode('all'); setPrayerListGroup(null); }}
+                  size="sm"
+                  data-testid="button-mode-all"
+                >
+                  全部禱告
+                </Button>
+                <Button
+                  variant={prayerListMode === 'named' ? 'default' : 'outline'}
+                  onClick={() => { setPrayerListMode('named'); setPrayerListGroup(null); }}
+                  size="sm"
+                  data-testid="button-mode-named"
+                >
+                  各組禱告
+                </Button>
+                <Button
+                  variant={prayerListMode === 'anonymous' ? 'default' : 'outline'}
+                  onClick={() => { setPrayerListMode('anonymous'); setPrayerListGroup(null); }}
+                  size="sm"
+                  data-testid="button-mode-anonymous"
+                >
+                  匿名禱告
+                </Button>
+                
+                {prayerListMode === 'named' && groupNumbers.length > 0 && (
+                  <>
+                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
+                    <Select
+                      value={prayerListGroup?.toString() || 'all'}
+                      onValueChange={(value) => setPrayerListGroup(value === 'all' ? null : parseInt(value))}
+                    >
+                      <SelectTrigger className="w-32" data-testid="select-group-filter">
+                        <SelectValue placeholder="選擇組別" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部組別</SelectItem>
+                        {groupNumbers.map(num => (
+                          <SelectItem key={num} value={num.toString()}>
+                            第 {num} 組
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+              </div>
+
+              {prayerListData?.urgentPrayers && prayerListData.urgentPrayers.length > 0 && (
+                <Card className="mb-6 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2 text-red-700 dark:text-red-300">
+                      <AlertTriangle className="w-5 h-5" />
+                      緊急代禱事項
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {prayerListData.urgentPrayers.map(prayer => (
+                      <div key={prayer.id} className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <span className="font-semibold">{prayer.name}</span>
+                          <Badge className={categoryColors[prayer.category] || categoryColors['其他']}>
+                            {prayer.category}
+                          </Badge>
+                          {prayer.groupNumber && (
+                            <Badge variant="outline">第 {prayer.groupNumber} 組</Badge>
+                          )}
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {prayerListData?.categorizedPrayers && Object.entries(prayerListData.categorizedPrayers).map(([category, prayers]) => (
+                <Card key={category} className="mb-4">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Badge className={categoryColors[category] || categoryColors['其他']}>
+                        {category}
                       </Badge>
-                      {prayer.groupNumber && (
-                        <Badge variant="outline">第 {prayer.groupNumber} 組</Badge>
-                      )}
-                    </div>
-                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                      <span className="text-sm text-gray-500">({prayers.length})</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {prayers.map(prayer => (
+                      <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-medium">{prayer.name}</span>
+                          {prayer.groupNumber && (
+                            <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
+                          )}
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ))}
 
-          {prayerListData?.categorizedPrayers && Object.entries(prayerListData.categorizedPrayers).map(([category, prayers]) => (
-            <Card key={category} className="mb-4">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Badge className={categoryColors[category] || categoryColors['其他']}>
-                    {category}
-                  </Badge>
-                  <span className="text-sm text-gray-500">({prayers.length})</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {prayers.map(prayer => (
-                  <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="font-medium">{prayer.name}</span>
-                      {prayer.groupNumber && (
-                        <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
-                      )}
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
+              {isLoadingPrayerList && (
+                <div className="text-center py-12 text-gray-500">
+                  載入中...
+                </div>
+              )}
 
-          {isLoadingPrayerList && (
-            <div className="text-center py-12 text-gray-500">
-              載入中...
-            </div>
-          )}
-
-          {!isLoadingPrayerList && (!prayerListData || prayerListData.totalCount === 0) && (
-            <div className="text-center py-12 text-gray-500">
-              尚無禱告事項
-            </div>
+              {!isLoadingPrayerList && (!prayerListData || prayerListData.totalCount === 0) && (
+                <div className="text-center py-12 text-gray-500">
+                  尚無禱告事項
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
