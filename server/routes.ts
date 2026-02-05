@@ -1353,6 +1353,48 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Delete prayer meeting (admin/leader only, for historical records)
+  app.delete("/api/prayer-meetings/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Check user role
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Only leaders can delete prayer meetings" });
+      }
+
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      // Delete participants first
+      await db.delete(prayerMeetingParticipants).where(eq(prayerMeetingParticipants.meetingId, req.params.id));
+      
+      // Delete the meeting
+      await db.delete(prayerMeetings).where(eq(prayerMeetings.id, req.params.id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to delete prayer meeting:", error);
+      res.status(500).json({ error: "Failed to delete prayer meeting" });
+    }
+  });
+
   // Execute grouping for prayer meeting
   app.post("/api/prayer-meetings/:id/execute-grouping", async (req, res) => {
     try {

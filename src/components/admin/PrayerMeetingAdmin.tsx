@@ -232,6 +232,26 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     },
   });
 
+  const deleteMeetingMutation = useMutation({
+    mutationFn: async (meetingId: string) => {
+      await apiRequest('DELETE', `/api/prayer-meetings/${meetingId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/prayer-meetings/history'] });
+      toast.success('禱告會記錄已刪除');
+    },
+    onError: () => {
+      toast.error('刪除失敗');
+    },
+  });
+
+  const handleDeleteMeeting = (e: React.MouseEvent, meetingId: string, title: string) => {
+    e.stopPropagation();
+    if (window.confirm(`確定要刪除「${title}」的禱告會記錄嗎？此操作無法復原。`)) {
+      deleteMeetingMutation.mutate(meetingId);
+    }
+  };
+
   const classifyPrayersMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', `/api/prayer-meetings/${currentMeetingId}/classify-prayers`);
@@ -1020,15 +1040,26 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                     data-testid={`card-history-meeting-${m.id}`}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <div className="font-medium">{m.title}</div>
                         <div className="text-sm text-gray-500">
                           {new Date(m.createdAt).toLocaleDateString('zh-TW')}
                         </div>
                       </div>
-                      <Badge variant="outline" className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                        已結束
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                          已結束
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          onClick={(e) => handleDeleteMeeting(e, m.id, m.title)}
+                          data-testid={`button-delete-meeting-${m.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
