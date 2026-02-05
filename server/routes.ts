@@ -1487,18 +1487,119 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Update participant prayer request
+  // Unified endpoint to update both named and anonymous prayers in a single request
+  app.patch("/api/prayer-meetings/:id/my-prayers/:participantId", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Validate payload
+      const prayersSchema = z.object({
+        namedPrayer: z.string().max(2000).optional().default(''),
+        anonymousPrayer: z.string().max(2000).optional().default(''),
+      });
+      
+      const validation = prayersSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid prayer content", details: validation.error.errors });
+      }
+      
+      const { namedPrayer, anonymousPrayer } = validation.data;
+      
+      const meeting = await storage.getPrayerMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ error: "Prayer meeting not found" });
+      }
+
+      const participant = await storage.getPrayerMeetingParticipantById(req.params.participantId);
+      if (!participant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+
+      // Verify participant belongs to this meeting
+      if (participant.meetingId !== req.params.id) {
+        return res.status(403).json({ error: "Participant does not belong to this meeting" });
+      }
+
+      // Get the current user's ID and verify ownership
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+
+      // Check if user owns this participant or is a leader/admin
+      const isOwner = participant.userId === userId;
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
+      
+      if (!isOwner && !isLeaderOrAdmin) {
+        return res.status(403).json({ error: "You can only update your own prayer requests" });
+      }
+
+      // Update both prayers in a single operation (preserve existing isAnonymous value)
+      const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, {
+        prayerRequest: namedPrayer || null,
+        anonymousPrayer: anonymousPrayer || null,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("[PrayerMeeting] Failed to update prayers:", error);
+      res.status(500).json({ error: "Failed to update prayers" });
+    }
+  });
+
+  // Update participant prayer request (legacy route, requires auth)
   app.patch("/api/prayer-meetings/:meetingId/participants/:participantId", async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const participant = await storage.getPrayerMeetingParticipantById(req.params.participantId);
+      if (!participant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+
+      // Verify participant belongs to this meeting
+      if (participant.meetingId !== req.params.meetingId) {
+        return res.status(403).json({ error: "Participant does not belong to this meeting" });
+      }
+
+      // Get the current user's ID and verify ownership
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+
+      // Check if user owns this participant or is a leader/admin
+      const isOwner = participant.userId === userId;
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
+      
+      if (!isOwner && !isLeaderOrAdmin) {
+        return res.status(403).json({ error: "You can only update your own prayer requests" });
+      }
+
       const { prayerRequest, isAnonymous } = req.body;
       const updateData: { prayerRequest?: string; isAnonymous?: boolean } = {};
       if (prayerRequest !== undefined) updateData.prayerRequest = prayerRequest;
       if (isAnonymous !== undefined) updateData.isAnonymous = isAnonymous;
       
       const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, updateData);
-      if (!updated) {
-        return res.status(404).json({ error: "Participant not found" });
-      }
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update prayer request" });

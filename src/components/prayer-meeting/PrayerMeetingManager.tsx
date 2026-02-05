@@ -244,11 +244,12 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
   const updateBothPrayersMutation = useMutation({
     mutationFn: async ({ namedPrayer, anonymousPrayer }: { namedPrayer: string; anonymousPrayer: string }) => {
-      // Always send both requests to allow clearing prayers
-      await Promise.all([
-        apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/participants/${myParticipantId}`, { prayerRequest: namedPrayer || '', isAnonymous: false }),
-        apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/anonymous-prayer/${myParticipantId}`, { anonymousPrayer: anonymousPrayer || '' })
-      ]);
+      // Use unified endpoint to update both prayers in a single request
+      const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/my-prayers/${myParticipantId}`, { 
+        namedPrayer: namedPrayer || '', 
+        anonymousPrayer: anonymousPrayer || '' 
+      });
+      return res.json();
     },
     onSuccess: () => {
       refetchParticipants();
