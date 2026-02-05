@@ -63,8 +63,13 @@ The prayer meeting feature allows leaders to create prayer sessions with groupin
 - **QR code generation**: Automatic QR codes for mobile scanning
 - **Flexible grouping modes**: Group by size or by count, with gender separation options
 - **Anonymous prayer option**: Users can submit both named and anonymous prayers with a single save button
-- **AI prayer classification**: Uses GPT-4o-mini to categorize BOTH named and anonymous prayers into 11 categories:
-  - 健康(health), 工作(work), 關係(relationships), 小孩(children), 婚姻(marriage), 財務(finances), 學業(academics), 信仰(faith), 事工(ministry), 感恩(thanksgiving), 其他(other)
+- **AI Prayer Report Generation**: Uses GPT-4o-mini with "Church Prayer Secretary" role to generate comprehensive 4-section Markdown reports:
+  - **(a) 個人/小組代禱摘要**: Summary of individual/group prayer requests
+  - **(b) 分類代禱事項**: Categorized prayers with 12 categories (疾病醫治, 職場工作, 人際關係, 親子家庭, 婚姻關係, 財務供應, 學業考試, 信仰成長, 事工服事, 靈魂得救, 感恩讚美, 其他)
+  - **(c) 匿名代禱牆**: Anonymized prayer wall for projection display
+  - **(d) 緊急代禱事項**: Urgent prayers with reasons highlighted
+- **Prayer Report Storage**: Full Markdown report stored in `prayerReport` field of prayerMeetings table
+- **Dual View Modes**: Toggle between "報告檢視" (report view with formatted Markdown) and "列表檢視" (traditional list view)
 - **Anonymous prayer classification**: Stored separately in `anonymousPrayerCategory` and `isAnonymousPrayerUrgent` fields
 - **Urgent prayer detection**: AI detects:
   - Severe illness (cancer, hospitalization)
@@ -73,12 +78,13 @@ The prayer meeting feature allows leaders to create prayer sessions with groupin
   - Mental health crises (depression, anxiety, emotional breakdown)
   - Relationship crises (divorce, separation, affairs, abortion)
   - Severe financial crises (bankruptcy, unemployment, debt)
+- **Pastoral Alerts**: Report includes ⚠️ section for content requiring pastoral attention (suicide, self-harm, criminal matters)
 - **Prayer list view**: Categorized view with urgent prayers highlighted, filterable by group
 - **Own prayer visibility**: Users see their own prayers highlighted in sky blue with "我" badge
-- **Presentation mode**: Full-screen display for projecting prayer requests
+- **Presentation mode**: Full-screen display for projecting prayer requests with keyboard navigation
 - **Historical meetings**: View past prayer meetings with their prayers and classifications
 - **Backend routes**:
-  - POST `/api/prayer-meetings/:id/classify-prayers` - Trigger AI classification for both named and anonymous prayers
+  - POST `/api/prayer-meetings/:id/classify-prayers` - Generate AI prayer report (4-section Markdown stored in prayerReport field)
   - GET `/api/prayer-meetings/:id/prayer-list?group=X&mode=all` - Retrieve categorized prayer list (mode: all/named/anonymous)
   - GET `/api/prayer-meetings/history` - Retrieve closed/completed prayer meetings
 
