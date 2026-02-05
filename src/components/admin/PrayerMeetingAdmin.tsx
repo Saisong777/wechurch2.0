@@ -17,12 +17,16 @@ interface PrayerMeeting {
   id: string;
   shortCode: string;
   title: string;
+  description: string | null;
   status: string;
   groupingMode: string;
   groupSize: number | null;
   groupCount: number | null;
   genderMode: string;
+  separateByGender: boolean | null;
   ownerId: string | null;
+  prayerReport: string | null;
+  createdBy: string | null;
   createdAt: string;
 }
 
