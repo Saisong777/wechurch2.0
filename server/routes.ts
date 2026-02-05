@@ -1175,14 +1175,31 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Get historical (closed/completed) prayer meetings
+  // Get historical (closed/completed) prayer meetings (leader/admin only)
   app.get("/api/prayer-meetings/history", async (req, res) => {
     try {
-      const meetings = await storage.getPrayerMeetings();
-      const historical = meetings.filter(m => m.status === 'completed' || m.status === 'closed');
-      // Sort by created date, newest first
-      historical.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      res.json(historical);
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      
+      const role = userId ? await storage.getUserRole(userId) : undefined;
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Only leaders can view history" });
+      }
+
+      const closedMeetings = await storage.getClosedPrayerMeetings();
+      res.json(closedMeetings);
     } catch (error) {
       res.status(500).json({ error: "Failed to get historical prayer meetings" });
     }
@@ -1847,35 +1864,6 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Get closed/historical prayer meetings for admin
-  app.get("/api/prayer-meetings/history", async (req, res) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-      
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
-      
-      const role = userId ? await storage.getUserRole(userId) : undefined;
-      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
-        return res.status(403).json({ error: "Only leaders can view history" });
-      }
-
-      const closedMeetings = await storage.getClosedPrayerMeetings();
-      res.json(closedMeetings);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to get prayer meeting history" });
-    }
-  });
 
   // Card Questions CRUD for admin
   app.get("/api/card-questions", async (req, res) => {

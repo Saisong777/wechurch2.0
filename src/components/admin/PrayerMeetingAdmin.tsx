@@ -125,7 +125,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: showHistory,
+    staleTime: 30000,
   });
 
   const { data: meeting, refetch: refetchMeeting } = useQuery<PrayerMeeting>({
