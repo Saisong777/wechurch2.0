@@ -476,6 +476,8 @@ export const prayerMeetingParticipants = pgTable("prayer_meeting_participants", 
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   prayerCategory: text("prayer_category"),
   isUrgent: boolean("is_urgent").default(false),
+  anonymousPrayerCategory: text("anonymous_prayer_category"),
+  isAnonymousPrayerUrgent: boolean("is_anonymous_prayer_urgent").default(false),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -1175,6 +1175,19 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Get historical (closed/completed) prayer meetings
+  app.get("/api/prayer-meetings/history", async (req, res) => {
+    try {
+      const meetings = await storage.getPrayerMeetings();
+      const historical = meetings.filter(m => m.status === 'completed' || m.status === 'closed');
+      // Sort by created date, newest first
+      historical.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(historical);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get historical prayer meetings" });
+    }
+  });
+
   // Get prayer meeting by ID
   app.get("/api/prayer-meetings/:id", async (req, res) => {
     try {
@@ -1572,14 +1585,15 @@ export async function registerRoutes(app: Express) {
 
       const participants = await storage.getPrayerMeetingParticipants(meeting.id);
       
-      // Classify only named prayers (prayerRequest) - anonymous prayers are shown but not categorized
-      const prayersToClassify = participants.filter(p => p.prayerRequest && p.prayerRequest.trim());
+      // Collect both named prayers and anonymous prayers for classification
+      const namedPrayers = participants.filter(p => p.prayerRequest && p.prayerRequest.trim());
+      const anonymousPrayers = participants.filter(p => p.anonymousPrayer && p.anonymousPrayer.trim());
 
-      if (prayersToClassify.length === 0) {
+      if (namedPrayers.length === 0 && anonymousPrayers.length === 0) {
         return res.json({ message: "No prayers to classify", classified: 0 });
       }
 
-      console.log("[PrayerMeeting] Starting AI classification for", prayersToClassify.length, "prayers");
+      console.log("[PrayerMeeting] Starting AI classification for", namedPrayers.length, "named prayers and", anonymousPrayers.length, "anonymous prayers");
       
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
@@ -1587,7 +1601,22 @@ export async function registerRoutes(app: Express) {
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
-      const prayerTexts = prayersToClassify.map((p, i) => `${i + 1}. ${p.prayerRequest}`).join('\n');
+      // Build combined prayer list for classification
+      let prayerIndex = 1;
+      const namedPrayerMap: { index: number; participant: typeof namedPrayers[0] }[] = [];
+      const anonymousPrayerMap: { index: number; participant: typeof anonymousPrayers[0] }[] = [];
+      
+      let prayerTexts = "";
+      for (const p of namedPrayers) {
+        namedPrayerMap.push({ index: prayerIndex, participant: p });
+        prayerTexts += `${prayerIndex}. ${p.prayerRequest}\n`;
+        prayerIndex++;
+      }
+      for (const p of anonymousPrayers) {
+        anonymousPrayerMap.push({ index: prayerIndex, participant: p });
+        prayerTexts += `${prayerIndex}. ${p.anonymousPrayer}\n`;
+        prayerIndex++;
+      }
       console.log("[PrayerMeeting] Prayer texts to classify:", prayerTexts);
       
       const response = await openai.chat.completions.create({
@@ -1610,11 +1639,15 @@ export async function registerRoutes(app: Express) {
 - 感恩：感謝、讚美相關
 - 其他：無法歸類
 
-緊急判斷標準：
-- 嚴重疾病（如癌症、重症）
-- 死亡或瀕臨死亡
-- 急難事件（如車禍、災難）
+緊急判斷標準（只要符合任一條件就標記為緊急）：
+- 嚴重疾病（如癌症、重症、住院）
+- 死亡、瀕臨死亡、想死、自殺傾向
+- 急難事件（如車禍、災難、意外）
 - 緊急手術或醫療處置
+- 精神健康危機（如憂鬱、焦慮、情緒崩潰）
+- 關係危機（如離婚、分居、外遇、墮胎）
+- 嚴重財務危機（如破產、失業、負債）
+- 任何需要立即禱告支持的緊急狀況
 
 請以JSON格式回覆，格式如下：
 {
@@ -1647,20 +1680,36 @@ export async function registerRoutes(app: Express) {
       const classifications = result.classifications || [];
       console.log("[PrayerMeeting] Classifications:", classifications.length);
 
+      let classifiedCount = 0;
       for (const classification of classifications) {
-        const idx = classification.index - 1;
-        if (idx >= 0 && idx < prayersToClassify.length) {
-          const participant = prayersToClassify[idx];
-          console.log(`[PrayerMeeting] Updating participant ${participant.id} with category=${classification.category}, isUrgent=${classification.isUrgent}`);
-          await storage.updatePrayerMeetingParticipant(participant.id, {
+        const classIndex = classification.index;
+        
+        // Check if this is a named prayer
+        const namedEntry = namedPrayerMap.find(e => e.index === classIndex);
+        if (namedEntry) {
+          console.log(`[PrayerMeeting] Updating named prayer for participant ${namedEntry.participant.id} with category=${classification.category}, isUrgent=${classification.isUrgent}`);
+          await storage.updatePrayerMeetingParticipant(namedEntry.participant.id, {
             prayerCategory: classification.category,
             isUrgent: classification.isUrgent === true,
           });
+          classifiedCount++;
+          continue;
+        }
+        
+        // Check if this is an anonymous prayer
+        const anonymousEntry = anonymousPrayerMap.find(e => e.index === classIndex);
+        if (anonymousEntry) {
+          console.log(`[PrayerMeeting] Updating anonymous prayer for participant ${anonymousEntry.participant.id} with category=${classification.category}, isUrgent=${classification.isUrgent}`);
+          await storage.updatePrayerMeetingParticipant(anonymousEntry.participant.id, {
+            anonymousPrayerCategory: classification.category,
+            isAnonymousPrayerUrgent: classification.isUrgent === true,
+          });
+          classifiedCount++;
         }
       }
 
       console.log("[PrayerMeeting] Classification complete");
-      res.json({ message: "Prayers classified successfully", classified: classifications.length });
+      res.json({ message: "Prayers classified successfully", classified: classifiedCount });
     } catch (error) {
       console.error("[PrayerMeeting] Failed to classify prayers:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -1727,8 +1776,8 @@ export async function registerRoutes(app: Express) {
             id: `${p.id}-anon`,
             name: '匿名',
             prayerRequest: p.anonymousPrayer,
-            category: '其他', // Anonymous prayers are not categorized
-            isUrgent: false,
+            category: p.anonymousPrayerCategory || '其他',
+            isUrgent: p.isAnonymousPrayerUrgent || false,
             isAnonymous: true,
             groupNumber: p.groupNumber,
             prayerType: 'anonymous',

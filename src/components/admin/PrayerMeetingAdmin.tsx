@@ -125,8 +125,8 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       if (!res.ok) throw new Error('Meeting not found');
       return res.json();
     },
-    enabled: !!currentMeetingId && (step === 'manage' || step === 'presentation'),
-    refetchInterval: 3000,
+    enabled: !!currentMeetingId && (step === 'manage' || step === 'presentation' || step === 'prayer-list'),
+    refetchInterval: step === 'manage' || step === 'presentation' ? 3000 : false,
   });
 
   const { data: participants = [], refetch: refetchParticipants } = useQuery<PrayerMeetingParticipant[]>({
@@ -136,12 +136,13 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       if (!res.ok) throw new Error('Failed to fetch participants');
       return res.json();
     },
-    enabled: !!currentMeetingId && (step === 'manage' || step === 'presentation'),
-    refetchInterval: 3000,
+    enabled: !!currentMeetingId && (step === 'manage' || step === 'presentation' || step === 'prayer-list'),
+    refetchInterval: step === 'manage' || step === 'presentation' ? 3000 : false,
   });
 
-  const isGrouped = meeting?.status === 'grouped' || meeting?.status === 'praying' || meeting?.status === 'completed';
-  const isPraying = meeting?.status === 'praying' || meeting?.status === 'completed';
+  const isGrouped = meeting?.status === 'grouped' || meeting?.status === 'praying' || meeting?.status === 'completed' || meeting?.status === 'closed';
+  const isPraying = meeting?.status === 'praying' || meeting?.status === 'completed' || meeting?.status === 'closed';
+  const isClosed = meeting?.status === 'closed' || meeting?.status === 'completed';
 
   const getQRCodeUrl = (code: string) => {
     const joinUrl = `${window.location.origin}/prayer-meeting?code=${code}`;
@@ -760,16 +761,22 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
               </div>
             )}
 
-            <Button
-              variant="destructive"
-              onClick={() => deleteMeetingMutation.mutate()}
-              disabled={deleteMeetingMutation.isPending}
-              className="w-full"
-              data-testid="button-end-meeting"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              結束禱告會
-            </Button>
+            {isClosed ? (
+              <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center text-gray-600 dark:text-gray-400">
+                此禱告會已結束（歷史記錄）
+              </div>
+            ) : (
+              <Button
+                variant="destructive"
+                onClick={() => deleteMeetingMutation.mutate()}
+                disabled={deleteMeetingMutation.isPending}
+                className="w-full"
+                data-testid="button-end-meeting"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                結束禱告會
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
