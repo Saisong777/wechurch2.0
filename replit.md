@@ -62,15 +62,25 @@ The prayer meeting feature allows leaders to create prayer sessions with groupin
 - **4-digit short codes**: Each meeting has a unique code for easy joining
 - **QR code generation**: Automatic QR codes for mobile scanning
 - **Flexible grouping modes**: Group by size or by count, with gender separation options
-- **Anonymous prayer option**: Users can submit prayers anonymously (excluded from group displays but included in final lists)
-- **AI prayer classification**: Uses GPT to categorize prayers into 11 categories:
+- **Anonymous prayer option**: Users can submit both named and anonymous prayers with a single save button
+- **AI prayer classification**: Uses GPT-4o-mini to categorize BOTH named and anonymous prayers into 11 categories:
   - 健康(health), 工作(work), 關係(relationships), 小孩(children), 婚姻(marriage), 財務(finances), 學業(academics), 信仰(faith), 事工(ministry), 感恩(thanksgiving), 其他(other)
-- **Urgent prayer detection**: AI detects severe illness, death/near-death situations, emergency events, urgent medical needs
+- **Anonymous prayer classification**: Stored separately in `anonymousPrayerCategory` and `isAnonymousPrayerUrgent` fields
+- **Urgent prayer detection**: AI detects:
+  - Severe illness (cancer, hospitalization)
+  - Death, near-death, suicide ideation
+  - Emergency events (accidents, disasters)
+  - Mental health crises (depression, anxiety, emotional breakdown)
+  - Relationship crises (divorce, separation, affairs, abortion)
+  - Severe financial crises (bankruptcy, unemployment, debt)
 - **Prayer list view**: Categorized view with urgent prayers highlighted, filterable by group
+- **Own prayer visibility**: Users see their own prayers highlighted in sky blue with "我" badge
 - **Presentation mode**: Full-screen display for projecting prayer requests
+- **Historical meetings**: View past prayer meetings with their prayers and classifications
 - **Backend routes**:
-  - POST `/api/prayer-meetings/:id/classify-prayers` - Trigger AI classification
-  - GET `/api/prayer-meetings/:id/prayer-list?group=X&includeAnonymous=true` - Retrieve categorized prayer list
+  - POST `/api/prayer-meetings/:id/classify-prayers` - Trigger AI classification for both named and anonymous prayers
+  - GET `/api/prayer-meetings/:id/prayer-list?group=X&mode=all` - Retrieve categorized prayer list (mode: all/named/anonymous)
+  - GET `/api/prayer-meetings/history` - Retrieve closed/completed prayer meetings
 
 ### Random Grouper ("神的安排")
 The random grouper feature allows leaders to create grouping activities with:
