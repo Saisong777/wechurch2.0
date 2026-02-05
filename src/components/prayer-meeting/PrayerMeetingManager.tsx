@@ -166,20 +166,16 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
     }
   }, [initialCode]);
 
-  // Load existing prayer data into form for editing
+  // Load existing prayer data into form for editing (only on initial load or when entering edit mode)
   useEffect(() => {
-    if (myParticipantId && participants.length > 0) {
+    if (myParticipantId && participants.length > 0 && !isEditingPrayer) {
       const myParticipant = participants.find(p => p.id === myParticipantId);
       if (myParticipant) {
-        if (myParticipant.prayerRequest) {
-          setMyNamedPrayer(myParticipant.prayerRequest);
-        }
-        if (myParticipant.anonymousPrayer) {
-          setMyAnonymousPrayer(myParticipant.anonymousPrayer);
-        }
+        setMyNamedPrayer(myParticipant.prayerRequest || '');
+        setMyAnonymousPrayer(myParticipant.anonymousPrayer || '');
       }
     }
-  }, [myParticipantId, participants]);
+  }, [myParticipantId, participants, isEditingPrayer]);
 
   const createMeetingMutation = useMutation({
     mutationFn: async () => {

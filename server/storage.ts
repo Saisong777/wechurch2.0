@@ -724,7 +724,7 @@ export class DatabaseStorage implements IStorage {
 
   async getClosedPrayerMeetings(): Promise<PrayerMeeting[]> {
     return db.select().from(prayerMeetings)
-      .where(eq(prayerMeetings.status, 'closed'))
+      .where(or(eq(prayerMeetings.status, 'closed'), eq(prayerMeetings.status, 'completed')))
       .orderBy(desc(prayerMeetings.createdAt));
   }
 

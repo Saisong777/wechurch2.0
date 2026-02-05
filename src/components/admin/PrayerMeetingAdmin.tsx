@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, Presentation, X, Sparkles, List, AlertTriangle } from 'lucide-react';
+import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, ChevronUp, ChevronDown, Presentation, X, Sparkles, List, AlertTriangle, EyeOff, Maximize, Minimize } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,6 +64,14 @@ type GroupingMode = 'bySize' | 'byCount';
 type GenderMode = 'mixed' | 'separate' | 'male_only' | 'female_only';
 type ViewStep = 'list' | 'create' | 'manage' | 'presentation' | 'prayer-list';
 
+interface PresentationPage {
+  title: string;
+  subtitle?: string;
+  prayers: { id: string; name: string; prayer: string; groupNumber: number | null; isUrgent?: boolean }[];
+  type: 'urgent' | 'anonymous' | 'group';
+  groupNumber?: number;
+}
+
 const GROUP_COLORS = [
   { bg: 'bg-blue-100 dark:bg-blue-900/40', border: 'border-blue-400 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-300', accent: 'bg-blue-500' },
   { bg: 'bg-green-100 dark:bg-green-900/40', border: 'border-green-400 dark:border-green-600', text: 'text-green-700 dark:text-green-300', accent: 'bg-green-500' },
@@ -89,6 +97,8 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
   const [currentMeetingId, setCurrentMeetingId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [presentationGroup, setPresentationGroup] = useState<number>(0);
+  const [presentationPageIndex, setPresentationPageIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [title, setTitle] = useState('禱告會');
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('bySize');
@@ -270,79 +280,217 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     .filter(n => n > 0)
     .sort((a, b) => a - b);
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.();
+      setIsFullscreen(false);
+    }
+  };
+
+  const computePresentationPages = () => {
+    const pages: PresentationPage[] = [];
+    const urgentPrayers: PresentationPage['prayers'] = [];
+    const anonymousPrayers: PresentationPage['prayers'] = [];
+    
+    participants.forEach(p => {
+      if (p.prayerRequest && p.isUrgent) {
+        urgentPrayers.push({ id: p.id + '-urgent', name: p.name, prayer: p.prayerRequest, groupNumber: p.groupNumber, isUrgent: true });
+      }
+      if (p.anonymousPrayer) {
+        anonymousPrayers.push({ id: p.id + '-anon', name: '匿名', prayer: p.anonymousPrayer, groupNumber: p.groupNumber });
+      }
+    });
+    
+    if (urgentPrayers.length > 0) {
+      pages.push({ title: '緊急禱告事項', subtitle: '需要迫切代禱', prayers: urgentPrayers, type: 'urgent' });
+    }
+    if (anonymousPrayers.length > 0) {
+      pages.push({ title: '匿名禱告事項', prayers: anonymousPrayers, type: 'anonymous' });
+    }
+    
+    groupNumbers.forEach(num => {
+      const groupPrayers: PresentationPage['prayers'] = [];
+      const groupParticipants = groupedParticipants[num] || [];
+      groupParticipants.forEach(p => {
+        if (p.prayerRequest) {
+          groupPrayers.push({ id: p.id + '-named', name: p.name, prayer: p.prayerRequest, groupNumber: p.groupNumber });
+        }
+      });
+      if (groupPrayers.length > 0) {
+        pages.push({ title: `第 ${num} 組`, subtitle: `${groupParticipants.length} 位組員`, prayers: groupPrayers, type: 'group', groupNumber: num });
+      }
+    });
+    
+    if (pages.length === 0) {
+      pages.push({ title: '尚無禱告事項', prayers: [], type: 'group' });
+    }
+    return pages;
+  };
+
+  const presentationPages = computePresentationPages();
+  const maxPageIndex = Math.max(0, presentationPages.length - 1);
+
+  useEffect(() => {
+    if (step === 'presentation' && presentationPageIndex > maxPageIndex) {
+      setPresentationPageIndex(maxPageIndex);
+    }
+  }, [step, presentationPageIndex, maxPageIndex]);
+
+  useEffect(() => {
+    if (step !== 'presentation') return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        setPresentationPageIndex(prev => Math.min(prev + 1, maxPageIndex));
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setPresentationPageIndex(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'Escape') {
+        if (isFullscreen) {
+          document.exitFullscreen?.();
+          setIsFullscreen(false);
+        } else {
+          setStep('manage');
+          setPresentationPageIndex(0);
+        }
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [step, isFullscreen, maxPageIndex]);
+
   if (step === 'presentation') {
-    const currentGroupParticipants = presentationGroup === 0 
-      ? participants 
-      : groupedParticipants[presentationGroup] || [];
+    const pages = presentationPages;
+    const currentPage = pages[Math.min(presentationPageIndex, maxPageIndex)];
+    const safePageIndex = Math.min(presentationPageIndex, maxPageIndex);
+    
+    const getPageGradient = (type: PresentationPage['type']) => {
+      switch (type) {
+        case 'urgent':
+          return 'from-red-900 via-rose-900 to-orange-900';
+        case 'anonymous':
+          return 'from-slate-800 via-gray-900 to-zinc-900';
+        case 'group':
+        default:
+          return 'from-purple-900 via-indigo-900 to-blue-900';
+      }
+    };
     
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 z-50 overflow-auto">
-        <div className="absolute top-4 right-4 flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setStep('manage')} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+      <div className={cn("fixed inset-0 z-50 overflow-hidden bg-gradient-to-br", getPageGradient(currentPage.type))}>
+        <div className="absolute top-4 right-4 flex gap-2 z-10">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={toggleFullscreen} 
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+            data-testid="button-toggle-fullscreen"
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => { setStep('manage'); setPresentationPageIndex(0); }} 
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+            data-testid="button-exit-presentation"
+          >
             <X className="w-4 h-4 mr-2" />
-            退出簡報
+            退出
           </Button>
         </div>
 
-        <div className="min-h-screen flex flex-col items-center justify-center p-8">
-          <h1 className="text-4xl font-bold text-white mb-8">
-            {presentationGroup === 0 ? '所有禱告事項' : `第 ${presentationGroup} 組`}
-          </h1>
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setPresentationPageIndex(prev => Math.max(prev - 1, 0))}
+            disabled={safePageIndex === 0}
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-30"
+            data-testid="button-prev-page"
+          >
+            <ChevronUp className="w-6 h-6" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setPresentationPageIndex(prev => Math.min(prev + 1, pages.length - 1))}
+            disabled={safePageIndex === pages.length - 1}
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-30"
+            data-testid="button-next-page"
+          >
+            <ChevronDown className="w-6 h-6" />
+          </Button>
+        </div>
 
-          <div className="flex gap-2 mb-8 flex-wrap justify-center">
-            <Button
-              variant={presentationGroup === 0 ? 'default' : 'outline'}
-              onClick={() => setPresentationGroup(0)}
-              className={cn(presentationGroup === 0 ? '' : 'bg-white/10 border-white/20 text-white hover:bg-white/20')}
-            >
-              全部
-            </Button>
-            {groupNumbers.map(num => (
-              <Button
-                key={num}
-                variant={presentationGroup === num ? 'default' : 'outline'}
-                onClick={() => setPresentationGroup(num)}
-                className={cn(presentationGroup === num ? '' : 'bg-white/10 border-white/20 text-white hover:bg-white/20')}
-              >
-                第 {num} 組
-              </Button>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+          <span className="text-white/60 text-sm">
+            {safePageIndex + 1} / {pages.length}
+          </span>
+          <div className="flex gap-1">
+            {pages.map((page, idx) => (
+              <button
+                key={idx}
+                onClick={() => setPresentationPageIndex(idx)}
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all",
+                  idx === safePageIndex ? "bg-white w-4" : "bg-white/40 hover:bg-white/60"
+                )}
+                data-testid={`button-page-dot-${idx}`}
+              />
             ))}
           </div>
+          <span className="text-white/40 text-xs ml-2">按上下鍵切換</span>
+        </div>
 
-          <div className="w-full max-w-4xl bg-white/10 backdrop-blur rounded-lg p-8">
-            <ul className="space-y-4">
-              {(() => {
-                const allPrayers: { id: string; name: string; prayer: string; groupNumber: number | null; isAnonymous: boolean }[] = [];
-                currentGroupParticipants.forEach(p => {
-                  if (p.prayerRequest) {
-                    allPrayers.push({ id: p.id + '-named', name: p.name, prayer: p.prayerRequest, groupNumber: p.groupNumber, isAnonymous: false });
-                  }
-                  if (p.anonymousPrayer) {
-                    allPrayers.push({ id: p.id + '-anon', name: '匿名', prayer: p.anonymousPrayer, groupNumber: p.groupNumber, isAnonymous: true });
-                  }
-                });
-                return allPrayers.map((item, index) => (
+        <div className="min-h-screen flex flex-col items-center justify-center p-8 pt-16">
+          <div className="text-center mb-8">
+            {currentPage.type === 'urgent' && (
+              <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            )}
+            {currentPage.type === 'anonymous' && (
+              <EyeOff className="w-12 h-12 text-white/60 mx-auto mb-4" />
+            )}
+            <h1 className="text-5xl font-bold text-white mb-2">
+              {currentPage.title}
+            </h1>
+            {currentPage.subtitle && (
+              <p className="text-xl text-white/60">{currentPage.subtitle}</p>
+            )}
+          </div>
+
+          <div className="w-full max-w-4xl bg-white/10 backdrop-blur rounded-xl p-8">
+            {currentPage.prayers.length > 0 ? (
+              <ul className="space-y-6">
+                {currentPage.prayers.map((item, index) => (
                   <li key={item.id} className="flex items-start gap-4 text-white">
-                    <span className="text-2xl font-bold text-white/60 min-w-[2rem]">{index + 1}.</span>
+                    <span className="text-3xl font-bold text-white/40 min-w-[2.5rem]">{index + 1}.</span>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="font-semibold text-lg">{item.name}</span>
-                        {item.groupNumber && presentationGroup === 0 && (
-                          <Badge variant="outline" className="text-white/70 border-white/30 text-xs">
-                            第{item.groupNumber}組
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="font-semibold text-xl">{item.name}</span>
+                        {item.isUrgent && (
+                          <Badge className="bg-red-500/80 text-white border-0">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            緊急
                           </Badge>
                         )}
                       </div>
-                      <p className="text-white/90 text-xl leading-relaxed">
+                      <p className="text-white/90 text-2xl leading-relaxed">
                         {item.prayer}
                       </p>
                     </div>
                   </li>
-                ));
-              })()}
-            </ul>
-            {currentGroupParticipants.every(p => !p.prayerRequest && !p.anonymousPrayer) && (
-              <p className="text-center text-white/60 text-xl">尚無禱告事項</p>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-center text-white/60 text-xl py-8">此分類沒有禱告事項</p>
             )}
           </div>
         </div>
@@ -433,6 +581,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
               size="sm"
               onClick={() => {
                 setPresentationGroup(prayerListGroup || 0);
+                setPresentationPageIndex(0);
                 setStep('presentation');
               }}
               className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
@@ -729,7 +878,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
 
                 <Button
                   variant="outline"
-                  onClick={() => setStep('presentation')}
+                  onClick={() => { setPresentationPageIndex(0); setStep('presentation'); }}
                   className="w-full"
                   data-testid="button-presentation-mode"
                 >
