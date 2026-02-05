@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, ChevronUp, ChevronDown, Presentation, X, Sparkles, List, AlertTriangle, EyeOff, Maximize, Minimize } from 'lucide-react';
+import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, ChevronUp, ChevronDown, Presentation, X, Sparkles, List, AlertTriangle, EyeOff, Maximize, Minimize, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -216,9 +216,9 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     },
   });
 
-  const deleteMeetingMutation = useMutation({
+  const endMeetingMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest('DELETE', `/api/prayer-meetings/${currentMeetingId}`);
+      await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}`, { status: 'closed' });
     },
     onSuccess: () => {
       setCurrentMeetingId(null);
@@ -917,12 +917,12 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
             ) : (
               <Button
                 variant="destructive"
-                onClick={() => deleteMeetingMutation.mutate()}
-                disabled={deleteMeetingMutation.isPending}
+                onClick={() => endMeetingMutation.mutate()}
+                disabled={endMeetingMutation.isPending}
                 className="w-full"
                 data-testid="button-end-meeting"
               >
-                <Trash2 className="w-4 h-4 mr-2" />
+                <XCircle className="w-4 h-4 mr-2" />
                 結束禱告會
               </Button>
             )}
