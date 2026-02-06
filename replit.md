@@ -63,29 +63,19 @@ The prayer meeting feature allows leaders to create prayer sessions with groupin
 - **QR code generation**: Automatic QR codes for mobile scanning
 - **Flexible grouping modes**: Group by size or by count, with gender separation options
 - **Anonymous prayer option**: Users can submit both named and anonymous prayers with a single save button
-- **AI Prayer Report Generation**: Uses GPT-4o-mini with "Church Prayer Secretary" role to generate comprehensive 4-section Markdown reports:
-  - **(a) 個人/小組代禱摘要**: Summary of individual/group prayer requests
-  - **(b) 分類代禱事項**: Categorized prayers with 12 categories (疾病醫治, 職場工作, 人際關係, 親子家庭, 婚姻關係, 財務供應, 學業考試, 信仰成長, 事工服事, 靈魂得救, 感恩讚美, 其他)
-  - **(c) 匿名代禱牆**: Anonymized prayer wall for projection display
-  - **(d) 緊急代禱事項**: Urgent prayers with reasons highlighted
-- **Prayer Report Storage**: Full Markdown report stored in `prayerReport` field of prayerMeetings table
-- **Dual View Modes**: Toggle between "報告檢視" (report view with formatted Markdown) and "列表檢視" (traditional list view)
-- **Anonymous prayer classification**: Stored separately in `anonymousPrayerCategory` and `isAnonymousPrayerUrgent` fields
-- **Urgent prayer detection**: AI detects:
-  - Severe illness (cancer, hospitalization)
-  - Death, near-death, suicide ideation
-  - Emergency events (accidents, disasters)
-  - Mental health crises (depression, anxiety, emotional breakdown)
-  - Relationship crises (divorce, separation, affairs, abortion)
-  - Severe financial crises (bankruptcy, unemployment, debt)
-- **Pastoral Alerts**: Report includes ⚠️ section for content requiring pastoral attention (suicide, self-harm, criminal matters)
-- **Prayer list view**: Categorized view with urgent prayers highlighted, filterable by group
+- **Three prayer input fields**: Each participant can submit three types of prayers with distinct visibility rules:
+  - **Urgent prayer** (緊急禱告事項): Red-styled input, visible in group prayer lists AND PPT presentation
+  - **Regular prayer** (一般禱告事項): Visible in group prayer lists only (not in PPT)
+  - **Anonymous prayer** (匿名禱告事項): Visible in PPT only (without name), not shown in group lists
+- **4-tab prayer list view**: Admin can view prayers in four filtered tabs:
+  - 全部禱告 (all prayers), 各組禱告 (by group with dropdown selector), 緊急禱告 (urgent only), 匿名禱告 (anonymous only)
+- **Collapsible admin sections**: Participant list and group list are collapsible to reduce clutter
+- **Duplicate-click prevention**: "開始禱告" button disabled after first click
+- **PPT presentation mode**: Full-screen display with statistics overview page, then paginated urgent/anonymous/group prayers (5 per page), keyboard navigation
 - **Own prayer visibility**: Users see their own prayers highlighted in sky blue with "我" badge
-- **Presentation mode**: Full-screen display for projecting prayer requests with keyboard navigation
-- **Historical meetings**: View past prayer meetings with their prayers and classifications
+- **Historical meetings**: View past prayer meetings with their prayers
 - **Backend routes**:
-  - POST `/api/prayer-meetings/:id/classify-prayers` - Generate AI prayer report (4-section Markdown stored in prayerReport field)
-  - GET `/api/prayer-meetings/:id/prayer-list?group=X&mode=all` - Retrieve categorized prayer list (mode: all/named/anonymous)
+  - GET `/api/prayer-meetings/:id/prayer-list?group=X` - Retrieve structured prayer list (urgentPrayers, namedPrayers, anonymousPrayers, groupedNamedPrayers, stats)
   - GET `/api/prayer-meetings/history` - Retrieve closed/completed prayer meetings
 
 ### Random Grouper ("神的安排")
