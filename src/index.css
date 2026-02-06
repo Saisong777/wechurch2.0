@@ -282,6 +282,24 @@
   animation: scan 2s ease-in-out infinite;
 }
 
+.scripture-scroll-visible {
+  scrollbar-gutter: stable;
+}
+.scripture-scroll-visible::-webkit-scrollbar {
+  width: 6px;
+}
+.scripture-scroll-visible::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+.scripture-scroll-visible::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+.scripture-scroll-visible::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
 /* Smooth hover transitions for interactive elements */
 @layer utilities {
   .hover-lift {

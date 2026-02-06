@@ -234,7 +234,7 @@ const SyncedScriptureDisplay = ({ scriptures, fontSizeClass }: {
           key={g.key}
           ref={(el) => { scrollRefs.current[idx] = el; }}
           onScroll={() => handleScroll(idx)}
-          className={`rounded-lg p-2 sm:p-3 sm:max-h-[60vh] sm:overflow-y-auto ${bgColors[g.key] || 'bg-muted/30'}`}
+          className={`rounded-lg p-2 sm:p-3 sm:max-h-[60vh] sm:overflow-y-scroll scripture-scroll-visible ${bgColors[g.key] || 'bg-muted/30'}`}
         >
           <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} />
         </div>
