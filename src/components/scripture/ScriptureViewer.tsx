@@ -165,7 +165,7 @@ export const ScriptureViewer = ({ verses, className = '', paragraphMode = false 
       />
 
       {paragraphMode ? (
-        <div className="text-sm leading-relaxed">
+        <div className="text-base sm:text-lg leading-relaxed">
           {verses.map((v) => {
             const key = getVerseKey(v);
             const isSelected = selectedVerses.has(key);
