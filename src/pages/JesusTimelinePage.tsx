@@ -153,6 +153,10 @@ function getExclusiveGospel(event: JesusEvent): string | null {
 
 const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference: string; gospelName: string; fontSizeClass: string }) => {
   const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [selectedNoteRef, setSelectedNoteRef] = useState<string>('');
+  const [selectedNoteText, setSelectedNoteText] = useState<string>('');
+  const [ttsText, setTtsText] = useState<string>('');
+  const [showSelectedTts, setShowSelectedTts] = useState(false);
   const { data, isLoading } = useQuery<ScriptureData>({
     queryKey: ['/api/bible/by-reference', reference],
     queryFn: async () => {
@@ -188,7 +192,29 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference:
         <Book className="w-4 h-4" />
         {gospelName} {data.chapter} 章
       </h6>
-      <ScriptureViewer verses={formattedVerses} paragraphMode fontSizeClass={fontSizeClass} />
+      <ScriptureViewer 
+        verses={formattedVerses} 
+        paragraphMode 
+        fontSizeClass={fontSizeClass}
+        onNoteForSelected={(ref, text) => {
+          setSelectedNoteRef(ref);
+          setSelectedNoteText(text);
+          setShowNoteDialog(true);
+        }}
+        onReadSelected={(text) => {
+          setTtsText(text);
+          setShowSelectedTts(true);
+        }}
+      />
+
+      {showSelectedTts && ttsText && (
+        <div className="flex items-center gap-2 mt-2 p-2 rounded-md bg-primary/5 border border-primary/10">
+          <ScriptureTTS text={ttsText} compact label="朗讀選取經文" />
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setShowSelectedTts(false)} data-testid="button-close-selected-tts">
+            關閉
+          </Button>
+        </div>
+      )}
 
       {data && data.verses && data.verses.length > 0 && (
         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
@@ -196,7 +222,11 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference:
             variant="outline"
             size="sm"
             className="gap-1.5"
-            onClick={() => setShowNoteDialog(true)}
+            onClick={() => {
+              setSelectedNoteRef(reference);
+              setSelectedNoteText(data.verses.map((v: any) => v.text).join(' '));
+              setShowNoteDialog(true);
+            }}
             data-testid="button-timeline-note"
           >
             <BookMarked className="w-3.5 h-3.5" />
@@ -212,9 +242,15 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference:
 
       <DevotionalNoteDialog
         open={showNoteDialog}
-        onOpenChange={setShowNoteDialog}
-        verseReference={reference}
-        verseText={data?.verses?.map((v: any) => v.text).join(' ') || ''}
+        onOpenChange={(open) => {
+          setShowNoteDialog(open);
+          if (!open) {
+            setSelectedNoteRef('');
+            setSelectedNoteText('');
+          }
+        }}
+        verseReference={selectedNoteRef || reference}
+        verseText={selectedNoteText || (data?.verses?.map((v: any) => v.text).join(' ') || '')}
       />
     </div>
   );
