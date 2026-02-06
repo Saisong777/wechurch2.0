@@ -1,13 +1,12 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown } from 'lucide-react';
+import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type } from 'lucide-react';
+/* ScrollArea removed to allow natural page scrolling on mobile */
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
 import { FeatureGate } from '@/components/ui/feature-gate';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface JesusEvent {
   id: number;
@@ -136,13 +135,21 @@ const gospelIndicatorColors: Record<string, { active: string; inactive: string }
   '約': { active: 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400', inactive: 'bg-muted text-muted-foreground/30' },
 };
 
+const FONT_SIZE_KEY = 'wechurch-timeline-font-size';
+const fontSizeOptions = [
+  { label: '小', value: 0, class: 'text-sm sm:text-base' },
+  { label: '中', value: 1, class: 'text-base sm:text-lg' },
+  { label: '大', value: 2, class: 'text-lg sm:text-xl' },
+  { label: '特大', value: 3, class: 'text-xl sm:text-2xl' },
+];
+
 function getExclusiveGospel(event: JesusEvent): string | null {
   const present = gospelKeys.filter(g => event[g.field]);
   if (present.length === 1) return present[0].abbr;
   return null;
 }
 
-const ScriptureDisplay = ({ reference, gospelName }: { reference: string; gospelName: string }) => {
+const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference: string; gospelName: string; fontSizeClass: string }) => {
   const { data, isLoading } = useQuery<ScriptureData>({
     queryKey: ['/api/bible/by-reference', reference],
     queryFn: async () => {
@@ -178,7 +185,60 @@ const ScriptureDisplay = ({ reference, gospelName }: { reference: string; gospel
         <Book className="w-4 h-4" />
         {gospelName} {data.chapter} 章
       </h6>
-      <ScriptureViewer verses={formattedVerses} paragraphMode />
+      <ScriptureViewer verses={formattedVerses} paragraphMode fontSizeClass={fontSizeClass} />
+    </div>
+  );
+};
+
+const SyncedScriptureDisplay = ({ scriptures, fontSizeClass }: {
+  scriptures: { key: string; name: string; ref: string }[];
+  fontSizeClass: string;
+}) => {
+  const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const isScrolling = useRef(false);
+
+  const handleScroll = useCallback((sourceIdx: number) => {
+    if (isScrolling.current) return;
+    isScrolling.current = true;
+    const source = scrollRefs.current[sourceIdx];
+    if (!source) { isScrolling.current = false; return; }
+
+    const scrollTop = source.scrollTop;
+    const scrollRatio = source.scrollHeight > source.clientHeight
+      ? scrollTop / (source.scrollHeight - source.clientHeight)
+      : 0;
+
+    scrollRefs.current.forEach((ref, idx) => {
+      if (idx !== sourceIdx && ref) {
+        const targetMax = ref.scrollHeight - ref.clientHeight;
+        if (targetMax > 0) {
+          ref.scrollTop = scrollRatio * targetMax;
+        }
+      }
+    });
+
+    requestAnimationFrame(() => { isScrolling.current = false; });
+  }, []);
+
+  const bgColors: Record<string, string> = {
+    'scriptureMt': 'bg-blue-50/60 dark:bg-blue-950/20',
+    'scriptureMk': 'bg-green-50/60 dark:bg-green-950/20',
+    'scriptureLk': 'bg-amber-50/60 dark:bg-amber-950/20',
+    'scriptureJn': 'bg-purple-50/60 dark:bg-purple-950/20',
+  };
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {scriptures.map((g, idx) => (
+        <div
+          key={g.key}
+          ref={(el) => { scrollRefs.current[idx] = el; }}
+          onScroll={() => handleScroll(idx)}
+          className={`rounded-lg p-2 sm:p-3 sm:max-h-[60vh] sm:overflow-y-auto ${bgColors[g.key] || 'bg-muted/30'}`}
+        >
+          <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} />
+        </div>
+      ))}
     </div>
   );
 };
@@ -187,10 +247,12 @@ const EventCard = ({
   event,
   isCollapsed,
   onToggle,
+  fontSizeClass,
 }: {
   event: JesusEvent;
   isCollapsed: boolean;
   onToggle: () => void;
+  fontSizeClass: string;
 }) => {
   const cfg = seasonConfig[event.season] || seasonConfig['春'];
   const exclusive = getExclusiveGospel(event);
@@ -198,6 +260,8 @@ const EventCard = ({
   const gospelScriptures = gospelKeys
     .filter(g => event[g.field])
     .map(g => ({ key: g.field, name: g.fullName, ref: event[g.field]! }));
+
+  const hasMultipleScriptures = gospelScriptures.length >= 2;
 
   return (
     <Card
@@ -290,19 +354,23 @@ const EventCard = ({
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
           >
-            {gospelScriptures.map((g, idx) => {
-              const bgColors = [
-                'bg-blue-50/60 dark:bg-blue-950/20',
-                'bg-green-50/60 dark:bg-green-950/20',
-                'bg-amber-50/60 dark:bg-amber-950/20',
-                'bg-purple-50/60 dark:bg-purple-950/20',
-              ];
-              return (
-                <div key={g.key} className={`rounded-lg p-3 ${bgColors[idx % bgColors.length]}`}>
-                  <ScriptureDisplay reference={g.ref} gospelName={g.name} />
-                </div>
-              );
-            })}
+            {hasMultipleScriptures ? (
+              <SyncedScriptureDisplay scriptures={gospelScriptures} fontSizeClass={fontSizeClass} />
+            ) : (
+              gospelScriptures.map((g) => {
+                const bgColors: Record<string, string> = {
+                  'scriptureMt': 'bg-blue-50/60 dark:bg-blue-950/20',
+                  'scriptureMk': 'bg-green-50/60 dark:bg-green-950/20',
+                  'scriptureLk': 'bg-amber-50/60 dark:bg-amber-950/20',
+                  'scriptureJn': 'bg-purple-50/60 dark:bg-purple-950/20',
+                };
+                return (
+                  <div key={g.key} className={`rounded-lg p-3 ${bgColors[g.key] || 'bg-muted/30'}`}>
+                    <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} />
+                  </div>
+                );
+              })
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -324,19 +392,35 @@ const EventCard = ({
 };
 
 const JesusTimelinePage = () => {
-  const isMobile = useIsMobile();
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
   const [selectedGospel, setSelectedGospel] = useState<string | null>(null);
   const [collapsedEvents, setCollapsedEvents] = useState<Set<number>>(new Set());
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filterInitialized, setFilterInitialized] = useState(false);
-
-  useEffect(() => {
-    if (!filterInitialized) {
-      setFilterOpen(!isMobile);
-      setFilterInitialized(true);
+  const [filterOpen, setFilterOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
     }
-  }, [isMobile, filterInitialized]);
+    return false;
+  });
+  const [fontSizeIdx, setFontSizeIdx] = useState(() => {
+    try {
+      const saved = localStorage.getItem(FONT_SIZE_KEY);
+      if (saved !== null) {
+        const parsed = parseInt(saved, 10);
+        if (parsed >= 0 && parsed < fontSizeOptions.length) return parsed;
+      }
+    } catch {}
+    return 1;
+  });
+
+  const currentFontSize = fontSizeOptions[fontSizeIdx];
+
+  const handleFontSizeChange = (delta: number) => {
+    setFontSizeIdx(prev => {
+      const next = Math.max(0, Math.min(fontSizeOptions.length - 1, prev + delta));
+      try { localStorage.setItem(FONT_SIZE_KEY, String(next)); } catch {}
+      return next;
+    });
+  };
 
   const { data: allEvents = [], isLoading, isError } = useQuery<JesusEvent[]>({
     queryKey: ['/api/jesus/timeline'],
@@ -401,9 +485,9 @@ const JesusTimelinePage = () => {
       description="耶穌四季功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background flex flex-col">
-        <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
-          <div className="max-w-3xl mx-auto w-full flex flex-col flex-1">
-            <Card className="mb-4">
+        <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 overflow-y-auto">
+          <div className="max-w-3xl mx-auto w-full space-y-4 pb-8">
+            <Card>
               <CardContent className="py-2.5 sm:py-4">
                 <button
                   onClick={() => setFilterOpen(!filterOpen)}
@@ -411,8 +495,8 @@ const JesusTimelinePage = () => {
                   aria-expanded={filterOpen}
                   data-testid="button-toggle-filter"
                 >
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-4 h-4 text-primary" />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Filter className="w-4 h-4 text-primary flex-shrink-0" />
                     <span className="text-sm font-medium text-foreground" data-testid="text-event-count">
                       {filteredEvents.length} 個事件
                     </span>
@@ -422,7 +506,7 @@ const JesusTimelinePage = () => {
                       </span>
                     )}
                     {!filterOpen && (selectedSeason || selectedGospel) && (
-                      <div className="flex items-center gap-1 ml-1">
+                      <div className="flex items-center gap-1">
                         {selectedGospel && (
                           <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
                             {selectedGospel}
@@ -436,7 +520,7 @@ const JesusTimelinePage = () => {
                       </div>
                     )}
                   </div>
-                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${filterOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${filterOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {filterOpen && (
@@ -498,6 +582,34 @@ const JesusTimelinePage = () => {
                         </Button>
                       )}
                     </div>
+
+                    <div className="flex items-center gap-2 pt-1 border-t border-border mt-2">
+                      <Type className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                      <span className="text-xs text-muted-foreground">字體</span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleFontSizeChange(-1)}
+                          disabled={fontSizeIdx === 0}
+                          data-testid="button-font-decrease"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <span className="text-xs font-medium text-foreground min-w-[2rem] text-center" data-testid="text-font-size">
+                          {currentFontSize.label}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleFontSizeChange(1)}
+                          disabled={fontSizeIdx === fontSizeOptions.length - 1}
+                          data-testid="button-font-increase"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -513,44 +625,43 @@ const JesusTimelinePage = () => {
             ) : filteredEvents.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground text-sm">沒有找到事件</div>
             ) : (
-              <ScrollArea className="flex-1 h-[calc(100vh-200px)] sm:h-[calc(100vh-240px)]">
-                <div className="space-y-6 pr-2 sm:pr-4 pb-8">
-                  {groupedBySeason.map(({ season, events }) => {
-                    const cfg = seasonConfig[season];
-                    const SeasonIcon = cfg.icon;
-                    return (
-                      <section key={season} data-testid={`section-season-${season}`}>
-                        <div
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 ${cfg.headerBg} border ${cfg.borderColor}`}
-                        >
-                          <SeasonIcon className={`w-4 h-4 ${cfg.textColor}`} />
-                          <h3 className={`text-sm sm:text-base font-semibold ${cfg.textColor}`}>
-                            {cfg.buttonLabel}
-                            <span className="text-muted-foreground font-normal">
-                              {' / '}
-                              {cfg.subtitle}
-                            </span>
-                          </h3>
-                          <span className="text-xs text-muted-foreground ml-auto">
-                            {events.length} 個事件
+              <div className="space-y-6">
+                {groupedBySeason.map(({ season, events }) => {
+                  const cfg = seasonConfig[season];
+                  const SeasonIcon = cfg.icon;
+                  return (
+                    <section key={season} data-testid={`section-season-${season}`}>
+                      <div
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 ${cfg.headerBg} border ${cfg.borderColor}`}
+                      >
+                        <SeasonIcon className={`w-4 h-4 ${cfg.textColor}`} />
+                        <h3 className={`text-sm sm:text-base font-semibold ${cfg.textColor}`}>
+                          {cfg.buttonLabel}
+                          <span className="text-muted-foreground font-normal">
+                            {' / '}
+                            {cfg.subtitle}
                           </span>
-                        </div>
+                        </h3>
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {events.length} 個事件
+                        </span>
+                      </div>
 
-                        <div className="space-y-3">
-                          {events.map(event => (
-                            <EventCard
-                              key={event.id}
-                              event={event}
-                              isCollapsed={collapsedEvents.has(event.id)}
-                              onToggle={() => toggleCollapse(event.id)}
-                            />
-                          ))}
-                        </div>
-                      </section>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
+                      <div className="space-y-3">
+                        {events.map(event => (
+                          <EventCard
+                            key={event.id}
+                            event={event}
+                            isCollapsed={collapsedEvents.has(event.id)}
+                            onToggle={() => toggleCollapse(event.id)}
+                            fontSizeClass={currentFontSize.class}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
             )}
           </div>
         </main>

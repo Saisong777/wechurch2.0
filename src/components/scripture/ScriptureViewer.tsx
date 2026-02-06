@@ -15,9 +15,10 @@ interface ScriptureViewerProps {
   verses: Verse[];
   className?: string;
   paragraphMode?: boolean;
+  fontSizeClass?: string;
 }
 
-export const ScriptureViewer = ({ verses, className = '', paragraphMode = false }: ScriptureViewerProps) => {
+export const ScriptureViewer = ({ verses, className = '', paragraphMode = false, fontSizeClass }: ScriptureViewerProps) => {
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -165,7 +166,7 @@ export const ScriptureViewer = ({ verses, className = '', paragraphMode = false 
       />
 
       {paragraphMode ? (
-        <div className="text-base sm:text-lg leading-relaxed">
+        <div className={`${fontSizeClass || 'text-base sm:text-lg'} leading-relaxed`}>
           {verses.map((v) => {
             const key = getVerseKey(v);
             const isSelected = selectedVerses.has(key);
