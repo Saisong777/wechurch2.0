@@ -344,6 +344,16 @@ export const devotionalNotes = pgTable("devotional_notes", {
   newUnderstanding: text("new_understanding"),
   promises: text("promises"),
   notes: text("notes"),
+  titlePhrase: text("title_phrase"),
+  heartbeatVerse: text("heartbeat_verse"),
+  observation: text("observation"),
+  coreInsightCategory: text("core_insight_category"),
+  coreInsightNote: text("core_insight_note"),
+  scholarsNote: text("scholars_note"),
+  actionPlan: text("action_plan"),
+  coolDownNote: text("cool_down_note"),
+  readingPlanId: uuid("reading_plan_id").references(() => userReadingPlans.id),
+  dayNumber: integer("day_number"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -400,6 +410,11 @@ export const userReadingPlans = pgTable("user_reading_plans", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date"),
   isActive: boolean("is_active").notNull().default(true),
+  reminderEnabled: boolean("reminder_enabled").default(true),
+  reminderMorning: text("reminder_morning").default("07:00"),
+  reminderNoon: text("reminder_noon").default("12:00"),
+  reminderEvening: text("reminder_evening").default("20:00"),
+  totalDays: integer("total_days"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -538,10 +553,12 @@ export const insertDevotionalNoteSchema = createInsertSchema(devotionalNotes).om
 export const insertSavedVerseSchema = createInsertSchema(savedVerses).omit({ id: true, createdAt: true });
 export const insertReadingPlanTemplateSchema = createInsertSchema(readingPlanTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserReadingPlanSchema = createInsertSchema(userReadingPlans).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUserReadingProgressSchema = createInsertSchema(userReadingProgress).omit({ id: true, createdAt: true });
 
 export type InsertDevotionalNote = z.infer<typeof insertDevotionalNoteSchema>;
 export type InsertSavedVerse = z.infer<typeof insertSavedVerseSchema>;
 export type InsertReadingPlanTemplate = z.infer<typeof insertReadingPlanTemplateSchema>;
 export type InsertUserReadingPlan = z.infer<typeof insertUserReadingPlanSchema>;
+export type InsertUserReadingProgress = z.infer<typeof insertUserReadingProgressSchema>;
 
 export * from "./models/auth";

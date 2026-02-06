@@ -9,11 +9,14 @@ import {
   chineseUnionTrad, jesus4Seasons, jesusDailyContent, readingPlanTemplates, readingPlanTemplateItems, blessingVerses, savedVerses,
   groupingActivities, groupingParticipants,
   prayerMeetings, prayerMeetingParticipants,
+  userReadingPlans, userReadingProgress, devotionalNotes,
   User, InsertUser, Session, InsertSession, Participant, InsertParticipant,
   Submission, InsertSubmission, Prayer, InsertPrayer, StudyResponse, InsertStudyResponse,
   FeatureToggle, PotentialMember, IcebreakerGame, IcebreakerPlayer, CardQuestion,
   AiReport, MessageCard, MessageCardDownload,
   ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse, SavedVerse, InsertSavedVerse,
+  UserReadingPlan, InsertUserReadingPlan, UserReadingProgress, InsertUserReadingProgress,
+  DevotionalNote, InsertDevotionalNote, InsertReadingPlanTemplate,
   PrayerMeeting, InsertPrayerMeeting, PrayerMeetingParticipant, InsertPrayerMeetingParticipant,
   GroupingActivity, GroupingParticipant, InsertGroupingActivity, InsertGroupingParticipant
 } from "@shared/schema";
@@ -153,6 +156,26 @@ export interface IStorage {
   getSavedVerse(userId: string, bookName: string, chapter: number, verse: number): Promise<SavedVerse | undefined>;
   createSavedVerse(data: InsertSavedVerse): Promise<SavedVerse>;
   deleteSavedVerse(id: string): Promise<void>;
+
+  getUserReadingPlans(userId: string): Promise<UserReadingPlan[]>;
+  getUserReadingPlan(id: string): Promise<UserReadingPlan | undefined>;
+  createUserReadingPlan(plan: InsertUserReadingPlan): Promise<UserReadingPlan>;
+  updateUserReadingPlan(id: string, updates: Partial<InsertUserReadingPlan>): Promise<UserReadingPlan | undefined>;
+  deleteUserReadingPlan(id: string): Promise<void>;
+
+  getUserReadingProgress(planId: string): Promise<UserReadingProgress[]>;
+  getUserTodayProgress(userId: string): Promise<UserReadingProgress[]>;
+  markReadingComplete(id: string): Promise<UserReadingProgress | undefined>;
+  createReadingProgress(progress: InsertUserReadingProgress): Promise<UserReadingProgress>;
+
+  getDevotionalNote(id: string): Promise<DevotionalNote | undefined>;
+  getDevotionalNotes(userId: string): Promise<DevotionalNote[]>;
+  getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
+  createDevotionalNote(note: InsertDevotionalNote): Promise<DevotionalNote>;
+  updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined>;
+
+  createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate>;
+  createReadingPlanTemplateItems(items: Array<{templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string}>): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -947,6 +970,96 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSavedVerse(id: string): Promise<void> {
     await db.delete(savedVerses).where(eq(savedVerses.id, id));
+  }
+
+  async getUserReadingPlans(userId: string): Promise<UserReadingPlan[]> {
+    return db.select().from(userReadingPlans).where(eq(userReadingPlans.userId, userId)).orderBy(desc(userReadingPlans.createdAt));
+  }
+
+  async getUserReadingPlan(id: string): Promise<UserReadingPlan | undefined> {
+    const [plan] = await db.select().from(userReadingPlans).where(eq(userReadingPlans.id, id)).limit(1);
+    return plan;
+  }
+
+  async createUserReadingPlan(plan: InsertUserReadingPlan): Promise<UserReadingPlan> {
+    const [created] = await db.insert(userReadingPlans).values(plan).returning();
+    return created;
+  }
+
+  async updateUserReadingPlan(id: string, updates: Partial<InsertUserReadingPlan>): Promise<UserReadingPlan | undefined> {
+    const [updated] = await db.update(userReadingPlans).set({ ...updates, updatedAt: new Date() }).where(eq(userReadingPlans.id, id)).returning();
+    return updated;
+  }
+
+  async deleteUserReadingPlan(id: string): Promise<void> {
+    await db.delete(userReadingProgress).where(eq(userReadingProgress.planId, id));
+    await db.delete(userReadingPlans).where(eq(userReadingPlans.id, id));
+  }
+
+  async getUserReadingProgress(planId: string): Promise<UserReadingProgress[]> {
+    return db.select().from(userReadingProgress).where(eq(userReadingProgress.planId, planId)).orderBy(asc(userReadingProgress.dayNumber));
+  }
+
+  async getUserTodayProgress(userId: string): Promise<UserReadingProgress[]> {
+    const today = new Date().toISOString().split('T')[0];
+    return db.select().from(userReadingProgress).where(
+      and(
+        eq(userReadingProgress.userId, userId),
+        eq(userReadingProgress.readingDate, today)
+      )
+    );
+  }
+
+  async markReadingComplete(id: string): Promise<UserReadingProgress | undefined> {
+    const [updated] = await db.update(userReadingProgress).set({
+      isCompleted: true,
+      completedAt: new Date(),
+    }).where(eq(userReadingProgress.id, id)).returning();
+    return updated;
+  }
+
+  async createReadingProgress(progress: InsertUserReadingProgress): Promise<UserReadingProgress> {
+    const [created] = await db.insert(userReadingProgress).values(progress).returning();
+    return created;
+  }
+
+  async getDevotionalNote(id: string): Promise<DevotionalNote | undefined> {
+    const [note] = await db.select().from(devotionalNotes).where(eq(devotionalNotes.id, id)).limit(1);
+    return note;
+  }
+
+  async getDevotionalNotes(userId: string): Promise<DevotionalNote[]> {
+    return db.select().from(devotionalNotes).where(eq(devotionalNotes.userId, userId)).orderBy(desc(devotionalNotes.createdAt));
+  }
+
+  async getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined> {
+    const [note] = await db.select().from(devotionalNotes).where(
+      and(
+        eq(devotionalNotes.readingPlanId, planId),
+        eq(devotionalNotes.dayNumber, dayNumber)
+      )
+    ).limit(1);
+    return note;
+  }
+
+  async createDevotionalNote(note: InsertDevotionalNote): Promise<DevotionalNote> {
+    const [created] = await db.insert(devotionalNotes).values(note).returning();
+    return created;
+  }
+
+  async updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined> {
+    const [updated] = await db.update(devotionalNotes).set({ ...updates, updatedAt: new Date() }).where(eq(devotionalNotes.id, id)).returning();
+    return updated;
+  }
+
+  async createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate> {
+    const [created] = await db.insert(readingPlanTemplates).values(template).returning();
+    return created;
+  }
+
+  async createReadingPlanTemplateItems(items: Array<{templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string}>): Promise<void> {
+    if (items.length === 0) return;
+    await db.insert(readingPlanTemplateItems).values(items);
   }
 }
 

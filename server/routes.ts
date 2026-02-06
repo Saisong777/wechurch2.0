@@ -6,7 +6,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { storage } from "./storage";
 import { db } from "./db";
-import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, prayerMeetings, prayerMeetingParticipants } from "@shared/schema";
+import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { pool, getPoolStats } from "./db";
 import { bibleCache, timelineCache, apiCache } from "./cache";
@@ -2604,6 +2604,408 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching reading plan items:', error);
       res.status(500).json({ error: "Failed to get reading plan items" });
+    }
+  });
+
+  // ============ Personal Reading Plans API Routes ============
+  app.get("/api/user-reading-plans", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const plans = await storage.getUserReadingPlans(userId);
+      res.json(plans);
+    } catch (error) {
+      console.error('Error fetching user reading plans:', error);
+      res.status(500).json({ error: "Failed to get user reading plans" });
+    }
+  });
+
+  app.get("/api/user-reading-progress/today", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const progress = await storage.getUserTodayProgress(userId);
+      res.json(progress);
+    } catch (error) {
+      console.error('Error fetching today progress:', error);
+      res.status(500).json({ error: "Failed to get today's progress" });
+    }
+  });
+
+  app.get("/api/user-reading-plans/:id", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const plan = await storage.getUserReadingPlan(req.params.id);
+      if (!plan) {
+        return res.status(404).json({ error: "Reading plan not found" });
+      }
+      const progress = await storage.getUserReadingProgress(plan.id);
+      const completedDays = progress.filter(p => p.isCompleted).length;
+      const totalDays = plan.totalDays || progress.length;
+      res.json({ ...plan, progress: { completedDays, totalDays, entries: progress } });
+    } catch (error) {
+      console.error('Error fetching user reading plan:', error);
+      res.status(500).json({ error: "Failed to get reading plan" });
+    }
+  });
+
+  app.post("/api/user-reading-plans", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const { name, description, startDate, bookSelections, chaptersPerDay, reminderEnabled, reminderMorning, reminderNoon, reminderEvening } = req.body;
+      if (!name || !startDate || !bookSelections || !chaptersPerDay) {
+        return res.status(400).json({ error: "Missing required fields: name, startDate, bookSelections, chaptersPerDay" });
+      }
+
+      const chapters: Array<{ bookName: string; chapter: number }> = [];
+      for (const sel of bookSelections) {
+        const start = sel.chapterStart || 1;
+        const end = sel.chapterEnd || start;
+        for (let ch = start; ch <= end; ch++) {
+          chapters.push({ bookName: sel.bookName, chapter: ch });
+        }
+      }
+
+      const totalDays = Math.ceil(chapters.length / chaptersPerDay);
+
+      const template = await storage.createReadingPlanTemplate({
+        name: `${name} - Personal`,
+        description: description || null,
+        category: "personal",
+        durationDays: totalDays,
+        isPublic: false,
+        createdBy: userId,
+      });
+
+      const templateItems: Array<{ templateId: string; dayNumber: number; bookName: string; chapterStart: number; chapterEnd: number; scriptureReference: string }> = [];
+      for (let day = 0; day < totalDays; day++) {
+        const dayChapters = chapters.slice(day * chaptersPerDay, (day + 1) * chaptersPerDay);
+        if (dayChapters.length === 0) continue;
+        const firstChapter = dayChapters[0];
+        const lastChapter = dayChapters[dayChapters.length - 1];
+        let scriptureRef: string;
+        if (firstChapter.bookName === lastChapter.bookName) {
+          if (firstChapter.chapter === lastChapter.chapter) {
+            scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}`;
+          } else {
+            scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}-${lastChapter.chapter}`;
+          }
+        } else {
+          scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter} - ${lastChapter.bookName} ${lastChapter.chapter}`;
+        }
+        templateItems.push({
+          templateId: template.id,
+          dayNumber: day + 1,
+          bookName: firstChapter.bookName,
+          chapterStart: firstChapter.chapter,
+          chapterEnd: lastChapter.chapter,
+          scriptureReference: scriptureRef,
+        });
+      }
+
+      await storage.createReadingPlanTemplateItems(templateItems);
+
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + totalDays - 1);
+
+      const plan = await storage.createUserReadingPlan({
+        userId,
+        templateId: template.id,
+        name,
+        description: description || null,
+        startDate,
+        endDate: endDate.toISOString().split('T')[0],
+        isActive: true,
+        totalDays,
+        reminderEnabled: reminderEnabled ?? true,
+        reminderMorning: reminderMorning ?? "07:00",
+        reminderNoon: reminderNoon ?? "12:00",
+        reminderEvening: reminderEvening ?? "20:00",
+      });
+
+      const progressEntries = templateItems.map((item, idx) => {
+        const readingDate = new Date(startDate);
+        readingDate.setDate(readingDate.getDate() + idx);
+        return {
+          userId,
+          planId: plan.id,
+          dayNumber: item.dayNumber,
+          readingDate: readingDate.toISOString().split('T')[0],
+          scriptureReference: item.scriptureReference,
+          isCompleted: false,
+        };
+      });
+
+      for (const entry of progressEntries) {
+        await storage.createReadingProgress(entry);
+      }
+
+      res.status(201).json(plan);
+    } catch (error) {
+      console.error('Error creating user reading plan:', error);
+      res.status(500).json({ error: "Failed to create reading plan" });
+    }
+  });
+
+  app.patch("/api/user-reading-plans/:id", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { name, description, isActive, reminderEnabled, reminderMorning, reminderNoon, reminderEvening } = req.body;
+      const updates: Record<string, any> = {};
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (isActive !== undefined) updates.isActive = isActive;
+      if (reminderEnabled !== undefined) updates.reminderEnabled = reminderEnabled;
+      if (reminderMorning !== undefined) updates.reminderMorning = reminderMorning;
+      if (reminderNoon !== undefined) updates.reminderNoon = reminderNoon;
+      if (reminderEvening !== undefined) updates.reminderEvening = reminderEvening;
+
+      const plan = await storage.updateUserReadingPlan(req.params.id, updates);
+      if (!plan) {
+        return res.status(404).json({ error: "Reading plan not found" });
+      }
+      res.json(plan);
+    } catch (error) {
+      console.error('Error updating user reading plan:', error);
+      res.status(500).json({ error: "Failed to update reading plan" });
+    }
+  });
+
+  app.delete("/api/user-reading-plans/:id", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      await storage.deleteUserReadingPlan(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting user reading plan:', error);
+      res.status(500).json({ error: "Failed to delete reading plan" });
+    }
+  });
+
+  // ============ Reading Progress API Routes ============
+  app.get("/api/user-reading-plans/:id/progress", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const progress = await storage.getUserReadingProgress(req.params.id);
+      res.json(progress);
+    } catch (error) {
+      console.error('Error fetching reading progress:', error);
+      res.status(500).json({ error: "Failed to get reading progress" });
+    }
+  });
+
+  app.get("/api/user-reading-plans/:id/today", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const plan = await storage.getUserReadingPlan(req.params.id);
+      if (!plan) {
+        return res.status(404).json({ error: "Reading plan not found" });
+      }
+      const today = new Date();
+      const startDate = new Date(plan.startDate);
+      const diffTime = today.getTime() - startDate.getTime();
+      const dayNumber = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      const progress = await storage.getUserReadingProgress(plan.id);
+      const todayProgress = progress.find(p => p.dayNumber === dayNumber);
+
+      const items = await storage.getReadingPlanItems(plan.templateId || '');
+      const todayItem = items.find(i => i.dayNumber === dayNumber);
+
+      res.json({
+        dayNumber,
+        totalDays: plan.totalDays || progress.length,
+        progress: todayProgress || null,
+        planItem: todayItem || null,
+      });
+    } catch (error) {
+      console.error('Error fetching today reading:', error);
+      res.status(500).json({ error: "Failed to get today's reading" });
+    }
+  });
+
+  app.post("/api/user-reading-plans/:id/progress/:dayNumber/complete", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const dayNumber = parseInt(req.params.dayNumber);
+      const progress = await storage.getUserReadingProgress(req.params.id);
+      const dayProgress = progress.find(p => p.dayNumber === dayNumber);
+      if (!dayProgress) {
+        return res.status(404).json({ error: "Progress entry not found for this day" });
+      }
+      const updated = await storage.markReadingComplete(dayProgress.id);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error marking reading complete:', error);
+      res.status(500).json({ error: "Failed to mark reading as complete" });
+    }
+  });
+
+  // ============ Devotional Notes API Routes ============
+  app.get("/api/devotional-notes", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const notes = await storage.getDevotionalNotes(userId);
+      res.json(notes);
+    } catch (error) {
+      console.error('Error fetching devotional notes:', error);
+      res.status(500).json({ error: "Failed to get devotional notes" });
+    }
+  });
+
+  app.get("/api/devotional-notes/:id", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const note = await storage.getDevotionalNote(req.params.id);
+      if (!note) {
+        return res.status(404).json({ error: "Devotional note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error('Error fetching devotional note:', error);
+      res.status(500).json({ error: "Failed to get devotional note" });
+    }
+  });
+
+  app.get("/api/user-reading-plans/:planId/devotional/:dayNumber", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const dayNumber = parseInt(req.params.dayNumber);
+      const note = await storage.getDevotionalNoteByPlanDay(req.params.planId, dayNumber);
+      res.json(note || null);
+    } catch (error) {
+      console.error('Error fetching devotional note by plan day:', error);
+      res.status(500).json({ error: "Failed to get devotional note" });
+    }
+  });
+
+  app.post("/api/devotional-notes", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const parsed = insertDevotionalNoteSchema.safeParse({ ...req.body, userId });
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid devotional note data", details: parsed.error.errors });
+      }
+      const note = await storage.createDevotionalNote(parsed.data);
+      res.status(201).json(note);
+    } catch (error) {
+      console.error('Error creating devotional note:', error);
+      res.status(500).json({ error: "Failed to create devotional note" });
+    }
+  });
+
+  app.patch("/api/devotional-notes/:id", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const note = await storage.updateDevotionalNote(req.params.id, req.body);
+      if (!note) {
+        return res.status(404).json({ error: "Devotional note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error('Error updating devotional note:', error);
+      res.status(500).json({ error: "Failed to update devotional note" });
     }
   });
 
