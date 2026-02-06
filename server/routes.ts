@@ -1532,16 +1532,14 @@ export async function registerRoutes(app: Express) {
   });
 
   // Unified endpoint to update both named and anonymous prayers in a single request
+  // Allows both authenticated users and guest participants (who have their participantId)
   app.patch("/api/prayer-meetings/:id/my-prayers/:participantId", async (req, res) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
       const prayersSchema = z.object({
         namedPrayer: z.string().max(2000).optional().default(''),
         urgentPrayer: z.string().max(2000).optional().default(''),
         anonymousPrayer: z.string().max(2000).optional().default(''),
+        meetingCode: z.string().optional(),
       });
       
       const validation = prayersSchema.safeParse(req.body);
@@ -1549,7 +1547,7 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Invalid prayer content", details: validation.error.errors });
       }
       
-      const { namedPrayer, urgentPrayer, anonymousPrayer } = validation.data;
+      const { namedPrayer, urgentPrayer, anonymousPrayer, meetingCode } = validation.data;
       
       const meeting = await storage.getPrayerMeeting(req.params.id);
       if (!meeting) {
@@ -1566,25 +1564,32 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Participant does not belong to this meeting" });
       }
 
-      // Get the current user's ID and verify ownership
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-      
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
+      // For authenticated users, verify ownership or leadership
+      if (req.user) {
+        const claims = (req.user as any).claims || {};
+        const authUserId = claims.sub;
+        const { authStorage } = await import("./replit_integrations/auth/storage");
+        const fullUser = await authStorage.getUser(authUserId);
+        
+        let userId = fullUser?.legacyUserId;
+        if (!userId && fullUser?.email) {
+          const legacyUser = await storage.getUserByEmail(fullUser.email);
+          if (legacyUser) userId = legacyUser.id;
+        }
 
-      // Check if user owns this participant or is a leader/admin
-      const isOwner = participant.userId === userId;
-      const role = userId ? await storage.getUserRole(userId) : undefined;
-      const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
-      
-      if (!isOwner && !isLeaderOrAdmin) {
-        return res.status(403).json({ error: "You can only update your own prayer requests" });
+        const isOwner = participant.userId === userId;
+        const role = userId ? await storage.getUserRole(userId) : undefined;
+        const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
+        
+        if (!isOwner && !isLeaderOrAdmin) {
+          return res.status(403).json({ error: "You can only update your own prayer requests" });
+        }
+      }
+      // For guest users (no req.user), verify meeting code for additional security
+      if (!req.user) {
+        if (!meetingCode || meetingCode !== meeting.shortCode) {
+          return res.status(403).json({ error: "Invalid meeting code" });
+        }
       }
 
       const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, {
@@ -1594,9 +1599,9 @@ export async function registerRoutes(app: Express) {
       });
 
       res.json(updated);
-    } catch (error) {
-      console.error("[PrayerMeeting] Failed to update prayers:", error);
-      res.status(500).json({ error: "Failed to update prayers" });
+    } catch (error: any) {
+      console.error("[PrayerMeeting] Failed to update prayers:", error?.message || error, error?.stack);
+      res.status(500).json({ error: "Failed to update prayers", details: error?.message });
     }
   });
 
@@ -2052,9 +2057,9 @@ export async function registerRoutes(app: Express) {
         }
       }
 
-      const groupedNamedPrayers: Record<string, PrayerItem[]> = {};
-      for (const prayer of namedPrayers) {
-        const groupKey = prayer.groupNumber ? `第 ${prayer.groupNumber} 組` : '未分組';
+      const groupedNamedPrayers: Record<number, PrayerItem[]> = {};
+      for (const prayer of [...namedPrayers, ...urgentPrayers]) {
+        const groupKey = prayer.groupNumber || 0;
         if (!groupedNamedPrayers[groupKey]) groupedNamedPrayers[groupKey] = [];
         groupedNamedPrayers[groupKey].push(prayer);
       }

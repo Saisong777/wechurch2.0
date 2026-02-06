@@ -777,25 +777,41 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
               {prayerListMode === 'group' && (
                 <>
                   {prayerListData.groupedNamedPrayers && Object.entries(prayerListData.groupedNamedPrayers)
-                    .filter(([groupNum]) => prayerListGroup === null || parseInt(groupNum) === prayerListGroup)
-                    .map(([groupNum, prayers]) => (
-                      <div key={groupNum} className="space-y-2">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <Badge className={cn(getGroupColor(parseInt(groupNum)).bg, getGroupColor(parseInt(groupNum)).text, "border", getGroupColor(parseInt(groupNum)).border)}>
-                            第 {groupNum} 組
-                          </Badge>
-                          <span className="text-gray-500">({prayers.length})</span>
-                        </h3>
-                        {prayers.map(prayer => (
-                          <div key={prayer.id} className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-medium">{prayer.name}</span>
+                    .filter(([groupKey]) => {
+                      const num = parseInt(groupKey);
+                      return prayerListGroup === null || num === prayerListGroup;
+                    })
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .map(([groupKey, prayers]) => {
+                      const num = parseInt(groupKey);
+                      const color = getGroupColor(num || 1);
+                      return (
+                        <div key={groupKey} className="space-y-2">
+                          <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <Badge className={cn(color.bg, color.text, "border", color.border)}>
+                              {num > 0 ? `第 ${num} 組` : '未分組'}
+                            </Badge>
+                            <span className="text-gray-500">({prayers.length})</span>
+                          </h3>
+                          {prayers.map((prayer: any) => (
+                            <div key={prayer.id} className={cn(
+                              "p-3 rounded-lg border",
+                              prayer.prayerType === 'urgent' 
+                                ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800" 
+                                : "bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700"
+                            )}>
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className="font-medium">{prayer.name}</span>
+                                {prayer.prayerType === 'urgent' && (
+                                  <Badge variant="destructive" className="text-xs">緊急</Badge>
+                                )}
+                              </div>
+                              <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
                             </div>
-                            <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                          ))}
+                        </div>
+                      );
+                    })}
                   {prayerListData.groupedNamedPrayers && Object.keys(prayerListData.groupedNamedPrayers).length === 0 && (
                     <div className="text-center py-8 text-gray-500">尚無各組禱告事項</div>
                   )}

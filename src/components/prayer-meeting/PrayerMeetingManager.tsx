@@ -250,7 +250,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
       const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/my-prayers/${myParticipantId}`, { 
         namedPrayer: namedPrayer || '', 
         urgentPrayer: urgentPrayer || '',
-        anonymousPrayer: anonymousPrayer || '' 
+        anonymousPrayer: anonymousPrayer || '',
+        meetingCode: meeting?.shortCode || '',
       });
       return res.json();
     },
