@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronDown, ChevronUp, BookOpen, FileText } from 'lucide-react';
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
+import { FeatureGate } from '@/components/ui/feature-gate';
 
 interface JesusEvent {
   id: number;
@@ -183,6 +184,11 @@ const JesusTimelinePage = () => {
     : allEvents;
 
   return (
+    <FeatureGate
+      featureKeys={["we_learn", "jesus_timeline"]}
+      title="耶穌四季功能維護中"
+      description="耶穌四季功能目前暫時關閉，請稍後再試"
+    >
     <div className="min-h-screen bg-background flex flex-col">
       <Header title="耶穌四季" subtitle="生平時間軸" variant="compact" />
       
@@ -339,6 +345,7 @@ const JesusTimelinePage = () => {
       </main>
 
     </div>
+    </FeatureGate>
   );
 };
 

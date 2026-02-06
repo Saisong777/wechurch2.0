@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FloatingToolbar } from '@/components/scripture/FloatingToolbar';
 import { ScriptureCardCreator } from '@/components/scripture/ScriptureCardCreator';
+import { FeatureGate } from '@/components/ui/feature-gate';
 
 interface BibleBook {
   bookName: string;
@@ -380,6 +381,11 @@ const BiblePage = () => {
 
 
   return (
+    <FeatureGate
+      featureKeys={["we_learn", "bible_reading"]}
+      title="聖經閱讀功能維護中"
+      description="聖經閱讀功能目前暫時關閉，請稍後再試"
+    >
     <div className="min-h-screen bg-background flex flex-col">
       <Header title="聖經閱讀" subtitle="和合本" variant="compact" />
       
@@ -621,6 +627,7 @@ const BiblePage = () => {
         verse={getCardVerseData()}
       />
     </div>
+    </FeatureGate>
   );
 };
 

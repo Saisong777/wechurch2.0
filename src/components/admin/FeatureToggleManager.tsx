@@ -26,12 +26,11 @@ interface FeatureToggleManagerProps {
   onBack?: () => void;
 }
 
-// Define parent-child relationships
 const FEATURE_HIERARCHY: Record<string, string[]> = {
-  we_live: [], // No child features yet
-  we_learn: [], // No child features yet
+  we_live: ['bible_study', 'random_grouper', 'notebook'],
+  we_learn: ['bible_reading', 'jesus_timeline', 'reading_plans'],
   we_play: ['icebreaker_game'],
-  we_share: ['prayer_wall', 'message_cards'],
+  we_share: ['prayer_wall', 'prayer_meeting', 'message_cards'],
 };
 
 const PARENT_FEATURE_KEYS = Object.keys(FEATURE_HIERARCHY);

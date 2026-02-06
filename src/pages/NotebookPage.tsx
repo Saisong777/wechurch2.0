@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { MyNotebook } from '@/components/user/MyNotebook';
 import { Loader2 } from 'lucide-react';
+import { FeatureGate } from '@/components/ui/feature-gate';
 
 const NotebookPage = () => {
   const { user, loading } = useAuth();
@@ -34,8 +35,12 @@ const NotebookPage = () => {
     );
   }
 
-  // Logged in - show notebook
   return (
+    <FeatureGate
+      featureKeys={["we_live", "notebook"]}
+      title="筆記本功能維護中"
+      description="筆記本功能目前暫時關閉，請稍後再試"
+    >
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
@@ -44,6 +49,7 @@ const NotebookPage = () => {
         </div>
       </main>
     </div>
+    </FeatureGate>
   );
 };
 

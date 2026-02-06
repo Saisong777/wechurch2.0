@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen, Clock, ChevronRight, X, CheckCircle2, AlertCircle, Play, Pause, RotateCcw, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { FeatureGate } from '@/components/ui/feature-gate';
 
 interface ReadingPlan {
   id: string;
@@ -167,6 +168,11 @@ const ReadingPlansPage = () => {
   };
 
   return (
+    <FeatureGate
+      featureKeys={["we_learn", "reading_plans"]}
+      title="讀經計劃功能維護中"
+      description="讀經計劃功能目前暫時關閉，請稍後再試"
+    >
     <div className="min-h-screen bg-background">
       <Header title="讀經計劃" subtitle="每日靈修" variant="compact" />
       
@@ -433,6 +439,7 @@ const ReadingPlansPage = () => {
         </div>
       </main>
     </div>
+    </FeatureGate>
   );
 };
 
