@@ -6,11 +6,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Book, ChevronRight, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check } from 'lucide-react';
+import { Search, Book, ChevronRight, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FloatingToolbar } from '@/components/scripture/FloatingToolbar';
 import { ScriptureCardCreator } from '@/components/scripture/ScriptureCardCreator';
+import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
+import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
 import { FeatureGate } from '@/components/ui/feature-gate';
 
 interface BibleBook {
@@ -47,6 +49,8 @@ const BiblePage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVerseNums, setSelectedVerseNums] = useState<Set<number>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [showTTS, setShowTTS] = useState(false);
   const [copied, setCopied] = useState(false);
   const verseRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const { toast } = useToast();
@@ -473,6 +477,12 @@ const BiblePage = () => {
                   點擊經文可選取，已選 {selectedVerseNums.size} 節
                 </p>
                 
+                {showTTS && selectedVerseNums.size > 0 && (
+                  <div className="mb-3 p-2 bg-muted/30 rounded-lg">
+                    <ScriptureTTS text={getSelectedVerses().map(v => v.text).join(' ')} />
+                  </div>
+                )}
+
                 {versesLoading ? (
                   <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">載入中...</div>
                 ) : versesError ? (
@@ -618,6 +628,8 @@ const BiblePage = () => {
           onCreateCard={openCardCreator}
           onClear={() => setSelectedVerseNums(new Set())}
           copied={copied}
+          onNote={() => setShowNoteDialog(true)}
+          onRead={() => setShowTTS(prev => !prev)}
         />
       )}
 
@@ -625,6 +637,13 @@ const BiblePage = () => {
         open={showCardModal}
         onOpenChange={setShowCardModal}
         verse={getCardVerseData()}
+      />
+
+      <DevotionalNoteDialog
+        open={showNoteDialog}
+        onOpenChange={setShowNoteDialog}
+        verseReference={getCardVerseData().reference}
+        verseText={getCardVerseData().text}
       />
     </div>
     </FeatureGate>

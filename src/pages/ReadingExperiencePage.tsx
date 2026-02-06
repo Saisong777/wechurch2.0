@@ -11,8 +11,9 @@ import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import {
   ArrowLeft, Play, Pause, Square, Volume2, VolumeX, BookOpen,
-  Check, ChevronDown, ChevronUp, Loader2, SkipForward, SkipBack,
+  Check, ChevronDown, ChevronUp, Loader2, SkipForward, SkipBack, Mic,
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -125,6 +126,10 @@ const ReadingExperiencePage = () => {
   const [autoRead, setAutoRead] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [currentVerseIndex, setCurrentVerseIndex] = useState(-1);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>(() => {
+    return localStorage.getItem('wechurch-tts-voice') || '';
+  });
   const [devotionalExpanded, setDevotionalExpanded] = useState(false);
   const [devotionalForm, setDevotionalForm] = useState({
     titlePhrase: '',
@@ -263,6 +268,31 @@ const ReadingExperiencePage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const loadVoices = () => {
+      const allVoices = window.speechSynthesis.getVoices();
+      const chineseVoices = allVoices.filter(v => v.lang.startsWith('zh'));
+      setVoices(chineseVoices);
+      if (!selectedVoiceURI && chineseVoices.length > 0) {
+        const twVoice = chineseVoices.find(v => v.lang === 'zh-TW');
+        setSelectedVoiceURI(twVoice?.voiceURI || chineseVoices[0].voiceURI);
+      }
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+  }, [selectedVoiceURI]);
+
+  const handleVoiceChange = useCallback((voiceURI: string) => {
+    setSelectedVoiceURI(voiceURI);
+    localStorage.setItem('wechurch-tts-voice', voiceURI);
+    if (ttsState !== 'idle') {
+      window.speechSynthesis.cancel();
+      setTtsState('idle');
+      setCurrentVerseIndex(-1);
+    }
+  }, [ttsState]);
+
   const completedCount = useMemo(() => progressEntries.filter(e => e.isCompleted).length, [progressEntries]);
   const totalDays = plan?.totalDays || progressEntries.length || 1;
   const overallProgress = Math.round((completedCount / totalDays) * 100);
@@ -328,6 +358,10 @@ const ReadingExperiencePage = () => {
     const utterance = new SpeechSynthesisUtterance(verse.text);
     utterance.lang = 'zh-TW';
     utterance.rate = speed;
+    if (selectedVoiceURI) {
+      const voice = voices.find(v => v.voiceURI === selectedVoiceURI);
+      if (voice) utterance.voice = voice;
+    }
     utteranceRef.current = utterance;
     setCurrentVerseIndex(index);
     setTtsState('playing');
@@ -349,7 +383,7 @@ const ReadingExperiencePage = () => {
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [speed, autoRead]);
+  }, [speed, autoRead, selectedVoiceURI, voices]);
 
   const handlePlay = useCallback(() => {
     if (allVerses.length === 0) return;
@@ -592,7 +626,7 @@ const ReadingExperiencePage = () => {
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -602,6 +636,21 @@ const ReadingExperiencePage = () => {
                 >
                   {speed}x
                 </Button>
+                {voices.length > 0 && (
+                  <Select value={selectedVoiceURI} onValueChange={handleVoiceChange}>
+                    <SelectTrigger className="h-8 w-auto max-w-[120px] text-xs gap-1" data-testid="select-voice">
+                      <Mic className="w-3 h-3 flex-shrink-0" />
+                      <SelectValue placeholder="聲音" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {voices.map((v) => (
+                        <SelectItem key={v.voiceURI} value={v.voiceURI}>
+                          {v.name.replace(/Microsoft |Google |Apple /g, '').substring(0, 20)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Button
                   variant={autoRead ? 'default' : 'outline'}
                   size="sm"

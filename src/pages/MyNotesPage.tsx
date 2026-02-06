@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { MyNotebook } from '@/components/user/MyNotebook';
+import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle } from 'lucide-react';
-import { INSIGHT_CATEGORIES, type InsightCategory } from '@/types/spiritual-fitness';
+import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen } from 'lucide-react';
+import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 
@@ -52,146 +53,183 @@ const countFilledFields = (note: DevotionalNote): number => {
 
 const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const navigate = useNavigate();
   const filledCount = countFilledFields(note);
   const categoryInfo = getCategoryInfo(note.coreInsightCategory);
+  const isFromReadingPlan = !!note.readingPlanId;
 
   return (
-    <Card
-      className="overflow-visible cursor-pointer hover-elevate"
-      onClick={() => setExpanded(!expanded)}
-      data-testid={`card-devotional-note-${note.id}`}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <Calendar className="w-4 h-4" />
-              {format(new Date(note.updatedAt), 'yyyy年M月d日', { locale: zhTW })}
-              {note.dayNumber && (
-                <span>第 {note.dayNumber} 天</span>
-              )}
-            </div>
-            <CardTitle className="text-base font-medium truncate">
-              {note.verseReference}
-            </CardTitle>
-            {note.titlePhrase && (
-              <p className="text-sm text-muted-foreground mt-1 truncate">
-                {note.titlePhrase}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="secondary" className="text-xs">
-              {filledCount}/7
-            </Badge>
-            {expanded ? (
-              <ChevronUp className="w-5 h-5 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-muted-foreground" />
-            )}
-          </div>
-        </div>
-      </CardHeader>
-
-      {expanded && (
-        <CardContent className="pt-0 space-y-4 border-t">
-          {note.titlePhrase && (
-            <div className="flex gap-2">
-              <BookMarked className="w-4 h-4 text-green-500 shrink-0 mt-1" />
-              <div>
-                <p className="text-sm font-medium mb-1">1. 定標題</p>
-                <p className="text-sm text-muted-foreground">{note.titlePhrase}</p>
-              </div>
-            </div>
-          )}
-
-          {note.heartbeatVerse && (
-            <div className="flex gap-2">
-              <Heart className="w-4 h-4 text-red-500 shrink-0 mt-1" />
-              <div>
-                <p className="text-sm font-medium mb-1">2. 心跳的時刻</p>
-                <p className="text-sm text-muted-foreground">{note.heartbeatVerse}</p>
-              </div>
-            </div>
-          )}
-
-          {note.observation && (
-            <div className="flex gap-2">
-              <Eye className="w-4 h-4 text-blue-500 shrink-0 mt-1" />
-              <div>
-                <p className="text-sm font-medium mb-1">3. 查看聖經的資訊</p>
-                <p className="text-sm text-muted-foreground">{note.observation}</p>
-              </div>
-            </div>
-          )}
-
-          {(categoryInfo || note.coreInsightNote) && (
-            <div className="flex gap-2">
-              <Dumbbell className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
-              <div>
-                <p className="text-sm font-medium mb-1">4. 思想神的話</p>
-                {categoryInfo && (
-                  <Badge variant="outline" className="mb-1">
-                    {categoryInfo.label}
+    <>
+      <Card
+        className="overflow-visible cursor-pointer hover-elevate"
+        onClick={() => setExpanded(!expanded)}
+        data-testid={`card-devotional-note-${note.id}`}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1 flex-wrap">
+                <Calendar className="w-4 h-4" />
+                {format(new Date(note.updatedAt), 'yyyy年M月d日', { locale: zhTW })}
+                {note.dayNumber && (
+                  <span>第 {note.dayNumber} 天</span>
+                )}
+                {isFromReadingPlan ? (
+                  <Badge variant="outline" className="text-xs">
+                    讀經計劃
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs">
+                    <BookOpen className="w-3 h-3 mr-1" />
+                    經文靈修
                   </Badge>
                 )}
-                {note.coreInsightNote && (
-                  <p className="text-sm text-muted-foreground">{note.coreInsightNote}</p>
-                )}
               </div>
+              <CardTitle className="text-base font-medium truncate">
+                {note.verseReference}
+              </CardTitle>
+              {note.titlePhrase && (
+                <p className="text-sm text-muted-foreground mt-1 truncate">
+                  {note.titlePhrase}
+                </p>
+              )}
             </div>
-          )}
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="secondary" className="text-xs">
+                {filledCount}/7
+              </Badge>
+              {expanded ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </CardHeader>
 
-          {note.scholarsNote && (
-            <div className="flex gap-2">
-              <MessageCircle className="w-4 h-4 text-purple-500 shrink-0 mt-1" />
-              <div>
-                <p className="text-sm font-medium mb-1">5. 學長姐的話</p>
-                <p className="text-sm text-muted-foreground">{note.scholarsNote}</p>
+        {expanded && (
+          <CardContent className="pt-0 space-y-4 border-t">
+            {note.titlePhrase && (
+              <div className="flex gap-2">
+                <BookMarked className="w-4 h-4 text-green-500 shrink-0 mt-1" />
+                <div>
+                  <p className="text-sm font-medium mb-1">1. 定標題</p>
+                  <p className="text-sm text-muted-foreground">{note.titlePhrase}</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {note.actionPlan && (
-            <div className="flex gap-2">
-              <Target className="w-4 h-4 text-teal-500 shrink-0 mt-1" />
-              <div>
-                <p className="text-sm font-medium mb-1">6. 帶一招</p>
-                <p className="text-sm text-muted-foreground">{note.actionPlan}</p>
+            {note.heartbeatVerse && (
+              <div className="flex gap-2">
+                <Heart className="w-4 h-4 text-red-500 shrink-0 mt-1" />
+                <div>
+                  <p className="text-sm font-medium mb-1">2. 心跳的時刻</p>
+                  <p className="text-sm text-muted-foreground">{note.heartbeatVerse}</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {note.coolDownNote && (
-            <div className="flex gap-2">
-              <Heart className="w-4 h-4 text-indigo-500 shrink-0 mt-1" />
-              <div>
-                <p className="text-sm font-medium mb-1">7. 安靜的心</p>
-                <p className="text-sm text-muted-foreground">{note.coolDownNote}</p>
+            {note.observation && (
+              <div className="flex gap-2">
+                <Eye className="w-4 h-4 text-blue-500 shrink-0 mt-1" />
+                <div>
+                  <p className="text-sm font-medium mb-1">3. 查看聖經的資訊</p>
+                  <p className="text-sm text-muted-foreground">{note.observation}</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {note.readingPlanId && (
+            {(categoryInfo || note.coreInsightNote) && (
+              <div className="flex gap-2">
+                <Dumbbell className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
+                <div>
+                  <p className="text-sm font-medium mb-1">4. 思想神的話</p>
+                  {categoryInfo && (
+                    <Badge variant="outline" className="mb-1">
+                      {categoryInfo.label}
+                    </Badge>
+                  )}
+                  {note.coreInsightNote && (
+                    <p className="text-sm text-muted-foreground">{note.coreInsightNote}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {note.scholarsNote && (
+              <div className="flex gap-2">
+                <MessageCircle className="w-4 h-4 text-purple-500 shrink-0 mt-1" />
+                <div>
+                  <p className="text-sm font-medium mb-1">5. 學長姐的話</p>
+                  <p className="text-sm text-muted-foreground">{note.scholarsNote}</p>
+                </div>
+              </div>
+            )}
+
+            {note.actionPlan && (
+              <div className="flex gap-2">
+                <Target className="w-4 h-4 text-teal-500 shrink-0 mt-1" />
+                <div>
+                  <p className="text-sm font-medium mb-1">6. 帶一招</p>
+                  <p className="text-sm text-muted-foreground">{note.actionPlan}</p>
+                </div>
+              </div>
+            )}
+
+            {note.coolDownNote && (
+              <div className="flex gap-2">
+                <Heart className="w-4 h-4 text-indigo-500 shrink-0 mt-1" />
+                <div>
+                  <p className="text-sm font-medium mb-1">7. 安靜的心</p>
+                  <p className="text-sm text-muted-foreground">{note.coolDownNote}</p>
+                </div>
+              </div>
+            )}
+
             <div className="pt-2 border-t">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/learn/reading-plans/${note.readingPlanId}/read${note.dayNumber ? `?day=${note.dayNumber}` : ''}`);
-                }}
-                data-testid={`button-edit-note-${note.id}`}
-              >
-                <Pencil className="w-3.5 h-3.5 mr-1" />
-                前往編輯
-              </Button>
+              {isFromReadingPlan ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/learn/reading-plans/${note.readingPlanId}/read${note.dayNumber ? `?day=${note.dayNumber}` : ''}`);
+                  }}
+                  data-testid={`button-edit-note-${note.id}`}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1" />
+                  前往編輯
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEditDialog(true);
+                  }}
+                  data-testid={`button-edit-note-${note.id}`}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1" />
+                  編輯筆記
+                </Button>
+              )}
             </div>
-          )}
-        </CardContent>
+          </CardContent>
+        )}
+      </Card>
+
+      {!isFromReadingPlan && (
+        <DevotionalNoteDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          verseReference={note.verseReference}
+          verseText={note.verseText || ''}
+          noteId={note.id}
+        />
       )}
-    </Card>
+    </>
   );
 };
 
@@ -259,7 +297,7 @@ const MyNotesPage = () => {
                       <BookMarked className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="text-lg font-medium mb-2" data-testid="text-empty-devotional">尚無靈修筆記</h3>
                       <p className="text-muted-foreground text-sm">
-                        開始讀經計劃後筆記會出現在這裡
+                        在聖經閱讀、耶穌事蹟、今日經文等頁面點擊「筆記」即可開始記錄
                       </p>
                     </CardContent>
                   </Card>

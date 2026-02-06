@@ -2930,6 +2930,36 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/devotional-notes/by-reference", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const ref = req.query.ref as string;
+      if (!ref) {
+        return res.status(400).json({ error: "Missing ref query parameter" });
+      }
+      const note = await storage.getDevotionalNoteByVerseReference(userId, ref);
+      res.json(note || null);
+    } catch (error) {
+      console.error('Error fetching devotional note by verse reference:', error);
+      res.status(500).json({ error: "Failed to get devotional note by verse reference" });
+    }
+  });
+
   app.get("/api/devotional-notes/:id", async (req, res) => {
     try {
       const user = (req as any).user;

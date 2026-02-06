@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, sql, asc, like, or } from "drizzle-orm";
+import { eq, and, desc, sql, asc, like, or, isNull } from "drizzle-orm";
 import { bibleCache, timelineCache, cacheKeys } from "./cache";
 import {
   users, sessions, participants, submissions, aiReports,
@@ -173,6 +173,7 @@ export interface IStorage {
   getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
   createDevotionalNote(note: InsertDevotionalNote): Promise<DevotionalNote>;
   updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined>;
+  getDevotionalNoteByVerseReference(userId: string, verseReference: string): Promise<DevotionalNote | undefined>;
 
   createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate>;
   createReadingPlanTemplateItems(items: Array<{templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string}>): Promise<void>;
@@ -1050,6 +1051,17 @@ export class DatabaseStorage implements IStorage {
   async updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined> {
     const [updated] = await db.update(devotionalNotes).set({ ...updates, updatedAt: new Date() }).where(eq(devotionalNotes.id, id)).returning();
     return updated;
+  }
+
+  async getDevotionalNoteByVerseReference(userId: string, verseReference: string): Promise<DevotionalNote | undefined> {
+    const [note] = await db.select().from(devotionalNotes).where(
+      and(
+        eq(devotionalNotes.userId, userId),
+        eq(devotionalNotes.verseReference, verseReference),
+        isNull(devotionalNotes.readingPlanId)
+      )
+    ).orderBy(desc(devotionalNotes.updatedAt)).limit(1);
+    return note;
   }
 
   async createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate> {

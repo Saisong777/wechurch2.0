@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type } from 'lucide-react';
+import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type, BookMarked, Volume2 } from 'lucide-react';
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
+import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
+import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { Header } from '@/components/layout/Header';
 
@@ -150,6 +152,7 @@ function getExclusiveGospel(event: JesusEvent): string | null {
 }
 
 const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference: string; gospelName: string; fontSizeClass: string }) => {
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
   const { data, isLoading } = useQuery<ScriptureData>({
     queryKey: ['/api/bible/by-reference', reference],
     queryFn: async () => {
@@ -186,6 +189,32 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference:
         {gospelName} {data.chapter} 章
       </h6>
       <ScriptureViewer verses={formattedVerses} paragraphMode fontSizeClass={fontSizeClass} />
+
+      {data && data.verses && data.verses.length > 0 && (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setShowNoteDialog(true)}
+            data-testid="button-timeline-note"
+          >
+            <BookMarked className="w-3.5 h-3.5" />
+            <span className="text-xs">靈修筆記</span>
+          </Button>
+          <ScriptureTTS
+            text={data.verses.map((v: any) => v.text).join(' ')}
+            compact
+          />
+        </div>
+      )}
+
+      <DevotionalNoteDialog
+        open={showNoteDialog}
+        onOpenChange={setShowNoteDialog}
+        verseReference={reference}
+        verseText={data?.verses?.map((v: any) => v.text).join(' ') || ''}
+      />
     </div>
   );
 };

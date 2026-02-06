@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Share2, Image, Check, X } from 'lucide-react';
+import { Copy, Share2, Image, Check, X, BookMarked, Volume2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScriptureCardCreator } from './ScriptureCardCreator';
+import { DevotionalNoteDialog } from './DevotionalNoteDialog';
+import { ScriptureTTS } from './ScriptureTTS';
 
 interface ClickableVerseProps {
   text: string;
@@ -14,6 +16,8 @@ export const ClickableVerse = ({ text, reference, className = '' }: ClickableVer
   const [showActions, setShowActions] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showCardCreator, setShowCardCreator] = useState(false);
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [showTTS, setShowTTS] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -64,6 +68,17 @@ export const ClickableVerse = ({ text, reference, className = '' }: ClickableVer
     setShowActions(false);
   };
 
+  const handleNote = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowNoteDialog(true);
+    setShowActions(false);
+  };
+
+  const handleTTS = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowTTS(prev => !prev);
+  };
+
   const handleClick = () => {
     setShowActions(!showActions);
   };
@@ -93,7 +108,7 @@ export const ClickableVerse = ({ text, reference, className = '' }: ClickableVer
 
         {showActions && (
           <div 
-            className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-150"
+            className="flex flex-wrap items-center justify-center gap-1 mt-3 pt-3 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <Button
@@ -127,6 +142,26 @@ export const ClickableVerse = ({ text, reference, className = '' }: ClickableVer
               <span className="text-xs">圖卡</span>
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleNote}
+              data-testid="button-verse-note"
+            >
+              <BookMarked className="w-3.5 h-3.5" />
+              <span className="text-xs">筆記</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleTTS}
+              data-testid="button-verse-read"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span className="text-xs">朗讀</span>
+            </Button>
+            <Button
               variant="ghost"
               size="icon"
               className="ml-1"
@@ -137,12 +172,25 @@ export const ClickableVerse = ({ text, reference, className = '' }: ClickableVer
             </Button>
           </div>
         )}
+
+        {showTTS && (
+          <div className="mt-2 p-2 bg-muted/30 rounded-lg" onClick={(e) => e.stopPropagation()}>
+            <ScriptureTTS text={text} />
+          </div>
+        )}
       </div>
 
       <ScriptureCardCreator
         open={showCardCreator}
         onOpenChange={setShowCardCreator}
         verse={{ text, reference }}
+      />
+
+      <DevotionalNoteDialog
+        open={showNoteDialog}
+        onOpenChange={setShowNoteDialog}
+        verseReference={reference}
+        verseText={text}
       />
     </>
   );
