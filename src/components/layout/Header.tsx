@@ -100,9 +100,9 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/notebook" className="flex items-center gap-2 cursor-pointer">
+              <Link to="/learn/my-notes" className="flex items-center gap-2 cursor-pointer">
                 <BookMarked className="w-4 h-4" />
-                我的筆記本
+                我的筆記
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShowProfileSettings(true)} className="cursor-pointer">
@@ -123,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
           variant="ghost" 
           size="icon" 
           className="rounded-full w-9 h-9"
-          onClick={() => navigate('/notebook')}
+          onClick={() => navigate('/login')}
         >
           <User className="w-5 h-5 text-muted-foreground" />
         </Button>

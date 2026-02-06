@@ -10,17 +10,13 @@ const NotebookPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Get user's email - from auth or localStorage fallback
   const userEmail = user?.email || localStorage.getItem('bible_study_guest_email') || '';
 
-  // Redirect to login if not authenticated - do NOT store redirect to prevent loop
   useEffect(() => {
-    if (!loading && !user) {
-      // Clear any existing redirect to ensure clean state
-      localStorage.removeItem('login_redirect');
-      navigate('/login', { replace: true });
+    if (!loading) {
+      navigate('/learn/my-notes', { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [loading, navigate]);
 
   if (loading || !user) {
     return (

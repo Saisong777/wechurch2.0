@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -114,11 +114,13 @@ function calculateCurrentDay(startDate: string): number {
 
 const ReadingExperiencePage = () => {
   const { planId } = useParams<{ planId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [selectedDay, setSelectedDay] = useState<number>(1);
+  const initialDay = searchParams.get('day') ? parseInt(searchParams.get('day')!, 10) : 1;
+  const [selectedDay, setSelectedDay] = useState<number>(initialDay || 1);
   const [ttsState, setTtsState] = useState<TtsState>('idle');
   const [autoRead, setAutoRead] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -135,6 +137,7 @@ const ReadingExperiencePage = () => {
     coolDownNote: '',
   });
   const [devotionalNoteId, setDevotionalNoteId] = useState<string | null>(null);
+  const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const dayStripRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -209,12 +212,12 @@ const ReadingExperiencePage = () => {
   });
 
   useEffect(() => {
-    if (plan?.startDate) {
+    if (plan?.startDate && !searchParams.get('day')) {
       const calcDay = calculateCurrentDay(plan.startDate);
       const totalDays = plan.totalDays || progressEntries.length;
       setSelectedDay(Math.min(calcDay, totalDays || 1));
     }
-  }, [plan?.startDate, plan?.totalDays, progressEntries.length]);
+  }, [plan?.startDate, plan?.totalDays, progressEntries.length, searchParams]);
 
   useEffect(() => {
     if (existingNote) {
@@ -280,6 +283,7 @@ const ReadingExperiencePage = () => {
 
   const saveDevotionalNote = useCallback(async () => {
     if (!user || !planId) return;
+    setSavingState('saving');
     const body = {
       userId: user.id,
       verseReference: currentDayEntry?.scriptureReference || '',
@@ -305,25 +309,19 @@ const ReadingExperiencePage = () => {
         if (data.id) setDevotionalNoteId(data.id);
       }
       queryClient.invalidateQueries({ queryKey: ['/api/user-reading-plans', planId, 'devotional', selectedDay] });
+      setSavingState('saved');
+      toast({ title: '筆記已儲存' });
+      setTimeout(() => setSavingState('idle'), 2000);
     } catch (err) {
       console.error('Failed to save devotional note:', err);
+      setSavingState('idle');
+      toast({ title: '儲存失敗', description: '請稍後再試', variant: 'destructive' });
     }
-  }, [user, planId, selectedDay, devotionalForm, devotionalNoteId, currentDayEntry, allVerses]);
-
-  const debouncedSave = useCallback(() => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveDevotionalNote();
-    }, 1500);
-  }, [saveDevotionalNote]);
+  }, [user, planId, selectedDay, devotionalForm, devotionalNoteId, currentDayEntry, allVerses, toast]);
 
   const updateDevotionalField = useCallback((field: string, value: string | InsightCategory | null) => {
     setDevotionalForm(prev => ({ ...prev, [field]: value }));
   }, []);
-
-  const handleFieldBlur = useCallback(() => {
-    debouncedSave();
-  }, [debouncedSave]);
 
   const speakVerse = useCallback((verse: BibleVerse, index: number) => {
     window.speechSynthesis.cancel();
@@ -725,7 +723,6 @@ const ReadingExperiencePage = () => {
                     id="dev-titlePhrase"
                     value={devotionalForm.titlePhrase}
                     onChange={(e) => updateDevotionalField('titlePhrase', e.target.value)}
-                    onBlur={handleFieldBlur}
                     placeholder="幫這段經文下一個標題"
                     data-testid="input-title-phrase"
                   />
@@ -739,7 +736,6 @@ const ReadingExperiencePage = () => {
                     id="dev-heartbeatVerse"
                     value={devotionalForm.heartbeatVerse}
                     onChange={(e) => updateDevotionalField('heartbeatVerse', e.target.value)}
-                    onBlur={handleFieldBlur}
                     placeholder="哪一節經文讓你心跳加速？"
                     minRows={2}
                     data-testid="textarea-heartbeat-verse"
@@ -754,7 +750,6 @@ const ReadingExperiencePage = () => {
                     id="dev-observation"
                     value={devotionalForm.observation}
                     onChange={(e) => updateDevotionalField('observation', e.target.value)}
-                    onBlur={handleFieldBlur}
                     placeholder="你觀察到什麼？"
                     minRows={2}
                     data-testid="textarea-observation"
@@ -778,7 +773,6 @@ const ReadingExperiencePage = () => {
                         size="sm"
                         onClick={() => {
                           updateDevotionalField('coreInsightCategory', cat.value);
-                          debouncedSave();
                         }}
                         className="text-xs gap-1"
                         data-testid={`button-category-${cat.value}`}
@@ -791,7 +785,6 @@ const ReadingExperiencePage = () => {
                   <AutoResizeTextarea
                     value={devotionalForm.coreInsightNote}
                     onChange={(e) => updateDevotionalField('coreInsightNote', e.target.value)}
-                    onBlur={handleFieldBlur}
                     placeholder="從經文中你學到什麼？"
                     minRows={2}
                     data-testid="textarea-core-insight"
@@ -806,7 +799,6 @@ const ReadingExperiencePage = () => {
                     id="dev-scholarsNote"
                     value={devotionalForm.scholarsNote}
                     onChange={(e) => updateDevotionalField('scholarsNote', e.target.value)}
-                    onBlur={handleFieldBlur}
                     placeholder="查閱資料或聽過的教導"
                     minRows={2}
                     data-testid="textarea-scholars-note"
@@ -828,7 +820,6 @@ const ReadingExperiencePage = () => {
                     id="dev-actionPlan"
                     value={devotionalForm.actionPlan}
                     onChange={(e) => updateDevotionalField('actionPlan', e.target.value)}
-                    onBlur={handleFieldBlur}
                     placeholder="今天你要如何實踐？"
                     minRows={2}
                     data-testid="textarea-action-plan"
@@ -843,12 +834,34 @@ const ReadingExperiencePage = () => {
                     id="dev-coolDownNote"
                     value={devotionalForm.coolDownNote}
                     onChange={(e) => updateDevotionalField('coolDownNote', e.target.value)}
-                    onBlur={handleFieldBlur}
                     placeholder="安靜在神面前，寫下你的禱告"
                     minRows={2}
                     data-testid="textarea-cool-down"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t">
+                {savingState === 'saved' && (
+                  <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    已儲存
+                  </span>
+                )}
+                <Button
+                  onClick={saveDevotionalNote}
+                  disabled={savingState === 'saving'}
+                  data-testid="button-save-devotional"
+                >
+                  {savingState === 'saving' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                      儲存中...
+                    </>
+                  ) : (
+                    '儲存筆記'
+                  )}
+                </Button>
               </div>
             </CardContent>
           )}
