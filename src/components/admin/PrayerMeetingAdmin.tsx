@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, ChevronUp, ChevronDown, Presentation, X, Sparkles, List, AlertTriangle, EyeOff, Maximize, Minimize, XCircle, FileText } from 'lucide-react';
+import { Shuffle, Copy, Check, Users, Crown, QrCode, Trash2, Plus, ChevronLeft, ChevronUp, ChevronDown, Presentation, X, List, AlertTriangle, EyeOff, Maximize, Minimize, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +38,7 @@ interface PrayerMeetingParticipant {
   gender: string;
   groupNumber: number | null;
   prayerRequest: string | null;
+  urgentPrayer: string | null;
   anonymousPrayer: string | null;
   isAnonymous: boolean;
   prayerCategory: string | null;
@@ -50,18 +51,26 @@ interface PrayerListData {
   meetingTitle: string;
   groupNumber: number | null;
   urgentPrayers: PrayerItem[];
-  categorizedPrayers: Record<string, PrayerItem[]>;
+  namedPrayers: PrayerItem[];
+  anonymousPrayers: PrayerItem[];
+  groupedNamedPrayers: Record<string, PrayerItem[]>;
   totalCount: number;
+  stats: {
+    totalParticipants: number;
+    urgentCount: number;
+    namedCount: number;
+    anonymousCount: number;
+    groupCount: number;
+  };
 }
 
 interface PrayerItem {
   id: string;
   name: string;
   prayerRequest: string;
-  category: string;
-  isUrgent: boolean;
   isAnonymous: boolean;
   groupNumber: number | null;
+  prayerType: 'named' | 'anonymous' | 'urgent';
 }
 
 type GroupingMode = 'bySize' | 'byCount';
@@ -71,8 +80,8 @@ type ViewStep = 'list' | 'create' | 'manage' | 'presentation' | 'prayer-list';
 interface PresentationPage {
   title: string;
   subtitle?: string;
-  prayers: { id: string; name: string; prayer: string; groupNumber: number | null; isUrgent?: boolean }[];
-  type: 'urgent' | 'anonymous' | 'group';
+  prayers: { id: string; name: string; prayer: string; groupNumber: number | null }[];
+  type: 'stats' | 'urgent' | 'anonymous' | 'group';
   groupNumber?: number;
 }
 
@@ -111,6 +120,10 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
   const [genderMode, setGenderMode] = useState<GenderMode>('mixed');
 
   const [showHistory, setShowHistory] = useState(false);
+
+  const [isParticipantListExpanded, setIsParticipantListExpanded] = useState(false);
+  const [isGroupListExpanded, setIsGroupListExpanded] = useState(false);
+  const [startPrayingClicked, setStartPrayingClicked] = useState(false);
 
   const { data: activeMeetings = [] } = useQuery<PrayerMeeting[]>({
     queryKey: ['/api/prayer-meetings/active'],
@@ -215,6 +228,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       return res.json();
     },
     onSuccess: () => {
+      setStartPrayingClicked(true);
       refetchMeeting();
       toast.success('開始禱告！');
     },
@@ -256,32 +270,12 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     }
   };
 
-  const classifyPrayersMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', `/api/prayer-meetings/${currentMeetingId}/classify-prayers`);
-      return res.json();
-    },
-    onSuccess: (data) => {
-      refetchParticipants();
-      refetchMeeting();
-      if (data.hasAlertContent) {
-        toast.warning(`已分類 ${data.classified} 個禱告事項 - 有需要牧長特別關注的內容`, { duration: 8000 });
-      } else {
-        toast.success(`已分類 ${data.classified} 個禱告事項，報告已生成`);
-      }
-    },
-    onError: () => {
-      toast.error('分類禱告事項失敗');
-    },
-  });
-
   const [prayerListGroup, setPrayerListGroup] = useState<number | null>(null);
-  const [prayerListMode, setPrayerListMode] = useState<'all' | 'named' | 'anonymous'>('all');
-  const [prayerListViewType, setPrayerListViewType] = useState<'report' | 'list'>('report');
+  const [prayerListMode, setPrayerListMode] = useState<'all' | 'group' | 'urgent' | 'anonymous'>('all');
 
   const buildPrayerListQueryKey = () => {
     let url = `/api/prayer-meetings/${currentMeetingId}/prayer-list?mode=${prayerListMode}`;
-    if (prayerListMode === 'named' && prayerListGroup !== null) {
+    if (prayerListMode === 'group' && prayerListGroup !== null) {
       url += `&group=${prayerListGroup}`;
     }
     return url;
@@ -322,39 +316,64 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
 
   const computePresentationPages = () => {
     const pages: PresentationPage[] = [];
-    const urgentPrayers: PresentationPage['prayers'] = [];
-    const anonymousPrayers: PresentationPage['prayers'] = [];
-    
+    const ITEMS_PER_PAGE = 5;
+
+    pages.push({
+      title: meeting?.title || '禱告會',
+      subtitle: '禱告統計',
+      prayers: [],
+      type: 'stats',
+    });
+
+    const urgentPrayerItems: PresentationPage['prayers'] = [];
     participants.forEach(p => {
-      if (p.prayerRequest && p.isUrgent) {
-        urgentPrayers.push({ id: p.id + '-urgent', name: p.name, prayer: p.prayerRequest, groupNumber: p.groupNumber, isUrgent: true });
-      }
-      if (p.anonymousPrayer) {
-        anonymousPrayers.push({ id: p.id + '-anon', name: '匿名', prayer: p.anonymousPrayer, groupNumber: p.groupNumber });
+      if (p.urgentPrayer?.trim()) {
+        urgentPrayerItems.push({ id: p.id + '-urgent', name: p.name, prayer: p.urgentPrayer, groupNumber: p.groupNumber });
       }
     });
-    
-    if (urgentPrayers.length > 0) {
-      pages.push({ title: '緊急禱告事項', subtitle: '需要迫切代禱', prayers: urgentPrayers, type: 'urgent' });
+    for (let i = 0; i < urgentPrayerItems.length; i += ITEMS_PER_PAGE) {
+      const chunk = urgentPrayerItems.slice(i, i + ITEMS_PER_PAGE);
+      const pageNum = Math.ceil(urgentPrayerItems.length / ITEMS_PER_PAGE) > 1 ? ` (${Math.floor(i / ITEMS_PER_PAGE) + 1})` : '';
+      pages.push({ title: `緊急禱告事項${pageNum}`, subtitle: '需要迫切代禱', prayers: chunk, type: 'urgent' });
     }
-    if (anonymousPrayers.length > 0) {
-      pages.push({ title: '匿名禱告事項', prayers: anonymousPrayers, type: 'anonymous' });
+
+    const anonymousPrayerItems: PresentationPage['prayers'] = [];
+    participants.forEach(p => {
+      if (p.anonymousPrayer?.trim()) {
+        anonymousPrayerItems.push({ id: p.id + '-anon', name: '匿名', prayer: p.anonymousPrayer, groupNumber: p.groupNumber });
+      }
+    });
+    for (let i = 0; i < anonymousPrayerItems.length; i += ITEMS_PER_PAGE) {
+      const chunk = anonymousPrayerItems.slice(i, i + ITEMS_PER_PAGE);
+      const pageNum = Math.ceil(anonymousPrayerItems.length / ITEMS_PER_PAGE) > 1 ? ` (${Math.floor(i / ITEMS_PER_PAGE) + 1})` : '';
+      pages.push({ title: `匿名禱告事項${pageNum}`, prayers: chunk, type: 'anonymous' });
     }
-    
+
     groupNumbers.forEach(num => {
       const groupPrayers: PresentationPage['prayers'] = [];
-      const groupParticipants = groupedParticipants[num] || [];
-      groupParticipants.forEach(p => {
-        if (p.prayerRequest) {
+      const groupParticipantsArr = groupedParticipants[num] || [];
+      groupParticipantsArr.forEach(p => {
+        if (p.prayerRequest?.trim()) {
           groupPrayers.push({ id: p.id + '-named', name: p.name, prayer: p.prayerRequest, groupNumber: p.groupNumber });
         }
+        if (p.urgentPrayer?.trim()) {
+          groupPrayers.push({ id: p.id + '-group-urgent', name: p.name + ' (緊急)', prayer: p.urgentPrayer, groupNumber: p.groupNumber });
+        }
       });
-      if (groupPrayers.length > 0) {
-        pages.push({ title: `第 ${num} 組`, subtitle: `${groupParticipants.length} 位組員`, prayers: groupPrayers, type: 'group', groupNumber: num });
+      for (let i = 0; i < groupPrayers.length; i += ITEMS_PER_PAGE) {
+        const chunk = groupPrayers.slice(i, i + ITEMS_PER_PAGE);
+        const pageNum = Math.ceil(groupPrayers.length / ITEMS_PER_PAGE) > 1 ? ` (${Math.floor(i / ITEMS_PER_PAGE) + 1})` : '';
+        pages.push({
+          title: `第 ${num} 組 禱告事項${pageNum}`,
+          subtitle: `${groupParticipantsArr.length} 位組員`,
+          prayers: chunk,
+          type: 'group',
+          groupNumber: num,
+        });
       }
     });
     
-    if (pages.length === 0) {
+    if (pages.length <= 1) {
       pages.push({ title: '尚無禱告事項', prayers: [], type: 'group' });
     }
     return pages;
@@ -362,6 +381,14 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
 
   const presentationPages = computePresentationPages();
   const maxPageIndex = Math.max(0, presentationPages.length - 1);
+
+  const presentationStats = {
+    totalParticipants: participants.length,
+    urgentCount: participants.filter(p => p.urgentPrayer?.trim()).length,
+    namedCount: participants.filter(p => p.prayerRequest?.trim()).length,
+    anonymousCount: participants.filter(p => p.anonymousPrayer?.trim()).length,
+    groupCount: groupNumbers.length,
+  };
 
   useEffect(() => {
     if (step === 'presentation' && presentationPageIndex > maxPageIndex) {
@@ -403,6 +430,8 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     
     const getPageGradient = (type: PresentationPage['type']) => {
       switch (type) {
+        case 'stats':
+          return 'from-indigo-900 via-purple-900 to-pink-900';
         case 'urgent':
           return 'from-red-900 via-rose-900 to-orange-900';
         case 'anonymous':
@@ -481,84 +510,111 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
         </div>
 
         <div className="min-h-screen flex flex-col items-center justify-center p-8 pt-16">
-          <div className="text-center mb-8">
-            {currentPage.type === 'urgent' && (
-              <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            )}
-            {currentPage.type === 'anonymous' && (
-              <EyeOff className="w-12 h-12 text-white/60 mx-auto mb-4" />
-            )}
-            <h1 className="text-5xl font-bold text-white mb-2">
-              {currentPage.title}
-            </h1>
-            {currentPage.subtitle && (
-              <p className="text-xl text-white/60">{currentPage.subtitle}</p>
-            )}
-          </div>
+          {currentPage.type === 'stats' ? (
+            <>
+              <div className="text-center mb-12">
+                <h1 className="text-5xl font-bold text-white mb-4">
+                  {currentPage.title}
+                </h1>
+                {currentPage.subtitle && (
+                  <p className="text-xl text-white/60">{currentPage.subtitle}</p>
+                )}
+              </div>
+              <div className="w-full max-w-4xl grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
+                  <div className="text-6xl font-bold text-white mb-2">{presentationStats.totalParticipants}</div>
+                  <div className="text-white/70 text-lg">
+                    <Users className="w-5 h-5 inline mr-2" />
+                    參與人數
+                  </div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
+                  <div className="text-6xl font-bold text-red-400 mb-2">{presentationStats.urgentCount}</div>
+                  <div className="text-white/70 text-lg">
+                    <AlertTriangle className="w-5 h-5 inline mr-2" />
+                    緊急禱告
+                  </div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
+                  <div className="text-6xl font-bold text-blue-400 mb-2">{presentationStats.namedCount}</div>
+                  <div className="text-white/70 text-lg">具名禱告</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
+                  <div className="text-6xl font-bold text-gray-400 mb-2">{presentationStats.anonymousCount}</div>
+                  <div className="text-white/70 text-lg">
+                    <EyeOff className="w-5 h-5 inline mr-2" />
+                    匿名禱告
+                  </div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
+                  <div className="text-6xl font-bold text-purple-400 mb-2">{presentationStats.groupCount}</div>
+                  <div className="text-white/70 text-lg">禱告小組</div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-center mb-8">
+                {currentPage.type === 'urgent' && (
+                  <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                )}
+                {currentPage.type === 'anonymous' && (
+                  <EyeOff className="w-12 h-12 text-white/60 mx-auto mb-4" />
+                )}
+                <h1 className="text-5xl font-bold text-white mb-2">
+                  {currentPage.title}
+                </h1>
+                {currentPage.subtitle && (
+                  <p className="text-xl text-white/60">{currentPage.subtitle}</p>
+                )}
+              </div>
 
-          <div className="w-full max-w-4xl bg-white/10 backdrop-blur rounded-xl p-8">
-            {currentPage.prayers.length > 0 ? (
-              <ul className="space-y-6">
-                {currentPage.prayers.map((item, index) => (
-                  <li key={item.id} className="flex items-start gap-4 text-white">
-                    <span className="text-3xl font-bold text-white/40 min-w-[2.5rem]">{index + 1}.</span>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <span className="font-semibold text-xl">{item.name}</span>
-                        {item.isUrgent && (
-                          <Badge className="bg-red-500/80 text-white border-0">
-                            <AlertTriangle className="w-3 h-3 mr-1" />
-                            緊急
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-white/90 text-2xl leading-relaxed">
-                        {item.prayer}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-center text-white/60 text-xl py-8">此分類沒有禱告事項</p>
-            )}
-          </div>
+              <div className="w-full max-w-4xl bg-white/10 backdrop-blur rounded-xl p-8">
+                {currentPage.prayers.length > 0 ? (
+                  <ul className="space-y-6">
+                    {currentPage.prayers.map((item, index) => (
+                      <li key={item.id} className="flex items-start gap-4 text-white">
+                        <span className="text-3xl font-bold text-white/40 min-w-[2.5rem]">{index + 1}.</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className="font-semibold text-xl">{item.name}</span>
+                          </div>
+                          <p className="text-white/90 text-2xl leading-relaxed">
+                            {item.prayer}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-center text-white/60 text-xl py-8">此分類沒有禱告事項</p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
   }
 
   if (step === 'prayer-list') {
-    const categoryColors: Record<string, string> = {
-      '健康': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-      '疾病醫治': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-      '工作': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-      '職場工作': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-      '關係': 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300',
-      '人際關係': 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300',
-      '小孩': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
-      '親子家庭': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
-      '婚姻': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
-      '婚姻關係': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
-      '財務': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-      '財務供應': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-      '學業': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
-      '學業考試': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
-      '信仰': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
-      '信仰成長': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
-      '靈魂得救': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
-      '事工': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
-      '事工服事': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
-      '感恩': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-      '感恩讚美': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-      '其他': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-    };
-
-    const hasReport = meeting?.prayerReport && meeting.prayerReport.length > 0;
-
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 z-50 overflow-auto">
         <div className="absolute top-4 right-4 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setPresentationGroup(prayerListGroup || 0);
+              setPresentationPageIndex(0);
+              setStep('presentation');
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
+            data-testid="button-ppt-projection"
+          >
+            <Presentation className="w-4 h-4 mr-2" />
+            PPT 投影
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setStep('manage')}>
             <X className="w-4 h-4 mr-2" />
             返回管理
@@ -567,262 +623,230 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
 
         <div className="max-w-4xl mx-auto p-6 pt-16">
           <h1 className="text-3xl font-bold text-center mb-6">
-            禱告報告
+            禱告清單
           </h1>
+
+          {prayerListData?.stats && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+              <div className="bg-white dark:bg-slate-800 rounded-lg p-3 text-center border border-gray-200 dark:border-gray-700">
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{prayerListData.stats.totalParticipants}</div>
+                <div className="text-xs text-gray-500">參與人數</div>
+              </div>
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center border border-red-200 dark:border-red-800">
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{prayerListData.stats.urgentCount}</div>
+                <div className="text-xs text-red-500">緊急禱告</div>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center border border-blue-200 dark:border-blue-800">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{prayerListData.stats.namedCount}</div>
+                <div className="text-xs text-blue-500">具名禱告</div>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center border border-purple-200 dark:border-purple-800">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{prayerListData.stats.anonymousCount}</div>
+                <div className="text-xs text-purple-500">匿名禱告</div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center border border-green-200 dark:border-green-800">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{prayerListData.stats.groupCount}</div>
+                <div className="text-xs text-green-500">小組數</div>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-2 mb-6 flex-wrap justify-center items-center">
             <Button
-              variant={prayerListViewType === 'report' ? 'default' : 'outline'}
-              onClick={() => setPrayerListViewType('report')}
+              variant={prayerListMode === 'all' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('all'); setPrayerListGroup(null); }}
               size="sm"
-              data-testid="button-view-report"
+              data-testid="button-mode-all"
             >
-              <FileText className="w-4 h-4 mr-2" />
-              報告檢視
+              全部禱告
             </Button>
             <Button
-              variant={prayerListViewType === 'list' ? 'default' : 'outline'}
-              onClick={() => setPrayerListViewType('list')}
+              variant={prayerListMode === 'group' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('group'); setPrayerListGroup(null); }}
               size="sm"
-              data-testid="button-view-list"
+              data-testid="button-mode-group"
             >
-              <List className="w-4 h-4 mr-2" />
-              列表檢視
+              各組禱告
             </Button>
-            
-            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
             <Button
-              variant="outline"
+              variant={prayerListMode === 'urgent' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('urgent'); setPrayerListGroup(null); }}
               size="sm"
-              onClick={() => {
-                setPresentationGroup(prayerListGroup || 0);
-                setPresentationPageIndex(0);
-                setStep('presentation');
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
-              data-testid="button-ppt-projection"
+              data-testid="button-mode-urgent"
             >
-              <Presentation className="w-4 h-4 mr-2" />
-              PPT 投影
+              <AlertTriangle className="w-4 h-4 mr-1" />
+              緊急禱告
+            </Button>
+            <Button
+              variant={prayerListMode === 'anonymous' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('anonymous'); setPrayerListGroup(null); }}
+              size="sm"
+              data-testid="button-mode-anonymous"
+            >
+              <EyeOff className="w-4 h-4 mr-1" />
+              匿名禱告
             </Button>
           </div>
 
-          {prayerListViewType === 'report' ? (
-            <div className="space-y-6">
-              {!hasReport ? (
-                <Card className="text-center py-12">
-                  <CardContent>
-                    <Sparkles className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                    <p className="text-gray-500 mb-4">尚未生成禱告報告</p>
-                    <Button 
-                      onClick={() => classifyPrayersMutation.mutate()}
-                      disabled={classifyPrayersMutation.isPending}
-                    >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      {classifyPrayersMutation.isPending ? '生成中...' : '生成 AI 禱告報告'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="prose prose-slate dark:prose-invert max-w-none">
-                      {meeting.prayerReport.split('\n').map((line, idx) => {
-                        if (line.startsWith('# ')) {
-                          return <h1 key={idx} className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">{line.substring(2)}</h1>;
-                        }
-                        if (line.startsWith('## ⚠️')) {
-                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-red-600 dark:text-red-400 flex items-center gap-2"><AlertTriangle className="w-5 h-5" />{line.substring(5)}</h2>;
-                        }
-                        if (line.startsWith('## (a)')) {
-                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-sky-600 dark:text-sky-400">{line.substring(3)}</h2>;
-                        }
-                        if (line.startsWith('## (b)')) {
-                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-emerald-600 dark:text-emerald-400">{line.substring(3)}</h2>;
-                        }
-                        if (line.startsWith('## (c)')) {
-                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-purple-600 dark:text-purple-400">{line.substring(3)}</h2>;
-                        }
-                        if (line.startsWith('## (d)')) {
-                          return <h2 key={idx} className="text-xl font-bold mt-6 mb-3 text-red-600 dark:text-red-400">{line.substring(3)}</h2>;
-                        }
-                        if (line.startsWith('### 📂')) {
-                          const category = line.substring(7);
-                          return (
-                            <h3 key={idx} className="text-lg font-semibold mt-4 mb-2 flex items-center gap-2">
-                              <Badge className={categoryColors[category] || categoryColors['其他']}>{category}</Badge>
-                            </h3>
-                          );
-                        }
-                        if (line.startsWith('> ')) {
-                          return <blockquote key={idx} className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic text-gray-600 dark:text-gray-400 my-2">{line.substring(2)}</blockquote>;
-                        }
-                        if (line.startsWith('- **')) {
-                          const match = line.match(/^- \*\*(.+?)\*\*[：:](.+)$/);
-                          if (match) {
-                            const hasUrgent = match[2].includes('🚨');
-                            return (
-                              <div key={idx} className={`flex items-start gap-2 py-1 ${hasUrgent ? 'text-red-600 dark:text-red-400' : ''}`}>
-                                <span className="text-gray-400">•</span>
-                                <span><strong className="font-semibold">{match[1]}</strong>：{match[2].replace('🚨', '')}{hasUrgent && <AlertTriangle className="inline w-4 h-4 ml-1 text-red-500" />}</span>
-                              </div>
-                            );
-                          }
-                        }
-                        if (line.startsWith('- 「')) {
-                          return (
-                            <div key={idx} className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg my-2 italic text-gray-700 dark:text-gray-300">
-                              {line.substring(2)}
-                            </div>
-                          );
-                        }
-                        if (line.match(/^\d+\.\s+\*\*/)) {
-                          const match = line.match(/^(\d+)\.\s+\*\*(.+?)\*\*（(.+?)）[：:](.+)$/);
-                          if (match) {
-                            return (
-                              <div key={idx} className="flex items-start gap-2 py-2 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg my-2">
-                                <span className="font-bold text-red-600 dark:text-red-400">{match[1]}.</span>
-                                <div>
-                                  <span className="font-semibold">{match[2]}</span>
-                                  <Badge variant="outline" className="ml-2 text-xs">{match[3]}</Badge>
-                                  <p className="text-gray-600 dark:text-gray-400 mt-1">{match[4]}</p>
-                                </div>
-                              </div>
-                            );
-                          }
-                        }
-                        if (line.startsWith('---')) {
-                          return <hr key={idx} className="my-4 border-gray-200 dark:border-gray-700" />;
-                        }
-                        if (line.trim() === '') {
-                          return <div key={idx} className="h-2" />;
-                        }
-                        if (line.startsWith('_') && line.endsWith('_')) {
-                          return <p key={idx} className="text-gray-500 italic">{line.substring(1, line.length - 1)}</p>;
-                        }
-                        return <p key={idx} className="text-gray-700 dark:text-gray-300">{line}</p>;
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+          {prayerListMode === 'group' && groupNumbers.length > 0 && (
+            <div className="flex justify-center mb-4">
+              <Select
+                value={prayerListGroup?.toString() || 'all'}
+                onValueChange={(value) => setPrayerListGroup(value === 'all' ? null : parseInt(value))}
+              >
+                <SelectTrigger className="w-40" data-testid="select-group-filter">
+                  <SelectValue placeholder="選擇組別" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部組別</SelectItem>
+                  {groupNumbers.map(num => (
+                    <SelectItem key={num} value={num.toString()}>
+                      第 {num} 組
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
-            <>
-              <div className="flex gap-2 mb-4 flex-wrap justify-center items-center">
-                <Button
-                  variant={prayerListMode === 'all' ? 'default' : 'outline'}
-                  onClick={() => { setPrayerListMode('all'); setPrayerListGroup(null); }}
-                  size="sm"
-                  data-testid="button-mode-all"
-                >
-                  全部禱告
-                </Button>
-                <Button
-                  variant={prayerListMode === 'named' ? 'default' : 'outline'}
-                  onClick={() => { setPrayerListMode('named'); setPrayerListGroup(null); }}
-                  size="sm"
-                  data-testid="button-mode-named"
-                >
-                  各組禱告
-                </Button>
-                <Button
-                  variant={prayerListMode === 'anonymous' ? 'default' : 'outline'}
-                  onClick={() => { setPrayerListMode('anonymous'); setPrayerListGroup(null); }}
-                  size="sm"
-                  data-testid="button-mode-anonymous"
-                >
-                  匿名禱告
-                </Button>
-                
-                {prayerListMode === 'named' && groupNumbers.length > 0 && (
-                  <>
-                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
-                    <Select
-                      value={prayerListGroup?.toString() || 'all'}
-                      onValueChange={(value) => setPrayerListGroup(value === 'all' ? null : parseInt(value))}
-                    >
-                      <SelectTrigger className="w-32" data-testid="select-group-filter">
-                        <SelectValue placeholder="選擇組別" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">全部組別</SelectItem>
-                        {groupNumbers.map(num => (
-                          <SelectItem key={num} value={num.toString()}>
-                            第 {num} 組
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
-              </div>
+          )}
 
-              {prayerListData?.urgentPrayers && prayerListData.urgentPrayers.length > 0 && (
-                <Card className="mb-6 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2 text-red-700 dark:text-red-300">
-                      <AlertTriangle className="w-5 h-5" />
-                      緊急代禱事項
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {prayerListData.urgentPrayers.map(prayer => (
-                      <div key={prayer.id} className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-800">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <span className="font-semibold">{prayer.name}</span>
-                          <Badge className={categoryColors[prayer.category] || categoryColors['其他']}>
-                            {prayer.category}
+          {isLoadingPrayerList && (
+            <div className="text-center py-12 text-gray-500">
+              載入中...
+            </div>
+          )}
+
+          {!isLoadingPrayerList && prayerListData && (
+            <div className="space-y-4">
+              {prayerListMode === 'all' && (
+                <>
+                  {prayerListData.urgentPrayers.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        緊急禱告 ({prayerListData.urgentPrayers.length})
+                      </h3>
+                      {prayerListData.urgentPrayers.map(prayer => (
+                        <div key={prayer.id} className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium text-red-700 dark:text-red-300">{prayer.name}</span>
+                            {prayer.groupNumber && (
+                              <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
+                            )}
+                          </div>
+                          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {prayerListData.namedPrayers.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        具名禱告 ({prayerListData.namedPrayers.length})
+                      </h3>
+                      {prayerListData.namedPrayers.map(prayer => (
+                        <div key={prayer.id} className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium">{prayer.name}</span>
+                            {prayer.groupNumber && (
+                              <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
+                            )}
+                          </div>
+                          <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {prayerListData.anonymousPrayers.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                        <EyeOff className="w-4 h-4" />
+                        匿名禱告 ({prayerListData.anonymousPrayers.length})
+                      </h3>
+                      {prayerListData.anonymousPrayers.map(prayer => (
+                        <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {prayerListMode === 'group' && (
+                <>
+                  {prayerListData.groupedNamedPrayers && Object.entries(prayerListData.groupedNamedPrayers)
+                    .filter(([groupNum]) => prayerListGroup === null || parseInt(groupNum) === prayerListGroup)
+                    .map(([groupNum, prayers]) => (
+                      <div key={groupNum} className="space-y-2">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Badge className={cn(getGroupColor(parseInt(groupNum)).bg, getGroupColor(parseInt(groupNum)).text, "border", getGroupColor(parseInt(groupNum)).border)}>
+                            第 {groupNum} 組
                           </Badge>
-                          {prayer.groupNumber && (
-                            <Badge variant="outline">第 {prayer.groupNumber} 組</Badge>
-                          )}
-                        </div>
-                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                          <span className="text-gray-500">({prayers.length})</span>
+                        </h3>
+                        {prayers.map(prayer => (
+                          <div key={prayer.id} className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-medium">{prayer.name}</span>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                          </div>
+                        ))}
                       </div>
                     ))}
-                  </CardContent>
-                </Card>
+                  {prayerListData.groupedNamedPrayers && Object.keys(prayerListData.groupedNamedPrayers).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">尚無各組禱告事項</div>
+                  )}
+                </>
               )}
 
-              {prayerListData?.categorizedPrayers && Object.entries(prayerListData.categorizedPrayers).map(([category, prayers]) => (
-                <Card key={category} className="mb-4">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Badge className={categoryColors[category] || categoryColors['其他']}>
-                        {category}
-                      </Badge>
-                      <span className="text-sm text-gray-500">({prayers.length})</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {prayers.map(prayer => (
-                      <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="font-medium">{prayer.name}</span>
-                          {prayer.groupNumber && (
-                            <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
-                          )}
+              {prayerListMode === 'urgent' && (
+                <>
+                  {prayerListData.urgentPrayers.length > 0 ? (
+                    <div className="space-y-2">
+                      {prayerListData.urgentPrayers.map(prayer => (
+                        <div key={prayer.id} className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <span className="font-medium text-red-700 dark:text-red-300">{prayer.name}</span>
+                            {prayer.groupNumber && (
+                              <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
+                            )}
+                          </div>
+                          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
                         </div>
-                        <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              ))}
-
-              {isLoadingPrayerList && (
-                <div className="text-center py-12 text-gray-500">
-                  載入中...
-                </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">沒有緊急禱告事項</div>
+                  )}
+                </>
               )}
 
-              {!isLoadingPrayerList && (!prayerListData || prayerListData.totalCount === 0) && (
+              {prayerListMode === 'anonymous' && (
+                <>
+                  {prayerListData.anonymousPrayers.length > 0 ? (
+                    <div className="space-y-2">
+                      {prayerListData.anonymousPrayers.map(prayer => (
+                        <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">沒有匿名禱告事項</div>
+                  )}
+                </>
+              )}
+
+              {prayerListData.totalCount === 0 && (
                 <div className="text-center py-12 text-gray-500">
                   尚無禱告事項
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -971,19 +995,25 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
               <img src={getQRCodeUrl(meeting.shortCode)} alt="QR Code" className="w-24 h-24" data-testid="img-qrcode" />
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div
+              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg cursor-pointer"
+              onClick={() => setIsParticipantListExpanded(!isParticipantListExpanded)}
+              data-testid="button-toggle-participant-list"
+            >
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-gray-500" />
                 <span className="text-gray-600 dark:text-gray-300">目前參與者</span>
               </div>
-              <Badge variant="secondary" className="text-lg px-3 py-1" data-testid="badge-participant-count">
-                {participants.length} 人
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-lg px-3 py-1" data-testid="badge-participant-count">
+                  {participants.length} 人
+                </Badge>
+                {isParticipantListExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+              </div>
             </div>
 
-            {participants.length > 0 && (
+            {isParticipantListExpanded && participants.length > 0 && (
               <div className="space-y-2">
-                <Label>參與者名單</Label>
                 <div className="flex flex-wrap gap-2">
                   {participants.map(p => (
                     <Badge
@@ -1014,13 +1044,18 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
               </Button>
             ) : (
               <div className="space-y-2">
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+                <div
+                  className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center cursor-pointer flex items-center justify-center gap-2"
+                  onClick={() => setIsGroupListExpanded(!isGroupListExpanded)}
+                  data-testid="button-toggle-group-list"
+                >
                   <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
                     已完成分組 - {groupNumbers.length} 組
                   </Badge>
+                  {isGroupListExpanded ? <ChevronUp className="w-4 h-4 text-green-600" /> : <ChevronDown className="w-4 h-4 text-green-600" />}
                 </div>
 
-                {groupNumbers.map(num => (
+                {isGroupListExpanded && groupNumbers.map(num => (
                   <div key={num} className={cn('p-3 rounded-lg border', getGroupColor(num).bg, getGroupColor(num).border)}>
                     <div className="font-medium mb-2">第 {num} 組</div>
                     <div className="flex flex-wrap gap-2">
@@ -1036,7 +1071,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                 {!isPraying && (
                   <Button
                     onClick={() => startPrayingMutation.mutate()}
-                    disabled={startPrayingMutation.isPending}
+                    disabled={startPrayingMutation.isPending || startPrayingClicked || isPraying}
                     className="w-full"
                     data-testid="button-start-praying"
                   >
@@ -1054,27 +1089,15 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                   簡報模式
                 </Button>
 
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => classifyPrayersMutation.mutate()}
-                    disabled={classifyPrayersMutation.isPending}
-                    className="flex-1"
-                    data-testid="button-classify-prayers"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    {classifyPrayersMutation.isPending ? 'AI分類中...' : 'AI分類禱告'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setStep('prayer-list')}
-                    className="flex-1"
-                    data-testid="button-view-prayer-list"
-                  >
-                    <List className="w-4 h-4 mr-2" />
-                    禱告清單
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setStep('prayer-list')}
+                  className="w-full"
+                  data-testid="button-view-prayer-list"
+                >
+                  <List className="w-4 h-4 mr-2" />
+                  禱告清單
+                </Button>
               </div>
             )}
 

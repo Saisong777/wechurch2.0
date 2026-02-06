@@ -1538,9 +1538,9 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      // Validate payload
       const prayersSchema = z.object({
         namedPrayer: z.string().max(2000).optional().default(''),
+        urgentPrayer: z.string().max(2000).optional().default(''),
         anonymousPrayer: z.string().max(2000).optional().default(''),
       });
       
@@ -1549,7 +1549,7 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Invalid prayer content", details: validation.error.errors });
       }
       
-      const { namedPrayer, anonymousPrayer } = validation.data;
+      const { namedPrayer, urgentPrayer, anonymousPrayer } = validation.data;
       
       const meeting = await storage.getPrayerMeeting(req.params.id);
       if (!meeting) {
@@ -1587,9 +1587,9 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "You can only update your own prayer requests" });
       }
 
-      // Update both prayers in a single operation (preserve existing isAnonymous value)
       const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, {
         prayerRequest: namedPrayer || null,
+        urgentPrayer: urgentPrayer || null,
         anonymousPrayer: anonymousPrayer || null,
       });
 
@@ -2000,50 +2000,51 @@ export async function registerRoutes(app: Express) {
       
       const excludeParticipantId = req.query.excludeParticipant as string | undefined;
 
-      // Build unified prayer list with both named and anonymous prayers
       type PrayerItem = {
         id: string;
         name: string;
         prayerRequest: string;
-        category: string;
-        isUrgent: boolean;
         isAnonymous: boolean;
         groupNumber: number | null;
-        prayerType: 'named' | 'anonymous';
+        prayerType: 'named' | 'anonymous' | 'urgent';
       };
       
-      const allPrayers: PrayerItem[] = [];
+      const namedPrayers: PrayerItem[] = [];
+      const urgentPrayers: PrayerItem[] = [];
+      const anonymousPrayers: PrayerItem[] = [];
       
       for (const p of participants) {
-        // Filter by group if specified (only for named prayers mode)
-        if (mode === 'named' && groupNumber && p.groupNumber !== groupNumber) continue;
-        
-        // Add named prayer if exists and mode includes named prayers
-        if ((mode === 'all' || mode === 'named') && p.prayerRequest && p.prayerRequest.trim()) {
-          allPrayers.push({
-            id: p.id,
-            name: p.isAnonymous ? '匿名' : p.name,
-            prayerRequest: p.prayerRequest,
-            category: p.prayerCategory || '其他',
-            isUrgent: p.isUrgent || false,
-            isAnonymous: p.isAnonymous || false,
+        if (p.urgentPrayer && p.urgentPrayer.trim()) {
+          urgentPrayers.push({
+            id: `${p.id}-urgent`,
+            name: p.name,
+            prayerRequest: p.urgentPrayer,
+            isAnonymous: false,
             groupNumber: p.groupNumber,
-            prayerType: 'named',
+            prayerType: 'urgent',
           });
         }
+
+        if (p.prayerRequest && p.prayerRequest.trim()) {
+          if (groupNumber && p.groupNumber !== groupNumber) {
+          } else {
+            namedPrayers.push({
+              id: p.id,
+              name: p.name,
+              prayerRequest: p.prayerRequest,
+              isAnonymous: false,
+              groupNumber: p.groupNumber,
+              prayerType: 'named',
+            });
+          }
+        }
         
-        // Add anonymous prayer field if exists and mode includes anonymous prayers
-        // Exclude current user's anonymous prayers so they can't identify themselves
-        if ((mode === 'all' || mode === 'anonymous') && p.anonymousPrayer && p.anonymousPrayer.trim()) {
-          // Skip user's own anonymous prayer to maintain true anonymity
+        if (p.anonymousPrayer && p.anonymousPrayer.trim()) {
           if (excludeParticipantId && p.id === excludeParticipantId) continue;
-          
-          allPrayers.push({
+          anonymousPrayers.push({
             id: `${p.id}-anon`,
             name: '匿名',
             prayerRequest: p.anonymousPrayer,
-            category: p.anonymousPrayerCategory || '其他',
-            isUrgent: p.isAnonymousPrayerUrgent || false,
             isAnonymous: true,
             groupNumber: p.groupNumber,
             prayerType: 'anonymous',
@@ -2051,14 +2052,11 @@ export async function registerRoutes(app: Express) {
         }
       }
 
-      const urgentPrayers = allPrayers.filter(p => p.isUrgent);
-      const regularPrayers = allPrayers.filter(p => !p.isUrgent);
-
-      const categories: Record<string, PrayerItem[]> = {};
-      for (const prayer of regularPrayers) {
-        const cat = prayer.category;
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(prayer);
+      const groupedNamedPrayers: Record<string, PrayerItem[]> = {};
+      for (const prayer of namedPrayers) {
+        const groupKey = prayer.groupNumber ? `第 ${prayer.groupNumber} 組` : '未分組';
+        if (!groupedNamedPrayers[groupKey]) groupedNamedPrayers[groupKey] = [];
+        groupedNamedPrayers[groupKey].push(prayer);
       }
 
       res.json({
@@ -2066,8 +2064,17 @@ export async function registerRoutes(app: Express) {
         meetingTitle: meeting.title,
         groupNumber,
         urgentPrayers,
-        categorizedPrayers: categories,
-        totalCount: allPrayers.length,
+        namedPrayers,
+        anonymousPrayers,
+        groupedNamedPrayers,
+        totalCount: urgentPrayers.length + namedPrayers.length + anonymousPrayers.length,
+        stats: {
+          totalParticipants: participants.length,
+          urgentCount: urgentPrayers.length,
+          namedCount: namedPrayers.length,
+          anonymousCount: anonymousPrayers.length,
+          groupCount: new Set(participants.map(p => p.groupNumber).filter(Boolean)).size,
+        },
       });
     } catch (error) {
       console.error("[PrayerMeeting] Failed to get prayer list:", error);

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Crown, Shuffle, Presentation, EyeOff, Pencil } from 'lucide-react';
+import { Copy, Check, Users, Sparkles, UserPlus, Clock, QrCode, Search, Home, PenLine, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Crown, Shuffle, Presentation, EyeOff, Pencil, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +35,7 @@ interface PrayerMeetingParticipant {
   gender: string;
   groupNumber: number | null;
   prayerRequest: string | null;
+  urgentPrayer: string | null;
   anonymousPrayer: string | null;
   isAnonymous: boolean;
   prayerCategory: string | null;
@@ -86,6 +87,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
   const [copiedCode, setCopiedCode] = useState(false);
   const [meetingDeleted, setMeetingDeleted] = useState(false);
   const [myNamedPrayer, setMyNamedPrayer] = useState('');
+  const [myUrgentPrayer, setMyUrgentPrayer] = useState('');
   const [myAnonymousPrayer, setMyAnonymousPrayer] = useState('');
   const [presentationGroup, setPresentationGroup] = useState<number>(0);
   const [isEditingPrayer, setIsEditingPrayer] = useState(false);
@@ -172,6 +174,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
       const myParticipant = participants.find(p => p.id === myParticipantId);
       if (myParticipant) {
         setMyNamedPrayer(myParticipant.prayerRequest || '');
+        setMyUrgentPrayer(myParticipant.urgentPrayer || '');
         setMyAnonymousPrayer(myParticipant.anonymousPrayer || '');
       }
     }
@@ -243,10 +246,10 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
   });
 
   const updateBothPrayersMutation = useMutation({
-    mutationFn: async ({ namedPrayer, anonymousPrayer }: { namedPrayer: string; anonymousPrayer: string }) => {
-      // Use unified endpoint to update both prayers in a single request
+    mutationFn: async ({ namedPrayer, urgentPrayer, anonymousPrayer }: { namedPrayer: string; urgentPrayer: string; anonymousPrayer: string }) => {
       const res = await apiRequest('PATCH', `/api/prayer-meetings/${currentMeetingId}/my-prayers/${myParticipantId}`, { 
         namedPrayer: namedPrayer || '', 
+        urgentPrayer: urgentPrayer || '',
         anonymousPrayer: anonymousPrayer || '' 
       });
       return res.json();
@@ -877,17 +880,34 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {(!myParticipant?.prayerRequest && !myParticipant?.anonymousPrayer) || isEditingPrayer ? (
+                {(!myParticipant?.prayerRequest && !myParticipant?.urgentPrayer && !myParticipant?.anonymousPrayer) || isEditingPrayer ? (
                   <>
                     <div className="space-y-3">
-                      <Label className="font-medium">實名代禱事項</Label>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        <Label className="font-medium text-red-600 dark:text-red-400">緊急禱告事項</Label>
+                      </div>
+                      <p className="text-xs text-red-500 dark:text-red-400">
+                        非常緊急需要大家一起禱告的事項，會顯示在小組禱告清單及PPT投影上
+                      </p>
+                      <Textarea
+                        value={myUrgentPrayer}
+                        onChange={(e) => setMyUrgentPrayer(e.target.value)}
+                        placeholder="請輸入緊急禱告事項..."
+                        rows={3}
+                        data-testid="textarea-urgent-prayer"
+                      />
+                    </div>
+
+                    <div className="border-t pt-4 space-y-3">
+                      <Label className="font-medium">一般禱告事項</Label>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        組員可以看到您的姓名和禱告內容，方便小組代禱
+                        可以在小組裡公開代禱的事項，顯示在小組禱告清單裡面
                       </p>
                       <Textarea
                         value={myNamedPrayer}
                         onChange={(e) => setMyNamedPrayer(e.target.value)}
-                        placeholder="請輸入實名禱告事項..."
+                        placeholder="請輸入一般禱告事項..."
                         rows={3}
                         data-testid="textarea-named-prayer"
                       />
@@ -896,10 +916,10 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                     <div className="border-t pt-4 space-y-3">
                       <div className="flex items-center gap-2">
                         <EyeOff className="w-4 h-4 text-gray-500" />
-                        <Label className="font-medium">匿名代禱事項</Label>
+                        <Label className="font-medium">匿名禱告事項</Label>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        匿名禱告不會在小組清單中顯示您的姓名，但會在最後投影時一起禱告
+                        不方便公布姓名但需要大家禱告，不顯示在小組清單，但可以顯示在PPT讓大家一起禱告
                       </p>
                       <Textarea
                         value={myAnonymousPrayer}
@@ -911,7 +931,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                     </div>
 
                     <Button
-                      onClick={() => updateBothPrayersMutation.mutate({ namedPrayer: myNamedPrayer, anonymousPrayer: myAnonymousPrayer })}
+                      onClick={() => updateBothPrayersMutation.mutate({ namedPrayer: myNamedPrayer, urgentPrayer: myUrgentPrayer, anonymousPrayer: myAnonymousPrayer })}
                       disabled={updateBothPrayersMutation.isPending}
                       className="w-full"
                       data-testid="button-save-prayers"
@@ -921,9 +941,22 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                   </>
                 ) : (
                   <div className="space-y-3">
+                    {myParticipant?.urgentPrayer && (
+                      <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 mb-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          緊急禱告：
+                        </div>
+                        <p className="text-sm text-red-700 dark:text-red-300">
+                          {myParticipant.urgentPrayer.length > 50
+                            ? `${myParticipant.urgentPrayer.substring(0, 50)}...`
+                            : myParticipant.urgentPrayer}
+                        </p>
+                      </div>
+                    )}
                     {myParticipant?.prayerRequest && (
                       <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">實名禱告：</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">一般禱告：</div>
                         <p className="text-sm text-gray-700 dark:text-gray-200">
                           {myParticipant.prayerRequest.length > 50
                             ? `${myParticipant.prayerRequest.substring(0, 50)}...`
@@ -956,11 +989,11 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                   </div>
                 )}
 
-                {myGroupMembers.some(m => m.prayerRequest && !m.isAnonymous) && (
+                {myGroupMembers.some(m => (m.prayerRequest || m.urgentPrayer) && !m.isAnonymous) && (
                   <div className="pt-4 border-t space-y-4">
                     <h4 className="font-medium text-gray-900 dark:text-white">組員禱告事項</h4>
                     <div className="space-y-3">
-                      {myGroupMembers.filter(m => m.prayerRequest && !m.isAnonymous).map(m => (
+                      {myGroupMembers.filter(m => (m.prayerRequest || m.urgentPrayer) && !m.isAnonymous).map(m => (
                         <div key={m.id} className={cn(
                           "flex gap-3 p-3 rounded-lg border",
                           m.id === myParticipantId 
@@ -973,7 +1006,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="font-medium text-sm text-gray-900 dark:text-white">{m.name}</span>
                               {m.id === myParticipantId && (
                                 <Badge variant="secondary" className="text-xs">我</Badge>
@@ -981,11 +1014,16 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                               {m.prayerCategory && (
                                 <Badge variant="outline" className="text-xs">{m.prayerCategory}</Badge>
                               )}
-                              {m.isUrgent && (
+                              {m.urgentPrayer && (
                                 <Badge variant="destructive" className="text-xs">緊急</Badge>
                               )}
                             </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">{m.prayerRequest}</p>
+                            {m.urgentPrayer && (
+                              <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-wrap break-words mb-1">{m.urgentPrayer}</p>
+                            )}
+                            {m.prayerRequest && (
+                              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">{m.prayerRequest}</p>
+                            )}
                           </div>
                         </div>
                       ))}
