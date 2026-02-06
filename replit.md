@@ -131,7 +131,11 @@ The application is optimized for 500+ concurrent users with:
 The app uses a standardized responsive design pattern across all pages:
 - **Horizontal padding**: `px-3 sm:px-4 md:px-6` — consistent gutters across mobile/tablet/desktop
 - **Content max-widths**: Progressive scaling using `max-w-2xl md:max-w-3xl lg:max-w-4xl` (varies by page)
-- **Bottom navigation**: Touch-optimized with `h-14 sm:h-16` for 44px+ tap targets, icons scale with `sm:w-6 sm:h-6`
+- **Responsive navigation**: 
+  - Mobile (< md): Bottom navigation bar with touch-optimized `h-14 sm:h-16` for 44px+ tap targets
+  - Tablet/Desktop (>= md): Top navigation links in header (logo-left, nav-center, user-right layout), bottom nav hidden via `md:hidden`
+  - Both Header.tsx and Index.tsx (custom header) include the top nav links
+  - Active nav state: `text-primary bg-primary/10`; inactive: `text-muted-foreground`
 - **iPad breakpoint (md:)**: Added throughout for tablet-specific optimizations
 - **Scripture scrollbars**: Always visible using `.scripture-scroll-visible` class with webkit styling
 - **Prayer Meeting containers**: Use `max-w-md md:max-w-lg` for card-style views, `max-w-3xl md:max-w-4xl` for admin/list views
