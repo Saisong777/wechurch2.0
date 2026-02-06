@@ -134,7 +134,7 @@ const ReadingExperiencePage = () => {
     actionPlan: '',
     coolDownNote: '',
   });
-  const [devotionalNoteId, setDevotionalNoteId] = useState<number | null>(null);
+  const [devotionalNoteId, setDevotionalNoteId] = useState<string | null>(null);
 
   const dayStripRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -284,7 +284,7 @@ const ReadingExperiencePage = () => {
       userId: user.id,
       verseReference: currentDayEntry?.scriptureReference || '',
       verseText: allVerses.slice(0, 3).map(v => v.text).join(' ') || '',
-      readingPlanId: parseInt(planId, 10),
+      readingPlanId: planId,
       dayNumber: selectedDay,
       titlePhrase: devotionalForm.titlePhrase || null,
       heartbeatVerse: devotionalForm.heartbeatVerse || null,
