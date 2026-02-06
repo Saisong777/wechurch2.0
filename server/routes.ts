@@ -2607,6 +2607,99 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/user-reading-plans/today-summary", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const claims = (req.user as any).claims || {};
+      const authUserId = claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      let userId = fullUser?.legacyUserId;
+      if (!userId && fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) userId = legacyUser.id;
+      }
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const plans = await storage.getUserReadingPlans(userId);
+      const activePlans = plans.filter(p => p.isActive);
+
+      if (activePlans.length === 0) {
+        return res.json(null);
+      }
+
+      const plan = activePlans[0];
+      const today = new Date();
+      const startDate = new Date(plan.startDate);
+      const diffTime = today.getTime() - startDate.getTime();
+      const dayNumber = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      const items = plan.templateId ? await storage.getReadingPlanItems(plan.templateId) : [];
+      const todayItem = items.find(i => i.dayNumber === dayNumber);
+
+      const progress = await storage.getUserReadingProgress(plan.id);
+      const completedDays = progress.filter(p => p.isCompleted).length;
+      const totalDays = plan.totalDays || items.length || 1;
+
+      if (dayNumber > totalDays) {
+        return res.json(null);
+      }
+
+      let previewVerses: Array<{ verse: number; text: string }> = [];
+      let scriptureRef = todayItem?.scriptureReference || '';
+
+      if (todayItem?.bookName && todayItem?.chapterStart) {
+        try {
+          const verses = await storage.getBibleVerses(todayItem.bookName, todayItem.chapterStart);
+          const startVerse = todayItem.verseStart || 1;
+          const filtered = verses.filter(v => v.verse >= startVerse);
+          previewVerses = filtered.slice(0, 3).map(v => ({
+            verse: v.verse,
+            text: v.text,
+          }));
+        } catch (e) {
+        }
+      }
+
+      if (!scriptureRef && todayItem?.bookName) {
+        scriptureRef = todayItem.bookName;
+        if (todayItem.chapterStart) {
+          scriptureRef += ` ${todayItem.chapterStart}`;
+          if (todayItem.chapterEnd && todayItem.chapterEnd !== todayItem.chapterStart) {
+            scriptureRef += `-${todayItem.chapterEnd}`;
+          }
+        }
+      }
+
+      if (!todayItem && items.length === 0) {
+        const todayProgress = progress.find(p => p.dayNumber === dayNumber);
+        if (todayProgress?.scriptureReference) {
+          scriptureRef = todayProgress.scriptureReference;
+        }
+      }
+
+      res.json({
+        planId: plan.id,
+        planName: plan.name,
+        dayNumber,
+        totalDays,
+        completedDays,
+        isCompleted: false,
+        scriptureReference: scriptureRef,
+        previewVerses,
+        todayCompleted: progress.some(p => p.dayNumber === dayNumber && p.isCompleted),
+      });
+    } catch (error) {
+      console.error('Error fetching today reading summary:', error);
+      res.status(500).json({ error: "Failed to get today's reading summary" });
+    }
+  });
+
   // ============ Personal Reading Plans API Routes ============
   app.get("/api/user-reading-plans", async (req, res) => {
     try {

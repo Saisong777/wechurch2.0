@@ -30,6 +30,8 @@ import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { useQuery } from '@tanstack/react-query';
 import { ClickableVerse } from '@/components/scripture/ClickableVerse';
+import { CheckCircle2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface BlessingVerse {
   verseId: number;
@@ -40,30 +42,17 @@ interface BlessingVerse {
   blessingType: string | null;
 }
 
-interface UserProgress {
+interface TodayReadingSummary {
   planId: string;
-  startDate: string;
-  completedDays: number[];
-  isPaused: boolean;
+  planName: string;
+  dayNumber: number;
+  totalDays: number;
+  completedDays: number;
+  isCompleted: boolean;
+  scriptureReference: string;
+  previewVerses: Array<{ verse: number; text: string }>;
+  todayCompleted: boolean;
 }
-
-interface ReadingPlan {
-  id: string;
-  name: string;
-  description: string | null;
-  durationDays: number;
-}
-
-const READING_PROGRESS_KEY = 'wechurch_reading_progress';
-
-const getStoredReadingProgress = (): Record<string, UserProgress> => {
-  try {
-    const stored = localStorage.getItem(READING_PROGRESS_KEY);
-    return stored ? JSON.parse(stored) : {};
-  } catch {
-    return {};
-  }
-};
 
 const featureConfig = [
   {
@@ -120,28 +109,18 @@ const Index = () => {
   const { profile } = useUserProfile();
   const { isFeatureEnabled, getDisabledMessage, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [readingProgress, setReadingProgress] = useState<Record<string, UserProgress>>({});
-
-  useEffect(() => {
-    setReadingProgress(getStoredReadingProgress());
-  }, []);
 
   const { data: randomVerse } = useQuery<BlessingVerse>({
     queryKey: ['/api/bible/blessing/random'],
     refetchOnWindowFocus: false,
   });
 
-  const { data: readingPlans = [] } = useQuery<ReadingPlan[]>({
-    queryKey: ['/api/reading-plans'],
-    enabled: Object.keys(readingProgress).length > 0,
+  const { data: todaySummary } = useQuery<TodayReadingSummary | null>({
+    queryKey: ['/api/user-reading-plans/today-summary'],
+    enabled: !!user,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
-
-  const activeReadingPlans = readingPlans.filter(plan => {
-    const progress = readingProgress[plan.id];
-    return progress && !progress.isPaused;
-  });
-
-  const hasActiveReadingPlan = activeReadingPlans.length > 0;
   
   useEffect(() => {
     const sessionId = searchParams.get('session');
@@ -287,28 +266,64 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-4 md:py-8">
         <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
-          {hasActiveReadingPlan ? (
-            <Link to="/learn/reading-plans" className="block mb-4 animate-fade-in">
-              <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent hover:shadow-md transition-shadow">
-                <CardContent className="py-3 sm:py-4 px-4 sm:px-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
+          {todaySummary && !todaySummary.isCompleted ? (
+            <Card className="mb-4 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent animate-fade-in" data-testid="card-today-reading">
+              <CardContent className="py-3 sm:py-4 px-4 sm:px-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {todaySummary.todayCompleted ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    ) : (
                       <BookOpen className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">繼續閱讀</p>
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {activeReadingPlans[0].name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        已完成 {readingProgress[activeReadingPlans[0].id]?.completedDays?.length || 0} / {activeReadingPlans[0].durationDays} 天
-                      </p>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs text-muted-foreground">
+                        {todaySummary.todayCompleted ? '今日已完成' : '今日讀經'}
+                      </p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                        第{todaySummary.dayNumber}天 / 共{todaySummary.totalDays}天
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-foreground mt-0.5 truncate" data-testid="text-plan-name">
+                      {todaySummary.planName}
+                    </p>
+                    {todaySummary.scriptureReference && (
+                      <p className="text-xs text-primary/80 mt-0.5" data-testid="text-scripture-ref">
+                        {todaySummary.scriptureReference}
+                      </p>
+                    )}
+                    {todaySummary.previewVerses.length > 0 && (
+                      <div className="mt-2 space-y-1" data-testid="text-preview-verses">
+                        {todaySummary.previewVerses.map((v, i) => (
+                          <p key={i} className="text-xs text-muted-foreground leading-relaxed">
+                            <span className="text-primary/60 mr-1">{v.verse}</span>
+                            {v.text}
+                          </p>
+                        ))}
+                        <p className="text-[10px] text-muted-foreground/60 italic">......</p>
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      <Progress value={todaySummary.totalDays > 0 ? (todaySummary.completedDays / todaySummary.totalDays) * 100 : 0} className="h-1.5" />
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        已完成 {todaySummary.completedDays} / {todaySummary.totalDays} 天
+                      </p>
+                    </div>
+                    <Link
+                      to={`/learn/reading-plans/${todaySummary.planId}/read`}
+                      data-testid="link-continue-reading"
+                    >
+                      <Button size="sm" className="mt-2 gap-1.5">
+                        {todaySummary.todayCompleted ? '查看今日經文' : '繼續閱讀'}
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ) : randomVerse ? (
             <Card className="mb-4 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent animate-fade-in">
               <CardContent className="py-3 sm:py-4 px-4 sm:px-5">
