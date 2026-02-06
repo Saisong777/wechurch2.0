@@ -14,9 +14,10 @@ interface Verse {
 interface ScriptureViewerProps {
   verses: Verse[];
   className?: string;
+  paragraphMode?: boolean;
 }
 
-export const ScriptureViewer = ({ verses, className = '' }: ScriptureViewerProps) => {
+export const ScriptureViewer = ({ verses, className = '', paragraphMode = false }: ScriptureViewerProps) => {
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -163,39 +164,76 @@ export const ScriptureViewer = ({ verses, className = '' }: ScriptureViewerProps
         copied={copied}
       />
 
-      <div className="space-y-1">
-        {verses.map((v) => {
-          const key = getVerseKey(v);
-          const isSelected = selectedVerses.has(key);
-          return (
-            <div
-              key={key}
-              ref={(el) => {
-                if (el) verseRefs.current.set(key, el);
-                else verseRefs.current.delete(key);
-              }}
-              className={`flex gap-2 p-2 rounded cursor-pointer transition-colors select-none ${
-                isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50 active:bg-muted'
-              }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                toggleVerseSelection(v);
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-              }}
-              role="button"
-              tabIndex={0}
-              data-testid={`verse-${v.chapter}-${v.verse}`}
-            >
-              {isSelected && <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />}
-              <span className="text-primary font-medium min-w-[1.5rem]">{v.verse}</span>
-              <span className="text-sm leading-relaxed">{v.text}</span>
-            </div>
-          );
-        })}
-      </div>
+      {paragraphMode ? (
+        <div className="text-sm leading-relaxed">
+          {verses.map((v) => {
+            const key = getVerseKey(v);
+            const isSelected = selectedVerses.has(key);
+            return (
+              <span key={key}>
+                <span
+                  ref={(el) => {
+                    if (el) verseRefs.current.set(key, el as unknown as HTMLDivElement);
+                    else verseRefs.current.delete(key);
+                  }}
+                  className={`cursor-pointer transition-colors select-none rounded-sm ${
+                    isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    toggleVerseSelection(v);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  data-testid={`verse-${v.chapter}-${v.verse}`}
+                >
+                  <sup className="text-primary/60 font-medium text-[10px] mr-0.5">{v.verse}</sup>
+                  {v.text}
+                </span>
+                {' '}
+              </span>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {verses.map((v) => {
+            const key = getVerseKey(v);
+            const isSelected = selectedVerses.has(key);
+            return (
+              <div
+                key={key}
+                ref={(el) => {
+                  if (el) verseRefs.current.set(key, el);
+                  else verseRefs.current.delete(key);
+                }}
+                className={`flex gap-2 p-2 rounded cursor-pointer transition-colors select-none ${
+                  isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50 active:bg-muted'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  toggleVerseSelection(v);
+                }}
+                onTouchEnd={(e) => {
+                  e.stopPropagation();
+                }}
+                role="button"
+                tabIndex={0}
+                data-testid={`verse-${v.chapter}-${v.verse}`}
+              >
+                {isSelected && <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />}
+                <span className="text-primary font-medium min-w-[1.5rem]">{v.verse}</span>
+                <span className="text-sm leading-relaxed">{v.text}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <ScriptureCardCreator
         open={showCardModal}

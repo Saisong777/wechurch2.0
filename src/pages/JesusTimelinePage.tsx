@@ -1,12 +1,10 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Header } from '@/components/layout/Header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronDown, ChevronUp, BookOpen, FileText, Quote } from 'lucide-react';
+import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText } from 'lucide-react';
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
 import { FeatureGate } from '@/components/ui/feature-gate';
 
@@ -48,98 +46,98 @@ interface ScriptureData {
 }
 
 const seasonConfig: Record<string, {
-  english: string;
+  buttonLabel: string;
   subtitle: string;
   icon: typeof FileText;
-  bgColor: string;
   textColor: string;
   badgeBg: string;
   borderColor: string;
   headerBg: string;
+  buttonSelectedBg: string;
+  buttonSelectedText: string;
+  buttonOutlineColor: string;
 }> = {
   '後設': {
-    english: 'Postlude',
+    buttonLabel: '前後言',
     subtitle: '前後言',
     icon: FileText,
-    bgColor: 'bg-gray-100 dark:bg-gray-800/40',
-    textColor: 'text-gray-600 dark:text-gray-400',
-    badgeBg: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
-    borderColor: 'border-gray-300 dark:border-gray-600',
-    headerBg: 'bg-gray-50 dark:bg-gray-900/50',
+    textColor: 'text-slate-600 dark:text-slate-400',
+    badgeBg: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
+    borderColor: 'border-slate-300 dark:border-slate-600',
+    headerBg: 'bg-slate-50 dark:bg-slate-900/50',
+    buttonSelectedBg: 'bg-slate-600 dark:bg-slate-500',
+    buttonSelectedText: 'text-white',
+    buttonOutlineColor: 'border-slate-400 text-slate-600 dark:border-slate-500 dark:text-slate-400',
   },
   '春': {
-    english: 'Spring',
+    buttonLabel: '春',
     subtitle: '預備期',
     icon: Sprout,
-    bgColor: 'bg-green-50 dark:bg-green-950/30',
     textColor: 'text-green-600 dark:text-green-400',
     badgeBg: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
     borderColor: 'border-green-300 dark:border-green-700',
     headerBg: 'bg-green-50 dark:bg-green-950/40',
+    buttonSelectedBg: 'bg-green-600 dark:bg-green-600',
+    buttonSelectedText: 'text-white',
+    buttonOutlineColor: 'border-green-400 text-green-600 dark:border-green-500 dark:text-green-400',
   },
   '夏': {
-    english: 'Summer',
+    buttonLabel: '夏',
     subtitle: '事工高峰',
     icon: Sun,
-    bgColor: 'bg-amber-50 dark:bg-amber-950/30',
     textColor: 'text-amber-600 dark:text-amber-400',
     badgeBg: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
     borderColor: 'border-amber-300 dark:border-amber-700',
     headerBg: 'bg-amber-50 dark:bg-amber-950/40',
+    buttonSelectedBg: 'bg-amber-600 dark:bg-amber-600',
+    buttonSelectedText: 'text-white',
+    buttonOutlineColor: 'border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400',
   },
   '秋': {
-    english: 'Autumn',
+    buttonLabel: '秋',
     subtitle: '轉折衝突',
     icon: Leaf,
-    bgColor: 'bg-orange-50 dark:bg-orange-950/30',
     textColor: 'text-orange-600 dark:text-orange-400',
     badgeBg: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
     borderColor: 'border-orange-300 dark:border-orange-700',
     headerBg: 'bg-orange-50 dark:bg-orange-950/40',
+    buttonSelectedBg: 'bg-orange-600 dark:bg-orange-600',
+    buttonSelectedText: 'text-white',
+    buttonOutlineColor: 'border-orange-400 text-orange-600 dark:border-orange-500 dark:text-orange-400',
   },
   '冬': {
-    english: 'Winter',
+    buttonLabel: '冬',
     subtitle: '受難復活',
     icon: Snowflake,
-    bgColor: 'bg-blue-50 dark:bg-blue-950/30',
     textColor: 'text-blue-600 dark:text-blue-400',
     badgeBg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
     borderColor: 'border-blue-300 dark:border-blue-700',
     headerBg: 'bg-blue-50 dark:bg-blue-950/40',
+    buttonSelectedBg: 'bg-blue-600 dark:bg-blue-600',
+    buttonSelectedText: 'text-white',
+    buttonOutlineColor: 'border-blue-400 text-blue-600 dark:border-blue-500 dark:text-blue-400',
   },
 };
 
 const seasonOrder = ['後設', '春', '夏', '秋', '冬'];
 
 const gospelKeys = [
-  { field: 'scriptureMt' as const, abbr: '太', fullName: '馬太福音', label: 'Mt' },
-  { field: 'scriptureMk' as const, abbr: '可', fullName: '馬可福音', label: 'Mk' },
-  { field: 'scriptureLk' as const, abbr: '路', fullName: '路加福音', label: 'Lk' },
-  { field: 'scriptureJn' as const, abbr: '約', fullName: '約翰福音', label: 'Jn' },
+  { field: 'scriptureMt' as const, abbr: '太', fullName: '馬太福音', label: 'Mt', color: 'border-blue-400 text-blue-600 dark:border-blue-500 dark:text-blue-400', selectedBg: 'bg-blue-600 dark:bg-blue-600 text-white border-blue-600' },
+  { field: 'scriptureMk' as const, abbr: '可', fullName: '馬可福音', label: 'Mk', color: 'border-green-400 text-green-600 dark:border-green-500 dark:text-green-400', selectedBg: 'bg-green-600 dark:bg-green-600 text-white border-green-600' },
+  { field: 'scriptureLk' as const, abbr: '路', fullName: '路加福音', label: 'Lk', color: 'border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400', selectedBg: 'bg-amber-600 dark:bg-amber-600 text-white border-amber-600' },
+  { field: 'scriptureJn' as const, abbr: '約', fullName: '約翰福音', label: 'Jn', color: 'border-purple-400 text-purple-600 dark:border-purple-500 dark:text-purple-400', selectedBg: 'bg-purple-600 dark:bg-purple-600 text-white border-purple-600' },
 ];
 
-function extractQuote(gospelCenter: string | null): string | null {
-  if (!gospelCenter) return null;
-  const lastIdx = gospelCenter.lastIndexOf('】');
-  if (lastIdx !== -1) {
-    const quote = gospelCenter.substring(lastIdx + 1).trim();
-    return quote || null;
-  }
-  return gospelCenter.trim() || null;
-}
+const gospelIndicatorColors: Record<string, { active: string; inactive: string }> = {
+  '太': { active: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400', inactive: 'bg-muted text-muted-foreground/30' },
+  '可': { active: 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400', inactive: 'bg-muted text-muted-foreground/30' },
+  '路': { active: 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400', inactive: 'bg-muted text-muted-foreground/30' },
+  '約': { active: 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400', inactive: 'bg-muted text-muted-foreground/30' },
+};
 
 function getExclusiveGospel(event: JesusEvent): string | null {
   const present = gospelKeys.filter(g => event[g.field]);
   if (present.length === 1) return present[0].abbr;
-  return null;
-}
-
-function getFirstScriptureRef(event: JesusEvent): { fullName: string; label: string; ref: string } | null {
-  for (const g of gospelKeys) {
-    if (event[g.field]) {
-      return { fullName: g.fullName, label: g.label, ref: event[g.field]! };
-    }
-  }
   return null;
 }
 
@@ -179,24 +177,22 @@ const ScriptureDisplay = ({ reference, gospelName }: { reference: string; gospel
         <Book className="w-4 h-4" />
         {gospelName} {data.chapter} 章
       </h6>
-      <ScriptureViewer verses={formattedVerses} />
+      <ScriptureViewer verses={formattedVerses} paragraphMode />
     </div>
   );
 };
 
 const EventCard = ({
   event,
-  isExpanded,
+  isCollapsed,
   onToggle,
 }: {
   event: JesusEvent;
-  isExpanded: boolean;
+  isCollapsed: boolean;
   onToggle: () => void;
 }) => {
   const cfg = seasonConfig[event.season] || seasonConfig['春'];
   const exclusive = getExclusiveGospel(event);
-  const quote = extractQuote(event.gospelCenter);
-  const firstRef = getFirstScriptureRef(event);
 
   const gospelScriptures = gospelKeys
     .filter(g => event[g.field])
@@ -225,7 +221,7 @@ const EventCard = ({
                 className={`${cfg.badgeBg} border-0 text-[10px] sm:text-xs no-default-hover-elevate no-default-active-elevate`}
                 data-testid={`season-badge-${event.id}`}
               >
-                {cfg.english}
+                {cfg.buttonLabel}
               </Badge>
               {exclusive && (
                 <Badge
@@ -263,13 +259,12 @@ const EventCard = ({
             <div className="flex items-center gap-1 mb-2" data-testid={`gospel-indicators-${event.id}`}>
               {gospelKeys.map(g => {
                 const hasScripture = !!event[g.field];
+                const colors = gospelIndicatorColors[g.abbr];
                 return (
                   <span
                     key={g.field}
                     className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-bold transition-colors ${
-                      hasScripture
-                        ? 'bg-primary/10 dark:bg-primary/20 text-primary'
-                        : 'bg-muted text-muted-foreground/30'
+                      hasScripture ? colors.active : colors.inactive
                     }`}
                     data-testid={`gospel-${g.abbr}-${event.id}`}
                   >
@@ -279,49 +274,23 @@ const EventCard = ({
               })}
             </div>
 
-            {event.theologicalTheme && (
-              <div className="mb-2">
-                <Badge
-                  variant="outline"
-                  className="text-[10px] sm:text-xs no-default-hover-elevate no-default-active-elevate"
-                  data-testid={`theme-${event.id}`}
-                >
-                  {event.theologicalTheme}
-                </Badge>
-              </div>
-            )}
-
-            {quote && (
-              <blockquote
-                className="border-l-2 border-muted-foreground/20 pl-3 my-2 text-sm text-muted-foreground italic leading-relaxed line-clamp-3"
-                data-testid={`quote-${event.id}`}
+            {isCollapsed && gospelScriptures.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle();
+                }}
+                className="mt-1 gap-1 text-xs text-muted-foreground"
+                data-testid={`button-expand-${event.id}`}
               >
-                {quote}
-              </blockquote>
+                <Book className="w-3.5 h-3.5" />
+                展開經文
+              </Button>
             )}
 
-            {firstRef && (
-              <p className="text-xs text-muted-foreground mt-2" data-testid={`scripture-ref-${event.id}`}>
-                {firstRef.fullName} {firstRef.ref.replace(/^(Mt|Mk|Lk|Jn)\s*/i, '')}
-              </p>
-            )}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle();
-              }}
-              className="mt-2 gap-1 text-xs text-muted-foreground"
-              data-testid={`button-expand-${event.id}`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              {isExpanded ? '收起經文' : '展開經文'}
-              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </Button>
-
-            {isExpanded && gospelScriptures.length > 0 && (
+            {!isCollapsed && gospelScriptures.length > 0 && (
               <div
                 className="mt-3 pt-3 border-t border-border space-y-3"
                 onClick={(e) => e.stopPropagation()}
@@ -341,6 +310,19 @@ const EventCard = ({
                     </div>
                   );
                 })}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggle();
+                  }}
+                  className="gap-1 text-xs text-muted-foreground"
+                  data-testid={`button-collapse-${event.id}`}
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  收起經文
+                </Button>
               </div>
             )}
           </div>
@@ -353,7 +335,7 @@ const EventCard = ({
 const JesusTimelinePage = () => {
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
   const [selectedGospel, setSelectedGospel] = useState<string | null>(null);
-  const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
+  const [collapsedEvents, setCollapsedEvents] = useState<Set<number>>(new Set());
 
   const { data: allEvents = [], isLoading, isError } = useQuery<JesusEvent[]>({
     queryKey: ['/api/jesus/timeline'],
@@ -364,8 +346,8 @@ const JesusTimelinePage = () => {
     },
   });
 
-  const toggleExpand = (eventId: number) => {
-    setExpandedEvents(prev => {
+  const toggleCollapse = (eventId: number) => {
+    setCollapsedEvents(prev => {
       const next = new Set(prev);
       if (next.has(eventId)) next.delete(eventId);
       else next.add(eventId);
@@ -418,8 +400,6 @@ const JesusTimelinePage = () => {
       description="耶穌四季功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background flex flex-col">
-        <Header title="耶穌四季" subtitle="Gospel Harmony" variant="compact" />
-
         <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
           <div className="max-w-3xl mx-auto w-full flex flex-col flex-1">
             <Card className="mb-4">
@@ -441,15 +421,18 @@ const JesusTimelinePage = () => {
                   {gospelKeys.map(g => {
                     const isSelected = selectedGospel === g.abbr;
                     return (
-                      <Button
+                      <button
                         key={g.abbr}
-                        variant={isSelected ? 'default' : 'outline'}
-                        size="sm"
                         onClick={() => handleGospelClick(g.abbr)}
+                        className={`inline-flex items-center justify-center rounded-md text-sm font-medium min-h-8 px-3 border transition-colors ${
+                          isSelected
+                            ? g.selectedBg
+                            : g.color
+                        }`}
                         data-testid={`button-gospel-${g.abbr}`}
                       >
                         {g.abbr}
-                      </Button>
+                      </button>
                     );
                   })}
                 </div>
@@ -461,17 +444,19 @@ const JesusTimelinePage = () => {
                     const SeasonIcon = cfg.icon;
                     const isSelected = selectedSeason === season;
                     return (
-                      <Button
+                      <button
                         key={season}
-                        variant={isSelected ? 'default' : 'outline'}
-                        size="sm"
                         onClick={() => handleSeasonClick(season)}
-                        className="gap-1"
+                        className={`inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium min-h-8 px-3 border transition-colors ${
+                          isSelected
+                            ? `${cfg.buttonSelectedBg} ${cfg.buttonSelectedText} border-transparent`
+                            : cfg.buttonOutlineColor
+                        }`}
                         data-testid={`button-season-${season}`}
                       >
                         <SeasonIcon className="w-3.5 h-3.5" />
-                        {cfg.english}
-                      </Button>
+                        {cfg.buttonLabel}
+                      </button>
                     );
                   })}
                   {(selectedSeason || selectedGospel) && (
@@ -501,7 +486,7 @@ const JesusTimelinePage = () => {
             ) : filteredEvents.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground text-sm">沒有找到事件</div>
             ) : (
-              <ScrollArea className="flex-1 h-[calc(100vh-240px)] sm:h-[calc(100vh-280px)]">
+              <ScrollArea className="flex-1 h-[calc(100vh-200px)] sm:h-[calc(100vh-240px)]">
                 <div className="space-y-6 pr-2 sm:pr-4 pb-8">
                   {groupedBySeason.map(({ season, events }) => {
                     const cfg = seasonConfig[season];
@@ -513,7 +498,7 @@ const JesusTimelinePage = () => {
                         >
                           <SeasonIcon className={`w-4 h-4 ${cfg.textColor}`} />
                           <h3 className={`text-sm sm:text-base font-semibold ${cfg.textColor}`}>
-                            {cfg.english}
+                            {cfg.buttonLabel}
                             <span className="text-muted-foreground font-normal">
                               {' / '}
                               {cfg.subtitle}
@@ -529,8 +514,8 @@ const JesusTimelinePage = () => {
                             <EventCard
                               key={event.id}
                               event={event}
-                              isExpanded={expandedEvents.has(event.id)}
-                              onToggle={() => toggleExpand(event.id)}
+                              isCollapsed={collapsedEvents.has(event.id)}
+                              onToggle={() => toggleCollapse(event.id)}
                             />
                           ))}
                         </div>
