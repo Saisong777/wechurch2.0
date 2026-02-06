@@ -4,9 +4,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type } from 'lucide-react';
-/* ScrollArea removed to allow natural page scrolling on mobile */
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
 import { FeatureGate } from '@/components/ui/feature-gate';
+import { Header } from '@/components/layout/Header';
 
 interface JesusEvent {
   id: number;
@@ -485,6 +485,7 @@ const JesusTimelinePage = () => {
       description="耶穌四季功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background flex flex-col">
+        <Header variant="compact" title="耶穌四季" />
         <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 overflow-y-auto">
           <div className="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-4 pb-8">
             <Card>
