@@ -50,55 +50,58 @@ export const FloatingToolbar = ({
       className="fixed bottom-0 left-0 right-0 z-[9999] bg-background border-t border-border shadow-lg p-2 pb-safe animate-in slide-in-from-bottom duration-200"
       data-testid="floating-toolbar"
     >
-      <div className="flex items-center justify-center gap-2">
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          已選 {selectedCount} 節
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+          {selectedCount}節
         </span>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="gap-1.5"
-          onClick={onCopy}
-          data-testid="button-toolbar-copy"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-          <span className="text-xs">複製</span>
-        </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="gap-1.5"
-          onClick={onShare}
-          data-testid="button-toolbar-share"
-        >
-          <Share2 className="w-3.5 h-3.5" />
-          <span className="text-xs">分享</span>
-        </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="gap-1.5"
-          onClick={onCreateCard}
-          data-testid="button-toolbar-card"
-        >
-          <Image className="w-3.5 h-3.5" />
-          <span className="text-xs">圖卡</span>
-        </Button>
-        {onNote && (
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={onNote} data-testid="button-toolbar-note">
-            <BookMarked className="w-3.5 h-3.5" />
-            <span className="text-xs">筆記</span>
+        <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1 shrink-0"
+            onClick={onCopy}
+            data-testid="button-toolbar-copy"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+            <span className="text-xs">複製</span>
           </Button>
-        )}
-        {onRead && (
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={onRead} data-testid="button-toolbar-read">
-            <Volume2 className="w-3.5 h-3.5" />
-            <span className="text-xs">朗讀</span>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1 shrink-0"
+            onClick={onShare}
+            data-testid="button-toolbar-share"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="text-xs">分享</span>
           </Button>
-        )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1 shrink-0"
+            onClick={onCreateCard}
+            data-testid="button-toolbar-card"
+          >
+            <Image className="w-3.5 h-3.5" />
+            <span className="text-xs">圖卡</span>
+          </Button>
+          {onNote && (
+            <Button variant="outline" size="sm" className="gap-1 shrink-0" onClick={onNote} data-testid="button-toolbar-note">
+              <BookMarked className="w-3.5 h-3.5" />
+              <span className="text-xs">筆記</span>
+            </Button>
+          )}
+          {onRead && (
+            <Button variant="outline" size="sm" className="gap-1 shrink-0" onClick={onRead} data-testid="button-toolbar-read">
+              <Volume2 className="w-3.5 h-3.5" />
+              <span className="text-xs">朗讀</span>
+            </Button>
+          )}
+        </div>
         <Button 
           variant="ghost" 
           size="icon"
+          className="shrink-0"
           onClick={onClear}
           data-testid="button-toolbar-clear"
         >

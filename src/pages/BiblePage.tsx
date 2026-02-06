@@ -50,7 +50,6 @@ const BiblePage = () => {
   const [selectedVerseNums, setSelectedVerseNums] = useState<Set<number>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
   const [showNoteDialog, setShowNoteDialog] = useState(false);
-  const [showTTS, setShowTTS] = useState(false);
   const [copied, setCopied] = useState(false);
   const verseRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const { toast } = useToast();
@@ -468,20 +467,21 @@ const BiblePage = () => {
               <CardContent className="py-2 sm:py-4 flex-1 flex flex-col">
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-2 sm:mb-4">
                   <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
-                  <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm">
-                    返回
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <ScriptureTTS
+                      text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
+                      compact
+                      label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
+                    />
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm">
+                      返回
+                    </Button>
+                  </div>
                 </div>
                 
                 <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4">
                   點擊經文可選取，已選 {selectedVerseNums.size} 節
                 </p>
-                
-                {showTTS && selectedVerseNums.size > 0 && (
-                  <div className="mb-3 p-2 bg-muted/30 rounded-lg">
-                    <ScriptureTTS text={getSelectedVerses().map(v => v.text).join(' ')} />
-                  </div>
-                )}
 
                 {versesLoading ? (
                   <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">載入中...</div>
@@ -629,7 +629,6 @@ const BiblePage = () => {
           onClear={() => setSelectedVerseNums(new Set())}
           copied={copied}
           onNote={() => setShowNoteDialog(true)}
-          onRead={() => setShowTTS(prev => !prev)}
         />
       )}
 

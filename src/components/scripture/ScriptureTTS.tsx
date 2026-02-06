@@ -8,12 +8,63 @@ interface ScriptureTTSProps {
   text: string;
   className?: string;
   compact?: boolean;
+  label?: string;
 }
 
 type TtsState = 'idle' | 'playing' | 'paused';
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5];
 const VOICE_STORAGE_KEY = 'wechurch-tts-voice';
+
+const MALE_VOICE_PATTERNS = [
+  /male/i,
+  /男/,
+  /Yunxi/i,
+  /Yunyang/i,
+  /Yunjian/i,
+  /Yunhao/i,
+  /Yunfeng/i,
+  /Yunze/i,
+  /Yunxia/i,
+  /YunJhe/i,
+  /Zhiyu/i,
+  /Kangkang/i,
+  /Hanhan/i,
+];
+
+const FEMALE_VOICE_PATTERNS = [
+  /female/i,
+  /女/,
+  /Xiaoxiao/i,
+  /Xiaoyi/i,
+  /Xiaomeng/i,
+  /Xiaobei/i,
+  /Xiaoni/i,
+  /Xiaoxuan/i,
+  /Xiaoshuang/i,
+  /Xiaomo/i,
+  /Xiaorui/i,
+  /Xiaohan/i,
+  /Xiaoqiu/i,
+  /Xiaoyan/i,
+  /Xiaozhen/i,
+  /HsiaoChen/i,
+  /HsiaoYu/i,
+  /Yating/i,
+  /Hanhan/i,
+  /Liang/i,
+  /Huihui/i,
+  /Yaoyao/i,
+  /Tingting/i,
+  /Meijia/i,
+];
+
+function detectGender(voice: SpeechSynthesisVoice): 'male' | 'female' | 'unknown' {
+  const nameAndLang = voice.name + ' ' + voice.voiceURI;
+  if (MALE_VOICE_PATTERNS.some(p => p.test(nameAndLang))) return 'male';
+  if (FEMALE_VOICE_PATTERNS.some(p => p.test(nameAndLang))) return 'female';
+  return 'unknown';
+}
 
 function shortenVoiceName(name: string): string {
   return name
@@ -24,7 +75,14 @@ function shortenVoiceName(name: string): string {
     .trim();
 }
 
-export function ScriptureTTS({ text, className, compact = false }: ScriptureTTSProps) {
+function getVoiceLabel(voice: SpeechSynthesisVoice): string {
+  const shortName = shortenVoiceName(voice.name);
+  const gender = detectGender(voice);
+  const genderTag = gender === 'male' ? ' [男聲]' : gender === 'female' ? ' [女聲]' : '';
+  return shortName + genderTag;
+}
+
+export function ScriptureTTS({ text, className, compact = false, label }: ScriptureTTSProps) {
   const [ttsState, setTtsState] = useState<TtsState>('idle');
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
@@ -37,17 +95,25 @@ export function ScriptureTTS({ text, className, compact = false }: ScriptureTTSP
   const loadVoices = useCallback(() => {
     const allVoices = window.speechSynthesis.getVoices();
     const chineseVoices = allVoices.filter(v => v.lang.startsWith('zh'));
-    setVoices(chineseVoices);
+    const sorted = [...chineseVoices].sort((a, b) => {
+      const gA = detectGender(a);
+      const gB = detectGender(b);
+      if (gA === 'male' && gB !== 'male') return -1;
+      if (gA !== 'male' && gB === 'male') return 1;
+      const twA = a.lang.startsWith('zh-TW') ? 0 : 1;
+      const twB = b.lang.startsWith('zh-TW') ? 0 : 1;
+      return twA - twB;
+    });
+    setVoices(sorted);
 
-    if (chineseVoices.length > 0) {
+    if (sorted.length > 0) {
       const stored = localStorage.getItem(VOICE_STORAGE_KEY);
-      const storedVoice = stored ? chineseVoices.find(v => v.voiceURI === stored) : null;
+      const storedVoice = stored ? sorted.find(v => v.voiceURI === stored) : null;
 
       if (storedVoice) {
         setSelectedVoiceURI(storedVoice.voiceURI);
       } else {
-        const twVoice = chineseVoices.find(v => v.lang.startsWith('zh-TW'));
-        const defaultVoice = twVoice || chineseVoices[0];
+        const defaultVoice = sorted[0];
         setSelectedVoiceURI(defaultVoice.voiceURI);
         localStorage.setItem(VOICE_STORAGE_KEY, defaultVoice.voiceURI);
       }
@@ -212,7 +278,7 @@ export function ScriptureTTS({ text, className, compact = false }: ScriptureTTSP
             <SelectContent>
               {voices.map(v => (
                 <SelectItem key={v.voiceURI} value={v.voiceURI} data-testid={`option-voice-${v.voiceURI}`}>
-                  {shortenVoiceName(v.name)}
+                  {getVoiceLabel(v)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -229,18 +295,31 @@ export function ScriptureTTS({ text, className, compact = false }: ScriptureTTSP
   if (compact) {
     return (
       <div className={cn('relative inline-block', className)} ref={panelRef}>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => setPanelOpen(prev => !prev)}
-          data-testid="button-tts-compact-toggle"
-        >
-          {ttsState === 'playing' ? (
-            <Volume2 className="w-4 h-4 text-primary" />
-          ) : (
-            <Volume2 className="w-4 h-4" />
-          )}
-        </Button>
+        {label ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setPanelOpen(prev => !prev)}
+            data-testid="button-tts-compact-toggle"
+          >
+            <Volume2 className={cn('w-3.5 h-3.5', ttsState === 'playing' && 'text-primary')} />
+            <span className="text-xs">{label}</span>
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setPanelOpen(prev => !prev)}
+            data-testid="button-tts-compact-toggle"
+          >
+            {ttsState === 'playing' ? (
+              <Volume2 className="w-4 h-4 text-primary" />
+            ) : (
+              <Volume2 className="w-4 h-4" />
+            )}
+          </Button>
+        )}
         {panelOpen && (
           <div className="absolute right-0 top-full mt-1 z-50 rounded-md border bg-popover p-3 shadow-md min-w-[200px]">
             {controls}
@@ -295,7 +374,7 @@ export function ScriptureTTS({ text, className, compact = false }: ScriptureTTSP
           <SelectContent>
             {voices.map(v => (
               <SelectItem key={v.voiceURI} value={v.voiceURI} data-testid={`option-voice-${v.voiceURI}`}>
-                {shortenVoiceName(v.name)}
+                {getVoiceLabel(v)}
               </SelectItem>
             ))}
           </SelectContent>

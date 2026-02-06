@@ -205,6 +205,7 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference:
           <ScriptureTTS
             text={data.verses.map((v: any) => v.text).join(' ')}
             compact
+            label="朗讀經文"
           />
         </div>
       )}
