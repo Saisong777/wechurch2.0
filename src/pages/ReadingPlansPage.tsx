@@ -176,8 +176,8 @@ const ReadingPlansPage = () => {
     <div className="min-h-screen bg-background">
       <Header title="讀經計劃" subtitle="每日靈修" variant="compact" />
       
-      <main className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
-        <div className="max-w-3xl mx-auto">
+      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+        <div className="max-w-3xl lg:max-w-4xl mx-auto">
           {selectedPlan ? (
             <div>
               <div className="flex items-center justify-between mb-4">

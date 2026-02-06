@@ -72,7 +72,7 @@ export const PrayerWall: React.FC = () => {
   const totalAmens = prayers?.reduce((sum, p) => sum + p.amenCount, 0) || 0;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 px-4 sm:px-0">
+    <div className="max-w-2xl md:max-w-3xl mx-auto space-y-6 px-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

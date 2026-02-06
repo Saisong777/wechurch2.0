@@ -21,10 +21,10 @@ export const IcebreakerPage: React.FC = () => {
     >
       <div className="min-h-screen bg-background">
         <Header variant="compact" />
-        <main className="container mx-auto pb-8">
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 pb-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex justify-center px-4 pt-4">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+            <div className="flex justify-center px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
+              <TabsList className="grid w-full max-w-md md:max-w-lg grid-cols-2">
                 <TabsTrigger value="icebreaker" className="flex items-center gap-2" data-testid="tab-icebreaker" disabled={!icebreakerEnabled}>
                   <Dumbbell className="w-4 h-4" />
                   破冰遊戲

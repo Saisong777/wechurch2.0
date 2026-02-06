@@ -398,7 +398,7 @@ export const UserPage: React.FC = () => {
       case 'enter-session':
         const storedEmail = localStorage.getItem('bible_study_guest_email');
         return (
-          <div className="w-full max-w-md mx-auto px-4 sm:px-4 py-6 sm:py-8 animate-fade-in">
+          <div className="w-full max-w-md md:max-w-lg mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8 animate-fade-in">
             {/* Back to Home Button */}
             <Button variant="ghost" size="sm" asChild className="mb-4">
               <Link to="/" className="gap-2">
@@ -500,7 +500,7 @@ export const UserPage: React.FC = () => {
       case 'notebook':
         const notebookEmail = localStorage.getItem('bible_study_guest_email') || '';
         return (
-          <div className="w-full max-w-2xl mx-auto px-4 py-6 sm:py-8 animate-fade-in">
+          <div className="w-full max-w-2xl md:max-w-3xl mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8 animate-fade-in">
             <div className="mb-4">
               <Button
                 variant="ghost"
@@ -606,7 +606,7 @@ export const UserPage: React.FC = () => {
         // Safety net: if step is corrupted (e.g., multiple test accounts on same device),
         // show a recoverable UI instead of a blank screen.
         return (
-          <div className="w-full max-w-md mx-auto px-4 py-10 animate-fade-in">
+          <div className="w-full max-w-md md:max-w-lg mx-auto px-3 sm:px-4 md:px-6 py-10 animate-fade-in">
             <Card variant="highlight" className="border-2">
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">畫面狀態已失效</CardTitle>
@@ -654,7 +654,7 @@ export const UserPage: React.FC = () => {
     >
       <div className="min-h-screen bg-background">
         <Header variant={step === 'landing' ? 'default' : 'compact'} />
-        <main className="container mx-auto pb-8">
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 pb-8">
           {renderStep()}
         </main>
       </div>

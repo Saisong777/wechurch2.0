@@ -26,7 +26,7 @@ const NotebookPage = () => {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <main className="container mx-auto px-4 py-12">
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-8 sm:py-12">
           <div className="flex items-center justify-center min-h-[60vh]">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
@@ -43,8 +43,8 @@ const NotebookPage = () => {
     >
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
+      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+        <div className="max-w-2xl md:max-w-3xl mx-auto">
           <MyNotebook userEmail={userEmail} />
         </div>
       </main>

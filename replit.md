@@ -127,6 +127,15 @@ The application is optimized for 500+ concurrent users with:
 - **In-memory caching**: Bible data and timeline events cached for 1 hour
 - **Health monitoring endpoints**: `/api/health`, `/api/health/detailed`, `/api/health/db`
 
+### Responsive Design System
+The app uses a standardized responsive design pattern across all pages:
+- **Horizontal padding**: `px-3 sm:px-4 md:px-6` — consistent gutters across mobile/tablet/desktop
+- **Content max-widths**: Progressive scaling using `max-w-2xl md:max-w-3xl lg:max-w-4xl` (varies by page)
+- **Bottom navigation**: Touch-optimized with `h-14 sm:h-16` for 44px+ tap targets, icons scale with `sm:w-6 sm:h-6`
+- **iPad breakpoint (md:)**: Added throughout for tablet-specific optimizations
+- **Scripture scrollbars**: Always visible using `.scripture-scroll-visible` class with webkit styling
+- **Prayer Meeting containers**: Use `max-w-md md:max-w-lg` for card-style views, `max-w-3xl md:max-w-4xl` for admin/list views
+
 ### Directory Structure
 ```
 ├── server/              # Express backend

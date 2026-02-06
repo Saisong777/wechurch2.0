@@ -170,7 +170,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
-      <header className="w-full py-3 px-4">
+      <header className="w-full py-3 sm:py-4 px-4 sm:px-6">
         <div className="container mx-auto flex items-center justify-between">
           <div className="w-10" />
           
@@ -245,11 +245,11 @@ const Index = () => {
       </header>
       
       <main className="container mx-auto px-4 py-4 md:py-8">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto">
           {hasActiveReadingPlan ? (
             <Link to="/learn/reading-plans" className="block mb-4 animate-fade-in">
               <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent hover:shadow-md transition-shadow">
-                <CardContent className="py-3 px-4">
+                <CardContent className="py-3 sm:py-4 px-4 sm:px-5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
                       <BookOpen className="w-5 h-5 text-primary" />
@@ -270,7 +270,7 @@ const Index = () => {
             </Link>
           ) : randomVerse ? (
             <Card className="mb-4 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent animate-fade-in">
-              <CardContent className="py-3 px-4">
+              <CardContent className="py-3 sm:py-4 px-4 sm:px-5">
                 <div className="flex items-start gap-2">
                   <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -285,7 +285,7 @@ const Index = () => {
             </Card>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-2 animate-fade-in" style={{ animationDelay: '100ms' }}>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 animate-fade-in" style={{ animationDelay: '100ms' }}>
             {featureConfig.map((feature) => {
               const Icon = feature.icon;
               const isEnabled = isFeatureEnabled(feature.featureKey);
@@ -297,16 +297,16 @@ const Index = () => {
                     ? 'opacity-60 border-muted border-dashed cursor-not-allowed' 
                     : `${feature.hoverBorder} hover:shadow-md cursor-pointer`
                 }`}>
-                  <CardContent className="p-3">
+                  <CardContent className="p-3 sm:p-4">
                     <div className="flex items-center gap-2">
-                      <div className={`w-9 h-9 rounded-lg ${feature.bgColor} flex items-center justify-center flex-shrink-0`}>
-                        <Icon className={`w-4 h-4 ${feature.iconColor}`} />
+                      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-lg ${feature.bgColor} flex items-center justify-center flex-shrink-0`}>
+                        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${feature.iconColor}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-foreground truncate">
+                        <h3 className="text-sm sm:text-base font-semibold text-foreground truncate">
                           {feature.title}
                         </h3>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
                           {feature.subtitle}
                         </p>
                       </div>
@@ -349,7 +349,7 @@ const Index = () => {
       </main>
 
       <footer className="w-full py-4 px-4 mt-auto border-t border-border/50">
-        <div className="container mx-auto max-w-2xl">
+        <div className="container mx-auto max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Home className="w-3 h-3 text-primary" />

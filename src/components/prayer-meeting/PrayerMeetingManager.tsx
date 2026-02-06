@@ -442,8 +442,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
   if (viewMode === 'home') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 p-4">
-        <div className="max-w-md mx-auto pt-8">
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 px-3 sm:px-4 md:px-6 py-4">
+        <div className="max-w-md md:max-w-lg mx-auto pt-6 sm:pt-8">
           <div className="text-center mb-8">
             <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
               <Sparkles className="w-10 h-10 text-white" />
@@ -470,8 +470,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
   if (viewMode === 'host') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 p-4">
-        <div className="max-w-2xl mx-auto pt-4">
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 px-3 sm:px-4 md:px-6 py-4">
+        <div className="max-w-2xl md:max-w-3xl mx-auto pt-4">
           <Button variant="ghost" size="sm" onClick={() => setViewMode('home')} className="mb-4">
             <Home className="w-4 h-4 mr-2" />
             返回首頁
@@ -709,8 +709,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
   if (viewMode === 'join') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 p-4">
-        <div className="max-w-md mx-auto pt-8">
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 px-3 sm:px-4 md:px-6 py-4">
+        <div className="max-w-md md:max-w-lg mx-auto pt-8">
           <Button variant="ghost" size="sm" onClick={() => setViewMode('home')} className="mb-4">
             <Home className="w-4 h-4 mr-2" />
             返回首頁
@@ -752,8 +752,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
     if (!hasJoined) {
       return (
-        <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 p-4">
-          <div className="max-w-md mx-auto pt-8">
+        <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 px-3 sm:px-4 md:px-6 py-4">
+          <div className="max-w-md md:max-w-lg mx-auto pt-8">
             <Button variant="ghost" size="sm" onClick={() => {
               setViewMode('home');
               setCurrentMeetingId(null);
@@ -807,8 +807,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
     if (!isGrouped) {
       return (
-        <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 p-4">
-          <div className="max-w-md mx-auto pt-8">
+        <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 px-3 sm:px-4 md:px-6 py-4">
+          <div className="max-w-md md:max-w-lg mx-auto pt-8">
             <Card className="text-center">
               <CardContent className="pt-8 pb-8">
                 <Clock className="w-16 h-16 mx-auto text-purple-500 mb-4 animate-pulse" />
@@ -827,8 +827,8 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
     const color = myGroupNumber ? getGroupColor(myGroupNumber) : GROUP_COLORS[0];
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 p-4">
-        <div className="max-w-md mx-auto pt-4">
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white dark:from-gray-900 dark:to-gray-800 px-3 sm:px-4 md:px-6 py-4">
+        <div className="max-w-md md:max-w-lg mx-auto pt-4">
           <div className={cn('text-center py-8 rounded-2xl mb-4', color.bg, 'border-2', color.border)}>
             <div className={cn('text-8xl font-bold', color.text)}>
               {myGroupNumber}

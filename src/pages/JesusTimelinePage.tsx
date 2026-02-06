@@ -485,8 +485,8 @@ const JesusTimelinePage = () => {
       description="耶穌四季功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background flex flex-col">
-        <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 overflow-y-auto">
-          <div className="max-w-3xl mx-auto w-full space-y-4 pb-8">
+        <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 overflow-y-auto">
+          <div className="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-4 pb-8">
             <Card>
               <CardContent className="py-2.5 sm:py-4">
                 <button

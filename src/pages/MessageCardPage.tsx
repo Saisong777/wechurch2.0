@@ -301,14 +301,14 @@ export const MessageCardPage: React.FC = () => {
 
   // Loading state during initialization
   const renderInitializing = () => (
-    <div className="px-4 py-16 max-w-md mx-auto flex flex-col items-center justify-center">
+    <div className="px-3 sm:px-4 md:px-6 py-16 max-w-md md:max-w-lg mx-auto flex flex-col items-center justify-center">
       <Loader2 className="w-10 h-10 animate-spin text-secondary mb-4" />
       <p className="text-muted-foreground">載入中...</p>
     </div>
   );
 
   const renderEnterCode = () => (
-    <div className="px-4 py-8 max-w-md mx-auto">
+    <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 max-w-md md:max-w-lg mx-auto">
       <Card className="border-2">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 rounded-full gradient-gold flex items-center justify-center glow-gold">
@@ -379,7 +379,7 @@ export const MessageCardPage: React.FC = () => {
   );
 
   const renderAuth = () => (
-    <div className="px-4 py-8 max-w-md mx-auto">
+    <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 max-w-md md:max-w-lg mx-auto">
       <Card className="border-2">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
@@ -477,7 +477,7 @@ export const MessageCardPage: React.FC = () => {
   );
 
   const renderDownload = () => (
-    <div className="px-4 py-8 max-w-lg mx-auto">
+    <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 max-w-lg md:max-w-xl mx-auto">
       <Card className="border-2">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-serif">{card?.title}</CardTitle>
@@ -526,7 +526,7 @@ export const MessageCardPage: React.FC = () => {
           subtitle="Message Card"
         />
         
-        <main className="container mx-auto max-w-4xl">
+        <main className="container mx-auto max-w-4xl lg:max-w-5xl">
           {step === 'initializing' && renderInitializing()}
           {step === 'enter-code' && renderEnterCode()}
           {step === 'auth' && renderAuth()}

@@ -69,10 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
       variant === 'default' ? 'py-3 sm:py-5' : 'py-2 sm:py-3',
       className
     )}>
-      <div className="container mx-auto px-2 sm:px-4">
+      <div className="container mx-auto px-3 sm:px-4 md:px-6">
         <div className="flex items-center justify-between">
           {/* Left spacer for balance */}
-          <div className="w-8 sm:w-12" />
+          <div className="w-10 sm:w-12" />
           
           {/* Center: Logo and Title - Clickable to go home */}
           <Link to="/" className="flex items-center justify-center gap-1.5 sm:gap-3 hover:opacity-80 transition-opacity group">
@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
 
           {/* Right: Auth Status */}
-          <div className="w-8 sm:w-12 flex justify-end">
+          <div className="w-10 sm:w-12 flex justify-end">
             {loading ? (
               <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
             ) : user ? (

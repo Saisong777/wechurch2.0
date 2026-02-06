@@ -389,8 +389,8 @@ const BiblePage = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header title="聖經閱讀" subtitle="和合本" variant="compact" />
       
-      <main className="flex-1 container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
-        <div className="max-w-4xl mx-auto w-full flex flex-col flex-1">
+      <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex flex-col">
+        <div className="max-w-4xl lg:max-w-5xl mx-auto w-full flex flex-col flex-1">
           <div className="flex items-center gap-2 mb-2 sm:mb-4">
             <div className="flex gap-1 sm:gap-2 flex-1">
               <div className="relative flex-1">
@@ -400,7 +400,7 @@ const BiblePage = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-8 sm:pl-10 h-8 sm:h-9 text-sm"
+                  className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
                   data-testid="input-bible-search"
                 />
                 {searchQuery && (
@@ -415,7 +415,7 @@ const BiblePage = () => {
                   </Button>
                 )}
               </div>
-              <Button onClick={handleSearch} size="sm" className="h-8 px-2 sm:px-3" data-testid="button-search">
+              <Button onClick={handleSearch} size="sm" className="h-9 px-2 sm:px-3" data-testid="button-search">
                 <Search className="w-4 h-4 sm:hidden" />
                 <span className="hidden sm:inline">搜尋</span>
               </Button>
@@ -451,7 +451,7 @@ const BiblePage = () => {
                             </p>
                             <VerseActions verse={v} />
                           </div>
-                          <p className="text-base sm:text-lg leading-relaxed">{v.text}</p>
+                          <p className="text-base sm:text-lg md:text-lg leading-relaxed">{v.text}</p>
                         </div>
                       ))}
                     </div>
@@ -504,7 +504,7 @@ const BiblePage = () => {
                             )}
                             <span className="text-primary font-bold text-sm sm:text-lg min-w-[1.5rem] sm:min-w-[2rem] text-right">{v.verse}</span>
                           </div>
-                          <span className="text-base sm:text-lg leading-relaxed flex-1">{v.text}</span>
+                          <span className="text-base sm:text-lg md:text-lg leading-relaxed flex-1">{v.text}</span>
                         </div>
                       ))}
                     </div>
@@ -527,7 +527,7 @@ const BiblePage = () => {
                     <span>載入章節時發生錯誤</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                  <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
                     {chapters.map((c) => (
                       <Button
                         key={c.chapter}
@@ -558,7 +558,7 @@ const BiblePage = () => {
                         <Book className="w-5 h-5 text-amber-600" />
                         舊約聖經
                       </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                         {oldTestamentBooks.map((book) => (
                           <Button
                             key={book.bookNumber}
@@ -581,7 +581,7 @@ const BiblePage = () => {
                         <Book className="w-5 h-5 text-sky-600" />
                         新約聖經
                       </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                         {newTestamentBooks.map((book) => (
                           <Button
                             key={book.bookNumber}
