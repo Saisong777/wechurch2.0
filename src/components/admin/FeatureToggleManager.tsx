@@ -27,9 +27,9 @@ interface FeatureToggleManagerProps {
 }
 
 const FEATURE_HIERARCHY: Record<string, string[]> = {
-  we_live: ['bible_study', 'random_grouper', 'notebook'],
+  we_live: ['bible_study', 'notebook'],
   we_learn: ['bible_reading', 'jesus_timeline', 'reading_plans'],
-  we_play: ['icebreaker_game'],
+  we_play: ['icebreaker_game', 'random_grouper'],
   we_share: ['prayer_wall', 'prayer_meeting', 'message_cards'],
 };
 
@@ -281,8 +281,8 @@ export const FeatureToggleManager: React.FC<FeatureToggleManagerProps> = ({ onBa
             <Button variant="outline" onClick={() => setEditingFeature(null)}>
               取消
             </Button>
-            <Button onClick={handleSaveMessage} disabled={updating === editingFeature?.feature_key}>
-              {updating === editingFeature?.feature_key ? (
+            <Button onClick={handleSaveMessage} disabled={updating === editingFeature?.featureKey}>
+              {updating === editingFeature?.featureKey ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
                 <Save className="w-4 h-4 mr-2" />

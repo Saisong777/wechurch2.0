@@ -648,7 +648,7 @@ export const UserPage: React.FC = () => {
 
   return (
     <FeatureGate 
-      featureKey="we_live" 
+      featureKeys={["we_live", "bible_study"]}
       title="靈魂健身房維護中"
       description="We Live 功能目前暫時關閉，請稍後再試"
     >

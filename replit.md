@@ -150,6 +150,28 @@ The application is optimized for 500+ concurrent users with:
 └── migrations/          # Database migrations
 ```
 
+### Feature Toggle System (功能開關管理)
+All features are managed through a centralized feature toggle system stored in the `feature_toggles` database table. This allows admins to enable/disable any feature without code changes.
+
+**Architecture:**
+- **Database**: `feature_toggles` table with `feature_key`, `feature_name`, `is_enabled`, `disabled_message`
+- **Frontend Hook**: `useFeatureToggles()` in `src/hooks/useFeatureToggles.ts` provides `isFeatureEnabled()`, `getDisabledMessage()`
+- **Gate Component**: `<FeatureGate>` in `src/components/ui/feature-gate.tsx` wraps pages/features to show disabled message when off
+- **Admin UI**: `FeatureToggleManager` in `src/components/admin/FeatureToggleManager.tsx` with parent-child hierarchy
+
+**Feature Hierarchy (parent → children):**
+- `we_live` → `bible_study`, `notebook`
+- `we_learn` → `bible_reading`, `jesus_timeline`, `reading_plans`
+- `we_play` → `icebreaker_game`, `random_grouper`
+- `we_share` → `prayer_wall`, `prayer_meeting`, `message_cards`
+
+**Convention for adding new features:**
+1. Insert a new row in `feature_toggles` table with a unique `feature_key`
+2. Add the `feature_key` to `FEATURE_HIERARCHY` in `FeatureToggleManager.tsx` under the appropriate parent
+3. Wrap the feature page/component with `<FeatureGate featureKeys={["parent_key", "child_key"]}>` 
+4. If the feature appears in a navigation list (like LearnPage, SharePage), add `featureKey` to the feature item and filter with `isFeatureEnabled()`
+5. Parent toggles disable all child features; child toggles only disable the specific sub-feature
+
 ## External Dependencies
 
 ### Database

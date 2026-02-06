@@ -3,10 +3,14 @@ import { Header } from '@/components/layout/Header';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { Book, Calendar, BookOpen } from 'lucide-react';
+import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 
 const LearnPage = () => {
+  const { isFeatureEnabled } = useFeatureToggles();
+
   const features = [
     {
+      featureKey: 'bible_reading',
       title: '聖經閱讀',
       description: '閱讀和平本聖經，搜尋經文，收藏喜愛的經節',
       icon: Book,
@@ -14,6 +18,7 @@ const LearnPage = () => {
       color: 'bg-sky-500',
     },
     {
+      featureKey: 'jesus_timeline',
       title: '耶穌四季',
       description: '探索耶穌生平的208個事件，按季節分類的時間軸',
       icon: Calendar,
@@ -21,6 +26,7 @@ const LearnPage = () => {
       color: 'bg-amber-500',
     },
     {
+      featureKey: 'reading_plans',
       title: '讀經計劃',
       description: '選擇適合你的讀經計劃，每日靈修陪伴成長',
       icon: BookOpen,
@@ -41,7 +47,7 @@ const LearnPage = () => {
         <main className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
           <div className="max-w-3xl mx-auto">
             <div className="grid gap-2 sm:gap-4">
-              {features.map((feature) => (
+              {features.filter(f => isFeatureEnabled(f.featureKey)).map((feature) => (
                 <Link 
                   key={feature.href} 
                   to={feature.href}

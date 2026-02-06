@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Heart, ImageIcon, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FeatureGate } from '@/components/ui/feature-gate';
+import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 
 const shareFeatures = [
   {
     id: 'prayer',
+    featureKey: 'prayer_wall',
     title: '禱告牆',
     subtitle: 'Prayer Wall',
     description: '分享代禱事項，一起為彼此禱告',
@@ -20,6 +22,7 @@ const shareFeatures = [
   },
   {
     id: 'prayer-meeting',
+    featureKey: 'prayer_meeting',
     title: '禱告會',
     subtitle: 'Prayer Meeting',
     description: '分組禱告，彼此代禱',
@@ -31,6 +34,7 @@ const shareFeatures = [
   },
   {
     id: 'card',
+    featureKey: 'message_cards',
     title: '信息圖卡',
     subtitle: 'Message Cards',
     description: '下載本週信息摘要圖片',
@@ -43,6 +47,8 @@ const shareFeatures = [
 ];
 
 const SharePage: React.FC = () => {
+  const { isFeatureEnabled } = useFeatureToggles();
+
   return (
     <FeatureGate 
       featureKey="we_share" 
@@ -54,9 +60,8 @@ const SharePage: React.FC = () => {
         
         <main className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
           <div className="max-w-2xl mx-auto">
-            {/* Feature Cards */}
             <div className="grid gap-3 sm:gap-4">
-              {shareFeatures.map((feature) => {
+              {shareFeatures.filter(f => isFeatureEnabled(f.featureKey)).map((feature) => {
                 const Icon = feature.icon;
                 return (
                   <Link key={feature.id} to={feature.href} className="block group">
