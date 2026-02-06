@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -115,6 +115,7 @@ const featureConfig = [
 const Index = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
   const { profile } = useUserProfile();
   const { isFeatureEnabled, getDisabledMessage, loading: featuresLoading } = useFeatureToggles();
@@ -170,11 +171,22 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
-      <header className="w-full py-3 sm:py-4 px-4 sm:px-6">
+      <header className="w-full py-3 sm:py-4 md:py-3 px-4 sm:px-6">
         <div className="container mx-auto flex items-center justify-between">
-          <div className="w-10" />
+          {/* Mobile: Left spacer */}
+          <div className="w-10 md:hidden" />
           
-          <div className="flex items-center gap-2 group">
+          {/* Desktop: Logo on left */}
+          <Link to="/" className="hidden md:flex items-center gap-2 group shrink-0">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/15 rounded-full blur-xl animate-pulse-soft" />
+              <WeChurchLogo size={32} className="relative group-hover:scale-105 transition-transform" />
+            </div>
+            <h1 className="text-lg font-bold text-foreground">WeChurch</h1>
+          </Link>
+
+          {/* Mobile: Center logo */}
+          <div className="flex md:hidden items-center gap-2 group">
             <div className="relative">
               <div className="absolute inset-0 bg-primary/15 rounded-full blur-xl animate-pulse-soft" />
               <WeChurchLogo size={36} className="relative group-hover:scale-105 transition-transform" />
@@ -183,6 +195,35 @@ const Index = () => {
               <h1 className="text-xl font-bold text-foreground">WeChurch</h1>
             </div>
           </div>
+
+          {/* Desktop: Navigation links */}
+          <nav className="hidden md:flex items-center gap-1" data-testid="nav-top-index">
+            {[
+              { id: 'home', label: '首頁', href: '/', icon: Home },
+              { id: 'live', label: '健身房', href: '/user', icon: Dumbbell },
+              { id: 'learn', label: '學習', href: '/learn', icon: BookOpen },
+              { id: 'play', label: '破冰', href: '/icebreaker', icon: Gamepad2 },
+              { id: 'share', label: '分享', href: '/share', icon: Share2 },
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = item.href === '/' ? location.pathname === '/' : location.pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.id}
+                  to={item.href}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    active
+                      ? "text-primary bg-primary/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                  data-testid={`nav-top-link-${item.id}`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
 
           <div className="w-10 flex justify-end">
             {authLoading ? (
