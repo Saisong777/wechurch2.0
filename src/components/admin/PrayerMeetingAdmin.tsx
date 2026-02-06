@@ -71,6 +71,7 @@ interface PrayerItem {
   isAnonymous: boolean;
   groupNumber: number | null;
   prayerType: 'named' | 'anonymous' | 'urgent';
+  gender?: string;
 }
 
 type GroupingMode = 'bySize' | 'byCount';
@@ -80,7 +81,7 @@ type ViewStep = 'list' | 'create' | 'manage' | 'presentation' | 'prayer-list';
 interface PresentationPage {
   title: string;
   subtitle?: string;
-  prayers: { id: string; name: string; prayer: string; groupNumber: number | null }[];
+  prayers: { id: string; name: string; prayer: string; groupNumber: number | null; gender?: string }[];
   type: 'stats' | 'urgent' | 'anonymous' | 'group';
   groupNumber?: number;
 }
@@ -271,7 +272,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
   };
 
   const [prayerListGroup, setPrayerListGroup] = useState<number | null>(null);
-  const [prayerListMode, setPrayerListMode] = useState<'all' | 'group' | 'urgent' | 'anonymous'>('all');
+  const [prayerListMode, setPrayerListMode] = useState<'all' | 'group' | 'urgent' | 'anonymous' | 'named'>('urgent');
 
   const buildPrayerListQueryKey = () => {
     let url = `/api/prayer-meetings/${currentMeetingId}/prayer-list?mode=${prayerListMode}`;
@@ -303,6 +304,15 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     .map(Number)
     .filter(n => n > 0)
     .sort((a, b) => a - b);
+
+  const getAnonymousLabel = (prayers: PrayerItem[], index: number): string => {
+    const prayer = prayers[index];
+    const gender = prayer.gender || 'M';
+    const prefix = gender === 'M' ? '弟兄' : '姊妹';
+    const sameGenderBefore = prayers.slice(0, index).filter(p => (p.gender || 'M') === gender).length;
+    const letter = String.fromCharCode(65 + sameGenderBefore);
+    return `${prefix}${letter}`;
+  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -338,9 +348,16 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     }
 
     const anonymousPrayerItems: PresentationPage['prayers'] = [];
+    const maleCount = { count: 0 };
+    const femaleCount = { count: 0 };
     participants.forEach(p => {
       if (p.anonymousPrayer?.trim()) {
-        anonymousPrayerItems.push({ id: p.id + '-anon', name: '匿名', prayer: p.anonymousPrayer, groupNumber: p.groupNumber });
+        const isMale = p.gender === 'M';
+        const counter = isMale ? maleCount : femaleCount;
+        const prefix = isMale ? '弟兄' : '姊妹';
+        const letter = String.fromCharCode(65 + counter.count);
+        counter.count++;
+        anonymousPrayerItems.push({ id: p.id + '-anon', name: `${prefix}${letter}`, prayer: p.anonymousPrayer, groupNumber: p.groupNumber, gender: p.gender });
       }
     });
     for (let i = 0; i < anonymousPrayerItems.length; i += ITEMS_PER_PAGE) {
@@ -529,6 +546,10 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                   </div>
                 </div>
                 <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
+                  <div className="text-6xl font-bold text-green-400 mb-2">{presentationStats.groupCount}</div>
+                  <div className="text-white/70 text-lg">小組數</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
                   <div className="text-6xl font-bold text-red-400 mb-2">{presentationStats.urgentCount}</div>
                   <div className="text-white/70 text-lg">
                     <AlertTriangle className="w-5 h-5 inline mr-2" />
@@ -536,19 +557,15 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                   </div>
                 </div>
                 <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
-                  <div className="text-6xl font-bold text-blue-400 mb-2">{presentationStats.namedCount}</div>
-                  <div className="text-white/70 text-lg">具名禱告</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
-                  <div className="text-6xl font-bold text-gray-400 mb-2">{presentationStats.anonymousCount}</div>
+                  <div className="text-6xl font-bold text-purple-400 mb-2">{presentationStats.anonymousCount}</div>
                   <div className="text-white/70 text-lg">
                     <EyeOff className="w-5 h-5 inline mr-2" />
                     匿名禱告
                   </div>
                 </div>
                 <div className="bg-white/10 backdrop-blur rounded-xl p-8 text-center">
-                  <div className="text-6xl font-bold text-purple-400 mb-2">{presentationStats.groupCount}</div>
-                  <div className="text-white/70 text-lg">禱告小組</div>
+                  <div className="text-6xl font-bold text-blue-400 mb-2">{presentationStats.namedCount}</div>
+                  <div className="text-white/70 text-lg">具名禱告</div>
                 </div>
               </div>
             </>
@@ -632,42 +649,26 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                 <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{prayerListData.stats.totalParticipants}</div>
                 <div className="text-xs text-gray-500">參與人數</div>
               </div>
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center border border-green-200 dark:border-green-800">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{prayerListData.stats.groupCount}</div>
+                <div className="text-xs text-green-500">小組數</div>
+              </div>
               <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center border border-red-200 dark:border-red-800">
                 <div className="text-2xl font-bold text-red-600 dark:text-red-400">{prayerListData.stats.urgentCount}</div>
                 <div className="text-xs text-red-500">緊急禱告</div>
-              </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center border border-blue-200 dark:border-blue-800">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{prayerListData.stats.namedCount}</div>
-                <div className="text-xs text-blue-500">具名禱告</div>
               </div>
               <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center border border-purple-200 dark:border-purple-800">
                 <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{prayerListData.stats.anonymousCount}</div>
                 <div className="text-xs text-purple-500">匿名禱告</div>
               </div>
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center border border-green-200 dark:border-green-800">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{prayerListData.stats.groupCount}</div>
-                <div className="text-xs text-green-500">小組數</div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center border border-blue-200 dark:border-blue-800">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{prayerListData.stats.namedCount}</div>
+                <div className="text-xs text-blue-500">具名禱告</div>
               </div>
             </div>
           )}
 
           <div className="flex gap-2 mb-6 flex-wrap justify-center items-center">
-            <Button
-              variant={prayerListMode === 'all' ? 'default' : 'outline'}
-              onClick={() => { setPrayerListMode('all'); setPrayerListGroup(null); }}
-              size="sm"
-              data-testid="button-mode-all"
-            >
-              全部禱告
-            </Button>
-            <Button
-              variant={prayerListMode === 'group' ? 'default' : 'outline'}
-              onClick={() => { setPrayerListMode('group'); setPrayerListGroup(null); }}
-              size="sm"
-              data-testid="button-mode-group"
-            >
-              各組禱告
-            </Button>
             <Button
               variant={prayerListMode === 'urgent' ? 'default' : 'outline'}
               onClick={() => { setPrayerListMode('urgent'); setPrayerListGroup(null); }}
@@ -685,6 +686,22 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
             >
               <EyeOff className="w-4 h-4 mr-1" />
               匿名禱告
+            </Button>
+            <Button
+              variant={prayerListMode === 'named' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('named'); setPrayerListGroup(null); }}
+              size="sm"
+              data-testid="button-mode-named"
+            >
+              具名禱告
+            </Button>
+            <Button
+              variant={prayerListMode === 'all' ? 'default' : 'outline'}
+              onClick={() => { setPrayerListMode('all'); setPrayerListGroup(null); }}
+              size="sm"
+              data-testid="button-mode-all"
+            >
+              全部禱告
             </Button>
           </div>
 
@@ -764,8 +781,11 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                         <EyeOff className="w-4 h-4" />
                         匿名禱告 ({prayerListData.anonymousPrayers.length})
                       </h3>
-                      {prayerListData.anonymousPrayers.map(prayer => (
+                      {prayerListData.anonymousPrayers.map((prayer, idx) => (
                         <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-purple-600 dark:text-purple-400">{getAnonymousLabel(prayerListData.anonymousPrayers, idx)}</span>
+                          </div>
                           <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
                         </div>
                       ))}
@@ -845,14 +865,39 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                 <>
                   {prayerListData.anonymousPrayers.length > 0 ? (
                     <div className="space-y-2">
-                      {prayerListData.anonymousPrayers.map(prayer => (
+                      {prayerListData.anonymousPrayers.map((prayer, idx) => (
                         <div key={prayer.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-purple-600 dark:text-purple-400">{getAnonymousLabel(prayerListData.anonymousPrayers, idx)}</span>
+                          </div>
                           <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">沒有匿名禱告事項</div>
+                  )}
+                </>
+              )}
+
+              {prayerListMode === 'named' && (
+                <>
+                  {prayerListData.namedPrayers.length > 0 ? (
+                    <div className="space-y-2">
+                      {prayerListData.namedPrayers.map(prayer => (
+                        <div key={prayer.id} className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-medium">{prayer.name}</span>
+                            {prayer.groupNumber && (
+                              <Badge variant="outline" className="text-xs">第 {prayer.groupNumber} 組</Badge>
+                            )}
+                          </div>
+                          <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{prayer.prayerRequest}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">沒有具名禱告事項</div>
                   )}
                 </>
               )}

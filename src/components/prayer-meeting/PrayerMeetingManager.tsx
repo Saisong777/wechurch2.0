@@ -992,23 +992,23 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
 
                 {myGroupMembers.some(m => (m.prayerRequest || m.urgentPrayer) && !m.isAnonymous) && (
                   <div className="pt-4 border-t space-y-4">
-                    <h4 className="font-medium text-gray-900 dark:text-white">組員禱告事項</h4>
-                    <div className="space-y-3">
+                    <h4 className="font-medium text-lg text-gray-900 dark:text-white">組員禱告事項</h4>
+                    <div className="space-y-4">
                       {myGroupMembers.filter(m => (m.prayerRequest || m.urgentPrayer) && !m.isAnonymous).map(m => (
                         <div key={m.id} className={cn(
-                          "flex gap-3 p-3 rounded-lg border",
+                          "flex gap-3 p-4 rounded-lg border",
                           m.id === myParticipantId 
                             ? "bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-700" 
                             : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                         )}>
                           <div className="shrink-0">
-                            <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium', color.accent)}>
+                            <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-white text-base font-medium', color.accent)}>
                               {m.name.charAt(0)}
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-medium text-sm text-gray-900 dark:text-white">{m.name}</span>
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <span className="font-semibold text-base text-gray-900 dark:text-white">{m.name}</span>
                               {m.id === myParticipantId && (
                                 <Badge variant="secondary" className="text-xs">我</Badge>
                               )}
@@ -1020,10 +1020,10 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                               )}
                             </div>
                             {m.urgentPrayer && (
-                              <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-wrap break-words mb-1">{m.urgentPrayer}</p>
+                              <p className="text-lg text-red-600 dark:text-red-400 whitespace-pre-wrap break-words mb-2 leading-relaxed">{m.urgentPrayer}</p>
                             )}
                             {m.prayerRequest && (
-                              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">{m.prayerRequest}</p>
+                              <p className="text-lg text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words leading-relaxed">{m.prayerRequest}</p>
                             )}
                           </div>
                         </div>

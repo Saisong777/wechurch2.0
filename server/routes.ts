@@ -2012,6 +2012,7 @@ export async function registerRoutes(app: Express) {
         isAnonymous: boolean;
         groupNumber: number | null;
         prayerType: 'named' | 'anonymous' | 'urgent';
+        gender?: string;
       };
       
       const namedPrayers: PrayerItem[] = [];
@@ -2053,6 +2054,7 @@ export async function registerRoutes(app: Express) {
             isAnonymous: true,
             groupNumber: p.groupNumber,
             prayerType: 'anonymous',
+            gender: p.gender,
           });
         }
       }
