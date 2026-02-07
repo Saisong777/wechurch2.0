@@ -883,10 +883,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchBibleVerses(query: string, limit = 50): Promise<ChineseUnionTrad[]> {
+    const normalizedQuery = query.replace(/\s+/g, '');
     return db
       .select()
       .from(chineseUnionTrad)
-      .where(like(chineseUnionTrad.text, `%${query}%`))
+      .where(sql`REPLACE(${chineseUnionTrad.text}, ' ', '') LIKE ${'%' + normalizedQuery + '%'}`)
       .limit(limit);
   }
 
