@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Book, ChevronRight, ChevronDown, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2, Image, BookOpen, PenLine, ExternalLink, List, AlignLeft } from 'lucide-react';
+import { Search, Book, ChevronRight, ChevronDown, ChevronLeft, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2, Image, BookOpen, PenLine, ExternalLink, List, AlignLeft, Minus, Plus, Type } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FloatingToolbar } from '@/components/scripture/FloatingToolbar';
@@ -80,6 +80,14 @@ const BiblePage = () => {
       const saved = localStorage.getItem('wechurch-bible-display-mode');
       return (saved === 'paragraph' || saved === 'list') ? saved : 'list';
     } catch { return 'list'; }
+  });
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [fontSizeLevel, setFontSizeLevel] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('wechurch-bible-font-size');
+      const parsed = parseInt(saved || '1', 10);
+      return [0, 1, 2].includes(parsed) ? parsed : 1;
+    } catch { return 1; }
   });
   const [searchCardVerse, setSearchCardVerse] = useState<{ text: string; reference: string } | null>(null);
   const [searchNoteVerse, setSearchNoteVerse] = useState<{ reference: string; text: string } | null>(null);
@@ -194,6 +202,70 @@ const BiblePage = () => {
   const clearSearch = () => {
     setSearchQuery('');
     setIsSearching(false);
+    setSearchExpanded(false);
+  };
+
+  const FONT_SIZE_CONFIG = [
+    { label: '小', verse: 'text-sm sm:text-base', verseNum: 'text-xs sm:text-sm', paragraph: 'text-sm sm:text-base leading-relaxed', sup: 'text-[9px] sm:text-[10px]' },
+    { label: '中', verse: 'text-base sm:text-lg md:text-lg', verseNum: 'text-sm sm:text-lg', paragraph: 'text-base sm:text-lg md:text-lg leading-relaxed', sup: 'text-[10px] sm:text-xs' },
+    { label: '大', verse: 'text-lg sm:text-xl md:text-xl', verseNum: 'text-base sm:text-xl', paragraph: 'text-lg sm:text-xl md:text-xl leading-loose', sup: 'text-xs sm:text-sm' },
+  ];
+
+  const currentFontConfig = FONT_SIZE_CONFIG[fontSizeLevel];
+
+  const changeFontSize = (delta: number) => {
+    const next = Math.max(0, Math.min(2, fontSizeLevel + delta));
+    setFontSizeLevel(next);
+    try { localStorage.setItem('wechurch-bible-font-size', String(next)); } catch {}
+  };
+
+  const getCurrentBookChapterCount = () => {
+    const currentBook = books.find(b => b.bookName === selectedBook);
+    return currentBook?.chapterCount || chapters.length;
+  };
+
+  const navigateChapter = (delta: number) => {
+    if (!selectedBook || !selectedChapter) return;
+    const totalChapters = getCurrentBookChapterCount();
+    const nextChapter = selectedChapter + delta;
+
+    if (nextChapter >= 1 && nextChapter <= totalChapters) {
+      setSelectedChapter(nextChapter);
+      setSelectedVerseNums(new Set());
+      return;
+    }
+
+    const currentBookIndex = books.findIndex(b => b.bookName === selectedBook);
+    if (delta > 0 && currentBookIndex < books.length - 1) {
+      const nextBook = books[currentBookIndex + 1];
+      setSelectedBook(nextBook.bookName);
+      setSelectedChapter(1);
+      setSelectedVerseNums(new Set());
+    } else if (delta < 0 && currentBookIndex > 0) {
+      const prevBook = books[currentBookIndex - 1];
+      setSelectedBook(prevBook.bookName);
+      setSelectedChapter(prevBook.chapterCount);
+      setSelectedVerseNums(new Set());
+    }
+  };
+
+  const getChapterLabel = (delta: number): string | null => {
+    if (!selectedBook || !selectedChapter) return null;
+    const totalChapters = getCurrentBookChapterCount();
+    const nextChapter = selectedChapter + delta;
+
+    if (nextChapter >= 1 && nextChapter <= totalChapters) {
+      return `${selectedBook} ${nextChapter}章`;
+    }
+
+    const currentBookIndex = books.findIndex(b => b.bookName === selectedBook);
+    if (delta > 0 && currentBookIndex < books.length - 1) {
+      return `${books[currentBookIndex + 1].bookName} 1章`;
+    } else if (delta < 0 && currentBookIndex > 0) {
+      const prevBook = books[currentBookIndex - 1];
+      return `${prevBook.bookName} ${prevBook.chapterCount}章`;
+    }
+    return null;
   };
 
   const toggleVerseSelection = (verseNum: number) => {
@@ -531,34 +603,62 @@ const BiblePage = () => {
       <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex flex-col">
         <div className="max-w-5xl lg:max-w-6xl mx-auto w-full flex flex-col flex-1">
           <div className="flex items-center gap-2 mb-2 sm:mb-4">
-            <div className="flex gap-1 sm:gap-2 flex-1">
-              <div className="relative flex-1">
-                <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="搜尋經文..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
-                  data-testid="input-bible-search"
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-                    onClick={clearSearch}
-                    data-testid="button-clear-search"
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                )}
+            {searchExpanded ? (
+              <div className="flex gap-1 sm:gap-2 flex-1">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="搜尋經文..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSearch();
+                      if (e.key === 'Escape') { if (!searchQuery) setSearchExpanded(false); }
+                    }}
+                    className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
+                    data-testid="input-bible-search"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-foreground hover:text-foreground"
+                      onClick={clearSearch}
+                      data-testid="button-clear-search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <Button onClick={handleSearch} size="sm" className="h-9 px-2 sm:px-3" data-testid="button-search">
+                  搜尋
+                </Button>
+                <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => { setSearchExpanded(false); setIsSearching(false); setSearchQuery(''); }} data-testid="button-close-search">
+                  <X className="w-4 h-4" />
+                </Button>
               </div>
-              <Button onClick={handleSearch} size="sm" className="h-9 px-2 sm:px-3" data-testid="button-search">
-                <Search className="w-4 h-4 sm:hidden" />
-                <span className="hidden sm:inline">搜尋</span>
-              </Button>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-1">
+                <div className="hidden sm:flex gap-2 flex-1">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="搜尋經文..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="pl-10 h-10 text-sm"
+                      data-testid="input-bible-search-desktop"
+                    />
+                  </div>
+                  <Button onClick={handleSearch} size="sm" className="h-10 px-3" data-testid="button-search-desktop">
+                    搜尋
+                  </Button>
+                </div>
+                <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setSearchExpanded(true)} data-testid="button-expand-search">
+                  <Search className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
           </div>
 
           {isSearching ? (
@@ -608,9 +708,49 @@ const BiblePage = () => {
           ) : selectedBook && selectedChapter ? (
             <Card className="flex-1 flex flex-col">
               <CardContent className="py-2 sm:py-4 flex-1 flex flex-col">
-                <div className="flex flex-wrap justify-between items-center gap-2 mb-2 sm:mb-4">
-                  <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
-                  <div className="flex items-center gap-1">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-1 sm:mb-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    {getChapterLabel(-1) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigateChapter(-1)}
+                        title={getChapterLabel(-1) || ''}
+                        data-testid="button-prev-chapter"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
+                    {getChapterLabel(1) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigateChapter(1)}
+                        title={getChapterLabel(1) || ''}
+                        data-testid="button-next-chapter"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-back-to-chapters">
+                    返回
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2 sm:mb-3">
+                  <div className="flex items-center gap-0.5 mr-1">
+                    <Type className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Button variant="ghost" size="sm" onClick={() => changeFontSize(-1)} disabled={fontSizeLevel === 0} title="縮小字體" data-testid="button-font-decrease">
+                      <Minus className="w-3 h-3" />
+                    </Button>
+                    <span className="text-xs text-muted-foreground min-w-[1.5rem] text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
+                    <Button variant="ghost" size="sm" onClick={() => changeFontSize(1)} disabled={fontSizeLevel === 2} title="放大字體" data-testid="button-font-increase">
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-0.5">
                     <Button
                       variant={displayMode === 'list' ? 'default' : 'outline'}
                       size="icon"
@@ -635,20 +775,16 @@ const BiblePage = () => {
                     >
                       <AlignLeft className="w-4 h-4" />
                     </Button>
-                    <ScriptureTTS
-                      text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
-                      compact
-                      label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
-                    />
-                    <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm">
-                      返回
-                    </Button>
                   </div>
+                  <ScriptureTTS
+                    text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
+                    compact
+                    label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
+                  />
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    已選 {selectedVerseNums.size} 節
+                  </span>
                 </div>
-                
-                <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-4">
-                  點擊經文可選取，已選 {selectedVerseNums.size} 節
-                </p>
 
                 {versesLoading ? (
                   <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">載入中...</div>
@@ -658,9 +794,9 @@ const BiblePage = () => {
                     <span className="text-sm">載入經文時發生錯誤</span>
                   </div>
                 ) : (
-                  <ScrollArea className="flex-1 h-[calc(100vh-240px)] sm:h-[calc(100vh-300px)]">
+                  <ScrollArea className="flex-1 h-[calc(100vh-280px)] sm:h-[calc(100vh-320px)]">
                     {displayMode === 'paragraph' ? (
-                      <div className="text-base sm:text-lg md:text-lg leading-relaxed pr-2 sm:pr-4 py-2">
+                      <div className={`${currentFontConfig.paragraph} pr-2 sm:pr-4 py-2`}>
                         {verses.map((v) => (
                           <span key={v.verse}>
                             <span
@@ -676,7 +812,7 @@ const BiblePage = () => {
                               onClick={() => toggleVerseSelection(v.verse)}
                               data-testid={`verse-${v.chapter}-${v.verse}`}
                             >
-                              <sup className="text-primary/60 font-medium text-[10px] sm:text-xs mr-0.5">{v.verse}</sup>
+                              <sup className={`text-primary/60 font-medium ${currentFontConfig.sup} mr-0.5`}>{v.verse}</sup>
                               {v.text}
                             </span>
                             {' '}
@@ -704,13 +840,28 @@ const BiblePage = () => {
                               {selectedVerseNums.has(v.verse) && (
                                 <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
                               )}
-                              <span className="text-primary font-bold text-sm sm:text-lg min-w-[1.5rem] sm:min-w-[2rem] text-right">{v.verse}</span>
+                              <span className={`text-primary font-bold ${currentFontConfig.verseNum} min-w-[1.5rem] sm:min-w-[2rem] text-right`}>{v.verse}</span>
                             </div>
-                            <span className="text-base sm:text-lg md:text-lg leading-relaxed flex-1">{v.text}</span>
+                            <span className={`${currentFontConfig.verse} leading-relaxed flex-1`}>{v.text}</span>
                           </div>
                         ))}
                       </div>
                     )}
+
+                    <div className="flex justify-between items-center py-4 px-2 border-t mt-4">
+                      {getChapterLabel(-1) ? (
+                        <Button variant="outline" size="sm" onClick={() => navigateChapter(-1)} data-testid="button-prev-chapter-bottom">
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          {getChapterLabel(-1)}
+                        </Button>
+                      ) : <div />}
+                      {getChapterLabel(1) ? (
+                        <Button variant="outline" size="sm" onClick={() => navigateChapter(1)} data-testid="button-next-chapter-bottom">
+                          {getChapterLabel(1)}
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      ) : <div />}
+                    </div>
                   </ScrollArea>
                 )}
               </CardContent>

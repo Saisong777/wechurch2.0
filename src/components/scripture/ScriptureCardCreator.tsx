@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,29 +26,31 @@ const BACKGROUND_PRESETS = [
 ];
 
 const TEXT_POSITIONS = [
-  { id: 'top-left', name: '左上', align: 'items-start justify-start', textAlign: 'text-left' },
-  { id: 'top-center', name: '上', align: 'items-start justify-center', textAlign: 'text-center' },
-  { id: 'top-right', name: '右上', align: 'items-start justify-end', textAlign: 'text-right' },
-  { id: 'center-left', name: '左', align: 'items-center justify-start', textAlign: 'text-left' },
-  { id: 'center', name: '中', align: 'items-center justify-center', textAlign: 'text-center' },
-  { id: 'center-right', name: '右', align: 'items-center justify-end', textAlign: 'text-right' },
-  { id: 'bottom-left', name: '左下', align: 'items-end justify-start', textAlign: 'text-left' },
-  { id: 'bottom-center', name: '下', align: 'items-end justify-center', textAlign: 'text-center' },
-  { id: 'bottom-right', name: '右下', align: 'items-end justify-end', textAlign: 'text-right' },
+  { id: 'top-left', name: '左上', justify: 'flex-start', alignItems: 'flex-start', textAlign: 'left' as const },
+  { id: 'top-center', name: '上', justify: 'flex-start', alignItems: 'center', textAlign: 'center' as const },
+  { id: 'top-right', name: '右上', justify: 'flex-start', alignItems: 'flex-end', textAlign: 'right' as const },
+  { id: 'center-left', name: '左', justify: 'center', alignItems: 'flex-start', textAlign: 'left' as const },
+  { id: 'center', name: '中', justify: 'center', alignItems: 'center', textAlign: 'center' as const },
+  { id: 'center-right', name: '右', justify: 'center', alignItems: 'flex-end', textAlign: 'right' as const },
+  { id: 'bottom-left', name: '左下', justify: 'flex-end', alignItems: 'flex-start', textAlign: 'left' as const },
+  { id: 'bottom-center', name: '下', justify: 'flex-end', alignItems: 'center', textAlign: 'center' as const },
+  { id: 'bottom-right', name: '右下', justify: 'flex-end', alignItems: 'flex-end', textAlign: 'right' as const },
 ];
 
 const ASPECT_RATIOS = [
-  { id: 'square', name: '正方形', ratio: 'aspect-square', width: 400, height: 400 },
-  { id: 'portrait', name: '直式', ratio: 'aspect-[3/4]', width: 400, height: 533 },
-  { id: 'story', name: '限動', ratio: 'aspect-[9/16]', width: 400, height: 711 },
-  { id: 'landscape', name: '橫式', ratio: 'aspect-[4/3]', width: 400, height: 300 },
+  { id: 'square', name: '正方形', w: 1, h: 1 },
+  { id: 'portrait', name: '直式', w: 3, h: 4 },
+  { id: 'story', name: '限動', w: 9, h: 16 },
+  { id: 'landscape', name: '橫式', w: 4, h: 3 },
 ];
 
 const FONT_SIZES = [
-  { id: 'sm', name: '小', verse: 'text-sm', ref: 'text-xs', message: 'text-xs' },
-  { id: 'md', name: '中', verse: 'text-base', ref: 'text-sm', message: 'text-sm' },
-  { id: 'lg', name: '大', verse: 'text-lg', ref: 'text-base', message: 'text-base' },
+  { id: 'sm', name: '小', verse: 14, ref: 12, message: 12 },
+  { id: 'md', name: '中', verse: 16, ref: 14, message: 14 },
+  { id: 'lg', name: '大', verse: 20, ref: 16, message: 16 },
 ];
+
+const CARD_RENDER_WIDTH = 400;
 
 export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCardCreatorProps) => {
   const [cardBackground, setCardBackground] = useState(BACKGROUND_PRESETS[0].style);
@@ -58,9 +60,31 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
   const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[0]);
   const [fontSize, setFontSize] = useState(FONT_SIZES[1]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState(260);
   const cardRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const cardRenderHeight = Math.round(CARD_RENDER_WIDTH * aspectRatio.h / aspectRatio.w);
+
+  useEffect(() => {
+    if (!open || !previewContainerRef.current) return;
+    const updateWidth = () => {
+      if (previewContainerRef.current) {
+        const containerWidth = previewContainerRef.current.clientWidth;
+        const maxPreviewWidth = Math.min(containerWidth - 16, 300);
+        setPreviewWidth(Math.max(200, maxPreviewWidth));
+      }
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(previewContainerRef.current);
+    return () => observer.disconnect();
+  }, [open]);
+
+  const previewScale = previewWidth / CARD_RENDER_WIDTH;
+  const previewHeight = cardRenderHeight * previewScale;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,28 +106,37 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
     
     try {
       const html2canvas = (await import('html2canvas')).default;
-      const element = cardRef.current;
       
-      const canvas = await html2canvas(element, {
+      const clone = cardRef.current.cloneNode(true) as HTMLElement;
+      clone.style.transform = 'none';
+      clone.style.position = 'absolute';
+      clone.style.left = '-9999px';
+      clone.style.top = '0';
+      clone.style.width = `${CARD_RENDER_WIDTH}px`;
+      clone.style.height = `${cardRenderHeight}px`;
+      document.body.appendChild(clone);
+      
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: null,
         logging: false,
-        width: element.offsetWidth,
-        height: element.offsetHeight,
+        width: CARD_RENDER_WIDTH,
+        height: cardRenderHeight,
         scrollX: 0,
         scrollY: 0,
-        windowWidth: element.offsetWidth,
-        windowHeight: element.offsetHeight,
+        windowWidth: CARD_RENDER_WIDTH,
+        windowHeight: cardRenderHeight,
       });
       
+      document.body.removeChild(clone);
       return canvas;
     } catch (err) {
       console.error('Canvas generation failed:', err);
       return null;
     }
-  }, []);
+  }, [cardRenderHeight]);
 
   const saveImage = useCallback((dataUrl: string) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -203,64 +236,114 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="max-w-2xl w-[95vw] max-h-[85vh] p-0 gap-0 flex flex-col"
+        className="max-w-lg w-[95vw] max-h-[90vh] p-0 gap-0 flex flex-col"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <DialogHeader className="px-4 pt-4 pb-2 flex-shrink-0">
-          <DialogTitle>製作經文圖卡</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="px-4 pt-3 pb-1 flex-shrink-0">
+          <DialogTitle className="text-base">製作經文圖卡</DialogTitle>
+          <DialogDescription className="text-xs">
             選擇背景、調整文字，製作可分享的經文圖卡
           </DialogDescription>
         </DialogHeader>
 
         <div 
-          className="flex-1 overflow-y-auto overscroll-contain px-4 pb-4"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-center">
-              <div
-                ref={cardRef}
-                className={`relative ${aspectRatio.ratio} w-full max-w-[280px] rounded-lg overflow-hidden shadow-lg flex-shrink-0`}
-                style={{
-                  background: customImage ? undefined : cardBackground,
+          <div className="flex flex-col gap-3">
+            <div ref={previewContainerRef} className="flex justify-center relative">
+              <div 
+                style={{ 
+                  width: previewWidth, 
+                  height: previewHeight,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  borderRadius: '0.5rem',
+                  flexShrink: 0,
                 }}
               >
-                {customImage && (
-                  <img
-                    src={customImage}
-                    alt="背景"
-                    className="absolute inset-0 w-full h-full object-cover"
-                    crossOrigin="anonymous"
-                  />
-                )}
-                {customImage && <div className="absolute inset-0 bg-black/40" />}
-                <div className={`relative h-full flex flex-col ${textPosition.align} p-4`}>
-                  <div className={`${textPosition.textAlign} max-w-full`}>
-                    <p className={`${fontSize.verse} text-white font-medium leading-relaxed mb-2 drop-shadow-lg break-words`}>
-                      {verse.text}
-                    </p>
-                    <p className={`${fontSize.ref} text-white/90 drop-shadow`}>
-                      — {verse.reference}
-                    </p>
-                    {personalMessage && (
-                      <p className={`${fontSize.message} text-white/80 mt-2 italic drop-shadow break-words`}>
-                        {personalMessage}
+                <div
+                  ref={cardRef}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: CARD_RENDER_WIDTH,
+                    height: cardRenderHeight,
+                    transform: `scale(${previewScale})`,
+                    transformOrigin: 'top left',
+                    background: customImage ? undefined : cardBackground,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {customImage && (
+                    <img
+                      src={customImage}
+                      alt="背景"
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                      crossOrigin="anonymous"
+                    />
+                  )}
+                  {customImage && <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.4)' }} />}
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: textPosition.justify,
+                    alignItems: textPosition.alignItems,
+                    padding: '24px',
+                    boxSizing: 'border-box',
+                  }}>
+                    <div style={{
+                      textAlign: textPosition.textAlign,
+                      maxWidth: '100%',
+                      wordBreak: 'break-word',
+                    }}>
+                      <p style={{
+                        fontSize: fontSize.verse,
+                        color: 'white',
+                        fontWeight: 500,
+                        lineHeight: 1.8,
+                        marginBottom: 8,
+                        textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                      }}>
+                        {verse.text}
                       </p>
-                    )}
+                      <p style={{
+                        fontSize: fontSize.ref,
+                        color: 'rgba(255,255,255,0.9)',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                      }}>
+                        — {verse.reference}
+                      </p>
+                      {personalMessage && (
+                        <p style={{
+                          fontSize: fontSize.message,
+                          color: 'rgba(255,255,255,0.8)',
+                          marginTop: 8,
+                          fontStyle: 'italic',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                          wordBreak: 'break-word',
+                        }}>
+                          {personalMessage}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div>
-                <label className="text-xs font-medium mb-1.5 block text-muted-foreground">背景樣式</label>
-                <div className="flex flex-wrap gap-2">
+                <label className="text-xs font-medium mb-1 block text-muted-foreground">背景樣式</label>
+                <div className="flex flex-wrap gap-1.5">
                   {BACKGROUND_PRESETS.map((preset) => (
                     <button
                       key={preset.id}
-                      className={`w-9 h-9 rounded-lg border-2 transition-all ${
+                      className={`w-8 h-8 rounded-md border-2 transition-all ${
                         cardBackground === preset.style && !customImage
                           ? 'border-primary ring-2 ring-primary/30 scale-110'
                           : 'border-transparent hover:scale-105'
@@ -272,14 +355,14 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
                     />
                   ))}
                   <button
-                    className={`px-3 h-9 rounded-lg border-2 flex items-center gap-1.5 bg-muted text-xs font-medium ${
+                    className={`px-2.5 h-8 rounded-md border-2 flex items-center gap-1 bg-muted text-xs font-medium ${
                       customImage ? 'border-primary ring-2 ring-primary/30' : 'border-transparent'
                     }`}
                     onClick={() => fileInputRef.current?.click()}
                     data-testid="button-upload-bg"
                   >
-                    <Upload className="w-3.5 h-3.5" />
-                    上傳圖片
+                    <Upload className="w-3 h-3" />
+                    上傳
                   </button>
                   <input
                     ref={fileInputRef}
@@ -291,16 +374,16 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-xs font-medium mb-1.5 block text-muted-foreground">比例</label>
+                  <label className="text-xs font-medium mb-1 block text-muted-foreground">比例</label>
                   <div className="flex flex-wrap gap-1">
                     {ASPECT_RATIOS.map((ratio) => (
                       <Button
                         key={ratio.id}
                         variant={aspectRatio.id === ratio.id ? 'default' : 'outline'}
                         size="sm"
-                        className="h-7 text-xs px-2"
+                        className="h-6 text-xs px-1.5"
                         onClick={() => setAspectRatio(ratio)}
                         data-testid={`button-ratio-${ratio.id}`}
                       >
@@ -311,14 +394,14 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium mb-1.5 block text-muted-foreground">文字大小</label>
+                  <label className="text-xs font-medium mb-1 block text-muted-foreground">文字大小</label>
                   <div className="flex gap-1">
                     {FONT_SIZES.map((size) => (
                       <Button
                         key={size.id}
                         variant={fontSize.id === size.id ? 'default' : 'outline'}
                         size="sm"
-                        className="h-7 text-xs px-2"
+                        className="h-6 text-xs px-1.5"
                         onClick={() => setFontSize(size)}
                         data-testid={`button-size-${size.id}`}
                       >
@@ -330,14 +413,14 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
               </div>
 
               <div>
-                <label className="text-xs font-medium mb-1.5 block text-muted-foreground">文字位置</label>
-                <div className="grid grid-cols-3 gap-1 max-w-[140px]">
+                <label className="text-xs font-medium mb-1 block text-muted-foreground">文字位置</label>
+                <div className="grid grid-cols-3 gap-1 max-w-[120px]">
                   {TEXT_POSITIONS.map((pos) => (
                     <Button
                       key={pos.id}
                       variant={textPosition.id === pos.id ? 'default' : 'outline'}
                       size="sm"
-                      className="h-7 text-xs px-1"
+                      className="h-6 text-xs px-1"
                       onClick={() => setTextPosition(pos)}
                       data-testid={`button-pos-${pos.id}`}
                     >
@@ -348,20 +431,21 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
               </div>
 
               <div>
-                <label className="text-xs font-medium mb-1.5 block text-muted-foreground">個人感言（選填）</label>
+                <label className="text-xs font-medium mb-1 block text-muted-foreground">個人感言（選填）</label>
                 <Input
                   placeholder="寫下你的感言..."
                   value={personalMessage}
                   onChange={(e) => setPersonalMessage(e.target.value)}
-                  className="h-9"
+                  className="h-8 text-sm"
                   data-testid="input-personal-message"
                 />
               </div>
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-0.5">
                 <Button 
                   onClick={handleDownloadCard} 
-                  className="flex-1 h-10" 
+                  className="flex-1" 
+                  size="sm"
                   disabled={isGenerating}
                   data-testid="button-download-card"
                 >
@@ -375,7 +459,8 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
                 <Button 
                   onClick={handleShareCard} 
                   variant="outline" 
-                  className="flex-1 h-10" 
+                  className="flex-1" 
+                  size="sm"
                   disabled={isGenerating}
                   data-testid="button-share-card"
                 >
