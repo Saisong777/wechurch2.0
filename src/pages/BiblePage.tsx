@@ -489,17 +489,17 @@ const BiblePage = () => {
     if (categoryBooks.length === 0) return null;
 
     return (
-      <div key={category.name} className={`rounded-md p-2.5 sm:p-3 ${category.bgClass} ${category.darkBgClass}`}>
-        <p className={`text-xs font-semibold mb-1.5 ${category.labelClass}`} data-testid={`text-category-${category.name}`}>
+      <div key={category.name} className={`rounded-md p-3 sm:p-3 ${category.bgClass} ${category.darkBgClass}`}>
+        <p className={`text-sm sm:text-sm font-semibold mb-2 ${category.labelClass}`} data-testid={`text-category-${category.name}`}>
           {category.name}
         </p>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {categoryBooks.map((book) => (
             <Button
               key={book.bookNumber}
               variant="ghost"
               size="sm"
-              className="h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 dark:bg-background/40"
+              className="h-auto py-1.5 px-2.5 text-sm sm:text-sm bg-background/60 dark:bg-background/40"
               onClick={() => setSelectedBook(book.bookName)}
               data-testid={`button-book-${book.bookNumber}`}
             >
@@ -710,7 +710,7 @@ const BiblePage = () => {
                           <Book className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
                           舊約聖經
                         </h3>
-                        <span className="text-xs text-muted-foreground">{oldTestamentBooks.length}卷</span>
+                        <span className="text-xs sm:text-sm text-muted-foreground">{oldTestamentBooks.length}卷</span>
                       </button>
                       {expandedOT && (
                         <div className="mt-2 space-y-2">
@@ -732,7 +732,7 @@ const BiblePage = () => {
                           <Book className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" />
                           新約聖經
                         </h3>
-                        <span className="text-xs text-muted-foreground">{newTestamentBooks.length}卷</span>
+                        <span className="text-xs sm:text-sm text-muted-foreground">{newTestamentBooks.length}卷</span>
                       </button>
                       {expandedNT && (
                         <div className="mt-2 space-y-2">
