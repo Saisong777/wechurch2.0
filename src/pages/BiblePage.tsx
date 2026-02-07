@@ -45,20 +45,23 @@ interface SavedVerse {
 interface BookCategory {
   name: string;
   books: number[];
+  bgClass: string;
+  darkBgClass: string;
+  labelClass: string;
 }
 
 const OLD_TESTAMENT_CATEGORIES: BookCategory[] = [
-  { name: '摩西五經', books: [1, 2, 3, 4, 5] },
-  { name: '舊約歷史', books: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] },
-  { name: '智慧詩體', books: [18, 19, 20, 21, 22] },
-  { name: '舊約先知書', books: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39] },
+  { name: '摩西五經', books: [1, 2, 3, 4, 5], bgClass: 'bg-amber-50', darkBgClass: 'dark:bg-amber-950/30', labelClass: 'text-amber-700 dark:text-amber-400' },
+  { name: '舊約歷史', books: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], bgClass: 'bg-emerald-50', darkBgClass: 'dark:bg-emerald-950/30', labelClass: 'text-emerald-700 dark:text-emerald-400' },
+  { name: '智慧詩體', books: [18, 19, 20, 21, 22], bgClass: 'bg-violet-50', darkBgClass: 'dark:bg-violet-950/30', labelClass: 'text-violet-700 dark:text-violet-400' },
+  { name: '舊約先知書', books: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39], bgClass: 'bg-rose-50', darkBgClass: 'dark:bg-rose-950/30', labelClass: 'text-rose-700 dark:text-rose-400' },
 ];
 
 const NEW_TESTAMENT_CATEGORIES: BookCategory[] = [
-  { name: '四福音', books: [40, 41, 42, 43] },
-  { name: '教會歷史', books: [44] },
-  { name: '新約書信', books: [45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65] },
-  { name: '新約先知書', books: [66] },
+  { name: '四福音', books: [40, 41, 42, 43], bgClass: 'bg-sky-50', darkBgClass: 'dark:bg-sky-950/30', labelClass: 'text-sky-700 dark:text-sky-400' },
+  { name: '教會歷史', books: [44], bgClass: 'bg-teal-50', darkBgClass: 'dark:bg-teal-950/30', labelClass: 'text-teal-700 dark:text-teal-400' },
+  { name: '新約書信', books: [45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65], bgClass: 'bg-indigo-50', darkBgClass: 'dark:bg-indigo-950/30', labelClass: 'text-indigo-700 dark:text-indigo-400' },
+  { name: '新約先知書', books: [66], bgClass: 'bg-orange-50', darkBgClass: 'dark:bg-orange-950/30', labelClass: 'text-orange-700 dark:text-orange-400' },
 ];
 
 const BiblePage = () => {
@@ -72,7 +75,6 @@ const BiblePage = () => {
   const [copied, setCopied] = useState(false);
   const [expandedOT, setExpandedOT] = useState(true);
   const [expandedNT, setExpandedNT] = useState(true);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['摩西五經', '四福音']));
   const [searchCardVerse, setSearchCardVerse] = useState<{ text: string; reference: string } | null>(null);
   const [searchNoteVerse, setSearchNoteVerse] = useState<{ reference: string; text: string } | null>(null);
   const verseRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -371,18 +373,6 @@ const BiblePage = () => {
     return { text, reference };
   };
 
-  const toggleCategory = (categoryName: string) => {
-    setExpandedCategories(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(categoryName)) {
-        newSet.delete(categoryName);
-      } else {
-        newSet.add(categoryName);
-      }
-      return newSet;
-    });
-  };
-
   const navigateToVerse = (verse: BibleVerse) => {
     setIsSearching(false);
     setSearchQuery('');
@@ -497,35 +487,26 @@ const BiblePage = () => {
   const renderCategorySection = (category: BookCategory, allBooks: BibleBook[]) => {
     const categoryBooks = getBooksByCategory(category, allBooks);
     if (categoryBooks.length === 0) return null;
-    const isExpanded = expandedCategories.has(category.name);
 
     return (
-      <div key={category.name} className="mb-1">
-        <button
-          className="w-full flex items-center gap-2 py-2 px-2 text-sm font-medium text-muted-foreground rounded-md hover-elevate transition-colors"
-          onClick={() => toggleCategory(category.name)}
-          data-testid={`button-category-${category.name}`}
-        >
-          {isExpanded ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />}
-          <span>{category.name}</span>
-          <span className="text-xs text-muted-foreground/60 ml-auto">{categoryBooks.length}卷</span>
-        </button>
-        {isExpanded && (
-          <div className="grid grid-cols-1 gap-0.5 pl-2">
-            {categoryBooks.map((book) => (
-              <Button
-                key={book.bookNumber}
-                variant="ghost"
-                className="justify-between h-auto py-2 px-2 text-sm"
-                onClick={() => setSelectedBook(book.bookName)}
-                data-testid={`button-book-${book.bookNumber}`}
-              >
-                <span>{book.bookName}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-              </Button>
-            ))}
-          </div>
-        )}
+      <div key={category.name} className={`rounded-md p-2.5 sm:p-3 ${category.bgClass} ${category.darkBgClass}`}>
+        <p className={`text-xs font-semibold mb-1.5 ${category.labelClass}`} data-testid={`text-category-${category.name}`}>
+          {category.name}
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {categoryBooks.map((book) => (
+            <Button
+              key={book.bookNumber}
+              variant="ghost"
+              size="sm"
+              className="h-auto py-1 px-2 text-xs sm:text-sm bg-background/60 dark:bg-background/40"
+              onClick={() => setSelectedBook(book.bookName)}
+              data-testid={`button-book-${book.bookNumber}`}
+            >
+              {book.bookName}
+            </Button>
+          ))}
+        </div>
       </div>
     );
   };
@@ -732,7 +713,7 @@ const BiblePage = () => {
                         <span className="text-xs text-muted-foreground">{oldTestamentBooks.length}卷</span>
                       </button>
                       {expandedOT && (
-                        <div className="mt-2">
+                        <div className="mt-2 space-y-2">
                           {OLD_TESTAMENT_CATEGORIES.map(cat => renderCategorySection(cat, oldTestamentBooks))}
                         </div>
                       )}
@@ -754,7 +735,7 @@ const BiblePage = () => {
                         <span className="text-xs text-muted-foreground">{newTestamentBooks.length}卷</span>
                       </button>
                       {expandedNT && (
-                        <div className="mt-2">
+                        <div className="mt-2 space-y-2">
                           {NEW_TESTAMENT_CATEGORIES.map(cat => renderCategorySection(cat, newTestamentBooks))}
                         </div>
                       )}
