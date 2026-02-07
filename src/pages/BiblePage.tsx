@@ -504,6 +504,7 @@ const BiblePage = () => {
               data-testid={`button-book-${book.bookNumber}`}
             >
               {book.bookName}
+              <span className="text-xs text-muted-foreground ml-0.5">{book.chapterCount}</span>
             </Button>
           ))}
         </div>
@@ -709,8 +710,8 @@ const BiblePage = () => {
                           {expandedOT ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           <Book className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
                           舊約聖經
+                          <span className="text-sm font-normal text-muted-foreground">{oldTestamentBooks.length}卷</span>
                         </h3>
-                        <span className="text-xs sm:text-sm text-muted-foreground">{oldTestamentBooks.length}卷</span>
                       </button>
                       {expandedOT && (
                         <div className="mt-2 space-y-2">
@@ -731,8 +732,8 @@ const BiblePage = () => {
                           {expandedNT ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           <Book className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" />
                           新約聖經
+                          <span className="text-sm font-normal text-muted-foreground">{newTestamentBooks.length}卷</span>
                         </h3>
-                        <span className="text-xs sm:text-sm text-muted-foreground">{newTestamentBooks.length}卷</span>
                       </button>
                       {expandedNT && (
                         <div className="mt-2 space-y-2">
