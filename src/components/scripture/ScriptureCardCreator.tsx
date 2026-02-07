@@ -236,7 +236,7 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="max-w-lg w-[95vw] max-h-[90vh] p-0 gap-0 flex flex-col"
+        className="max-w-lg w-[95vw] max-h-[85vh] p-0 gap-0 flex flex-col z-[10000]"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="px-4 pt-3 pb-1 flex-shrink-0">

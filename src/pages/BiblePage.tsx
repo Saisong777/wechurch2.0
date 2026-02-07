@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Book, ChevronRight, ChevronDown, ChevronLeft, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2, Image, BookOpen, PenLine, ExternalLink, List, AlignLeft, Minus, Plus, Type } from 'lucide-react';
+import { Search, Book, ChevronRight, ChevronDown, ChevronLeft, ChevronUp, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2, Image, BookOpen, PenLine, ExternalLink, List, AlignLeft, Minus, Plus, Type } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FloatingToolbar } from '@/components/scripture/FloatingToolbar';
@@ -86,9 +86,10 @@ const BiblePage = () => {
     try {
       const saved = localStorage.getItem('wechurch-bible-font-size');
       const parsed = parseInt(saved || '1', 10);
-      return [0, 1, 2].includes(parsed) ? parsed : 1;
+      return [0, 1, 2, 3].includes(parsed) ? parsed : 1;
     } catch { return 1; }
   });
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
   const [searchCardVerse, setSearchCardVerse] = useState<{ text: string; reference: string } | null>(null);
   const [searchNoteVerse, setSearchNoteVerse] = useState<{ reference: string; text: string } | null>(null);
   const verseRefs = useRef<Map<number, HTMLElement>>(new Map());
@@ -209,12 +210,13 @@ const BiblePage = () => {
     { label: '小', verse: 'text-sm sm:text-base', verseNum: 'text-xs sm:text-sm', paragraph: 'text-sm sm:text-base leading-relaxed', sup: 'text-[9px] sm:text-[10px]' },
     { label: '中', verse: 'text-base sm:text-lg md:text-lg', verseNum: 'text-sm sm:text-lg', paragraph: 'text-base sm:text-lg md:text-lg leading-relaxed', sup: 'text-[10px] sm:text-xs' },
     { label: '大', verse: 'text-lg sm:text-xl md:text-xl', verseNum: 'text-base sm:text-xl', paragraph: 'text-lg sm:text-xl md:text-xl leading-loose', sup: 'text-xs sm:text-sm' },
+    { label: '特大', verse: 'text-xl sm:text-2xl md:text-2xl', verseNum: 'text-lg sm:text-2xl', paragraph: 'text-xl sm:text-2xl md:text-2xl leading-loose', sup: 'text-sm sm:text-base' },
   ];
 
   const currentFontConfig = FONT_SIZE_CONFIG[fontSizeLevel];
 
   const changeFontSize = (delta: number) => {
-    const next = Math.max(0, Math.min(2, fontSizeLevel + delta));
+    const next = Math.max(0, Math.min(3, fontSizeLevel + delta));
     setFontSizeLevel(next);
     try { localStorage.setItem('wechurch-bible-font-size', String(next)); } catch {}
   };
@@ -602,62 +604,64 @@ const BiblePage = () => {
       
       <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex flex-col">
         <div className="max-w-5xl lg:max-w-6xl mx-auto w-full flex flex-col flex-1">
-          <div className="flex items-center gap-2 mb-2 sm:mb-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
+            <div className="hidden sm:flex gap-2 flex-1">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜尋經文..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="pl-10 h-10 text-sm"
+                  data-testid="input-bible-search-desktop"
+                />
+              </div>
+              <Button onClick={handleSearch} size="sm" className="h-10 px-3" data-testid="button-search-desktop">
+                搜尋
+              </Button>
+            </div>
             {searchExpanded ? (
-              <div className="flex gap-1 sm:gap-2 flex-1">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <div className="flex gap-1 flex-1 sm:hidden">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
-                    placeholder="搜尋經文..."
+                    placeholder="搜尋..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSearch();
                       if (e.key === 'Escape') { if (!searchQuery) setSearchExpanded(false); }
                     }}
-                    className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
+                    className="pl-7 pr-7 h-8 text-sm"
                     data-testid="input-bible-search"
                     autoFocus
                   />
                   {searchQuery && (
                     <button
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-foreground hover:text-foreground"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground"
                       onClick={clearSearch}
                       data-testid="button-clear-search"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" />
                     </button>
                   )}
                 </div>
-                <Button onClick={handleSearch} size="sm" className="h-9 px-2 sm:px-3" data-testid="button-search">
+                <Button onClick={handleSearch} size="sm" className="h-8 px-2 text-xs" data-testid="button-search">
                   搜尋
                 </Button>
-                <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => { setSearchExpanded(false); setIsSearching(false); setSearchQuery(''); }} data-testid="button-close-search">
+                <button
+                  className="p-1 text-muted-foreground"
+                  onClick={() => { setSearchExpanded(false); setIsSearching(false); setSearchQuery(''); }}
+                  data-testid="button-close-search"
+                >
                   <X className="w-4 h-4" />
-                </Button>
+                </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 flex-1">
-                <div className="hidden sm:flex gap-2 flex-1">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="搜尋經文..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      className="pl-10 h-10 text-sm"
-                      data-testid="input-bible-search-desktop"
-                    />
-                  </div>
-                  <Button onClick={handleSearch} size="sm" className="h-10 px-3" data-testid="button-search-desktop">
-                    搜尋
-                  </Button>
-                </div>
-                <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setSearchExpanded(true)} data-testid="button-expand-search">
-                  <Search className="w-4 h-4" />
-                </Button>
-              </div>
+              <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setSearchExpanded(true)} data-testid="button-expand-search">
+                <Search className="w-4 h-4" />
+              </Button>
             )}
           </div>
 
@@ -739,52 +743,75 @@ const BiblePage = () => {
                   </Button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2 sm:mb-3">
-                  <div className="flex items-center gap-0.5 mr-1">
-                    <Type className="w-3.5 h-3.5 text-muted-foreground" />
-                    <Button variant="ghost" size="sm" onClick={() => changeFontSize(-1)} disabled={fontSizeLevel === 0} title="縮小字體" data-testid="button-font-decrease">
-                      <Minus className="w-3 h-3" />
-                    </Button>
-                    <span className="text-xs text-muted-foreground min-w-[1.5rem] text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
-                    <Button variant="ghost" size="sm" onClick={() => changeFontSize(1)} disabled={fontSizeLevel === 2} title="放大字體" data-testid="button-font-increase">
-                      <Plus className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    <Button
-                      variant={displayMode === 'list' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => {
-                        setDisplayMode('list');
-                        try { localStorage.setItem('wechurch-bible-display-mode', 'list'); } catch {}
-                      }}
-                      title="條列式"
-                      data-testid="button-display-list"
-                    >
-                      <List className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant={displayMode === 'paragraph' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => {
-                        setDisplayMode('paragraph');
-                        try { localStorage.setItem('wechurch-bible-display-mode', 'paragraph'); } catch {}
-                      }}
-                      title="段落式"
-                      data-testid="button-display-paragraph"
-                    >
-                      <AlignLeft className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <ScriptureTTS
-                    text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
-                    compact
-                    label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
-                  />
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    已選 {selectedVerseNums.size} 節
-                  </span>
+                <div className="flex items-center gap-1 mb-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setToolbarCollapsed(!toolbarCollapsed)}
+                    title={toolbarCollapsed ? '展開工具列' : '收合工具列'}
+                    data-testid="button-toggle-toolbar"
+                    className="gap-1 text-muted-foreground"
+                  >
+                    {toolbarCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                    <span className="text-xs">{toolbarCollapsed ? '展開工具' : '收合工具'}</span>
+                  </Button>
+                  {toolbarCollapsed && (
+                    <span className="text-xs text-muted-foreground">
+                      {FONT_SIZE_CONFIG[fontSizeLevel].label} · {displayMode === 'list' ? '條列' : '段落'}
+                      {selectedVerseNums.size > 0 && ` · 已選${selectedVerseNums.size}節`}
+                    </span>
+                  )}
+                  {!toolbarCollapsed && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {selectedVerseNums.size > 0 ? `已選 ${selectedVerseNums.size} 節` : ''}
+                    </span>
+                  )}
                 </div>
+                {!toolbarCollapsed && (
+                  <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                    <div className="flex items-center gap-0.5 mr-1">
+                      <Type className="w-3.5 h-3.5 text-muted-foreground" />
+                      <Button variant="ghost" size="sm" onClick={() => changeFontSize(-1)} disabled={fontSizeLevel === 0} title="縮小字體" data-testid="button-font-decrease">
+                        <Minus className="w-3 h-3" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground min-w-[1.5rem] text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
+                      <Button variant="ghost" size="sm" onClick={() => changeFontSize(1)} disabled={fontSizeLevel === 3} title="放大字體" data-testid="button-font-increase">
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        variant={displayMode === 'list' ? 'default' : 'outline'}
+                        size="icon"
+                        onClick={() => {
+                          setDisplayMode('list');
+                          try { localStorage.setItem('wechurch-bible-display-mode', 'list'); } catch {}
+                        }}
+                        title="條列式"
+                        data-testid="button-display-list"
+                      >
+                        <List className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant={displayMode === 'paragraph' ? 'default' : 'outline'}
+                        size="icon"
+                        onClick={() => {
+                          setDisplayMode('paragraph');
+                          try { localStorage.setItem('wechurch-bible-display-mode', 'paragraph'); } catch {}
+                        }}
+                        title="段落式"
+                        data-testid="button-display-paragraph"
+                      >
+                        <AlignLeft className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <ScriptureTTS
+                      text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
+                      compact
+                      label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
+                    />
+                  </div>
+                )}
 
                 {versesLoading ? (
                   <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">載入中...</div>
@@ -958,7 +985,7 @@ const BiblePage = () => {
 
       {selectedBook && selectedChapter && (
         <FloatingToolbar
-          visible={selectedVerseNums.size > 0}
+          visible={selectedVerseNums.size > 0 && !showCardModal && !searchCardVerse}
           getAnchorRect={getAnchorRect}
           selectedCount={selectedVerseNums.size}
           onCopy={async () => {
