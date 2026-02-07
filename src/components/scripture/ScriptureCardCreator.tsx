@@ -233,10 +233,22 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
     }
   };
 
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+
+  const handleInputFocus = useCallback(() => {
+    setTimeout(() => {
+      scrollContentRef.current?.scrollTo({
+        top: scrollContentRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }, 300);
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="max-w-lg w-[95vw] max-h-[85vh] p-0 gap-0 flex flex-col z-[10000]"
+        className="max-w-lg w-[95vw] p-0 gap-0 flex flex-col z-[10000] !translate-y-0 !top-[8px] sm:!top-[50%] sm:!-translate-y-1/2"
+        style={{ maxHeight: '80dvh' }}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="px-4 pt-3 pb-1 flex-shrink-0">
@@ -247,8 +259,9 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
         </DialogHeader>
 
         <div 
+          ref={scrollContentRef}
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3"
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
           <div className="flex flex-col gap-3">
             <div ref={previewContainerRef} className="flex justify-center relative">
@@ -436,6 +449,7 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
                   placeholder="寫下你的感言..."
                   value={personalMessage}
                   onChange={(e) => setPersonalMessage(e.target.value)}
+                  onFocus={handleInputFocus}
                   className="h-8 text-sm"
                   data-testid="input-personal-message"
                 />

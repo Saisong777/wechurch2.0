@@ -604,66 +604,73 @@ const BiblePage = () => {
       
       <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex flex-col">
         <div className="max-w-5xl lg:max-w-6xl mx-auto w-full flex flex-col flex-1">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
-            <div className="hidden sm:flex gap-2 flex-1">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <div className="flex sm:hidden justify-end mb-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-muted-foreground"
+              onClick={() => setSearchExpanded(true)}
+              data-testid="button-expand-search"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="text-xs">搜尋</span>
+            </Button>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="搜尋經文..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="pl-10 h-10 text-sm"
+                data-testid="input-bible-search-desktop"
+              />
+            </div>
+            <Button onClick={handleSearch} size="sm" className="h-10 px-3" data-testid="button-search-desktop">
+              搜尋
+            </Button>
+          </div>
+          {searchExpanded && (
+            <div className="fixed inset-x-0 top-0 z-[10001] bg-background border-b shadow-sm p-2 flex gap-1 items-center sm:hidden animate-in slide-in-from-top-2 duration-200">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
                   placeholder="搜尋經文..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 h-10 text-sm"
-                  data-testid="input-bible-search-desktop"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSearch();
+                    if (e.key === 'Escape') { setSearchExpanded(false); if (!searchQuery) { setIsSearching(false); } }
+                  }}
+                  className="pl-7 pr-7 h-9 text-sm"
+                  data-testid="input-bible-search"
+                  autoFocus
                 />
+                {searchQuery && (
+                  <button
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground"
+                    onClick={clearSearch}
+                    data-testid="button-clear-search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-              <Button onClick={handleSearch} size="sm" className="h-10 px-3" data-testid="button-search-desktop">
+              <Button onClick={handleSearch} size="sm" data-testid="button-search">
                 搜尋
               </Button>
-            </div>
-            {searchExpanded ? (
-              <div className="flex gap-1 flex-1 sm:hidden">
-                <div className="relative flex-1 min-w-0">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="搜尋..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSearch();
-                      if (e.key === 'Escape') { if (!searchQuery) setSearchExpanded(false); }
-                    }}
-                    className="pl-7 pr-7 h-8 text-sm"
-                    data-testid="input-bible-search"
-                    autoFocus
-                  />
-                  {searchQuery && (
-                    <button
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground"
-                      onClick={clearSearch}
-                      data-testid="button-clear-search"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-                <Button onClick={handleSearch} size="sm" className="h-8 px-2 text-xs" data-testid="button-search">
-                  搜尋
-                </Button>
-                <button
-                  className="p-1 text-muted-foreground"
-                  onClick={() => { setSearchExpanded(false); setIsSearching(false); setSearchQuery(''); }}
-                  data-testid="button-close-search"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setSearchExpanded(true)} data-testid="button-expand-search">
-                <Search className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setSearchExpanded(false); setIsSearching(false); setSearchQuery(''); }}
+                data-testid="button-close-search"
+              >
+                <X className="w-4 h-4" />
               </Button>
-            )}
-          </div>
+            </div>
+          )}
 
           {isSearching ? (
             <Card className="flex-1 flex flex-col">
@@ -985,7 +992,7 @@ const BiblePage = () => {
 
       {selectedBook && selectedChapter && (
         <FloatingToolbar
-          visible={selectedVerseNums.size > 0 && !showCardModal && !searchCardVerse}
+          visible={selectedVerseNums.size > 0 && !showCardModal && !searchCardVerse && !searchExpanded}
           getAnchorRect={getAnchorRect}
           selectedCount={selectedVerseNums.size}
           onCopy={async () => {
