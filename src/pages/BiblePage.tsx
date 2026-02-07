@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Book, ChevronRight, ChevronDown, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2, Image, BookOpen, PenLine, ExternalLink } from 'lucide-react';
+import { Search, Book, ChevronRight, ChevronDown, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2, Image, BookOpen, PenLine, ExternalLink, List, AlignLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { FloatingToolbar } from '@/components/scripture/FloatingToolbar';
@@ -75,9 +75,15 @@ const BiblePage = () => {
   const [copied, setCopied] = useState(false);
   const [expandedOT, setExpandedOT] = useState(true);
   const [expandedNT, setExpandedNT] = useState(true);
+  const [displayMode, setDisplayMode] = useState<'list' | 'paragraph'>(() => {
+    try {
+      const saved = localStorage.getItem('wechurch-bible-display-mode');
+      return (saved === 'paragraph' || saved === 'list') ? saved : 'list';
+    } catch { return 'list'; }
+  });
   const [searchCardVerse, setSearchCardVerse] = useState<{ text: string; reference: string } | null>(null);
   const [searchNoteVerse, setSearchNoteVerse] = useState<{ reference: string; text: string } | null>(null);
-  const verseRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const verseRefs = useRef<Map<number, HTMLElement>>(new Map());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -605,6 +611,30 @@ const BiblePage = () => {
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-2 sm:mb-4">
                   <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
                   <div className="flex items-center gap-1">
+                    <Button
+                      variant={displayMode === 'list' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => {
+                        setDisplayMode('list');
+                        try { localStorage.setItem('wechurch-bible-display-mode', 'list'); } catch {}
+                      }}
+                      title="條列式"
+                      data-testid="button-display-list"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={displayMode === 'paragraph' ? 'default' : 'outline'}
+                      size="icon"
+                      onClick={() => {
+                        setDisplayMode('paragraph');
+                        try { localStorage.setItem('wechurch-bible-display-mode', 'paragraph'); } catch {}
+                      }}
+                      title="段落式"
+                      data-testid="button-display-paragraph"
+                    >
+                      <AlignLeft className="w-4 h-4" />
+                    </Button>
                     <ScriptureTTS
                       text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
                       compact
@@ -629,32 +659,58 @@ const BiblePage = () => {
                   </div>
                 ) : (
                   <ScrollArea className="flex-1 h-[calc(100vh-240px)] sm:h-[calc(100vh-300px)]">
-                    <div className="space-y-1 sm:space-y-2 pr-2 sm:pr-4">
-                      {verses.map((v) => (
-                        <div 
-                          key={v.verse} 
-                          ref={(el) => {
-                            if (el) verseRefs.current.set(v.verse, el);
-                            else verseRefs.current.delete(v.verse);
-                          }}
-                          className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${
-                            selectedVerseNums.has(v.verse) 
-                              ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30' 
-                              : 'hover:bg-muted/50'
-                          }`}
-                          onClick={() => toggleVerseSelection(v.verse)}
-                          data-testid={`verse-${v.chapter}-${v.verse}`}
-                        >
-                          <div className="flex items-start gap-1 sm:gap-2">
-                            {selectedVerseNums.has(v.verse) && (
-                              <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
-                            )}
-                            <span className="text-primary font-bold text-sm sm:text-lg min-w-[1.5rem] sm:min-w-[2rem] text-right">{v.verse}</span>
+                    {displayMode === 'paragraph' ? (
+                      <div className="text-base sm:text-lg md:text-lg leading-relaxed pr-2 sm:pr-4 py-2">
+                        {verses.map((v) => (
+                          <span key={v.verse}>
+                            <span
+                              ref={(el) => {
+                                if (el) verseRefs.current.set(v.verse, el);
+                                else verseRefs.current.delete(v.verse);
+                              }}
+                              className={`cursor-pointer transition-colors select-none rounded-sm ${
+                                selectedVerseNums.has(v.verse)
+                                  ? 'bg-primary/10 ring-1 ring-primary/30'
+                                  : 'hover:bg-muted/50'
+                              }`}
+                              onClick={() => toggleVerseSelection(v.verse)}
+                              data-testid={`verse-${v.chapter}-${v.verse}`}
+                            >
+                              <sup className="text-primary/60 font-medium text-[10px] sm:text-xs mr-0.5">{v.verse}</sup>
+                              {v.text}
+                            </span>
+                            {' '}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-1 sm:space-y-2 pr-2 sm:pr-4">
+                        {verses.map((v) => (
+                          <div 
+                            key={v.verse} 
+                            ref={(el) => {
+                              if (el) verseRefs.current.set(v.verse, el);
+                              else verseRefs.current.delete(v.verse);
+                            }}
+                            className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${
+                              selectedVerseNums.has(v.verse) 
+                                ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30' 
+                                : 'hover:bg-muted/50'
+                            }`}
+                            onClick={() => toggleVerseSelection(v.verse)}
+                            data-testid={`verse-${v.chapter}-${v.verse}`}
+                          >
+                            <div className="flex items-start gap-1 sm:gap-2">
+                              {selectedVerseNums.has(v.verse) && (
+                                <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
+                              )}
+                              <span className="text-primary font-bold text-sm sm:text-lg min-w-[1.5rem] sm:min-w-[2rem] text-right">{v.verse}</span>
+                            </div>
+                            <span className="text-base sm:text-lg md:text-lg leading-relaxed flex-1">{v.text}</span>
                           </div>
-                          <span className="text-base sm:text-lg md:text-lg leading-relaxed flex-1">{v.text}</span>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </ScrollArea>
                 )}
               </CardContent>

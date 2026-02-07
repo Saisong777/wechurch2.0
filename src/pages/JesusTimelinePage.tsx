@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type, BookMarked, Volume2 } from 'lucide-react';
+import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type, BookMarked, Volume2, List, AlignLeft } from 'lucide-react';
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
 import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
@@ -151,7 +151,7 @@ function getExclusiveGospel(event: JesusEvent): string | null {
   return null;
 }
 
-const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference: string; gospelName: string; fontSizeClass: string }) => {
+const ScriptureDisplay = ({ reference, gospelName, fontSizeClass, paragraphMode = true }: { reference: string; gospelName: string; fontSizeClass: string; paragraphMode?: boolean }) => {
   const [showNoteDialog, setShowNoteDialog] = useState(false);
   const [selectedNoteRef, setSelectedNoteRef] = useState<string>('');
   const [selectedNoteText, setSelectedNoteText] = useState<string>('');
@@ -194,7 +194,7 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference:
       </h6>
       <ScriptureViewer 
         verses={formattedVerses} 
-        paragraphMode 
+        paragraphMode={paragraphMode} 
         fontSizeClass={fontSizeClass}
         onNoteForSelected={(ref, text) => {
           setSelectedNoteRef(ref);
@@ -256,9 +256,10 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass }: { reference:
   );
 };
 
-const SyncedScriptureDisplay = ({ scriptures, fontSizeClass }: {
+const SyncedScriptureDisplay = ({ scriptures, fontSizeClass, paragraphMode = true }: {
   scriptures: { key: string; name: string; ref: string }[];
   fontSizeClass: string;
+  paragraphMode?: boolean;
 }) => {
   const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
   const isScrolling = useRef(false);
@@ -302,7 +303,7 @@ const SyncedScriptureDisplay = ({ scriptures, fontSizeClass }: {
           onScroll={() => handleScroll(idx)}
           className={`rounded-lg p-2 sm:p-3 sm:max-h-[60vh] sm:overflow-y-scroll scripture-scroll-visible ${bgColors[g.key] || 'bg-muted/30'}`}
         >
-          <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} />
+          <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} />
         </div>
       ))}
     </div>
@@ -314,11 +315,13 @@ const EventCard = ({
   isCollapsed,
   onToggle,
   fontSizeClass,
+  paragraphMode = true,
 }: {
   event: JesusEvent;
   isCollapsed: boolean;
   onToggle: () => void;
   fontSizeClass: string;
+  paragraphMode?: boolean;
 }) => {
   const cfg = seasonConfig[event.season] || seasonConfig['春'];
   const exclusive = getExclusiveGospel(event);
@@ -421,7 +424,7 @@ const EventCard = ({
             onTouchStart={(e) => e.stopPropagation()}
           >
             {hasMultipleScriptures ? (
-              <SyncedScriptureDisplay scriptures={gospelScriptures} fontSizeClass={fontSizeClass} />
+              <SyncedScriptureDisplay scriptures={gospelScriptures} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} />
             ) : (
               gospelScriptures.map((g) => {
                 const bgColors: Record<string, string> = {
@@ -432,7 +435,7 @@ const EventCard = ({
                 };
                 return (
                   <div key={g.key} className={`rounded-lg p-3 ${bgColors[g.key] || 'bg-muted/30'}`}>
-                    <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} />
+                    <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} />
                   </div>
                 );
               })
@@ -476,6 +479,13 @@ const JesusTimelinePage = () => {
       }
     } catch {}
     return 1;
+  });
+
+  const [displayMode, setDisplayMode] = useState<'list' | 'paragraph'>(() => {
+    try {
+      const saved = localStorage.getItem('wechurch-scripture-display-mode');
+      return (saved === 'paragraph' || saved === 'list') ? saved : 'paragraph';
+    } catch { return 'paragraph'; }
   });
 
   const currentFontSize = fontSizeOptions[fontSizeIdx];
@@ -676,6 +686,33 @@ const JesusTimelinePage = () => {
                           <Plus className="w-3 h-3" />
                         </Button>
                       </div>
+
+                      <div className="w-px h-4 bg-border mx-1" />
+
+                      <Button
+                        variant={displayMode === 'list' ? 'default' : 'outline'}
+                        size="icon"
+                        onClick={() => {
+                          setDisplayMode('list');
+                          try { localStorage.setItem('wechurch-scripture-display-mode', 'list'); } catch {}
+                        }}
+                        title="條列式"
+                        data-testid="button-display-list"
+                      >
+                        <List className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant={displayMode === 'paragraph' ? 'default' : 'outline'}
+                        size="icon"
+                        onClick={() => {
+                          setDisplayMode('paragraph');
+                          try { localStorage.setItem('wechurch-scripture-display-mode', 'paragraph'); } catch {}
+                        }}
+                        title="段落式"
+                        data-testid="button-display-paragraph"
+                      >
+                        <AlignLeft className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -722,6 +759,7 @@ const JesusTimelinePage = () => {
                             isCollapsed={collapsedEvents.has(event.id)}
                             onToggle={() => toggleCollapse(event.id)}
                             fontSizeClass={currentFontSize.class}
+                            paragraphMode={displayMode === 'paragraph'}
                           />
                         ))}
                       </div>
