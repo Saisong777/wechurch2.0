@@ -1,9 +1,9 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type, BookMarked, Volume2, List, AlignLeft } from 'lucide-react';
+import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type, BookMarked, List, AlignLeft } from 'lucide-react';
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
 import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
@@ -151,10 +151,13 @@ function getExclusiveGospel(event: JesusEvent): string | null {
   return null;
 }
 
-const ScriptureDisplay = ({ reference, gospelName, fontSizeClass, paragraphMode = true }: { reference: string; gospelName: string; fontSizeClass: string; paragraphMode?: boolean }) => {
-  const [showNoteDialog, setShowNoteDialog] = useState(false);
-  const [selectedNoteRef, setSelectedNoteRef] = useState<string>('');
-  const [selectedNoteText, setSelectedNoteText] = useState<string>('');
+const ScriptureDisplay = memo(({ reference, gospelName, fontSizeClass, paragraphMode = true, onOpenNote }: {
+  reference: string;
+  gospelName: string;
+  fontSizeClass: string;
+  paragraphMode?: boolean;
+  onOpenNote: (ref: string, text: string) => void;
+}) => {
   const [ttsText, setTtsText] = useState<string>('');
   const [showSelectedTts, setShowSelectedTts] = useState(false);
   const { data, isLoading } = useQuery<ScriptureData>({
@@ -186,6 +189,8 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass, paragraphMode 
     text: v.text,
   }));
 
+  const allText = data.verses.map((v: any) => v.text).join(' ');
+
   return (
     <div className="mb-2">
       <h6 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
@@ -196,11 +201,7 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass, paragraphMode 
         verses={formattedVerses} 
         paragraphMode={paragraphMode} 
         fontSizeClass={fontSizeClass}
-        onNoteForSelected={(ref, text) => {
-          setSelectedNoteRef(ref);
-          setSelectedNoteText(text);
-          setShowNoteDialog(true);
-        }}
+        onNoteForSelected={(ref, text) => onOpenNote(ref, text)}
         onReadSelected={(text) => {
           setTtsText(text);
           setShowSelectedTts(true);
@@ -216,50 +217,32 @@ const ScriptureDisplay = ({ reference, gospelName, fontSizeClass, paragraphMode 
         </div>
       )}
 
-      {data && data.verses && data.verses.length > 0 && (
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => {
-              setSelectedNoteRef(reference);
-              setSelectedNoteText(data.verses.map((v: any) => v.text).join(' '));
-              setShowNoteDialog(true);
-            }}
-            data-testid="button-timeline-note"
-          >
-            <BookMarked className="w-3.5 h-3.5" />
-            <span className="text-xs">靈修筆記</span>
-          </Button>
-          <ScriptureTTS
-            text={data.verses.map((v: any) => v.text).join(' ')}
-            compact
-            label="朗讀經文"
-          />
-        </div>
-      )}
-
-      <DevotionalNoteDialog
-        open={showNoteDialog}
-        onOpenChange={(open) => {
-          setShowNoteDialog(open);
-          if (!open) {
-            setSelectedNoteRef('');
-            setSelectedNoteText('');
-          }
-        }}
-        verseReference={selectedNoteRef || reference}
-        verseText={selectedNoteText || (data?.verses?.map((v: any) => v.text).join(' ') || '')}
-      />
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => onOpenNote(reference, allText)}
+          data-testid="button-timeline-note"
+        >
+          <BookMarked className="w-3.5 h-3.5" />
+          <span className="text-xs">靈修筆記</span>
+        </Button>
+        <ScriptureTTS
+          text={allText}
+          compact
+          label="朗讀經文"
+        />
+      </div>
     </div>
   );
-};
+});
 
-const SyncedScriptureDisplay = ({ scriptures, fontSizeClass, paragraphMode = true }: {
+const SyncedScriptureDisplay = memo(({ scriptures, fontSizeClass, paragraphMode = true, onOpenNote }: {
   scriptures: { key: string; name: string; ref: string }[];
   fontSizeClass: string;
   paragraphMode?: boolean;
+  onOpenNote: (ref: string, text: string) => void;
 }) => {
   const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
   const isScrolling = useRef(false);
@@ -303,25 +286,27 @@ const SyncedScriptureDisplay = ({ scriptures, fontSizeClass, paragraphMode = tru
           onScroll={() => handleScroll(idx)}
           className={`rounded-lg p-2 sm:p-3 sm:max-h-[60vh] sm:overflow-y-scroll scripture-scroll-visible ${bgColors[g.key] || 'bg-muted/30'}`}
         >
-          <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} />
+          <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} onOpenNote={onOpenNote} />
         </div>
       ))}
     </div>
   );
-};
+});
 
-const EventCard = ({
+const EventCard = memo(({
   event,
   isCollapsed,
-  onToggle,
+  onToggleExpand,
   fontSizeClass,
   paragraphMode = true,
+  onOpenNote,
 }: {
   event: JesusEvent;
   isCollapsed: boolean;
-  onToggle: () => void;
+  onToggleExpand: (id: number) => void;
   fontSizeClass: string;
   paragraphMode?: boolean;
+  onOpenNote: (ref: string, text: string) => void;
 }) => {
   const cfg = seasonConfig[event.season] || seasonConfig['春'];
   const exclusive = getExclusiveGospel(event);
@@ -406,7 +391,7 @@ const EventCard = ({
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              onToggle();
+              onToggleExpand(event.id);
             }}
             className="mt-1 gap-1 text-xs text-muted-foreground"
             data-testid={`button-expand-${event.id}`}
@@ -424,18 +409,18 @@ const EventCard = ({
             onTouchStart={(e) => e.stopPropagation()}
           >
             {hasMultipleScriptures ? (
-              <SyncedScriptureDisplay scriptures={gospelScriptures} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} />
+              <SyncedScriptureDisplay scriptures={gospelScriptures} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} onOpenNote={onOpenNote} />
             ) : (
               gospelScriptures.map((g) => {
-                const bgColors: Record<string, string> = {
+                const singleBgColors: Record<string, string> = {
                   'scriptureMt': 'bg-blue-50/60 dark:bg-blue-950/20',
                   'scriptureMk': 'bg-green-50/60 dark:bg-green-950/20',
                   'scriptureLk': 'bg-amber-50/60 dark:bg-amber-950/20',
                   'scriptureJn': 'bg-purple-50/60 dark:bg-purple-950/20',
                 };
                 return (
-                  <div key={g.key} className={`rounded-lg p-3 ${bgColors[g.key] || 'bg-muted/30'}`}>
-                    <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} />
+                  <div key={g.key} className={`rounded-lg p-3 ${singleBgColors[g.key] || 'bg-muted/30'}`}>
+                    <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} onOpenNote={onOpenNote} />
                   </div>
                 );
               })
@@ -445,7 +430,7 @@ const EventCard = ({
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                onToggle();
+                onToggleExpand(event.id);
               }}
               className="gap-1 text-xs text-muted-foreground"
               data-testid={`button-collapse-${event.id}`}
@@ -458,12 +443,39 @@ const EventCard = ({
       </CardContent>
     </Card>
   );
+});
+
+const LazyEventCard = ({ children }: { children: React.ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  if (!isVisible) {
+    return <div ref={ref} className="h-24 bg-card rounded-lg border border-border animate-pulse" />;
+  }
+
+  return <div ref={ref}>{children}</div>;
 };
 
 const JesusTimelinePage = () => {
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
   const [selectedGospel, setSelectedGospel] = useState<string | null>(null);
-  const [collapsedEvents, setCollapsedEvents] = useState<Set<number>>(new Set());
+  const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
   const [filterOpen, setFilterOpen] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth >= 768;
@@ -507,14 +519,25 @@ const JesusTimelinePage = () => {
     },
   });
 
-  const toggleCollapse = (eventId: number) => {
-    setCollapsedEvents(prev => {
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteRef, setNoteRef] = useState('');
+  const [noteText, setNoteText] = useState('');
+
+  const toggleExpand = useCallback((eventId: number) => {
+    setExpandedEvents(prev => {
       const next = new Set(prev);
       if (next.has(eventId)) next.delete(eventId);
       else next.add(eventId);
       return next;
     });
-  };
+  }, []);
+
+  const handleOpenNote = useCallback((ref: string, text: string) => {
+    setNoteRef(ref);
+    setNoteText(text);
+    setNoteDialogOpen(true);
+  }, []);
+
 
   const filteredEvents = useMemo(() => {
     let events = allEvents;
@@ -753,14 +776,16 @@ const JesusTimelinePage = () => {
 
                       <div className="space-y-3">
                         {events.map(event => (
-                          <EventCard
-                            key={event.id}
-                            event={event}
-                            isCollapsed={collapsedEvents.has(event.id)}
-                            onToggle={() => toggleCollapse(event.id)}
-                            fontSizeClass={currentFontSize.class}
-                            paragraphMode={displayMode === 'paragraph'}
-                          />
+                          <LazyEventCard key={event.id}>
+                            <EventCard
+                              event={event}
+                              isCollapsed={!expandedEvents.has(event.id)}
+                              onToggleExpand={toggleExpand}
+                              fontSizeClass={currentFontSize.class}
+                              paragraphMode={displayMode === 'paragraph'}
+                              onOpenNote={handleOpenNote}
+                            />
+                          </LazyEventCard>
                         ))}
                       </div>
                     </section>
@@ -770,6 +795,19 @@ const JesusTimelinePage = () => {
             )}
           </div>
         </main>
+
+        <DevotionalNoteDialog
+          open={noteDialogOpen}
+          onOpenChange={(open) => {
+            setNoteDialogOpen(open);
+            if (!open) {
+              setNoteRef('');
+              setNoteText('');
+            }
+          }}
+          verseReference={noteRef}
+          verseText={noteText}
+        />
       </div>
     </FeatureGate>
   );
