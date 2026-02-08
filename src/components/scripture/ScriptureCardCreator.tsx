@@ -138,26 +138,22 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
     }
   }, [cardRenderHeight]);
 
-  const saveImage = useCallback((dataUrl: string) => {
+  const saveImage = useCallback(async (dataUrl: string) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
     if (isMobile) {
-      const newWindow = window.open();
-      if (newWindow) {
-        newWindow.document.write(`
-          <html>
-            <head><title>經文圖卡</title></head>
-            <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-              <img src="${dataUrl}" style="max-width:100%;max-height:100vh;" />
-              <p style="position:fixed;bottom:20px;left:0;right:0;text-align:center;color:white;font-size:14px;">
-                長按圖片可以儲存
-              </p>
-            </body>
-          </html>
-        `);
-        newWindow.document.close();
-        toast({ title: '圖片已生成', description: '請長按圖片儲存' });
-        return;
+      try {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `verse-card-${Date.now()}.png`, { type: 'image/png' });
+        
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: '經文圖卡' });
+          toast({ title: '分享成功' });
+          return;
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
       }
     }
     
@@ -182,7 +178,7 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
       }
 
       const dataUrl = canvas.toDataURL('image/png', 1.0);
-      saveImage(dataUrl);
+      await saveImage(dataUrl);
     } catch (err) {
       console.error('Download failed:', err);
       toast({ title: '下載失敗', description: '請重試', variant: 'destructive' });
@@ -224,7 +220,7 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
       }
       
       const dataUrl = canvas.toDataURL('image/png', 1.0);
-      saveImage(dataUrl);
+      await saveImage(dataUrl);
     } catch (err) {
       console.error('Share failed:', err);
       toast({ title: '分享失敗', variant: 'destructive' });
@@ -455,7 +451,7 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
                   value={personalMessage}
                   onChange={(e) => setPersonalMessage(e.target.value)}
                   onFocus={handleInputFocus}
-                  className="h-8 text-sm"
+                  className="h-9 text-base"
                   data-testid="input-personal-message"
                 />
               </div>
