@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Sprout, Sun, Leaf, Snowflake, Calendar, MapPin, Book, AlertCircle, ChevronUp, FileText, Filter, ChevronDown, Minus, Plus, Type, BookMarked, List, AlignLeft } from 'lucide-react';
 import { ScriptureViewer } from '@/components/scripture/ScriptureViewer';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
-import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { Header } from '@/components/layout/Header';
 
@@ -158,8 +157,6 @@ const ScriptureDisplay = memo(({ reference, gospelName, fontSizeClass, paragraph
   paragraphMode?: boolean;
   onOpenNote: (ref: string, text: string) => void;
 }) => {
-  const [ttsText, setTtsText] = useState<string>('');
-  const [showSelectedTts, setShowSelectedTts] = useState(false);
   const { data, isLoading } = useQuery<ScriptureData>({
     queryKey: ['/api/bible/by-reference', reference],
     queryFn: async () => {
@@ -202,20 +199,7 @@ const ScriptureDisplay = memo(({ reference, gospelName, fontSizeClass, paragraph
         paragraphMode={paragraphMode} 
         fontSizeClass={fontSizeClass}
         onNoteForSelected={(ref, text) => onOpenNote(ref, text)}
-        onReadSelected={(text) => {
-          setTtsText(text);
-          setShowSelectedTts(true);
-        }}
       />
-
-      {showSelectedTts && ttsText && (
-        <div className="flex items-center gap-2 mt-2 p-2 rounded-md bg-primary/5 border border-primary/10">
-          <ScriptureTTS text={ttsText} compact label="朗讀選取經文" />
-          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setShowSelectedTts(false)} data-testid="button-close-selected-tts">
-            關閉
-          </Button>
-        </div>
-      )}
 
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
         <Button
@@ -228,11 +212,6 @@ const ScriptureDisplay = memo(({ reference, gospelName, fontSizeClass, paragraph
           <BookMarked className="w-3.5 h-3.5" />
           <span className="text-xs">靈修筆記</span>
         </Button>
-        <ScriptureTTS
-          text={allText}
-          compact
-          label="朗讀經文"
-        />
       </div>
     </div>
   );

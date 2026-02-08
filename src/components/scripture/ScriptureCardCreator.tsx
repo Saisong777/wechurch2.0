@@ -248,8 +248,10 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className="max-w-lg w-[95vw] p-0 gap-0 flex flex-col z-[10000] !translate-y-0 !top-[8px] sm:!top-[50%] sm:!-translate-y-1/2"
-        style={{ maxHeight: '80dvh' }}
+        style={{ maxHeight: '80dvh', touchAction: 'pan-y' }}
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="px-4 pt-3 pb-1 flex-shrink-0">
           <DialogTitle className="text-base">製作經文圖卡</DialogTitle>
@@ -262,6 +264,9 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
           ref={scrollContentRef}
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3"
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
         >
           <div className="flex flex-col gap-3">
             <div ref={previewContainerRef} className="flex justify-center relative">
