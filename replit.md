@@ -29,7 +29,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM for type-safe schema and migrations.
-- **Key Tables**: `users`, `sessions`, `participants`, `study_responses`, `ai_reports`, `prayers`, `icebreaker_games`, `grouping_activities`, `message_cards`, `feature_toggles`, `user_reading_plans`.
+- **Key Tables**: `users`, `sessions`, `participants`, `study_responses`, `ai_reports`, `prayers`, `icebreaker_games`, `grouping_activities`, `message_cards`, `feature_toggles`, `user_reading_plans`, `password_reset_tokens`.
 
 ### Core Features
 - **Prayer Wall**: Supports prayer sharing, categorization, anonymous posting, scripture references, and interactive features like 'Amen' and comments.
