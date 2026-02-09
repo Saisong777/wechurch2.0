@@ -44,6 +44,10 @@ Preferred communication style: Simple, everyday language.
 
 ### High-Concurrency Design
 - Optimized for 500+ concurrent users with staggered requests, exponential backoff, extended polling, debounced auto-save, and non-blocking operations.
+- **Phase-Aware Polling**: `useRealtimeSecure` and `useRealtime` hooks accept a `phase` parameter (`waiting`/`grouping`/`studying`/`all`) to skip unnecessary API calls. Waiting phase fetches session only; grouping adds participants; studying adds submissions.
+- **Efficient Comparisons**: Field-by-field comparison (groupNumber, readyConfirmed, status, verseReference) instead of JSON.stringify for change detection in polling hooks.
+- **Server-Side Filtering**: `GET /api/sessions/:id/participants?groupNumber=X` filters participants at the database level. `fetchGroupMembers()` uses this to avoid fetching all participants.
+- **Optimized Queries**: `getStudyResponses` uses LEFT JOIN instead of N+1 separate queries for participants/users.
 - **Database**: Connection pool with max 20 connections.
 - **Caching**: In-memory caching for Bible data and timeline events (1 hour).
 
