@@ -630,7 +630,7 @@ const BiblePage = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10 h-10 text-sm"
+                className="pl-10 h-10 text-base md:text-sm"
                 data-testid="input-bible-search-desktop"
               />
             </div>
@@ -650,7 +650,7 @@ const BiblePage = () => {
                     if (e.key === 'Enter') handleSearch();
                     if (e.key === 'Escape') { setSearchExpanded(false); if (!searchQuery) { setIsSearching(false); } }
                   }}
-                  className="pl-7 pr-7 h-9 text-sm"
+                  className="pl-7 pr-7 h-9 text-base"
                   data-testid="input-bible-search"
                   autoFocus
                 />
