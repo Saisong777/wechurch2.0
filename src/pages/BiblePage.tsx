@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
@@ -94,6 +94,10 @@ const BiblePage = () => {
   const verseRefs = useRef<Map<number, HTMLElement>>(new Map());
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [selectedBook, selectedChapter, isSearching]);
 
   const { data: books = [], isError: booksError } = useQuery<BibleBook[]>({
     queryKey: ['/api/bible/books'],
