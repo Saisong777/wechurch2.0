@@ -189,7 +189,7 @@ export function DevotionalNoteDialog({
             <Loader2 className="w-7 h-7 animate-spin text-primary" data-testid="loading-spinner" />
           </div>
         ) : (
-          <div className="space-y-4 pb-6">
+          <div className="space-y-4 pb-24">
             {/* Verse info */}
             <div className="rounded-md bg-muted/50 p-3 space-y-1">
               <p className="text-xs font-medium text-muted-foreground">經文</p>

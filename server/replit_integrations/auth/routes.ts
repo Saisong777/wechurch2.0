@@ -115,7 +115,28 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       const dbUser = userResult.rows[0];
-      const passwordMatch = await bcrypt.compare(password, dbUser.password);
+
+      if (!dbUser.password || dbUser.password.length === 0) {
+        return res.status(401).json({ message: "電子郵件或密碼錯誤" });
+      }
+
+      let passwordMatch = false;
+      const isBcryptHash = dbUser.password.length === 60 && dbUser.password.startsWith("$2");
+      if (isBcryptHash) {
+        passwordMatch = await bcrypt.compare(password, dbUser.password);
+      } else if (dbUser.password.length >= 6 && dbUser.password.length <= 30) {
+        const { timingSafeEqual } = await import("crypto");
+        const a = Buffer.from(password, "utf8");
+        const b = Buffer.from(dbUser.password, "utf8");
+        if (a.length === b.length) {
+          passwordMatch = timingSafeEqual(a, b);
+        }
+        if (passwordMatch) {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, dbUser.id]);
+          console.log("[Auth] Upgraded legacy password to bcrypt for:", normalizedEmail);
+        }
+      }
 
       if (!passwordMatch) {
         return res.status(401).json({ message: "電子郵件或密碼錯誤" });
