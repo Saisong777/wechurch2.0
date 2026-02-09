@@ -603,22 +603,25 @@ const BiblePage = () => {
       description="聖經閱讀功能目前暫時關閉，請稍後再試"
     >
     <div className="bg-background min-h-screen">
-      <Header title="聖經閱讀" subtitle="和合本" variant="compact" />
+      <Header
+        title="聖經閱讀"
+        subtitle="和合本"
+        variant="compact"
+        rightContent={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="sm:hidden text-muted-foreground"
+            onClick={() => setSearchExpanded(true)}
+            data-testid="button-expand-search"
+          >
+            <Search className="w-4 h-4" />
+          </Button>
+        }
+      />
       
       <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
         <div className="max-w-5xl lg:max-w-6xl mx-auto w-full">
-          <div className="flex sm:hidden justify-end mb-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1 text-muted-foreground"
-              onClick={() => setSearchExpanded(true)}
-              data-testid="button-expand-search"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span className="text-xs">搜尋</span>
-            </Button>
-          </div>
           <div className="hidden sm:flex items-center gap-2 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

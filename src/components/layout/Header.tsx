@@ -31,6 +31,7 @@ interface HeaderProps {
   showLogo?: boolean;
   className?: string;
   variant?: 'default' | 'compact';
+  rightContent?: React.ReactNode;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -39,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   showLogo = true,
   className,
   variant = 'default',
+  rightContent,
 }) => {
   const { user, loading, signOut } = useAuth();
   const { profile } = useUserProfile();
@@ -139,8 +141,8 @@ export const Header: React.FC<HeaderProps> = ({
     )}>
       <div className="container mx-auto px-3 sm:px-4 md:px-6">
         <div className="flex items-center justify-between">
-          {/* Mobile: Left spacer for balance */}
-          <div className="w-10 sm:w-12 md:hidden" />
+          {/* Mobile: Left spacer for balance (wider when rightContent is present) */}
+          <div className={cn("md:hidden", rightContent ? "w-[5.25rem] sm:w-24" : "w-10 sm:w-12")} />
           
           {/* Desktop: Logo on left */}
           <Link to="/" className="hidden md:flex items-center gap-2 hover:opacity-80 transition-opacity group shrink-0">
@@ -202,8 +204,10 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </nav>
 
-          {/* Right: Auth Status */}
-          {userMenu}
+          <div className="flex items-center gap-1">
+            {rightContent}
+            {userMenu}
+          </div>
         </div>
       </div>
       
