@@ -13,9 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, BookMarked, User, Settings, Home, Dumbbell, BookOpen, Gamepad2, Share2 } from 'lucide-react';
+import { LogOut, BookMarked, User, Settings, Home, Dumbbell, BookOpen, Gamepad2, Share2, Shield } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const navItems = [
   { id: 'home', label: '首頁', href: '/', icon: Home },
@@ -44,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, loading, signOut } = useAuth();
   const { profile } = useUserProfile();
+  const { isAdmin, isLeader } = useUserRole();
   const navigate = useNavigate();
   const location = useLocation();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
@@ -111,6 +113,18 @@ export const Header: React.FC<HeaderProps> = ({
               <Settings className="w-4 h-4 mr-2" />
               個人設定
             </DropdownMenuItem>
+            {(isAdmin || isLeader) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/admin" className="flex items-center gap-2 cursor-pointer" data-testid="link-admin-dashboard">
+                    <Shield className="w-4 h-4" />
+                    管理後台
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator />
             <DropdownMenuItem 
               onClick={handleSignOut}
               className="text-destructive focus:text-destructive cursor-pointer"

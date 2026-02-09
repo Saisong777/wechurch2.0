@@ -10,6 +10,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { Loader2, User, Camera, X } from 'lucide-react';
@@ -27,6 +34,10 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [birthday, setBirthday] = useState('');
+  const [userGender, setUserGender] = useState('');
+  const [address, setAddress] = useState('');
+  const [church, setChurch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +52,10 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
       
       setDisplayName(metaDisplayName || user.email?.split('@')[0] || '');
       setAvatarUrl(metaAvatarUrl || null);
+      setBirthday('');
+      setUserGender('');
+      setAddress('');
+      setChurch('');
       fetchProfile();
     }
   }, [user, open]);
@@ -54,6 +69,10 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
         const data = await res.json();
         if (data.displayName) setDisplayName(data.displayName);
         if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
+        if (data.birthday) setBirthday(data.birthday);
+        if (data.userGender) setUserGender(data.userGender);
+        if (data.address) setAddress(data.address);
+        if (data.church) setChurch(data.church);
       }
     } catch (error) {
       console.error('Failed to fetch profile:', error);
@@ -145,6 +164,16 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
       return;
     }
 
+    if (!birthday) {
+      toast.error('請填寫生日');
+      return;
+    }
+
+    if (!userGender) {
+      toast.error('請選擇性別');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch(`/api/users/${user.id}/profile`, {
@@ -153,6 +182,10 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
         body: JSON.stringify({
           displayName: displayName.trim(),
           avatarUrl,
+          birthday: birthday || null,
+          userGender: userGender || null,
+          address: address.trim() || null,
+          church: church.trim() || null,
         }),
       });
 
@@ -175,7 +208,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="w-5 h-5" />
@@ -186,7 +219,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-5 py-4">
             <div className="flex flex-col items-center gap-3">
               <div className="relative">
                 <Avatar className="w-24 h-24 cursor-pointer" onClick={handleAvatarClick}>
@@ -239,6 +272,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="輸入您的顯示名稱"
                 className="h-11"
+                data-testid="input-display-name"
               />
             </div>
 
@@ -253,6 +287,66 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
                 電子郵件無法修改
               </p>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="birthday">
+                  生日 <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="birthday"
+                  type="date"
+                  value={birthday}
+                  onChange={(e) => setBirthday(e.target.value)}
+                  className="h-11 text-base"
+                  data-testid="input-birthday"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="userGender">
+                  性別 <span className="text-destructive">*</span>
+                </Label>
+                <Select value={userGender} onValueChange={setUserGender}>
+                  <SelectTrigger className="h-11" data-testid="select-gender">
+                    <SelectValue placeholder="請選擇" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">男</SelectItem>
+                    <SelectItem value="female">女</SelectItem>
+                    <SelectItem value="other">其他</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="church">
+                所屬教會 <span className="text-xs text-muted-foreground">(選填)</span>
+              </Label>
+              <Input
+                id="church"
+                value={church}
+                onChange={(e) => setChurch(e.target.value)}
+                placeholder="輸入您所屬的教會"
+                className="h-11"
+                data-testid="input-church"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">
+                地址 <span className="text-xs text-muted-foreground">(選填)</span>
+              </Label>
+              <Input
+                id="address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="輸入您的地址"
+                className="h-11"
+                data-testid="input-address"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
@@ -265,6 +359,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
             <Button
               onClick={handleSave}
               disabled={isLoading}
+              data-testid="button-save-profile"
             >
               {isLoading ? (
                 <>

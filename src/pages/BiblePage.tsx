@@ -837,54 +837,94 @@ const BiblePage = () => {
                   <div>
                     {displayMode === 'paragraph' ? (
                       <div className={`${currentFontConfig.paragraph} pr-2 sm:pr-4 py-2`}>
-                        {verses.map((v) => (
-                          <span key={v.verse}>
-                            <span
+                        {verses.map((v) => {
+                          const isContinuation = v.text.trim() === 'a';
+                          if (isContinuation) {
+                            return (
+                              <span
+                                key={v.verse}
+                                ref={(el) => {
+                                  if (el) verseRefs.current.set(v.verse, el);
+                                  else verseRefs.current.delete(v.verse);
+                                }}
+                                className="text-[10px] text-muted-foreground/50 align-super cursor-pointer"
+                                onClick={() => toggleVerseSelection(v.verse)}
+                                data-testid={`verse-${v.chapter}-${v.verse}`}
+                              >{v.verse}</span>
+                            );
+                          }
+                          return (
+                            <span key={v.verse}>
+                              <span
+                                ref={(el) => {
+                                  if (el) verseRefs.current.set(v.verse, el);
+                                  else verseRefs.current.delete(v.verse);
+                                }}
+                                className={`cursor-pointer transition-colors select-none rounded-sm ${
+                                  selectedVerseNums.has(v.verse)
+                                    ? 'bg-primary/10 ring-1 ring-primary/30'
+                                    : 'hover:bg-muted/50'
+                                }`}
+                                onClick={() => toggleVerseSelection(v.verse)}
+                                data-testid={`verse-${v.chapter}-${v.verse}`}
+                              >
+                                <sup className={`text-primary/60 font-medium ${currentFontConfig.sup} mr-0.5`}>{v.verse}</sup>
+                                {v.text}
+                              </span>
+                              {' '}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="space-y-1 sm:space-y-2 pr-2 sm:pr-4">
+                        {(() => {
+                          const groups: { main: typeof verses[0]; continuations: typeof verses }[] = [];
+                          for (const v of verses) {
+                            if (v.text.trim() === 'a' && groups.length > 0) {
+                              groups[groups.length - 1].continuations.push(v);
+                            } else {
+                              groups.push({ main: v, continuations: [] });
+                            }
+                          }
+                          return groups.map(({ main: v, continuations }) => (
+                            <div 
+                              key={v.verse} 
                               ref={(el) => {
                                 if (el) verseRefs.current.set(v.verse, el);
                                 else verseRefs.current.delete(v.verse);
                               }}
-                              className={`cursor-pointer transition-colors select-none rounded-sm ${
-                                selectedVerseNums.has(v.verse)
-                                  ? 'bg-primary/10 ring-1 ring-primary/30'
+                              className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${
+                                selectedVerseNums.has(v.verse) 
+                                  ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30' 
                                   : 'hover:bg-muted/50'
                               }`}
                               onClick={() => toggleVerseSelection(v.verse)}
                               data-testid={`verse-${v.chapter}-${v.verse}`}
                             >
-                              <sup className={`text-primary/60 font-medium ${currentFontConfig.sup} mr-0.5`}>{v.verse}</sup>
-                              {v.text}
-                            </span>
-                            {' '}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-1 sm:space-y-2 pr-2 sm:pr-4">
-                        {verses.map((v) => (
-                          <div 
-                            key={v.verse} 
-                            ref={(el) => {
-                              if (el) verseRefs.current.set(v.verse, el);
-                              else verseRefs.current.delete(v.verse);
-                            }}
-                            className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${
-                              selectedVerseNums.has(v.verse) 
-                                ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30' 
-                                : 'hover:bg-muted/50'
-                            }`}
-                            onClick={() => toggleVerseSelection(v.verse)}
-                            data-testid={`verse-${v.chapter}-${v.verse}`}
-                          >
-                            <div className="flex items-start gap-1 sm:gap-2">
-                              {selectedVerseNums.has(v.verse) && (
-                                <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
-                              )}
-                              <span className={`text-primary font-bold ${currentFontConfig.verseNum} min-w-[1.5rem] sm:min-w-[2rem] text-right`}>{v.verse}</span>
+                              <div className="flex items-start gap-1 sm:gap-2">
+                                {selectedVerseNums.has(v.verse) && (
+                                  <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
+                                )}
+                                <span className={`text-primary font-bold ${currentFontConfig.verseNum} min-w-[1.5rem] sm:min-w-[2rem] text-right`}>{v.verse}</span>
+                              </div>
+                              <span className={`${currentFontConfig.verse} leading-relaxed flex-1`}>
+                                {v.text}
+                                {continuations.map(c => (
+                                  <span
+                                    key={c.verse}
+                                    ref={(el) => {
+                                      if (el) verseRefs.current.set(c.verse, el);
+                                      else verseRefs.current.delete(c.verse);
+                                    }}
+                                    className="text-[10px] text-muted-foreground/50 align-super ml-0.5"
+                                    data-testid={`verse-${c.chapter}-${c.verse}`}
+                                  >{c.verse}</span>
+                                ))}
+                              </span>
                             </div>
-                            <span className={`${currentFontConfig.verse} leading-relaxed flex-1`}>{v.text}</span>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
                     )}
 

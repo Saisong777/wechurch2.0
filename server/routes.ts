@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -40,6 +41,8 @@ const uploadMessageCard = multer({
 });
 
 export async function registerRoutes(app: Express) {
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
   // Register health check FIRST - before any auth setup that might fail
   app.get("/api/health", (req, res) => {
     res.json({
@@ -2322,6 +2325,108 @@ export async function registerRoutes(app: Express) {
       res.json(downloads);
     } catch (error) {
       res.status(500).json({ error: "Failed to get downloads" });
+    }
+  });
+
+  app.get("/api/users/:id/profile", async (req, res) => {
+    try {
+      if (!req.isAuthenticated || !req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        birthday: user.birthday,
+        userGender: user.userGender,
+        address: user.address,
+        church: user.church,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get user profile" });
+    }
+  });
+
+  app.patch("/api/users/:id/profile", async (req, res) => {
+    try {
+      if (!req.isAuthenticated || !req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { displayName, avatarUrl, birthday, userGender, address, church } = req.body;
+
+      if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
+        return res.status(400).json({ error: "Display name is required" });
+      }
+
+      const updated = await storage.updateUser(req.params.id, {
+        displayName: displayName.trim(),
+        avatarUrl,
+        birthday: birthday || null,
+        userGender: userGender || null,
+        address: address ? String(address).trim() : null,
+        church: church ? String(church).trim() : null,
+      });
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user profile" });
+    }
+  });
+
+  app.post("/api/users/:id/avatar", async (req, res) => {
+    try {
+      if (!req.isAuthenticated || !req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const multer = (await import("multer")).default;
+      const upload = multer({ 
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 5 * 1024 * 1024 }
+      });
+      
+      upload.single('avatar')(req, res, async (err) => {
+        if (err) {
+          return res.status(400).json({ error: "Upload failed" });
+        }
+        
+        const file = (req as any).file;
+        if (!file) {
+          return res.status(400).json({ error: "No file provided" });
+        }
+        
+        const fsP = await import("fs/promises");
+        const pathMod = await import("path");
+        const uploadDir = pathMod.default.join(process.cwd(), "uploads", "avatars");
+        await fsP.mkdir(uploadDir, { recursive: true });
+        
+        const filename = `${req.params.id}-${Date.now()}.jpg`;
+        const filepath = pathMod.default.join(uploadDir, filename);
+        await fsP.writeFile(filepath, file.buffer);
+        
+        const avatarUrl = `/uploads/avatars/${filename}`;
+        await storage.updateUser(req.params.id, { avatarUrl });
+        
+        res.json({ avatarUrl });
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to upload avatar" });
+    }
+  });
+
+  app.delete("/api/users/:id/avatar", async (req, res) => {
+    try {
+      if (!req.isAuthenticated || !req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      await storage.updateUser(req.params.id, { avatarUrl: null });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove avatar" });
     }
   });
 

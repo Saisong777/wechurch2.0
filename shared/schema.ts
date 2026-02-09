@@ -14,12 +14,18 @@ export const prayerCategoryEnum = pgEnum("prayer_category", ["thanksgiving", "su
 export const cardLevelEnum = pgEnum("card_level", ["easy", "medium", "hard"]);
 export const gameModeEnum = pgEnum("game_mode", ["free", "turn"]);
 
+export const userGenderEnum = pgEnum("user_gender", ["male", "female", "other"]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   displayName: text("display_name"),
   avatarUrl: text("avatar_url"),
+  birthday: date("birthday"),
+  userGender: userGenderEnum("user_gender"),
+  address: text("address"),
+  church: text("church"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
