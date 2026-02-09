@@ -232,7 +232,7 @@ export function DevotionalNoteDialog({
                   value={form.titlePhrase}
                   onChange={(e) => updateField('titlePhrase', e.target.value)}
                   placeholder="幫這段經文下一個標題"
-                  className="text-sm"
+                  className="text-base md:text-sm"
                 />
               </div>
 
@@ -250,7 +250,6 @@ export function DevotionalNoteDialog({
                   placeholder="哪一句話讓你感動"
                   minRows={2}
                   maxRows={5}
-                  className="text-sm"
                 />
               </div>
 
@@ -268,7 +267,6 @@ export function DevotionalNoteDialog({
                   placeholder="有什麼人事時地物或有趣的事"
                   minRows={2}
                   maxRows={5}
-                  className="text-sm"
                 />
               </div>
             </section>
@@ -324,7 +322,6 @@ export function DevotionalNoteDialog({
                   }
                   minRows={2}
                   maxRows={6}
-                  className="text-sm"
                 />
               </div>
 
@@ -342,7 +339,6 @@ export function DevotionalNoteDialog({
                   placeholder="查看相關資料或註釋"
                   minRows={2}
                   maxRows={5}
-                  className="text-sm"
                 />
               </div>
             </section>
@@ -368,7 +364,6 @@ export function DevotionalNoteDialog({
                   placeholder="具體的行動計畫"
                   minRows={2}
                   maxRows={5}
-                  className="text-sm"
                 />
               </div>
 
@@ -386,7 +381,6 @@ export function DevotionalNoteDialog({
                   placeholder="禱告、感想、或任何想寫的..."
                   minRows={2}
                   maxRows={5}
-                  className="text-sm"
                 />
               </div>
             </section>

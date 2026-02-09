@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 // Lazy load pages for better code splitting and FCP
 const Index = lazy(() => import("./pages/Index"));
@@ -22,7 +23,17 @@ const PrayerWallPage = lazy(() => import("./pages/PrayerWallPage"));
 const MessageCardPage = lazy(() => import("./pages/MessageCardPage"));
 const SharePage = lazy(() => import("./pages/SharePage"));
 const LearnPage = lazy(() => import("./pages/LearnPage"));
-const BiblePage = lazy(() => import("./pages/BiblePage"));
+const BiblePage = lazy(() => import("./pages/BiblePage").catch(() => ({ default: () => {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <div className="text-center space-y-4">
+        <p className="text-lg font-semibold">頁面載入失敗</p>
+        <p className="text-sm text-muted-foreground">請檢查網路連線後重新載入</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md">重新載入</button>
+      </div>
+    </div>
+  );
+}})));
 const JesusTimelinePage = lazy(() => import("./pages/JesusTimelinePage"));
 const ReadingPlansPage = lazy(() => import("./pages/ReadingPlansPage"));
 const ReadingExperiencePage = lazy(() => import("./pages/ReadingExperiencePage"));
@@ -45,6 +56,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ErrorBoundary fallbackTitle="頁面載入失敗">
             <Suspense fallback={<PageLoader />}>
               <AppLayout>
                 <Routes>
@@ -74,6 +86,7 @@ const App = () => (
                 </Routes>
               </AppLayout>
             </Suspense>
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </SessionProvider>
