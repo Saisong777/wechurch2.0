@@ -18,6 +18,152 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  app.post("/api/auth/register", async (req: any, res) => {
+    try {
+      const { email, password, displayName } = req.body;
+
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "請提供電子郵件" });
+      }
+      if (!password || typeof password !== "string" || password.length < 6) {
+        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const existing = await pool.query(
+        "SELECT id FROM users WHERE LOWER(email) = $1",
+        [normalizedEmail]
+      );
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ message: "此電子郵件已被註冊" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const userResult = await pool.query(
+        `INSERT INTO users (id, email, password, display_name, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+         RETURNING id, email, display_name`,
+        [normalizedEmail, hashedPassword, displayName || null]
+      );
+      const newUser = userResult.rows[0];
+
+      let authUserId = `local_${newUser.id}`;
+      const existingAuth = await pool.query(
+        "SELECT id FROM auth_users WHERE email = $1",
+        [normalizedEmail]
+      );
+      if (existingAuth.rows.length > 0) {
+        authUserId = existingAuth.rows[0].id;
+      } else {
+        await pool.query(
+          `INSERT INTO auth_users (id, email, first_name, created_at, updated_at)
+           VALUES ($1, $2, $3, NOW(), NOW())`,
+          [authUserId, normalizedEmail, displayName || normalizedEmail.split("@")[0]]
+        );
+      }
+
+      const sessionUser: any = {
+        claims: {
+          sub: authUserId,
+          email: normalizedEmail,
+          first_name: displayName || normalizedEmail.split("@")[0],
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+      };
+
+      req.login(sessionUser, (err: any) => {
+        if (err) {
+          console.error("[Auth] Register session error:", err);
+          return res.status(500).json({ message: "註冊成功但登入失敗，請手動登入" });
+        }
+        req.session.save((saveErr: any) => {
+          if (saveErr) {
+            console.error("[Auth] Register session save error:", saveErr);
+          }
+          console.log("[Auth] Registration successful for:", normalizedEmail);
+          res.json({ message: "註冊成功", user: { id: authUserId, email: normalizedEmail, displayName: displayName || null } });
+        });
+      });
+    } catch (error) {
+      console.error("[Auth] Register error:", error);
+      res.status(500).json({ message: "註冊失敗，請稍後重試" });
+    }
+  });
+
+  app.post("/api/auth/email-login", async (req: any, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "請提供電子郵件" });
+      }
+      if (!password || typeof password !== "string") {
+        return res.status(400).json({ message: "請提供密碼" });
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const userResult = await pool.query(
+        "SELECT id, email, password, display_name FROM users WHERE LOWER(email) = $1",
+        [normalizedEmail]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(401).json({ message: "電子郵件或密碼錯誤" });
+      }
+
+      const dbUser = userResult.rows[0];
+      const passwordMatch = await bcrypt.compare(password, dbUser.password);
+
+      if (!passwordMatch) {
+        return res.status(401).json({ message: "電子郵件或密碼錯誤" });
+      }
+
+      let authUserId = `local_${dbUser.id}`;
+      const existingAuth = await pool.query(
+        "SELECT id FROM auth_users WHERE email = $1",
+        [normalizedEmail]
+      );
+      if (existingAuth.rows.length > 0) {
+        authUserId = existingAuth.rows[0].id;
+      } else {
+        await pool.query(
+          `INSERT INTO auth_users (id, email, first_name, created_at, updated_at)
+           VALUES ($1, $2, $3, NOW(), NOW())`,
+          [authUserId, normalizedEmail, dbUser.display_name || normalizedEmail.split("@")[0]]
+        );
+      }
+
+      const sessionUser: any = {
+        claims: {
+          sub: authUserId,
+          email: normalizedEmail,
+          first_name: dbUser.display_name || normalizedEmail.split("@")[0],
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+      };
+
+      req.login(sessionUser, (err: any) => {
+        if (err) {
+          console.error("[Auth] Login session error:", err);
+          return res.status(500).json({ message: "登入失敗，請稍後重試" });
+        }
+        req.session.save((saveErr: any) => {
+          if (saveErr) {
+            console.error("[Auth] Login session save error:", saveErr);
+          }
+          console.log("[Auth] Email login successful for:", normalizedEmail);
+          res.json({ message: "登入成功", user: { id: authUserId, email: normalizedEmail, displayName: dbUser.display_name } });
+        });
+      });
+    } catch (error) {
+      console.error("[Auth] Email login error:", error);
+      res.status(500).json({ message: "登入失敗，請稍後重試" });
+    }
+  });
+
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;

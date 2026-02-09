@@ -69,14 +69,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchUser();
   }, []);
 
-  const signUp = async (_email: string, _password: string, _displayName?: string) => {
-    window.location.href = '/api/login';
-    return { error: null };
+  const fetchUser = async () => {
+    try {
+      const response = await fetch('/api/auth/user', { credentials: 'include' });
+      if (response.ok) {
+        const userData = await response.json();
+        const authUser: AuthUser = {
+          id: userData.legacyUserId || userData.id,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          legacyUserId: userData.legacyUserId,
+          displayName: userData.displayName,
+          role: userData.role,
+          user_metadata: {
+            display_name: userData.displayName || (userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined),
+            avatar_url: userData.profileImageUrl,
+          },
+        };
+        setUser(authUser);
+      }
+    } catch (error) {
+      console.warn('[AuthContext] Failed to refresh user:', error);
+    }
   };
 
-  const signIn = async (_email: string, _password: string) => {
-    window.location.href = '/api/login';
-    return { error: null };
+  const signUp = async (email: string, password: string, displayName?: string) => {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password, displayName }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        return { error: new Error(data.message || '註冊失敗') };
+      }
+
+      await fetchUser();
+      return { error: null };
+    } catch (err) {
+      return { error: new Error('註冊失敗，請稍後重試') };
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const response = await fetch('/api/auth/email-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        return { error: new Error(data.message || '登入失敗') };
+      }
+
+      await fetchUser();
+      return { error: null };
+    } catch (err) {
+      return { error: new Error('登入失敗，請稍後重試') };
+    }
   };
 
   const signOut = async () => {
