@@ -27,9 +27,6 @@ const MALE_VOICE_PATTERNS = [
   /Yunze/i,
   /Yunxia/i,
   /YunJhe/i,
-  /Zhiyu/i,
-  /Kangkang/i,
-  /Hanhan/i,
 ];
 
 const FEMALE_VOICE_PATTERNS = [
@@ -82,55 +79,101 @@ function getVoiceLabel(voice: SpeechSynthesisVoice): string {
   return shortName + genderTag;
 }
 
+function isTtsSupported(): boolean {
+  try {
+    return typeof window !== 'undefined' && 'speechSynthesis' in window && !!window.speechSynthesis;
+  } catch {
+    return false;
+  }
+}
+
+function safeSpeechSynthesis() {
+  if (!isTtsSupported()) return null;
+  return window.speechSynthesis;
+}
+
 export function ScriptureTTS({ text, className, compact = false, label }: ScriptureTTSProps) {
   const [ttsState, setTtsState] = useState<TtsState>('idle');
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
   const [speed, setSpeed] = useState(1);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [supported, setSupported] = useState(true);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const loadVoices = useCallback(() => {
-    const allVoices = window.speechSynthesis.getVoices();
-    const chineseVoices = allVoices.filter(v => v.lang.startsWith('zh'));
-    const sorted = [...chineseVoices].sort((a, b) => {
-      const gA = detectGender(a);
-      const gB = detectGender(b);
-      if (gA === 'male' && gB !== 'male') return -1;
-      if (gA !== 'male' && gB === 'male') return 1;
-      const twA = a.lang.startsWith('zh-TW') ? 0 : 1;
-      const twB = b.lang.startsWith('zh-TW') ? 0 : 1;
-      return twA - twB;
-    });
-    setVoices(sorted);
-
-    if (sorted.length > 0) {
-      const stored = localStorage.getItem(VOICE_STORAGE_KEY);
-      const storedVoice = stored ? sorted.find(v => v.voiceURI === stored) : null;
-
-      if (storedVoice) {
-        setSelectedVoiceURI(storedVoice.voiceURI);
-      } else {
-        const defaultVoice = sorted[0];
-        setSelectedVoiceURI(defaultVoice.voiceURI);
-        localStorage.setItem(VOICE_STORAGE_KEY, defaultVoice.voiceURI);
+    try {
+      const synth = safeSpeechSynthesis();
+      if (!synth) {
+        setSupported(false);
+        return;
       }
+      const allVoices = synth.getVoices();
+      const chineseVoices = allVoices.filter(v => v.lang.startsWith('zh'));
+      const sorted = [...chineseVoices].sort((a, b) => {
+        const gA = detectGender(a);
+        const gB = detectGender(b);
+        if (gA === 'male' && gB !== 'male') return -1;
+        if (gA !== 'male' && gB === 'male') return 1;
+        const twA = a.lang.startsWith('zh-TW') ? 0 : 1;
+        const twB = b.lang.startsWith('zh-TW') ? 0 : 1;
+        return twA - twB;
+      });
+      setVoices(sorted);
+
+      if (sorted.length > 0) {
+        try {
+          const stored = localStorage.getItem(VOICE_STORAGE_KEY);
+          const storedVoice = stored ? sorted.find(v => v.voiceURI === stored) : null;
+
+          if (storedVoice) {
+            setSelectedVoiceURI(storedVoice.voiceURI);
+          } else {
+            const defaultVoice = sorted[0];
+            setSelectedVoiceURI(defaultVoice.voiceURI);
+            localStorage.setItem(VOICE_STORAGE_KEY, defaultVoice.voiceURI);
+          }
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('[ScriptureTTS] loadVoices error:', e);
+      setSupported(false);
     }
   }, []);
 
   useEffect(() => {
-    loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-    };
+    try {
+      const synth = safeSpeechSynthesis();
+      if (!synth) {
+        setSupported(false);
+        return;
+      }
+      loadVoices();
+      if (typeof synth.addEventListener === 'function') {
+        synth.addEventListener('voiceschanged', loadVoices);
+        return () => {
+          try { synth.removeEventListener('voiceschanged', loadVoices); } catch {}
+        };
+      } else if ('onvoiceschanged' in synth) {
+        synth.onvoiceschanged = loadVoices;
+        return () => {
+          try { synth.onvoiceschanged = null; } catch {}
+        };
+      }
+    } catch (e) {
+      console.warn('[ScriptureTTS] init error:', e);
+      setSupported(false);
+    }
   }, [loadVoices]);
 
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      try {
+        const synth = safeSpeechSynthesis();
+        if (synth) synth.cancel();
+      } catch {}
     };
   }, []);
 
@@ -147,62 +190,87 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
   }, [panelOpen]);
 
   const startSpeech = useCallback(() => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'zh-TW';
-    utterance.rate = speed;
+    try {
+      const synth = safeSpeechSynthesis();
+      if (!synth) return;
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-TW';
+      utterance.rate = speed;
 
-    const voice = voices.find(v => v.voiceURI === selectedVoiceURI);
-    if (voice) {
-      utterance.voice = voice;
+      const voice = voices.find(v => v.voiceURI === selectedVoiceURI);
+      if (voice) {
+        utterance.voice = voice;
+      }
+
+      utterance.onend = () => {
+        setTtsState('idle');
+      };
+      utterance.onerror = () => {
+        setTtsState('idle');
+      };
+
+      utteranceRef.current = utterance;
+      synth.speak(utterance);
+      setTtsState('playing');
+    } catch (e) {
+      console.warn('[ScriptureTTS] startSpeech error:', e);
+      setTtsState('idle');
     }
-
-    utterance.onend = () => {
-      setTtsState('idle');
-    };
-    utterance.onerror = () => {
-      setTtsState('idle');
-    };
-
-    utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-    setTtsState('playing');
   }, [text, speed, voices, selectedVoiceURI]);
 
   const handlePlayPause = useCallback(() => {
-    if (ttsState === 'idle') {
-      startSpeech();
-    } else if (ttsState === 'playing') {
-      window.speechSynthesis.pause();
-      setTtsState('paused');
-    } else if (ttsState === 'paused') {
-      window.speechSynthesis.resume();
-      setTtsState('playing');
+    try {
+      const synth = safeSpeechSynthesis();
+      if (!synth) return;
+      if (ttsState === 'idle') {
+        startSpeech();
+      } else if (ttsState === 'playing') {
+        synth.pause();
+        setTtsState('paused');
+      } else if (ttsState === 'paused') {
+        synth.resume();
+        setTtsState('playing');
+      }
+    } catch (e) {
+      console.warn('[ScriptureTTS] playPause error:', e);
+      setTtsState('idle');
     }
   }, [ttsState, startSpeech]);
 
   const handleStop = useCallback(() => {
-    window.speechSynthesis.cancel();
+    try {
+      const synth = safeSpeechSynthesis();
+      if (synth) synth.cancel();
+    } catch {}
     setTtsState('idle');
   }, []);
 
   const handleVoiceChange = useCallback((voiceURI: string) => {
     setSelectedVoiceURI(voiceURI);
-    localStorage.setItem(VOICE_STORAGE_KEY, voiceURI);
+    try { localStorage.setItem(VOICE_STORAGE_KEY, voiceURI); } catch {}
     if (ttsState !== 'idle') {
-      window.speechSynthesis.cancel();
-      setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'zh-TW';
-        utterance.rate = speed;
-        const voice = voices.find(v => v.voiceURI === voiceURI);
-        if (voice) utterance.voice = voice;
-        utterance.onend = () => setTtsState('idle');
-        utterance.onerror = () => setTtsState('idle');
-        utteranceRef.current = utterance;
-        window.speechSynthesis.speak(utterance);
-        setTtsState('playing');
-      }, 50);
+      try {
+        const synth = safeSpeechSynthesis();
+        if (!synth) return;
+        synth.cancel();
+        setTimeout(() => {
+          try {
+            const s = safeSpeechSynthesis();
+            if (!s) return;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-TW';
+            utterance.rate = speed;
+            const voice = voices.find(v => v.voiceURI === voiceURI);
+            if (voice) utterance.voice = voice;
+            utterance.onend = () => setTtsState('idle');
+            utterance.onerror = () => setTtsState('idle');
+            utteranceRef.current = utterance;
+            s.speak(utterance);
+            setTtsState('playing');
+          } catch { setTtsState('idle'); }
+        }, 50);
+      } catch { setTtsState('idle'); }
     }
   }, [ttsState, text, speed, voices]);
 
@@ -210,21 +278,33 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
     const s = parseFloat(newSpeed);
     setSpeed(s);
     if (ttsState !== 'idle') {
-      window.speechSynthesis.cancel();
-      setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'zh-TW';
-        utterance.rate = s;
-        const voice = voices.find(v => v.voiceURI === selectedVoiceURI);
-        if (voice) utterance.voice = voice;
-        utterance.onend = () => setTtsState('idle');
-        utterance.onerror = () => setTtsState('idle');
-        utteranceRef.current = utterance;
-        window.speechSynthesis.speak(utterance);
-        setTtsState('playing');
-      }, 50);
+      try {
+        const synth = safeSpeechSynthesis();
+        if (!synth) return;
+        synth.cancel();
+        setTimeout(() => {
+          try {
+            const sy = safeSpeechSynthesis();
+            if (!sy) return;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-TW';
+            utterance.rate = s;
+            const voice = voices.find(v => v.voiceURI === selectedVoiceURI);
+            if (voice) utterance.voice = voice;
+            utterance.onend = () => setTtsState('idle');
+            utterance.onerror = () => setTtsState('idle');
+            utteranceRef.current = utterance;
+            sy.speak(utterance);
+            setTtsState('playing');
+          } catch { setTtsState('idle'); }
+        }, 50);
+      } catch { setTtsState('idle'); }
     }
   }, [ttsState, text, voices, selectedVoiceURI]);
+
+  if (!supported) {
+    return null;
+  }
 
   const controls = (
     <div className="flex flex-col gap-3">

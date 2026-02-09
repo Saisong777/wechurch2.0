@@ -13,6 +13,7 @@ import { ScriptureCardCreator } from '@/components/scripture/ScriptureCardCreato
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
 import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
 import { FeatureGate } from '@/components/ui/feature-gate';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 interface BibleBook {
   bookName: string;
@@ -721,6 +722,7 @@ const BiblePage = () => {
               </CardContent>
             </Card>
           ) : selectedBook && selectedChapter ? (
+            <ErrorBoundary fallbackTitle="經文顯示發生錯誤">
             <Card>
               <CardContent className="py-2 sm:py-4">
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-1 sm:mb-2">
@@ -904,6 +906,7 @@ const BiblePage = () => {
                 )}
               </CardContent>
             </Card>
+            </ErrorBoundary>
           ) : selectedBook ? (
             <Card>
               <CardContent className="py-6">
