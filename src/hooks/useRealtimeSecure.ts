@@ -41,13 +41,35 @@ export const useRealtimeSecure = ({
   const submissionsRef = useRef<Set<string>>(new Set());
   const sessionRef = useRef<Partial<Session> | null>(null);
   const mountedRef = useRef(true);
+  const failCountRef = useRef(0);
+
+  const onParticipantJoinedRef = useRef(onParticipantJoined);
+  const onParticipantUpdatedRef = useRef(onParticipantUpdated);
+  const onSessionUpdatedRef = useRef(onSessionUpdated);
+  const onSubmissionAddedRef = useRef(onSubmissionAdded);
+  const onCurrentUserRefetchedRef = useRef(onCurrentUserRefetched);
+  const onGroupingDetectedRef = useRef(onGroupingDetected);
+  const currentUserIdRef = useRef(currentUserId);
+  const phaseRef = useRef(phase);
+
+  useEffect(() => { onParticipantJoinedRef.current = onParticipantJoined; }, [onParticipantJoined]);
+  useEffect(() => { onParticipantUpdatedRef.current = onParticipantUpdated; }, [onParticipantUpdated]);
+  useEffect(() => { onSessionUpdatedRef.current = onSessionUpdated; }, [onSessionUpdated]);
+  useEffect(() => { onSubmissionAddedRef.current = onSubmissionAdded; }, [onSubmissionAdded]);
+  useEffect(() => { onCurrentUserRefetchedRef.current = onCurrentUserRefetched; }, [onCurrentUserRefetched]);
+  useEffect(() => { onGroupingDetectedRef.current = onGroupingDetected; }, [onGroupingDetected]);
+  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   const pollData = useCallback(async () => {
     if (!sessionId || !mountedRef.current) return;
 
+    const currentPhase = phaseRef.current;
+    const userId = currentUserIdRef.current;
+
     try {
-      const shouldFetchParticipants = phase !== 'waiting';
-      const shouldFetchSubmissions = phase === 'studying' || phase === 'all';
+      const shouldFetchParticipants = currentPhase !== 'waiting';
+      const shouldFetchSubmissions = currentPhase === 'studying' || currentPhase === 'all';
 
       const fetches: Promise<Response>[] = [
         fetch(`/api/sessions/${sessionId}`),
@@ -86,19 +108,19 @@ export const useRealtimeSecure = ({
           const existing = participantsRef.current.get(p.id);
           if (!existing) {
             participantsRef.current.set(p.id, user);
-            onParticipantJoined?.(user);
+            onParticipantJoinedRef.current?.(user);
           } else if (
             existing.groupNumber !== user.groupNumber ||
             existing.readyConfirmed !== user.readyConfirmed
           ) {
             participantsRef.current.set(p.id, user);
-            onParticipantUpdated?.(user);
+            onParticipantUpdatedRef.current?.(user);
           }
 
-          if (currentUserId && p.id === currentUserId) {
-            onCurrentUserRefetched?.(user);
+          if (userId && p.id === userId) {
+            onCurrentUserRefetchedRef.current?.(user);
             if (user.groupNumber && sessionRef.current?.status === 'verification') {
-              onGroupingDetected?.();
+              onGroupingDetectedRef.current?.();
             }
           }
         });
@@ -119,7 +141,7 @@ export const useRealtimeSecure = ({
           prev.verseReference !== sessionData.verseReference
         ) {
           sessionRef.current = sessionData;
-          onSessionUpdated?.(sessionData);
+          onSessionUpdatedRef.current?.(sessionData);
         }
       }
 
@@ -145,28 +167,24 @@ export const useRealtimeSecure = ({
               others: s.others,
               submittedAt: new Date(s.submittedAt),
             };
-            onSubmissionAdded?.(submission);
+            onSubmissionAddedRef.current?.(submission);
           }
         });
       }
 
+      failCountRef.current = 0;
       setConnectionState('connected');
       setLastSyncTime(new Date());
     } catch (error) {
       console.error('Polling error:', error);
-      setConnectionState('disconnected');
+      failCountRef.current += 1;
+      if (failCountRef.current >= 3) {
+        setConnectionState('disconnected');
+      } else {
+        setConnectionState('reconnecting');
+      }
     }
-  }, [
-    sessionId,
-    currentUserId,
-    phase,
-    onParticipantJoined,
-    onParticipantUpdated,
-    onSessionUpdated,
-    onSubmissionAdded,
-    onCurrentUserRefetched,
-    onGroupingDetected
-  ]);
+  }, [sessionId]);
 
   const forceRefresh = useCallback(async () => {
     await pollData();
@@ -183,6 +201,7 @@ export const useRealtimeSecure = ({
     participantsRef.current.clear();
     submissionsRef.current.clear();
     sessionRef.current = null;
+    failCountRef.current = 0;
     setConnectionState('connecting');
 
     pollData();

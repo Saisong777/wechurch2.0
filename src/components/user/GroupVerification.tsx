@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +24,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [errorState, setErrorState] = useState<'none' | 'no-group' | 'no-members' | 'fetch-error'>('none');
+  const allReadyFiredRef = useRef(false);
 
   // CRITICAL: Always use the actual groupNumber from the database
   // Never fall back to 1 as this causes all users to appear in group 1
@@ -119,18 +120,12 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       } else {
         setErrorState('none');
         setGroupMembers(members);
-
-        // Check if all members are ready - auto redirect (silent, no toast)
-        const allReady = members.every(m => m.readyConfirmed);
-        if (allReady) {
-          onAllReady();
-        }
       }
     } catch (err) {
       console.error('[GroupVerification] Fetch members error:', err);
       setErrorState('fetch-error');
     }
-  }, [currentSession?.id, globalGroupNumber, onAllReady]);
+  }, [currentSession?.id, globalGroupNumber]);
 
   // Handle manual resync button
   const handleResync = async () => {
@@ -158,14 +153,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     phase: 'grouping',
     onParticipantUpdated: (user) => {
       if (user.groupNumber === globalGroupNumber) {
-        setGroupMembers(prev => {
-          const updated = prev.map(m => m.id === user.id ? user : m);
-          const allReady = updated.length > 0 && updated.every(m => m.readyConfirmed);
-          if (allReady) {
-            onAllReady();
-          }
-          return updated;
-        });
+        setGroupMembers(prev => prev.map(m => m.id === user.id ? user : m));
       }
     },
     onSessionUpdated: (session) => {
@@ -174,6 +162,13 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       }
     },
   });
+
+  useEffect(() => {
+    if (!allReadyFiredRef.current && groupMembers.length > 0 && groupMembers.every(m => m.readyConfirmed)) {
+      allReadyFiredRef.current = true;
+      onAllReady();
+    }
+  }, [groupMembers, onAllReady]);
 
   const handleCheckMember = (memberId: string, checked: boolean) => {
     const newChecked = new Set(checkedMembers);

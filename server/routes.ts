@@ -596,6 +596,20 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/notebook", async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      const entries = await storage.getNotebookEntries(email);
+      res.json({ entries });
+    } catch (error) {
+      console.error("[notebook] Error:", error);
+      res.status(500).json({ error: "Failed to get notebook entries" });
+    }
+  });
+
   app.get("/api/study-responses/:sessionId/:participantId", async (req, res) => {
     try {
       const response = await storage.getStudyResponse(req.params.sessionId, req.params.participantId);

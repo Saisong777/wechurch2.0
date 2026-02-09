@@ -24,12 +24,26 @@ export const useRealtime = ({
   const submissionsRef = useRef<Set<string>>(new Set());
   const sessionRef = useRef<Partial<Session> | null>(null);
 
+  const onParticipantJoinedRef = useRef(onParticipantJoined);
+  const onParticipantUpdatedRef = useRef(onParticipantUpdated);
+  const onSessionUpdatedRef = useRef(onSessionUpdated);
+  const onSubmissionAddedRef = useRef(onSubmissionAdded);
+  const phaseRef = useRef(phase);
+
+  useEffect(() => { onParticipantJoinedRef.current = onParticipantJoined; }, [onParticipantJoined]);
+  useEffect(() => { onParticipantUpdatedRef.current = onParticipantUpdated; }, [onParticipantUpdated]);
+  useEffect(() => { onSessionUpdatedRef.current = onSessionUpdated; }, [onSessionUpdated]);
+  useEffect(() => { onSubmissionAddedRef.current = onSubmissionAdded; }, [onSubmissionAdded]);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+
   const pollData = useCallback(async () => {
     if (!sessionId) return;
 
+    const currentPhase = phaseRef.current;
+
     try {
-      const shouldFetchParticipants = phase !== 'waiting';
-      const shouldFetchSubmissions = phase === 'studying' || phase === 'all';
+      const shouldFetchParticipants = currentPhase !== 'waiting';
+      const shouldFetchSubmissions = currentPhase === 'studying' || currentPhase === 'all';
 
       const fetches: Promise<Response>[] = [
         fetch(`/api/sessions/${sessionId}`),
@@ -66,7 +80,7 @@ export const useRealtime = ({
           const existing = participantsRef.current.get(p.id);
           if (!existing) {
             participantsRef.current.set(p.id, user);
-            onParticipantJoined?.(user);
+            onParticipantJoinedRef.current?.(user);
           } else if (
             existing.groupNumber !== user.groupNumber ||
             existing.readyConfirmed !== user.readyConfirmed ||
@@ -74,7 +88,7 @@ export const useRealtime = ({
             existing.location !== user.location
           ) {
             participantsRef.current.set(p.id, user);
-            onParticipantUpdated?.(user);
+            onParticipantUpdatedRef.current?.(user);
           }
         });
       }
@@ -94,7 +108,7 @@ export const useRealtime = ({
           prev.verseReference !== sessionData.verseReference
         ) {
           sessionRef.current = sessionData;
-          onSessionUpdated?.(sessionData);
+          onSessionUpdatedRef.current?.(sessionData);
         }
       }
 
@@ -120,14 +134,14 @@ export const useRealtime = ({
               others: s.others,
               submittedAt: new Date(s.submittedAt),
             };
-            onSubmissionAdded?.(submission);
+            onSubmissionAddedRef.current?.(submission);
           }
         });
       }
     } catch (error) {
       console.error('Polling error:', error);
     }
-  }, [sessionId, phase, onParticipantJoined, onParticipantUpdated, onSessionUpdated, onSubmissionAdded]);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;

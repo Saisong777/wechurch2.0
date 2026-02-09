@@ -58,6 +58,7 @@ export interface IStorage {
   getStudyResponse(sessionId: string, participantId: string): Promise<StudyResponse | undefined>;
   upsertStudyResponse(response: InsertStudyResponse & { sessionId: string; userId: string }): Promise<StudyResponse>;
   deleteStudyResponse(id: string): Promise<void>;
+  getNotebookEntries(email: string): Promise<any[]>;
   
   getPrayers(): Promise<Prayer[]>;
   createPrayer(prayer: InsertPrayer): Promise<Prayer>;
@@ -350,6 +351,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStudyResponse(id: string): Promise<void> {
     await db.delete(studyResponses).where(eq(studyResponses.id, id));
+  }
+
+  async getNotebookEntries(email: string): Promise<any[]> {
+    const results = await db
+      .select({
+        id: studyResponses.id,
+        sessionId: studyResponses.sessionId,
+        titlePhrase: studyResponses.titlePhrase,
+        heartbeatVerse: studyResponses.heartbeatVerse,
+        observation: studyResponses.observation,
+        coreInsightCategory: studyResponses.coreInsightCategory,
+        coreInsightNote: studyResponses.coreInsightNote,
+        scholarsNote: studyResponses.scholarsNote,
+        actionPlan: studyResponses.actionPlan,
+        coolDownNote: studyResponses.coolDownNote,
+        createdAt: studyResponses.createdAt,
+        verseReference: sessions.verseReference,
+        sessionCreatedAt: sessions.createdAt,
+      })
+      .from(studyResponses)
+      .innerJoin(participants, eq(studyResponses.userId, participants.id))
+      .innerJoin(sessions, eq(studyResponses.sessionId, sessions.id))
+      .where(eq(participants.email, email))
+      .orderBy(desc(studyResponses.createdAt));
+
+    return results.map(row => ({
+      id: row.id,
+      session_id: row.sessionId,
+      verse_reference: row.verseReference,
+      session_date: row.sessionCreatedAt?.toISOString() || row.createdAt.toISOString(),
+      title_phrase: row.titlePhrase,
+      heartbeat_verse: row.heartbeatVerse,
+      observation: row.observation,
+      core_insight_category: row.coreInsightCategory,
+      core_insight_note: row.coreInsightNote,
+      scholars_note: row.scholarsNote,
+      action_plan: row.actionPlan,
+      cool_down_note: row.coolDownNote,
+    }));
   }
 
   async getPrayers(): Promise<Prayer[]> {
