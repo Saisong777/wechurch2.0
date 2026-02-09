@@ -10,7 +10,7 @@ import { db } from "./db";
 import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { pool, getPoolStats } from "./db";
-import { bibleCache, timelineCache, apiCache } from "./cache";
+import { bibleCache, timelineCache, apiCache, sessionCache } from "./cache";
 
 // Configure multer for file uploads
 const messageCardStorage = multer.diskStorage({
@@ -203,6 +203,81 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/sessions/:id/poll", async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const phase = (req.query.phase as string) || 'all';
+      const groupNumber = req.query.groupNumber ? parseInt(req.query.groupNumber as string) : undefined;
+      const clientVersion = req.query.v as string | undefined;
+
+      const cacheKey = `poll:${sessionId}:${phase}:${groupNumber || 'all'}`;
+      const cached = sessionCache.get<any>(cacheKey);
+
+      if (cached) {
+        if (clientVersion && clientVersion === cached.version) {
+          return res.status(304).end();
+        }
+        return res.json(cached);
+      }
+
+      const session = await storage.getSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      let participants: any[] | null = null;
+      let submissions: any[] | null = null;
+
+      if (phase !== 'waiting') {
+        participants = await storage.getParticipants(sessionId, groupNumber ? { groupNumber } : undefined);
+      }
+
+      if (phase === 'studying' || phase === 'all') {
+        submissions = await storage.getSubmissions(sessionId);
+      }
+
+      const participantCount = participants ? participants.length : 0;
+      const submissionCount = submissions ? submissions.length : 0;
+
+      let maxParticipantUpdate = '';
+      if (participants && participants.length > 0) {
+        const fields = participants.map((p: any) => `${p.id}:${p.groupNumber}:${p.readyConfirmed}:${p.updatedAt || ''}`);
+        maxParticipantUpdate = fields.join(',');
+      }
+      let maxSubmissionUpdate = '';
+      if (submissions && submissions.length > 0) {
+        maxSubmissionUpdate = submissions.map((s: any) => s.id).join(',');
+      }
+
+      const versionRaw = `${session.status}:${participantCount}:${submissionCount}:${maxParticipantUpdate}:${maxSubmissionUpdate}`;
+      let hash = 0;
+      for (let i = 0; i < versionRaw.length; i++) {
+        const char = versionRaw.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+      }
+      const version = Math.abs(hash).toString(36);
+
+      if (clientVersion && clientVersion === version) {
+        return res.status(304).end();
+      }
+
+      const responseData = {
+        session,
+        participants,
+        submissions,
+        version,
+        participantCount,
+      };
+
+      sessionCache.set(cacheKey, responseData, 2000);
+
+      res.json(responseData);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to poll session data" });
+    }
+  });
+
   app.post("/api/sessions", async (req, res) => {
     try {
       const parsed = insertSessionSchema.safeParse(req.body);
@@ -222,6 +297,7 @@ export async function registerRoutes(app: Express) {
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
+      sessionCache.invalidate(`poll:${req.params.id}`);
       res.json(session);
     } catch (error) {
       res.status(500).json({ error: "Failed to update session" });
@@ -269,6 +345,7 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Invalid participant data", details: (parsed as any).error.errors });
       }
       const participant = await storage.createParticipant(parsed.data);
+      sessionCache.invalidate(`poll:${req.params.sessionId}`);
       res.status(201).json(participant);
     } catch (error) {
       console.error("[create-participant] Error:", error);
@@ -281,6 +358,9 @@ export async function registerRoutes(app: Express) {
       const participant = await storage.updateParticipant(req.params.id, req.body);
       if (!participant) {
         return res.status(404).json({ error: "Participant not found" });
+      }
+      if (participant.sessionId) {
+        sessionCache.invalidate(`poll:${participant.sessionId}`);
       }
       res.json(participant);
     } catch (error) {
@@ -319,6 +399,7 @@ export async function registerRoutes(app: Express) {
       }
       
       await storage.updateParticipant(participantId, { readyConfirmed: ready });
+      sessionCache.invalidate(`poll:${sessionId}`);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to set participant ready", success: false });
@@ -348,6 +429,7 @@ export async function registerRoutes(app: Express) {
         }
       }
       
+      sessionCache.clear();
       res.json({ success: true });
     } catch (error) {
       console.error("[batch-assign-groups] Error:", error);
@@ -388,6 +470,7 @@ export async function registerRoutes(app: Express) {
         others: req.body.others || "",
       };
       const submission = await storage.createSubmission(submissionData as any);
+      sessionCache.invalidate(`poll:${req.params.sessionId}`);
       res.status(201).json(submission);
     } catch (error) {
       console.error("[create-submission] Error:", error);

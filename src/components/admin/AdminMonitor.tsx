@@ -184,13 +184,6 @@ export const AdminMonitor: React.FC = () => {
     loadData();
   }, [currentSession?.id, setSubmissions, setUsers, refreshReadyStatus]);
 
-  // Poll for ready status during verification phase
-  useEffect(() => {
-    if (!isVerificationPhase || !currentSession?.id) return;
-    
-    const interval = setInterval(refreshReadyStatus, 3000);
-    return () => clearInterval(interval);
-  }, [isVerificationPhase, currentSession?.id, refreshReadyStatus]);
 
   // Derive groups from users - more reliable than currentSession.groups
   const groupNumbers = [...new Set(users.filter(u => u.groupNumber).map(u => u.groupNumber))].sort((a, b) => (a || 0) - (b || 0));

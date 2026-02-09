@@ -10,7 +10,6 @@ class SimpleCache {
   constructor(defaultTTLSeconds: number = 300) {
     this.defaultTTL = defaultTTLSeconds * 1000;
     
-    // Cleanup expired entries every minute
     setInterval(() => this.cleanup(), 60000);
   }
 
@@ -54,7 +53,6 @@ class SimpleCache {
     this.cache.clear();
   }
 
-  // Delete all keys matching a pattern
   invalidatePattern(pattern: string): number {
     let count = 0;
     for (const key of this.cache.keys()) {
@@ -83,7 +81,47 @@ class SimpleCache {
   }
 }
 
-// Bible data cache - long TTL (1 hour) since Bible verses rarely change
+interface SessionCacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+class SessionCache {
+  private cache = new Map<string, SessionCacheEntry<any>>();
+  private defaultTTL = 2000;
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.data as T;
+  }
+
+  set<T>(key: string, data: T, ttlMs?: number): void {
+    this.cache.set(key, {
+      data,
+      expiresAt: Date.now() + (ttlMs || this.defaultTTL),
+    });
+  }
+
+  invalidate(pattern: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+export const sessionCache = new SessionCache();
+
 export const bibleCache = new SimpleCache(3600);
 
 // Timeline events cache - long TTL (1 hour)

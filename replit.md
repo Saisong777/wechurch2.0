@@ -44,12 +44,17 @@ Preferred communication style: Simple, everyday language.
 
 ### High-Concurrency Design
 - Optimized for 500+ concurrent users with staggered requests, exponential backoff, extended polling, debounced auto-save, and non-blocking operations.
-- **Phase-Aware Polling**: `useRealtimeSecure` and `useRealtime` hooks accept a `phase` parameter (`waiting`/`grouping`/`studying`/`all`) to skip unnecessary API calls. Waiting phase fetches session only; grouping adds participants; studying adds submissions.
+- **Merged Poll Endpoint**: `GET /api/sessions/:id/poll` combines session + participants + submissions into a single HTTP request, reducing per-poll requests from 3 to 1. Supports `phase`, `groupNumber`, and `v` (version hash) query params.
+- **Version-Based 304**: Poll endpoint returns a version hash based on actual data state (participant groupNumbers, readyConfirmed, submission IDs). Clients send `v` param; if data unchanged, server returns 304 Not Modified (zero body transfer).
+- **Phase-Aware Polling**: `useRealtimeSecure` and `useRealtime` hooks accept a `phase` parameter (`waiting`/`grouping`/`studying`/`all`) to skip unnecessary data. Waiting phase fetches session only; grouping adds participants; studying adds submissions.
+- **Group-Scoped Data**: `useRealtimeSecure` accepts `groupNumber` param, so users only download their group's 4-5 participants instead of all 500+.
+- **Polling Intervals**: Uses `HIGH_CONCURRENCY_CONFIG` from `retry-utils.ts` (8s base interval with 0-2s random jitter) instead of hardcoded 3-5s intervals, staggering client requests.
+- **Server-Side Cache**: `SessionCache` in `server/cache.ts` caches poll responses for 2 seconds, with automatic invalidation on mutations (session updates, participant changes, submissions).
+- **Database Indexes**: `idx_participants_session_id`, `idx_participants_session_group`, `idx_submissions_session_id`, `idx_study_responses_session_user`, `idx_ai_reports_session` for fast queries.
 - **Efficient Comparisons**: Field-by-field comparison (groupNumber, readyConfirmed, status, verseReference) instead of JSON.stringify for change detection in polling hooks.
-- **Server-Side Filtering**: `GET /api/sessions/:id/participants?groupNumber=X` filters participants at the database level. `fetchGroupMembers()` uses this to avoid fetching all participants.
 - **Optimized Queries**: `getStudyResponses` uses LEFT JOIN instead of N+1 separate queries for participants/users.
 - **Database**: Connection pool with max 20 connections.
-- **Caching**: In-memory caching for Bible data and timeline events (1 hour).
+- **Caching**: In-memory caching for Bible data and timeline events (1 hour), plus session poll cache (2s TTL).
 
 ### Responsive Design
 - Standardized responsive patterns with consistent horizontal padding, progressive content max-widths, and responsive navigation (bottom bar on mobile, top bar on tablet/desktop).

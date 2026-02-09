@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { User, Session, StudySubmission } from "@/types/bible-study";
+import { HIGH_CONCURRENCY_CONFIG } from "@/lib/retry-utils";
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
@@ -9,6 +10,7 @@ interface UseRealtimeSecureOptions {
   sessionId: string | null;
   currentUserId?: string | null;
   phase?: RealtimePhase;
+  groupNumber?: number;
   onParticipantJoined?: (user: User) => void;
   onParticipantUpdated?: (user: User) => void;
   onSessionUpdated?: (session: Partial<Session>) => void;
@@ -27,6 +29,7 @@ export const useRealtimeSecure = ({
   sessionId,
   currentUserId,
   phase = 'all',
+  groupNumber,
   onParticipantJoined,
   onParticipantUpdated,
   onSessionUpdated,
@@ -42,6 +45,7 @@ export const useRealtimeSecure = ({
   const sessionRef = useRef<Partial<Session> | null>(null);
   const mountedRef = useRef(true);
   const failCountRef = useRef(0);
+  const lastVersionRef = useRef<string | null>(null);
 
   const onParticipantJoinedRef = useRef(onParticipantJoined);
   const onParticipantUpdatedRef = useRef(onParticipantUpdated);
@@ -51,6 +55,7 @@ export const useRealtimeSecure = ({
   const onGroupingDetectedRef = useRef(onGroupingDetected);
   const currentUserIdRef = useRef(currentUserId);
   const phaseRef = useRef(phase);
+  const groupNumberRef = useRef(groupNumber);
 
   useEffect(() => { onParticipantJoinedRef.current = onParticipantJoined; }, [onParticipantJoined]);
   useEffect(() => { onParticipantUpdatedRef.current = onParticipantUpdated; }, [onParticipantUpdated]);
@@ -60,39 +65,45 @@ export const useRealtimeSecure = ({
   useEffect(() => { onGroupingDetectedRef.current = onGroupingDetected; }, [onGroupingDetected]);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
+  useEffect(() => { groupNumberRef.current = groupNumber; }, [groupNumber]);
 
   const pollData = useCallback(async () => {
     if (!sessionId || !mountedRef.current) return;
 
     const currentPhase = phaseRef.current;
     const userId = currentUserIdRef.current;
+    const grpNum = groupNumberRef.current;
 
     try {
-      const shouldFetchParticipants = currentPhase !== 'waiting';
-      const shouldFetchSubmissions = currentPhase === 'studying' || currentPhase === 'all';
-
-      const fetches: Promise<Response>[] = [
-        fetch(`/api/sessions/${sessionId}`),
-      ];
-
-      if (shouldFetchParticipants) {
-        fetches.push(fetch(`/api/sessions/${sessionId}/participants`));
+      const params = new URLSearchParams({ phase: currentPhase });
+      if (grpNum !== undefined) {
+        params.set('groupNumber', String(grpNum));
+      }
+      if (lastVersionRef.current) {
+        params.set('v', lastVersionRef.current);
       }
 
-      if (shouldFetchSubmissions) {
-        fetches.push(fetch(`/api/sessions/${sessionId}/submissions`));
-      }
-
-      const results = await Promise.all(fetches);
+      const res = await fetch(`/api/sessions/${sessionId}/poll?${params}`);
 
       if (!mountedRef.current) return;
 
-      const sessionRes = results[0];
-      const participantsRes = shouldFetchParticipants ? results[1] : null;
-      const submissionsRes = shouldFetchSubmissions ? results[shouldFetchParticipants ? 2 : 1] : null;
+      if (res.status === 304) {
+        failCountRef.current = 0;
+        setConnectionState('connected');
+        setLastSyncTime(new Date());
+        return;
+      }
 
-      if (participantsRes?.ok) {
-        const participants = await participantsRes.json();
+      if (!res.ok) {
+        throw new Error(`Poll failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      lastVersionRef.current = data.version;
+
+      const { session, participants, submissions } = data;
+
+      if (participants) {
         participants.forEach((p: any) => {
           const user: User = {
             id: p.id,
@@ -126,8 +137,7 @@ export const useRealtimeSecure = ({
         });
       }
 
-      if (sessionRes.ok) {
-        const session = await sessionRes.json();
+      if (session) {
         const sessionData: Partial<Session> = {
           id: session.id,
           verseReference: session.verseReference,
@@ -145,8 +155,7 @@ export const useRealtimeSecure = ({
         }
       }
 
-      if (submissionsRes?.ok) {
-        const submissions = await submissionsRes.json();
+      if (submissions) {
         submissions.forEach((s: any) => {
           if (!submissionsRef.current.has(s.id)) {
             submissionsRef.current.add(s.id);
@@ -187,6 +196,7 @@ export const useRealtimeSecure = ({
   }, [sessionId]);
 
   const forceRefresh = useCallback(async () => {
+    lastVersionRef.current = null;
     await pollData();
   }, [pollData]);
 
@@ -202,14 +212,18 @@ export const useRealtimeSecure = ({
     submissionsRef.current.clear();
     sessionRef.current = null;
     failCountRef.current = 0;
+    lastVersionRef.current = null;
     setConnectionState('connecting');
 
     pollData();
 
-    const interval = setInterval(pollData, 5000);
+    const baseInterval = HIGH_CONCURRENCY_CONFIG.HEARTBEAT_INTERVAL_MS;
+    const jitter = Math.random() * 2000;
+    const interval = setInterval(pollData, baseInterval + jitter);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        lastVersionRef.current = null;
         pollData();
       }
     };

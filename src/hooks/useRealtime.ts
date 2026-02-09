@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { User, Session, StudySubmission } from "@/types/bible-study";
+import { HIGH_CONCURRENCY_CONFIG } from "@/lib/retry-utils";
 
 export type RealtimePhase = 'waiting' | 'grouping' | 'studying' | 'all';
 
@@ -23,6 +24,7 @@ export const useRealtime = ({
   const participantsRef = useRef<Map<string, User>>(new Map());
   const submissionsRef = useRef<Set<string>>(new Set());
   const sessionRef = useRef<Partial<Session> | null>(null);
+  const lastVersionRef = useRef<string | null>(null);
 
   const onParticipantJoinedRef = useRef(onParticipantJoined);
   const onParticipantUpdatedRef = useRef(onParticipantUpdated);
@@ -42,29 +44,25 @@ export const useRealtime = ({
     const currentPhase = phaseRef.current;
 
     try {
-      const shouldFetchParticipants = currentPhase !== 'waiting';
-      const shouldFetchSubmissions = currentPhase === 'studying' || currentPhase === 'all';
-
-      const fetches: Promise<Response>[] = [
-        fetch(`/api/sessions/${sessionId}`),
-      ];
-
-      if (shouldFetchParticipants) {
-        fetches.push(fetch(`/api/sessions/${sessionId}/participants`));
+      const params = new URLSearchParams({ phase: currentPhase });
+      if (lastVersionRef.current) {
+        params.set('v', lastVersionRef.current);
       }
 
-      if (shouldFetchSubmissions) {
-        fetches.push(fetch(`/api/sessions/${sessionId}/submissions`));
+      const res = await fetch(`/api/sessions/${sessionId}/poll?${params}`);
+
+      if (res.status === 304) {
+        return;
       }
 
-      const results = await Promise.all(fetches);
+      if (!res.ok) return;
 
-      const sessionRes = results[0];
-      const participantsRes = shouldFetchParticipants ? results[1] : null;
-      const submissionsRes = shouldFetchSubmissions ? results[shouldFetchParticipants ? 2 : 1] : null;
+      const data = await res.json();
+      lastVersionRef.current = data.version;
 
-      if (participantsRes?.ok) {
-        const participants = await participantsRes.json();
+      const { session, participants, submissions } = data;
+
+      if (participants) {
         participants.forEach((p: any) => {
           const user: User = {
             id: p.id,
@@ -93,8 +91,7 @@ export const useRealtime = ({
         });
       }
 
-      if (sessionRes.ok) {
-        const session = await sessionRes.json();
+      if (session) {
         const sessionData: Partial<Session> = {
           id: session.id,
           verseReference: session.verseReference,
@@ -112,8 +109,7 @@ export const useRealtime = ({
         }
       }
 
-      if (submissionsRes?.ok) {
-        const submissions = await submissionsRes.json();
+      if (submissions) {
         submissions.forEach((s: any) => {
           if (!submissionsRef.current.has(s.id)) {
             submissionsRef.current.add(s.id);
@@ -149,10 +145,11 @@ export const useRealtime = ({
     participantsRef.current.clear();
     submissionsRef.current.clear();
     sessionRef.current = null;
+    lastVersionRef.current = null;
 
     pollData();
 
-    const interval = setInterval(pollData, 3000);
+    const interval = setInterval(pollData, HIGH_CONCURRENCY_CONFIG.HEARTBEAT_INTERVAL_MS);
 
     return () => {
       clearInterval(interval);

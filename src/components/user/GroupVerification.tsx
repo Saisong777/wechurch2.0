@@ -151,6 +151,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     sessionId: currentSession?.id || null,
     currentUserId: currentUser?.id || null,
     phase: 'grouping',
+    groupNumber: globalGroupNumber,
     onParticipantUpdated: (user) => {
       if (user.groupNumber === globalGroupNumber) {
         setGroupMembers(prev => prev.map(m => m.id === user.id ? user : m));

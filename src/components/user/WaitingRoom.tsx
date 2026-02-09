@@ -38,6 +38,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
   const { forceRefresh, connectionState, lastSyncTime } = useRealtimeSecure({
     sessionId: currentSession?.id || null,
     currentUserId: currentUser?.id || null,
+    phase: 'waiting',
     onSessionUpdated: (sessionUpdate) => {
       if (sessionUpdate.status && currentSession) {
         setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
