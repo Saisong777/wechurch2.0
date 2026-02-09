@@ -61,15 +61,13 @@ export const UserPage: React.FC = () => {
     setStep('enter-session');
   }, [setCurrentSession, setCurrentUser]);
 
-  // Handle session ended - show notification and return to landing
+  // Handle session ended - show notification and go to notebook
   const handleSessionEnded = useCallback(() => {
     toast.info('查經已結束', {
-      description: '感謝您的參與！您可以在「我的筆記」中查看您的筆記',
+      description: '感謝您的參與！已為您打開筆記本',
     });
-    // Clear session storage
-    resetLocalState();
-    setStep('landing');
-  }, [resetLocalState]);
+    setStep('notebook');
+  }, []);
 
   // Restore user session on page load/refresh
   const restoreUserSession = useCallback(async () => {
@@ -184,10 +182,9 @@ export const UserPage: React.FC = () => {
           restoredStep = 'waiting';
         }
       } else if (sessionData.status === 'completed') {
-        // Session has ended, show review page if they submitted, otherwise landing
-        restoredStep = storedStep === 'review' ? 'review' : 'landing';
+        restoredStep = storedStep === 'review' ? 'review' : 'notebook';
         toast.info('查經已結束', {
-          description: '感謝您的參與！您可以在「我的筆記」中查看您的筆記',
+          description: '感謝您的參與！已為您打開筆記本',
         });
       }
 

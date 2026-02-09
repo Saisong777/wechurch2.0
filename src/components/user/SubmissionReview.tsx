@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
-import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, Pencil, Loader2 } from 'lucide-react';
+import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, MessageCircle, Pencil, Loader2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudyResponse } from '@/hooks/useStudyResponse';
 import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
 import { GroupReportViewer } from './GroupReportViewer';
+import { OverallReportViewer } from './OverallReportViewer';
 import { toast } from 'sonner';
 
 interface SubmissionReviewProps {
@@ -20,7 +21,7 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
     userId: currentUser?.id,
     enabled: !!currentSession?.id && !!currentUser?.id,
   });
-  const [activeTab, setActiveTab] = useState<'personal' | 'group'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'group' | 'overall'>('personal');
 
   // Show loading only briefly - if data never arrives, show recovery UI
   if (isLoading) {
@@ -135,15 +136,22 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       {/* Tab Navigation between Personal and Group Report */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'personal' | 'group')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-12 sm:h-10">
-          <TabsTrigger value="personal" className="gap-2 text-base sm:text-sm">
-            <Dumbbell className="w-5 h-5 sm:w-4 sm:h-4" />
-            我的筆記
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'personal' | 'group' | 'overall')} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 h-12 sm:h-10">
+          <TabsTrigger value="personal" className="gap-1.5 text-sm sm:text-sm" data-testid="tab-personal">
+            <Dumbbell className="w-4 h-4 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">我的筆記</span>
+            <span className="sm:hidden">我的</span>
           </TabsTrigger>
-          <TabsTrigger value="group" className="gap-2 text-base sm:text-sm">
-            <Sparkles className="w-5 h-5 sm:w-4 sm:h-4" />
-            小組報告
+          <TabsTrigger value="group" className="gap-1.5 text-sm sm:text-sm" data-testid="tab-group">
+            <Sparkles className="w-4 h-4 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">小組報告</span>
+            <span className="sm:hidden">小組</span>
+          </TabsTrigger>
+          <TabsTrigger value="overall" className="gap-1.5 text-sm sm:text-sm" data-testid="tab-overall">
+            <Globe className="w-4 h-4 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">全體報告</span>
+            <span className="sm:hidden">全體</span>
           </TabsTrigger>
         </TabsList>
         
@@ -154,12 +162,12 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
                 <CardTitle className="text-xl sm:text-xl">您的 Spiritual Fitness 筆記</CardTitle>
                 <div className="flex gap-2">
                   {onEdit && (
-                    <Button variant="outline" size="default" onClick={onEdit} className="flex-1 sm:flex-none h-11 sm:h-9 text-base sm:text-sm touch-manipulation active:scale-[0.98]">
+                    <Button variant="outline" size="default" onClick={onEdit} className="flex-1 sm:flex-none h-11 sm:h-9 text-base sm:text-sm touch-manipulation active:scale-[0.98]" data-testid="button-edit-notes">
                       <Pencil className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
                       繼續編輯
                     </Button>
                   )}
-                  <Button variant="outline" size="default" onClick={handleSharePersonal} className="flex-1 sm:flex-none h-11 sm:h-9 text-base sm:text-sm touch-manipulation active:scale-[0.98]">
+                  <Button variant="outline" size="default" onClick={handleSharePersonal} className="flex-1 sm:flex-none h-11 sm:h-9 text-base sm:text-sm touch-manipulation active:scale-[0.98]" data-testid="button-share-personal">
                     <Share2 className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
                     分享
                   </Button>
@@ -200,6 +208,15 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
             <GroupReportViewer
               sessionId={currentSession.id}
               groupNumber={currentUser.groupNumber}
+              verseReference={currentSession.verseReference}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="overall" className="mt-4">
+          {currentSession?.id && (
+            <OverallReportViewer
+              sessionId={currentSession.id}
               verseReference={currentSession.verseReference}
             />
           )}
