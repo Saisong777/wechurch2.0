@@ -1,8 +1,11 @@
 import { useEffect, useCallback, useRef } from "react";
 import { User, Session, StudySubmission } from "@/types/bible-study";
 
+export type RealtimePhase = 'waiting' | 'grouping' | 'studying' | 'all';
+
 interface UseRealtimeOptions {
   sessionId: string | null;
+  phase?: RealtimePhase;
   onParticipantJoined?: (user: User) => void;
   onParticipantUpdated?: (user: User) => void;
   onSessionUpdated?: (session: Partial<Session>) => void;
@@ -11,6 +14,7 @@ interface UseRealtimeOptions {
 
 export const useRealtime = ({
   sessionId,
+  phase = 'all',
   onParticipantJoined,
   onParticipantUpdated,
   onSessionUpdated,
@@ -24,13 +28,28 @@ export const useRealtime = ({
     if (!sessionId) return;
 
     try {
-      const [participantsRes, sessionRes, submissionsRes] = await Promise.all([
-        fetch(`/api/sessions/${sessionId}/participants`),
-        fetch(`/api/sessions/${sessionId}`),
-        fetch(`/api/sessions/${sessionId}/submissions`)
-      ]);
+      const shouldFetchParticipants = phase !== 'waiting';
+      const shouldFetchSubmissions = phase === 'studying' || phase === 'all';
 
-      if (participantsRes.ok) {
+      const fetches: Promise<Response>[] = [
+        fetch(`/api/sessions/${sessionId}`),
+      ];
+
+      if (shouldFetchParticipants) {
+        fetches.push(fetch(`/api/sessions/${sessionId}/participants`));
+      }
+
+      if (shouldFetchSubmissions) {
+        fetches.push(fetch(`/api/sessions/${sessionId}/submissions`));
+      }
+
+      const results = await Promise.all(fetches);
+
+      const sessionRes = results[0];
+      const participantsRes = shouldFetchParticipants ? results[1] : null;
+      const submissionsRes = shouldFetchSubmissions ? results[shouldFetchParticipants ? 2 : 1] : null;
+
+      if (participantsRes?.ok) {
         const participants = await participantsRes.json();
         participants.forEach((p: any) => {
           const user: User = {
@@ -48,7 +67,12 @@ export const useRealtime = ({
           if (!existing) {
             participantsRef.current.set(p.id, user);
             onParticipantJoined?.(user);
-          } else if (JSON.stringify(existing) !== JSON.stringify(user)) {
+          } else if (
+            existing.groupNumber !== user.groupNumber ||
+            existing.readyConfirmed !== user.readyConfirmed ||
+            existing.name !== user.name ||
+            existing.location !== user.location
+          ) {
             participantsRef.current.set(p.id, user);
             onParticipantUpdated?.(user);
           }
@@ -63,20 +87,26 @@ export const useRealtime = ({
           status: session.status as Session["status"],
         };
 
-        if (sessionRef.current?.status !== sessionData.status) {
+        const prev = sessionRef.current;
+        if (
+          !prev ||
+          prev.status !== sessionData.status ||
+          prev.verseReference !== sessionData.verseReference
+        ) {
           sessionRef.current = sessionData;
           onSessionUpdated?.(sessionData);
         }
       }
 
-      if (submissionsRes.ok) {
+      if (submissionsRes?.ok) {
         const submissions = await submissionsRes.json();
         submissions.forEach((s: any) => {
           if (!submissionsRef.current.has(s.id)) {
             submissionsRef.current.add(s.id);
             const submission: StudySubmission = {
               id: s.id,
-              participantId: s.participantId,
+              sessionId: s.sessionId,
+              userId: s.participantId || s.userId,
               groupNumber: s.groupNumber,
               name: s.name,
               email: s.email,
@@ -97,7 +127,7 @@ export const useRealtime = ({
     } catch (error) {
       console.error('Polling error:', error);
     }
-  }, [sessionId, onParticipantJoined, onParticipantUpdated, onSessionUpdated, onSubmissionAdded]);
+  }, [sessionId, phase, onParticipantJoined, onParticipantUpdated, onSessionUpdated, onSubmissionAdded]);
 
   useEffect(() => {
     if (!sessionId) return;

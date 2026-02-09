@@ -269,32 +269,6 @@ export const UserPage: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  // Poll for session status changes (replaces Supabase realtime)
-  useEffect(() => {
-    if (!currentSession?.id) return;
-    
-    const checkSessionStatus = async () => {
-      try {
-        const res = await fetch(`/api/sessions/${currentSession.id}`);
-        if (res.ok) {
-          const session = await res.json();
-          if (session.status === 'completed') {
-            handleSessionEnded();
-          }
-        }
-      } catch (error) {
-        console.error('[UserPage] Error polling session status:', error);
-      }
-    };
-
-    // Poll every 10 seconds
-    const interval = setInterval(checkSessionStatus, 10000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [currentSession?.id, handleSessionEnded]);
-
   const loadSessionAndCheckAuth = async (idOrCode: string) => {
     setIsLoading(true);
     

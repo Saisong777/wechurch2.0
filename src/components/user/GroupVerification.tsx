@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSession } from '@/contexts/SessionContext';
+import { useRealtimeSecure } from '@/hooks/useRealtimeSecure';
 import { fetchGroupMembers } from '@/lib/api-helpers';
 import { User } from '@/types/bible-study';
 import { Users, CheckCircle, Loader2, MapPin, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
 
 interface GroupVerificationProps {
   onAllReady: () => void;
@@ -152,29 +152,28 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     load();
   }, [fetchMembers]);
 
-  // Poll for updates instead of realtime
-  useEffect(() => {
-    if (!currentSession?.id || !globalGroupNumber) return;
-
-    const pollInterval = setInterval(async () => {
-      await fetchMembers();
-      
-      // Also check session status
-      try {
-        const res = await fetch(`/api/sessions/${currentSession.id}`);
-        if (res.ok) {
-          const session = await res.json();
-          if (session.status === 'completed' && onSessionEnded) {
-            onSessionEnded();
+  useRealtimeSecure({
+    sessionId: currentSession?.id || null,
+    currentUserId: currentUser?.id || null,
+    phase: 'grouping',
+    onParticipantUpdated: (user) => {
+      if (user.groupNumber === globalGroupNumber) {
+        setGroupMembers(prev => {
+          const updated = prev.map(m => m.id === user.id ? user : m);
+          const allReady = updated.length > 0 && updated.every(m => m.readyConfirmed);
+          if (allReady) {
+            onAllReady();
           }
-        }
-      } catch (error) {
-        console.error('[GroupVerification] Poll error:', error);
+          return updated;
+        });
       }
-    }, HIGH_CONCURRENCY_CONFIG.GROUP_VERIFICATION_POLL_MS);
-
-    return () => clearInterval(pollInterval);
-  }, [currentSession?.id, globalGroupNumber, fetchMembers, onSessionEnded]);
+    },
+    onSessionUpdated: (session) => {
+      if (session.status === 'completed' && onSessionEnded) {
+        onSessionEnded();
+      }
+    },
+  });
 
   const handleCheckMember = (memberId: string, checked: boolean) => {
     const newChecked = new Set(checkedMembers);

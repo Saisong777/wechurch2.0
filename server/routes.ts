@@ -236,8 +236,9 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/sessions/:sessionId/participants", async (req, res) => {
     try {
-      const participants = await storage.getParticipants(req.params.sessionId);
-      res.json(participants);
+      const groupNumber = req.query.groupNumber ? parseInt(req.query.groupNumber as string) : undefined;
+      const result = await storage.getParticipants(req.params.sessionId, { groupNumber });
+      res.json(result);
     } catch (error) {
       res.status(500).json({ error: "Failed to get participants" });
     }

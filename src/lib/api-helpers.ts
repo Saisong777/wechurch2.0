@@ -518,12 +518,11 @@ export const fetchGroupMembers = async (
   groupNumber: number
 ): Promise<User[]> => {
   try {
-    const response = await fetch(`/api/sessions/${sessionId}/participants`);
+    const response = await fetch(`/api/sessions/${sessionId}/participants?groupNumber=${groupNumber}`);
     if (!response.ok) return [];
     const data = await response.json();
 
     return data
-      .filter((p: any) => p.groupNumber === groupNumber)
       .map((p: any) => ({
         id: p.id,
         name: p.name,

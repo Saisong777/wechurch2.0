@@ -3,9 +3,12 @@ import { User, Session, StudySubmission } from "@/types/bible-study";
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
+export type RealtimePhase = 'waiting' | 'grouping' | 'studying' | 'all';
+
 interface UseRealtimeSecureOptions {
   sessionId: string | null;
   currentUserId?: string | null;
+  phase?: RealtimePhase;
   onParticipantJoined?: (user: User) => void;
   onParticipantUpdated?: (user: User) => void;
   onSessionUpdated?: (session: Partial<Session>) => void;
@@ -23,6 +26,7 @@ interface UseRealtimeSecureReturn {
 export const useRealtimeSecure = ({
   sessionId,
   currentUserId,
+  phase = 'all',
   onParticipantJoined,
   onParticipantUpdated,
   onSessionUpdated,
@@ -42,21 +46,36 @@ export const useRealtimeSecure = ({
     if (!sessionId || !mountedRef.current) return;
 
     try {
-      const [participantsRes, sessionRes, submissionsRes] = await Promise.all([
-        fetch(`/api/sessions/${sessionId}/participants`),
+      const shouldFetchParticipants = phase !== 'waiting';
+      const shouldFetchSubmissions = phase === 'studying' || phase === 'all';
+
+      const fetches: Promise<Response>[] = [
         fetch(`/api/sessions/${sessionId}`),
-        fetch(`/api/sessions/${sessionId}/submissions`)
-      ]);
+      ];
+
+      if (shouldFetchParticipants) {
+        fetches.push(fetch(`/api/sessions/${sessionId}/participants`));
+      }
+
+      if (shouldFetchSubmissions) {
+        fetches.push(fetch(`/api/sessions/${sessionId}/submissions`));
+      }
+
+      const results = await Promise.all(fetches);
 
       if (!mountedRef.current) return;
 
-      if (participantsRes.ok) {
+      const sessionRes = results[0];
+      const participantsRes = shouldFetchParticipants ? results[1] : null;
+      const submissionsRes = shouldFetchSubmissions ? results[shouldFetchParticipants ? 2 : 1] : null;
+
+      if (participantsRes?.ok) {
         const participants = await participantsRes.json();
         participants.forEach((p: any) => {
           const user: User = {
             id: p.id,
             name: p.name,
-            email: '', // Don't expose email to participants
+            email: '',
             gender: p.gender as "male" | "female",
             groupNumber: p.groupNumber || undefined,
             joinedAt: new Date(p.joinedAt),
@@ -93,23 +112,29 @@ export const useRealtimeSecure = ({
           status: session.status as Session["status"],
         };
 
-        if (sessionRef.current?.status !== sessionData.status) {
+        const prev = sessionRef.current;
+        if (
+          !prev ||
+          prev.status !== sessionData.status ||
+          prev.verseReference !== sessionData.verseReference
+        ) {
           sessionRef.current = sessionData;
           onSessionUpdated?.(sessionData);
         }
       }
 
-      if (submissionsRes.ok) {
+      if (submissionsRes?.ok) {
         const submissions = await submissionsRes.json();
         submissions.forEach((s: any) => {
           if (!submissionsRef.current.has(s.id)) {
             submissionsRef.current.add(s.id);
             const submission: StudySubmission = {
               id: s.id,
-              participantId: s.participantId,
+              sessionId: s.sessionId,
+              userId: s.participantId || s.userId,
               groupNumber: s.groupNumber,
               name: s.name,
-              email: '', // Don't expose email
+              email: '',
               bibleVerse: s.bibleVerse,
               theme: s.theme,
               movingVerse: s.movingVerse,
@@ -134,6 +159,7 @@ export const useRealtimeSecure = ({
   }, [
     sessionId,
     currentUserId,
+    phase,
     onParticipantJoined,
     onParticipantUpdated,
     onSessionUpdated,

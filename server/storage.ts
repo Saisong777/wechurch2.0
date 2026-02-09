@@ -39,7 +39,7 @@ export interface IStorage {
   updateSession(id: string, data: Partial<Session>): Promise<Session | undefined>;
   deleteSession(id: string): Promise<void>;
   
-  getParticipants(sessionId: string): Promise<Participant[]>;
+  getParticipants(sessionId: string, filters?: { groupNumber?: number }): Promise<Participant[]>;
   getParticipant(id: string): Promise<Participant | undefined>;
   createParticipant(participant: InsertParticipant): Promise<Participant>;
   updateParticipant(id: string, data: Partial<Participant>): Promise<Participant | undefined>;
@@ -255,8 +255,12 @@ export class DatabaseStorage implements IStorage {
     await db.delete(sessions).where(eq(sessions.id, id));
   }
 
-  async getParticipants(sessionId: string): Promise<Participant[]> {
-    return db.select().from(participants).where(eq(participants.sessionId, sessionId));
+  async getParticipants(sessionId: string, filters?: { groupNumber?: number }): Promise<Participant[]> {
+    const conditions = [eq(participants.sessionId, sessionId)];
+    if (filters?.groupNumber !== undefined) {
+      conditions.push(eq(participants.groupNumber, filters.groupNumber));
+    }
+    return db.select().from(participants).where(and(...conditions));
   }
 
   async getParticipant(id: string): Promise<Participant | undefined> {
@@ -447,43 +451,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStudyResponses(sessionId: string): Promise<(StudyResponse & { participantName?: string; groupNumber?: number })[]> {
-    // Get study responses with participant info
-    const responses = await db.select().from(studyResponses).where(eq(studyResponses.sessionId, sessionId));
-    
-    // Get participants for this session to match names
-    const sessionParticipants = await db.select().from(participants).where(eq(participants.sessionId, sessionId));
-    
-    // Also get users for registered user names
-    const allUsers = await db.select().from(users);
-    
-    // Map responses with participant/user names
-    return responses.map(response => {
-      // Try to match by participant id first
-      const participant = sessionParticipants.find(p => p.id === response.userId);
-      if (participant) {
-        return {
-          ...response,
-          participantName: participant.name,
-          groupNumber: participant.groupNumber || undefined,
-        };
-      }
-      
-      // Try to match by user id
-      const user = allUsers.find(u => u.id === response.userId);
-      if (user) {
-        return {
-          ...response,
-          participantName: user.displayName || user.email?.split('@')[0] || 'Unknown',
-          groupNumber: undefined,
-        };
-      }
-      
-      return {
-        ...response,
-        participantName: 'Unknown',
-        groupNumber: undefined,
-      };
-    });
+    const results = await db
+      .select({
+        response: studyResponses,
+        participantName: participants.name,
+        participantGroupNumber: participants.groupNumber,
+        userName: users.displayName,
+        userEmail: users.email,
+      })
+      .from(studyResponses)
+      .leftJoin(participants, eq(studyResponses.userId, participants.id))
+      .leftJoin(users, eq(studyResponses.userId, users.id))
+      .where(eq(studyResponses.sessionId, sessionId));
+
+    return results.map(row => ({
+      ...row.response,
+      participantName: row.participantName || row.userName || row.userEmail?.split('@')[0] || 'Unknown',
+      groupNumber: row.participantGroupNumber || undefined,
+    }));
   }
 
   async getIcebreakerGame(id: string): Promise<IcebreakerGame | undefined> {
