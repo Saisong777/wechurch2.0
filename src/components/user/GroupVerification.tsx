@@ -16,7 +16,7 @@ interface GroupVerificationProps {
 }
 
 export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady, onSessionEnded }) => {
-  const { currentUser, currentSession, setCurrentUser } = useSession();
+  const { currentUser, currentSession, setCurrentUser, setCurrentSession } = useSession();
   const [groupMembers, setGroupMembers] = useState<User[]>([]);
   const [checkedMembers, setCheckedMembers] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -157,11 +157,21 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       }
     },
     onSessionUpdated: (session) => {
+      if (session.status && currentSession) {
+        setCurrentSession({ ...currentSession, ...session } as any);
+      }
       if (session.status === 'completed' && onSessionEnded) {
         onSessionEnded();
       }
     },
   });
+
+  // Reset idempotency guard if user's groupNumber is cleared (re-grouping)
+  useEffect(() => {
+    if (!globalGroupNumber) {
+      allReadyFiredRef.current = false;
+    }
+  }, [globalGroupNumber]);
 
   useEffect(() => {
     if (!allReadyFiredRef.current && groupMembers.length > 0 && groupMembers.every(m => m.readyConfirmed)) {

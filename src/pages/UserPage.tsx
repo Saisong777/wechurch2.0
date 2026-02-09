@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { JoinForm } from '@/components/user/JoinForm';
@@ -321,6 +321,55 @@ export const UserPage: React.FC = () => {
       setStep('group-reveal');
     }
   }, [currentUser?.groupNumber, step]);
+
+  // Lightweight session status poller for steps that don't have their own
+  // realtime hooks (group-reveal, icebreaker, study). This ensures the user
+  // detects re-grouping even when their current component doesn't poll.
+  useEffect(() => {
+    const stepsWithoutPolling = ['group-reveal', 'icebreaker', 'study'];
+    if (!currentSession?.id || !stepsWithoutPolling.includes(step)) return;
+
+    const pollSessionStatus = async () => {
+      try {
+        const res = await fetch(`/api/sessions/${currentSession.id}`);
+        if (res.ok) {
+          const session = await res.json();
+          if (session.status !== currentSession.status) {
+            setCurrentSession({ ...currentSession, status: session.status });
+          }
+        }
+      } catch {
+      }
+    };
+
+    const interval = setInterval(pollSessionStatus, 5000);
+    return () => clearInterval(interval);
+  }, [currentSession?.id, currentSession?.status, step]);
+
+  // Watch for session status going back to 'waiting' (admin re-grouped)
+  // This handles the case where the user is at a later step but the admin
+  // cleared groups and reset the session to 'waiting'.
+  const prevSessionStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentStatus = currentSession?.status;
+    const prevStatus = prevSessionStatusRef.current;
+    prevSessionStatusRef.current = currentStatus || null;
+
+    if (!currentStatus || !prevStatus) return;
+
+    if (
+      currentStatus === 'waiting' &&
+      prevStatus !== 'waiting' &&
+      ['group-reveal', 'verification', 'icebreaker', 'study'].includes(step)
+    ) {
+      console.log('[UserPage] Re-grouping detected: session went back to waiting, resetting user step');
+      setCurrentUser(currentUser ? { ...currentUser, groupNumber: undefined, readyConfirmed: false } : null);
+      setStep('waiting');
+      toast.info('帶領者已重新分組', {
+        description: '請稍候，即將進行新的分組',
+      });
+    }
+  }, [currentSession?.status, step]);
 
   const handleEnterSession = async () => {
     if (!sessionId.trim()) {

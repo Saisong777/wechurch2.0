@@ -39,10 +39,9 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
     sessionId: currentSession?.id || null,
     currentUserId: currentUser?.id || null,
     onSessionUpdated: (sessionUpdate) => {
-      if ((sessionUpdate.status === 'studying' || sessionUpdate.status === 'grouping' || sessionUpdate.status === 'verification') && currentSession) {
+      if (sessionUpdate.status && currentSession) {
         setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
       }
-      // Handle session ending
       if (sessionUpdate.status === 'completed' && onSessionEnded) {
         onSessionEnded();
       }
