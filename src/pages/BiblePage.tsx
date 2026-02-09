@@ -5,7 +5,6 @@ import { Header } from '@/components/layout/Header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Book, ChevronRight, ChevronDown, ChevronLeft, ChevronUp, X, AlertCircle, Copy, Share2, Bookmark, BookmarkCheck, Check, BookMarked, Volume2, Image, BookOpen, PenLine, ExternalLink, List, AlignLeft, Minus, Plus, Type } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
@@ -599,11 +598,11 @@ const BiblePage = () => {
       title="聖經閱讀功能維護中"
       description="聖經閱讀功能目前暫時關閉，請稍後再試"
     >
-    <div className={`bg-background flex flex-col ${(selectedBook && selectedChapter) || isSearching ? 'h-screen overflow-hidden' : 'min-h-screen'}`} style={(selectedBook && selectedChapter) || isSearching ? { height: '100dvh' } : undefined}>
+    <div className="bg-background min-h-screen">
       <Header title="聖經閱讀" subtitle="和合本" variant="compact" />
       
-      <main className="flex-1 min-h-0 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex flex-col">
-        <div className="max-w-5xl lg:max-w-6xl mx-auto w-full flex flex-col flex-1 min-h-0">
+      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+        <div className="max-w-5xl lg:max-w-6xl mx-auto w-full">
           <div className="flex sm:hidden justify-end mb-1">
             <Button
               variant="ghost"
@@ -673,8 +672,8 @@ const BiblePage = () => {
           )}
 
           {isSearching ? (
-            <Card className="flex-1 flex flex-col min-h-0">
-              <CardContent className="py-3 sm:py-6 flex-1 flex flex-col min-h-0">
+            <Card>
+              <CardContent className="py-3 sm:py-6">
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-3 sm:mb-6">
                   <h3 className="font-semibold text-sm sm:text-lg" data-testid="text-search-title">
                     搜尋: &ldquo;{searchQuery}&rdquo;
@@ -698,27 +697,25 @@ const BiblePage = () => {
                 ) : searchResults.length === 0 ? (
                   <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">找不到相關經文</div>
                 ) : (
-                  <ScrollArea className="flex-1 min-h-0">
-                    <div className="space-y-2 sm:space-y-3 pr-2 sm:pr-4">
-                      {searchResults.map((v) => (
-                        <div key={v.id} className="p-3 sm:p-4 rounded-lg bg-muted/50" data-testid={`search-result-${v.id}`}>
-                          <div className="flex flex-wrap justify-between items-start gap-2 mb-1 sm:mb-2">
-                            <p className="text-sm sm:text-base text-primary font-medium">
-                              {v.bookName} {v.chapter}:{v.verse}
-                            </p>
-                          </div>
-                          <p className="text-sm sm:text-base leading-relaxed mb-2">{v.text}</p>
-                          <SearchVerseActions verse={v} />
+                  <div className="space-y-2 sm:space-y-3">
+                    {searchResults.map((v) => (
+                      <div key={v.id} className="p-3 sm:p-4 rounded-lg bg-muted/50" data-testid={`search-result-${v.id}`}>
+                        <div className="flex flex-wrap justify-between items-start gap-2 mb-1 sm:mb-2">
+                          <p className="text-sm sm:text-base text-primary font-medium">
+                            {v.bookName} {v.chapter}:{v.verse}
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
+                        <p className="text-sm sm:text-base leading-relaxed mb-2">{v.text}</p>
+                        <SearchVerseActions verse={v} />
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
           ) : selectedBook && selectedChapter ? (
-            <Card className="flex-1 flex flex-col min-h-0">
-              <CardContent className="py-2 sm:py-4 flex-1 flex flex-col min-h-0">
+            <Card>
+              <CardContent className="py-2 sm:py-4">
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-1 sm:mb-2">
                   <div className="flex items-center gap-1 sm:gap-2">
                     {getChapterLabel(-1) && (
@@ -828,7 +825,7 @@ const BiblePage = () => {
                     <span className="text-sm">載入經文時發生錯誤</span>
                   </div>
                 ) : (
-                  <ScrollArea className="flex-1 min-h-0">
+                  <div>
                     {displayMode === 'paragraph' ? (
                       <div className={`${currentFontConfig.paragraph} pr-2 sm:pr-4 py-2`}>
                         {verses.map((v) => (
@@ -896,7 +893,7 @@ const BiblePage = () => {
                         </Button>
                       ) : <div />}
                     </div>
-                  </ScrollArea>
+                  </div>
                 )}
               </CardContent>
             </Card>
