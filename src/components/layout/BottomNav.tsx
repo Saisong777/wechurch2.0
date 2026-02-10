@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Dumbbell, BookOpen, Gamepad2, Share2, Home, Shuffle } from 'lucide-react';
+import { Dumbbell, BookOpen, Gamepad2, Share2, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -22,16 +22,10 @@ const navItems = [
     icon: BookOpen,
   },
   {
-    id: 'icebreaker',
-    label: '真心話不用冒險',
-    href: '/icebreaker',
+    id: 'play',
+    label: 'We Play',
+    href: '/play',
     icon: Gamepad2,
-  },
-  {
-    id: 'grouper',
-    label: '只能說是神的安排',
-    href: '/grouper',
-    icon: Shuffle,
   },
   {
     id: 'share',
@@ -47,6 +41,9 @@ export const BottomNav = () => {
   const isActive = (href: string) => {
     if (href === '/') {
       return location.pathname === '/';
+    }
+    if (href === '/play') {
+      return location.pathname.startsWith('/play') || location.pathname.startsWith('/icebreaker') || location.pathname.startsWith('/grouper');
     }
     return location.pathname.startsWith(href);
   };
