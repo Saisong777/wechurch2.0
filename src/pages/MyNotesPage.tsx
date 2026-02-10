@@ -8,11 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
+import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen, EyeOff, Download } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen, EyeOff, Download, Save } from 'lucide-react';
 import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -216,20 +219,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
             )}
 
             <div className="flex items-center justify-between gap-2 pt-2 border-t">
-              {isFromReadingPlan ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/learn/reading-plans/${note.readingPlanId}/read${note.dayNumber ? `?day=${note.dayNumber}` : ''}`);
-                  }}
-                  data-testid={`button-edit-note-${note.id}`}
-                >
-                  <Pencil className="w-3.5 h-3.5 mr-1" />
-                  前往編輯
-                </Button>
-              ) : (
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
@@ -242,7 +232,21 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                   <Pencil className="w-3.5 h-3.5 mr-1" />
                   編輯筆記
                 </Button>
-              )}
+                {isFromReadingPlan && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/learn/reading-plans/${note.readingPlanId}/read${note.dayNumber ? `?day=${note.dayNumber}` : ''}`);
+                    }}
+                    data-testid={`button-goto-reading-${note.id}`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5 mr-1" />
+                    前往閱讀
+                  </Button>
+                )}
+              </div>
               <AlertDialog open={showHideConfirm} onOpenChange={setShowHideConfirm}>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -281,22 +285,118 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
         )}
       </Card>
 
-      {!isFromReadingPlan && (
-        <DevotionalNoteDialog
-          open={showEditDialog}
-          onOpenChange={setShowEditDialog}
-          verseReference={note.verseReference}
-          verseText={note.verseText || ''}
-          noteId={note.id}
-        />
-      )}
+      <DevotionalNoteDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        verseReference={note.verseReference}
+        verseText={note.verseText || ''}
+        noteId={note.id}
+      />
     </>
+  );
+};
+
+const StudyNoteEditDialog = ({ entry, userEmail, open, onOpenChange }: { entry: NotebookEntry; userEmail: string; open: boolean; onOpenChange: (open: boolean) => void }) => {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    titlePhrase: entry.title_phrase || '',
+    heartbeatVerse: entry.heartbeat_verse || '',
+    observation: entry.observation || '',
+    coreInsightCategory: entry.core_insight_category || '',
+    coreInsightNote: entry.core_insight_note || '',
+    scholarsNote: entry.scholars_note || '',
+    actionPlan: entry.action_plan || '',
+    coolDownNote: entry.cool_down_note || '',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        titlePhrase: entry.title_phrase || '',
+        heartbeatVerse: entry.heartbeat_verse || '',
+        observation: entry.observation || '',
+        coreInsightCategory: entry.core_insight_category || '',
+        coreInsightNote: entry.core_insight_note || '',
+        scholarsNote: entry.scholars_note || '',
+        actionPlan: entry.action_plan || '',
+        coolDownNote: entry.cool_down_note || '',
+      });
+    }
+  }, [open, entry]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await apiRequest('PATCH', `/api/study-responses/${entry.id}`, form);
+      queryClient.invalidateQueries({ queryKey: ['/api/notebook', userEmail] });
+      toast({ title: '已儲存', description: '筆記已成功更新' });
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error saving study note:', error);
+      toast({ title: '儲存失敗', description: '請稍後再試', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const fields = [
+    { key: 'titlePhrase' as const, label: '1. 定標題', icon: <BookMarked className="w-4 h-4 text-green-500" /> },
+    { key: 'heartbeatVerse' as const, label: '2. 心跳的時刻', icon: <Heart className="w-4 h-4 text-red-500" /> },
+    { key: 'observation' as const, label: '3. 查看聖經的資訊', icon: <Eye className="w-4 h-4 text-blue-500" /> },
+    { key: 'coreInsightCategory' as const, label: '4a. 核心訓練分類', icon: <Dumbbell className="w-4 h-4 text-orange-500" /> },
+    { key: 'coreInsightNote' as const, label: '4b. 核心訓練筆記', icon: <Dumbbell className="w-4 h-4 text-orange-500" /> },
+    { key: 'scholarsNote' as const, label: '5. 學長姐的話', icon: <MessageCircle className="w-4 h-4 text-purple-500" /> },
+    { key: 'actionPlan' as const, label: '6. 帶一招', icon: <Target className="w-4 h-4 text-teal-500" /> },
+    { key: 'coolDownNote' as const, label: '7. 安靜的心', icon: <Heart className="w-4 h-4 text-indigo-500" /> },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Dumbbell className="w-5 h-5" />
+            編輯 Soul Gym 筆記
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">{entry.verse_reference}</p>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          {fields.map(({ key, label, icon }) => (
+            <div key={key} className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                {icon} {label}
+              </Label>
+              <AutoResizeTextarea
+                value={form[key]}
+                onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))}
+                placeholder={`輸入${label}...`}
+                minRows={1}
+                maxRows={6}
+                className="text-sm"
+                data-testid={`input-study-edit-${key}`}
+              />
+            </div>
+          ))}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+              取消
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving} data-testid="button-save-study-note">
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+              儲存
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
 const StudyNoteCard = ({ entry, userEmail }: { entry: NotebookEntry; userEmail: string }) => {
   const [expanded, setExpanded] = useState(false);
   const [showHideConfirm, setShowHideConfirm] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const { toast } = useToast();
   const parsedCats = parseCategories(entry.core_insight_category);
   const parsedNts = parseNotes(entry.core_insight_note, parsedCats);
@@ -430,7 +530,19 @@ const StudyNoteCard = ({ entry, userEmail }: { entry: NotebookEntry; userEmail: 
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t">
+          <div className="flex items-center justify-between gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditDialog(true);
+              }}
+              data-testid={`button-edit-study-note-${entry.id}`}
+            >
+              <Pencil className="w-3.5 h-3.5 mr-1" />
+              編輯筆記
+            </Button>
             <AlertDialog open={showHideConfirm} onOpenChange={setShowHideConfirm}>
               <AlertDialogTrigger asChild>
                 <Button
@@ -467,6 +579,12 @@ const StudyNoteCard = ({ entry, userEmail }: { entry: NotebookEntry; userEmail: 
           </div>
         </CardContent>
       )}
+      <StudyNoteEditDialog
+        entry={entry}
+        userEmail={userEmail}
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+      />
     </Card>
   );
 };

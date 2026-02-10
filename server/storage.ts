@@ -57,6 +57,8 @@ export interface IStorage {
   
   getStudyResponse(sessionId: string, participantId: string): Promise<StudyResponse | undefined>;
   upsertStudyResponse(response: InsertStudyResponse & { sessionId: string; userId: string }): Promise<StudyResponse>;
+  updateStudyResponseById(id: string, data: Partial<InsertStudyResponse>): Promise<StudyResponse | undefined>;
+  getStudyResponseWithOwner(id: string): Promise<{ id: string; userId: string; ownerEmail: string | null } | undefined>;
   deleteStudyResponse(id: string): Promise<void>;
   getNotebookEntries(email: string): Promise<any[]>;
   getNotebookSessions(email: string): Promise<any[]>;
@@ -355,6 +357,28 @@ export class DatabaseStorage implements IStorage {
     }
     const [newResponse] = await db.insert(studyResponses).values(response).returning();
     return newResponse;
+  }
+
+  async updateStudyResponseById(id: string, data: Partial<InsertStudyResponse>): Promise<StudyResponse | undefined> {
+    const [updated] = await db.update(studyResponses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(studyResponses.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getStudyResponseWithOwner(id: string): Promise<{ id: string; userId: string; ownerEmail: string | null } | undefined> {
+    const [result] = await db
+      .select({
+        id: studyResponses.id,
+        userId: studyResponses.userId,
+        ownerEmail: participants.email,
+      })
+      .from(studyResponses)
+      .leftJoin(participants, eq(studyResponses.userId, participants.id))
+      .where(eq(studyResponses.id, id))
+      .limit(1);
+    return result;
   }
 
   async deleteStudyResponse(id: string): Promise<void> {

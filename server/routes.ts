@@ -884,6 +884,63 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/study-responses/:id", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const userEmail = user.claims?.email || user.email;
+      if (!userEmail) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const userId = await resolveUserId(req);
+      const existing = await storage.getStudyResponseWithOwner(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Study response not found" });
+      }
+
+      const ownerMatch = (userId && existing.userId === userId) ||
+        (existing.ownerEmail && existing.ownerEmail.toLowerCase() === userEmail.toLowerCase());
+      if (!ownerMatch) {
+        return res.status(403).json({ error: "Not authorized to edit this note" });
+      }
+
+      const body = req.body;
+      if (!body || typeof body !== 'object') {
+        return res.status(400).json({ error: "Invalid request body" });
+      }
+
+      const cleanData: any = {};
+      const tp = body.titlePhrase ?? body.title_phrase;
+      if (tp !== undefined) cleanData.titlePhrase = tp || null;
+      const hv = body.heartbeatVerse ?? body.heartbeat_verse;
+      if (hv !== undefined) cleanData.heartbeatVerse = hv || null;
+      if (body.observation !== undefined) cleanData.observation = body.observation || null;
+      const cic = body.coreInsightCategory ?? body.core_insight_category;
+      if (cic !== undefined) cleanData.coreInsightCategory = cic || null;
+      const cin = body.coreInsightNote ?? body.core_insight_note;
+      if (cin !== undefined) cleanData.coreInsightNote = cin || null;
+      const sn = body.scholarsNote ?? body.scholars_note;
+      if (sn !== undefined) cleanData.scholarsNote = sn || null;
+      const ap = body.actionPlan ?? body.action_plan;
+      if (ap !== undefined) cleanData.actionPlan = ap || null;
+      const cdn = body.coolDownNote ?? body.cool_down_note;
+      if (cdn !== undefined) cleanData.coolDownNote = cdn || null;
+
+      const updated = await storage.updateStudyResponseById(req.params.id, cleanData);
+      if (!updated) {
+        return res.status(404).json({ error: "Study response not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating study response:", error);
+      res.status(500).json({ error: "Failed to update study response" });
+    }
+  });
+
   app.delete("/api/study-responses/:id", async (req, res) => {
     try {
       await storage.deleteStudyResponse(req.params.id);
