@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 
 interface AuthUser {
   id: string;
@@ -27,73 +27,81 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SESSION_REFRESH_INTERVAL = 5 * 60 * 1000;
+const AUTH_FAILURE_THRESHOLD = 3;
+
+function mapUserData(userData: any): AuthUser {
+  return {
+    id: userData.legacyUserId || userData.id,
+    email: userData.email,
+    firstName: userData.firstName,
+    lastName: userData.lastName,
+    profileImageUrl: userData.profileImageUrl,
+    legacyUserId: userData.legacyUserId,
+    displayName: userData.displayName,
+    role: userData.role,
+    user_metadata: {
+      display_name: userData.displayName || (userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined),
+      avatar_url: userData.profileImageUrl,
+    },
+  };
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const failureCountRef = useRef(0);
+  const hadUserRef = useRef(false);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch('/api/auth/user', {
-          credentials: 'include',
-        });
-        
-        if (response.ok) {
-          const userData = await response.json();
-          const authUser: AuthUser = {
-            id: userData.legacyUserId || userData.id,
-            email: userData.email,
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            profileImageUrl: userData.profileImageUrl,
-            legacyUserId: userData.legacyUserId,
-            displayName: userData.displayName,
-            role: userData.role,
-            user_metadata: {
-              display_name: userData.displayName || (userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined),
-              avatar_url: userData.profileImageUrl,
-            },
-          };
-          setUser(authUser);
-        } else {
-          setUser(null);
-        }
-      } catch (error) {
-        console.warn('[AuthContext] Failed to fetch user:', error);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  const fetchUser = async () => {
+  const fetchUser = async (isInitial = false): Promise<AuthUser | null> => {
     try {
-      const response = await fetch('/api/auth/user', { credentials: 'include' });
+      const response = await fetch('/api/auth/user', {
+        credentials: 'include',
+      });
+
       if (response.ok) {
         const userData = await response.json();
-        const authUser: AuthUser = {
-          id: userData.legacyUserId || userData.id,
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          profileImageUrl: userData.profileImageUrl,
-          legacyUserId: userData.legacyUserId,
-          displayName: userData.displayName,
-          role: userData.role,
-          user_metadata: {
-            display_name: userData.displayName || (userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined),
-            avatar_url: userData.profileImageUrl,
-          },
-        };
+        const authUser = mapUserData(userData);
         setUser(authUser);
+        hadUserRef.current = true;
+        failureCountRef.current = 0;
+        return authUser;
+      } else {
+        if (isInitial) {
+          setUser(null);
+        } else if (hadUserRef.current) {
+          failureCountRef.current += 1;
+          if (failureCountRef.current >= AUTH_FAILURE_THRESHOLD) {
+            setUser(null);
+            hadUserRef.current = false;
+          }
+        }
+        return null;
       }
     } catch (error) {
-      console.warn('[AuthContext] Failed to refresh user:', error);
+      console.warn('[AuthContext] Failed to fetch user:', error);
+      if (isInitial) {
+        setUser(null);
+      } else if (hadUserRef.current) {
+        failureCountRef.current += 1;
+        if (failureCountRef.current >= AUTH_FAILURE_THRESHOLD) {
+          setUser(null);
+          hadUserRef.current = false;
+        }
+      }
+      return null;
     }
   };
+
+  useEffect(() => {
+    fetchUser(true).finally(() => setLoading(false));
+
+    const interval = setInterval(() => {
+      fetchUser(false);
+    }, SESSION_REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const signUp = async (email: string, password: string, displayName?: string) => {
     try {
@@ -109,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { error: new Error(data.message || '註冊失敗') };
       }
 
-      await fetchUser();
+      await fetchUser(false);
       return { error: null };
     } catch (err) {
       return { error: new Error('註冊失敗，請稍後重試') };
@@ -130,7 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { error: new Error(data.message || '登入失敗') };
       }
 
-      await fetchUser();
+      await fetchUser(false);
       return { error: null };
     } catch (err) {
       return { error: new Error('登入失敗，請稍後重試') };

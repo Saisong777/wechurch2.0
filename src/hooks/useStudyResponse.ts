@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { StudyResponse, StudyResponseFormData, emptyFormData, parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
 import { toast } from 'sonner';
 import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
-import { apiRequest } from '@/lib/queryClient';
 
 const POLLING_INTERVAL = HIGH_CONCURRENCY_CONFIG.STUDY_RESPONSE_POLL_MS;
 const DEBOUNCE_DELAY = HIGH_CONCURRENCY_CONFIG.SAVE_DEBOUNCE_MS;
@@ -22,6 +21,11 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
   const [isSaving, setIsSaving] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialized = useRef(false);
+  const isDirtyRef = useRef(false);
+  const isSavingRef = useRef(false);
+
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { isSavingRef.current = isSaving; }, [isSaving]);
 
   const queryKey = ['study_response', sessionId, userId] as const;
 
@@ -41,12 +45,17 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       return data as StudyResponse | null;
     },
     enabled: enabled && !!sessionId && !!userId,
-    refetchInterval: POLLING_INTERVAL,
+    refetchInterval: () => {
+      if (isDirtyRef.current || isSavingRef.current) {
+        return false;
+      }
+      return POLLING_INTERVAL;
+    },
     staleTime: POLLING_INTERVAL - 500,
   });
 
   useEffect(() => {
-    if (response && !isDirty && !isInitialized.current) {
+    if (response && !isDirty && !isSaving && !isInitialized.current) {
       const coreCategory = response.coreInsightCategory || response.core_insight_category || null;
       const coreNote = response.coreInsightNote || response.core_insight_note || null;
       const parsedCategories = parseCategories(coreCategory);
@@ -62,7 +71,7 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       });
       isInitialized.current = true;
     }
-  }, [response, isDirty]);
+  }, [response, isDirty, isSaving]);
 
   const upsertMutation = useMutation({
     mutationFn: async (data: Partial<StudyResponseFormData>) => {
@@ -84,14 +93,26 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
         }),
       };
 
-      const result = await apiRequest('POST', '/api/study-responses', payload);
-      return result;
+      const res = await fetch('/api/study-responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Save failed: ${res.status} ${text}`);
+      }
+
+      return await res.json();
     },
-    onSuccess: (saved) => {
+    onSuccess: (savedData) => {
       setIsDirty(false);
       setIsSaving(false);
-      queryClient.setQueryData(queryKey, saved);
-      queryClient.invalidateQueries({ queryKey });
+      if (savedData && typeof savedData === 'object' && savedData.id) {
+        queryClient.setQueryData(queryKey, savedData);
+      }
     },
     onError: (error) => {
       console.error('Failed to save study response:', error);
