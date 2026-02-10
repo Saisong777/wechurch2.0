@@ -66,15 +66,19 @@ interface AIReport {
   groupNumber: number | null;
   content: string;
   createdAt: string;
+  status?: string;
 }
 
-interface SessionWithResponses {
+interface SessionMetadata {
   id: string;
   shortCode: string | null;
   verseReference: string;
   status: string;
   createdAt: string;
   participantCount: number;
+}
+
+interface SessionWithResponses extends SessionMetadata {
   responses: StudyResponseWithParticipant[];
   aiReports: AIReport[];
 }
@@ -101,7 +105,7 @@ export const HistoryBrowser: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-  const [selectedSession, setSelectedSession] = useState<SessionWithResponses | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'notes' | 'groups' | 'reports'>('notes');
   const [notesSearchTerm, setNotesSearchTerm] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -115,69 +119,73 @@ export const HistoryBrowser: React.FC = () => {
     }));
   };
 
-  // Fetch all sessions with their responses using API
   const { data: sessions, isLoading } = useQuery({
-    queryKey: ['admin_history', user?.id],
-    queryFn: async (): Promise<SessionWithResponses[]> => {
-      if (!user?.id) return [];
-
-      // Fetch sessions from API
+    queryKey: ['admin_history_sessions'],
+    queryFn: async (): Promise<SessionMetadata[]> => {
       const sessionsRes = await fetch('/api/sessions');
       if (!sessionsRes.ok) throw new Error('Failed to fetch sessions');
       const sessionsData = await sessionsRes.json();
-
-      // Process each session to get additional data
-      const sessionsWithData = await Promise.all(
-        sessionsData.map(async (session: any) => {
-          // Fetch study responses and reports in parallel
-          const [responsesRes, reportsRes] = await Promise.all([
-            fetch(`/api/sessions/${session.id}/study-responses`),
-            fetch(`/api/sessions/${session.id}/reports`),
-          ]);
-
-          const responses = responsesRes.ok ? await responsesRes.json() : [];
-          const reports = reportsRes.ok ? await reportsRes.json() : [];
-
-          return {
-            id: session.id,
-            shortCode: session.shortCode,
-            verseReference: session.verseReference,
-            status: session.status,
-            createdAt: session.createdAt,
-            participantCount: session.participantCount || 0,
-            responses: (responses || []).map((r: any) => ({
-              id: r.id || '',
-              participantName: r.participantName || 'Unknown',
-              groupNumber: r.groupNumber,
-              titlePhrase: r.titlePhrase,
-              heartbeatVerse: r.heartbeatVerse,
-              observation: r.observation,
-              coreInsightCategory: r.coreInsightCategory as InsightCategory | null,
-              coreInsightNote: r.coreInsightNote,
-              scholarsNote: r.scholarsNote,
-              actionPlan: r.actionPlan,
-              coolDownNote: r.coolDownNote,
-              createdAt: r.createdAt || '',
-            })),
-            aiReports: (reports || [])
-              .map((r: any) => ({
-                id: r.id,
-                reportType: r.reportType as 'group' | 'overall',
-                groupNumber: r.groupNumber,
-                content: r.content,
-                createdAt: r.createdAt,
-                status: r.status,
-              }))
-              .filter((r: any) => r.status === 'COMPLETED'),
-          };
-        })
-      );
-
-      return sessionsWithData;
+      return sessionsData.map((session: any) => ({
+        id: session.id,
+        shortCode: session.shortCode,
+        verseReference: session.verseReference,
+        status: session.status,
+        createdAt: session.createdAt,
+        participantCount: session.participantCount || 0,
+      }));
     },
     enabled: !!user?.id,
     staleTime: 60000,
   });
+
+  const { data: sessionDetail, isLoading: isLoadingDetail } = useQuery({
+    queryKey: ['admin_history_detail', selectedSessionId],
+    queryFn: async (): Promise<SessionWithResponses | null> => {
+      if (!selectedSessionId) return null;
+      const sessionMeta = sessions?.find(s => s.id === selectedSessionId);
+      if (!sessionMeta) return null;
+
+      const [responsesRes, reportsRes] = await Promise.all([
+        fetch(`/api/sessions/${selectedSessionId}/study-responses`),
+        fetch(`/api/sessions/${selectedSessionId}/reports`),
+      ]);
+
+      const responses = responsesRes.ok ? await responsesRes.json() : [];
+      const reports = reportsRes.ok ? await reportsRes.json() : [];
+
+      return {
+        ...sessionMeta,
+        responses: (responses || []).map((r: any) => ({
+          id: r.id || '',
+          participantName: r.participantName || 'Unknown',
+          groupNumber: r.groupNumber,
+          titlePhrase: r.titlePhrase,
+          heartbeatVerse: r.heartbeatVerse,
+          observation: r.observation,
+          coreInsightCategory: r.coreInsightCategory as InsightCategory | null,
+          coreInsightNote: r.coreInsightNote,
+          scholarsNote: r.scholarsNote,
+          actionPlan: r.actionPlan,
+          coolDownNote: r.coolDownNote,
+          createdAt: r.createdAt || '',
+        })),
+        aiReports: (reports || [])
+          .map((r: any) => ({
+            id: r.id,
+            reportType: r.reportType as 'group' | 'overall',
+            groupNumber: r.groupNumber,
+            content: r.content,
+            createdAt: r.createdAt,
+            status: r.status,
+          }))
+          .filter((r: any) => r.status === 'COMPLETED'),
+      };
+    },
+    enabled: !!selectedSessionId && !!sessions,
+    staleTime: 60000,
+  });
+
+  const selectedSession = sessionDetail || null;
 
   // Group responses by group number for the selected session
   const groupedResponses = useMemo(() => {
@@ -240,8 +248,7 @@ export const HistoryBrowser: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [presentationMode, presentationSlides.length]);
 
-  // Filter sessions by time
-  const filterByTime = (session: SessionWithResponses) => {
+  const filterByTime = (session: SessionMetadata) => {
     const sessionDate = new Date(session.createdAt);
     const now = new Date();
     const lastMonth = subMonths(now, 1);
@@ -258,17 +265,11 @@ export const HistoryBrowser: React.FC = () => {
     }
   };
 
-  // Filter sessions
   const filteredSessions = useMemo(() => {
     return (sessions || []).filter(session => {
       const matchesSearch = 
         session.verseReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.shortCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.responses.some(r => 
-          r.participantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.titlePhrase?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.coreInsightNote?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        session.shortCode?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = filterStatus === 'all' || session.status === filterStatus;
       const matchesTime = filterByTime(session);
@@ -277,9 +278,8 @@ export const HistoryBrowser: React.FC = () => {
     });
   }, [sessions, searchTerm, filterStatus, timeFilter]);
 
-  // Group sessions by month
   const groupedByMonth = useMemo(() => {
-    const groups: Record<string, SessionWithResponses[]> = {};
+    const groups: Record<string, SessionMetadata[]> = {};
     
     filteredSessions.forEach(session => {
       const monthKey = format(new Date(session.createdAt), 'yyyy-MM');
@@ -292,18 +292,13 @@ export const HistoryBrowser: React.FC = () => {
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filteredSessions]);
 
-  // Statistics
   const stats = useMemo(() => {
     const allSessions = sessions || [];
     const thisMonthSessions = allSessions.filter(s => isThisMonth(new Date(s.createdAt)));
-    const totalNotes = allSessions.reduce((sum, s) => sum + s.responses.length, 0);
-    const totalReports = allSessions.reduce((sum, s) => sum + s.aiReports.length, 0);
 
     return {
       totalSessions: allSessions.length,
       thisMonthSessions: thisMonthSessions.length,
-      totalNotes,
-      totalReports,
     };
   }, [sessions]);
 
@@ -315,7 +310,7 @@ export const HistoryBrowser: React.FC = () => {
       if (!res.ok) throw new Error('刪除失敗');
       
       toast.success('報告已刪除');
-      queryClient.invalidateQueries({ queryKey: ['admin_history'] });
+      queryClient.invalidateQueries({ queryKey: ['admin_history_detail', selectedSessionId] });
     } catch (err) {
       console.error('Error deleting report:', err);
       toast.error('刪除失敗');
@@ -330,7 +325,7 @@ export const HistoryBrowser: React.FC = () => {
       if (!res.ok) throw new Error('刪除失敗');
       
       toast.success('筆記已刪除');
-      queryClient.invalidateQueries({ queryKey: ['admin_history'] });
+      queryClient.invalidateQueries({ queryKey: ['admin_history_detail', selectedSessionId] });
     } catch (err) {
       console.error('Error deleting response:', err);
       toast.error('刪除失敗');
@@ -544,16 +539,32 @@ export const HistoryBrowser: React.FC = () => {
     );
   }
 
-  // Detail View
-  if (selectedSession) {
+  if (selectedSessionId) {
+    if (isLoadingDetail || !selectedSession) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedSessionId(null)} className="gap-1">
+              <ChevronRight className="w-4 h-4 rotate-180" />
+              返回列表
+            </Button>
+          </div>
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
-        {/* Header */}
         <div className="flex items-center gap-3">
           <Button 
             variant="ghost" 
             size="sm"
-            onClick={() => setSelectedSession(null)}
+            onClick={() => setSelectedSessionId(null)}
             className="gap-1"
           >
             <ChevronRight className="w-4 h-4 rotate-180" />
@@ -812,7 +823,7 @@ export const HistoryBrowser: React.FC = () => {
                 <FileText className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{stats.totalNotes}</p>
+                <p className="text-2xl font-bold">-</p>
                 <p className="text-xs text-muted-foreground">筆記總數</p>
               </div>
             </div>
@@ -825,7 +836,7 @@ export const HistoryBrowser: React.FC = () => {
                 <Brain className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{stats.totalReports}</p>
+                <p className="text-2xl font-bold">-</p>
                 <p className="text-xs text-muted-foreground">AI 報告</p>
               </div>
             </div>
@@ -919,7 +930,7 @@ export const HistoryBrowser: React.FC = () => {
                     <SessionCard
                       key={session.id}
                       session={session}
-                      onClick={() => setSelectedSession(session)}
+                      onClick={() => setSelectedSessionId(session.id)}
                     />
                   ))}
                 </div>
@@ -932,9 +943,8 @@ export const HistoryBrowser: React.FC = () => {
   );
 };
 
-// Session Card Component
 const SessionCard: React.FC<{
-  session: SessionWithResponses;
+  session: SessionMetadata;
   onClick: () => void;
 }> = ({ session, onClick }) => {
   return (
@@ -967,16 +977,6 @@ const SessionCard: React.FC<{
                 <Users className="w-3.5 h-3.5" />
                 {session.participantCount} 人
               </span>
-              <span className="flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5" />
-                {session.responses.length} 篇筆記
-              </span>
-              {session.aiReports.length > 0 && (
-                <span className="flex items-center gap-1 text-secondary">
-                  <Brain className="w-3.5 h-3.5" />
-                  {session.aiReports.length} 份報告
-                </span>
-              )}
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-secondary transition-colors flex-shrink-0" />
