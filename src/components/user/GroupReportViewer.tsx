@@ -95,19 +95,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
 
   const handleShare = async () => {
     if (!report) return;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `第 ${groupNumber} 組查經報告`,
-          text: report,
-        });
-      } catch {
-        handleCopy();
-      }
-    } else {
-      handleCopy();
-    }
+    handleCopy();
   };
 
   const handleCopy = () => {

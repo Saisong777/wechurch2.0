@@ -33,6 +33,7 @@ import {
   Brain,
   FileText,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   BarChart3,
   Clock,
@@ -40,7 +41,9 @@ import {
   CalendarDays,
   FolderOpen,
   Copy,
-  Trash2
+  Trash2,
+  Presentation,
+  X
 } from 'lucide-react';
 import {
   Collapsible,
@@ -99,9 +102,11 @@ export const HistoryBrowser: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [selectedSession, setSelectedSession] = useState<SessionWithResponses | null>(null);
-  const [activeTab, setActiveTab] = useState<'notes' | 'reports'>('notes');
+  const [activeTab, setActiveTab] = useState<'notes' | 'groups' | 'reports'>('notes');
   const [notesSearchTerm, setNotesSearchTerm] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   const toggleGroup = (groupNum: string) => {
     setCollapsedGroups(prev => ({
@@ -197,6 +202,43 @@ export const HistoryBrowser: React.FC = () => {
     });
     return groups;
   }, [selectedSession, notesSearchTerm]);
+
+  const presentationSlides = useMemo(() => {
+    if (!selectedSession || selectedSession.aiReports.length === 0) return [];
+    const slides: { type: 'title' | 'content' | 'end'; title?: string; subtitle?: string; section?: GroupReport }[] = [];
+    slides.push({ type: 'title', title: '查經分析報告', subtitle: selectedSession.verseReference || '靈魂健身房' });
+    const overallReport = selectedSession.aiReports.find(r => r.reportType === 'overall' || r.groupNumber === 0);
+    if (overallReport) {
+      const parsed = parseReportContent(overallReport.content);
+      slides.push({ type: 'content', title: '全會眾綜合分析', section: parsed[0] });
+    }
+    const groupReportsSorted = selectedSession.aiReports
+      .filter(r => r.reportType === 'group' && r.groupNumber !== 0)
+      .sort((a, b) => (a.groupNumber || 0) - (b.groupNumber || 0));
+    for (const report of groupReportsSorted) {
+      const parsed = parseReportContent(report.content);
+      slides.push({ type: 'content', title: `第 ${report.groupNumber} 組`, section: parsed[0] });
+    }
+    slides.push({ type: 'end', title: '感謝參與', subtitle: '願神的話語常存在我們心中' });
+    return slides;
+  }, [selectedSession]);
+
+  React.useEffect(() => {
+    if (!presentationMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        setCurrentSlide(prev => Math.min(prev + 1, presentationSlides.length - 1));
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setCurrentSlide(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'Escape') {
+        setPresentationMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [presentationMode, presentationSlides.length]);
 
   // Filter sessions by time
   const filterByTime = (session: SessionWithResponses) => {
@@ -370,6 +412,138 @@ export const HistoryBrowser: React.FC = () => {
     );
   }
 
+  // Presentation mode overlay
+  if (presentationMode && selectedSession && presentationSlides.length > 0) {
+    const slide = presentationSlides[currentSlide];
+    const formatSlideContent = (text?: string) => {
+      if (!text) return null;
+      return text.replace(/\*\*/g, '').replace(/^[-•]\s*/gm, '').split('\n').filter(l => l.trim()).map((line, i) => (
+        <div key={i} className="py-0.5 text-sm sm:text-base leading-relaxed">{line.trim()}</div>
+      ));
+    };
+    return (
+      <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+          <span className="text-white/60 text-xs sm:text-sm">
+            {currentSlide + 1} / {presentationSlides.length}
+          </span>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setPresentationMode(false)}
+            className="text-white/70 hover:text-white"
+            data-testid="button-close-presentation"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-auto">
+          {slide?.type === 'title' || slide?.type === 'end' ? (
+            <div className="text-center">
+              <h1 className="text-3xl sm:text-5xl font-bold text-white mb-4" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.3)' }}>
+                {slide.title}
+              </h1>
+              {slide.subtitle && (
+                <p className="text-xl sm:text-2xl text-white/80">{slide.subtitle}</p>
+              )}
+              {slide.type === 'title' && (
+                <p className="mt-6 text-white/50 text-sm">
+                  {new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              )}
+            </div>
+          ) : slide?.section ? (
+            <div className="w-full max-w-5xl">
+              <div className="flex items-center gap-3 mb-4 flex-wrap">
+                <h2 className={cn(
+                  "text-2xl sm:text-3xl font-bold",
+                  slide.section.groupNumber === 0 ? "text-purple-300" : "text-teal-300"
+                )}>
+                  {slide.title}
+                </h2>
+                {slide.section.members && (
+                  <span className="text-sm text-white/50 bg-white/10 px-3 py-1 rounded-full">
+                    {slide.section.members}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {slide.section.themes && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-green-400">
+                    <h3 className="text-green-300 font-semibold text-sm mb-2">主題</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.themes)}</div>
+                  </div>
+                )}
+                {slide.section.observations && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-teal-400">
+                    <h3 className="text-teal-300 font-semibold text-sm mb-2">事實發現</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.observations)}</div>
+                  </div>
+                )}
+                {slide.section.insights && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-amber-400">
+                    <h3 className="text-amber-300 font-semibold text-sm mb-2">獨特亮光</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.insights)}</div>
+                  </div>
+                )}
+                {slide.section.applications && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-blue-400">
+                    <h3 className="text-blue-300 font-semibold text-sm mb-2">如何應用</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.applications)}</div>
+                  </div>
+                )}
+              </div>
+              {slide.section.contributions && (
+                <div className="mt-3 sm:mt-4 bg-white/5 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-purple-400">
+                  <h3 className="text-purple-300 font-semibold text-sm mb-2">個人貢獻摘要</h3>
+                  <div className="text-white/80 text-sm">{formatSlideContent(slide.section.contributions)}</div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-center gap-4 pb-4">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setCurrentSlide(prev => Math.max(prev - 1, 0))}
+            disabled={currentSlide === 0}
+            className="text-white/70 hover:text-white disabled:opacity-30"
+            data-testid="button-prev-slide"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
+          <div className="flex gap-1.5">
+            {presentationSlides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentSlide(i)}
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all",
+                  i === currentSlide ? "bg-white w-6" : "bg-white/30"
+                )}
+                data-testid={`button-slide-dot-${i}`}
+              />
+            ))}
+          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setCurrentSlide(prev => Math.min(prev + 1, presentationSlides.length - 1))}
+            disabled={currentSlide === presentationSlides.length - 1}
+            className="text-white/70 hover:text-white disabled:opacity-30"
+            data-testid="button-next-slide"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </Button>
+        </div>
+        <p className="text-center text-white/30 text-xs pb-3">使用方向鍵或點擊導航 · ESC 退出</p>
+      </div>
+    );
+  }
+
   // Detail View
   if (selectedSession) {
     return (
@@ -408,27 +582,51 @@ export const HistoryBrowser: React.FC = () => {
                   </Badge>
                 </div>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleExport(selectedSession)}
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                匯出
-              </Button>
+              <div className="flex items-center gap-2">
+                {selectedSession.aiReports.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setCurrentSlide(0);
+                      setPresentationMode(true);
+                    }}
+                    className="gap-2"
+                    data-testid="button-presentation-mode"
+                  >
+                    <Presentation className="w-4 h-4" />
+                    PPT
+                  </Button>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleExport(selectedSession)}
+                  className="gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  匯出
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>
 
         {/* Tab Navigation */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'notes' | 'reports')}>
-          <TabsList className="grid w-full grid-cols-2 h-12">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'notes' | 'groups' | 'reports')}>
+          <TabsList className="grid w-full grid-cols-3 h-12">
             <TabsTrigger value="notes" className="gap-2 text-base">
               <User className="w-4 h-4" />
               個人筆記
               <Badge variant="secondary" className="ml-1">
                 {selectedSession.responses.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="groups" className="gap-2 text-base">
+              <Users className="w-4 h-4" />
+              分組成員
+              <Badge variant="secondary" className="ml-1">
+                {Object.keys(groupedResponses).length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="reports" className="gap-2 text-base">
@@ -500,6 +698,45 @@ export const HistoryBrowser: React.FC = () => {
                           </CollapsibleContent>
                         </Card>
                       </Collapsible>
+                    ))}
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="groups" className="mt-4">
+            <ScrollArea className="h-[calc(100vh-480px)]">
+              {Object.keys(groupedResponses).length === 0 ? (
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <Users className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">尚無分組資料</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 pr-4">
+                  {Object.entries(groupedResponses)
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([groupNum, responses]) => (
+                      <Card key={`group-members-${groupNum}`}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Users className="w-4 h-4 text-secondary" />
+                            {groupNum === '0' ? '未分組' : `第 ${groupNum} 組`}
+                            <Badge variant="secondary">{responses.length} 人</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {responses.map((r) => (
+                              <Badge key={r.id} variant="outline" className="gap-1 text-sm py-1 px-2.5">
+                                <User className="w-3 h-3" />
+                                {r.participantName}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
                 </div>
               )}

@@ -132,21 +132,13 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
       .filter(Boolean)
       .join('\n\n');
     
-    const shareText = `📖 ${currentSession?.verseReference}\n第 ${currentUser?.groupNumber} 組\n\n${content}`;
+    const shareText = `${currentSession?.verseReference}\n第 ${currentUser?.groupNumber} 組\n\n${content}`;
     
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Spiritual Fitness 筆記',
-          text: shareText,
-        });
-      } catch {
-        navigator.clipboard.writeText(shareText);
-        toast.success('已複製到剪貼簿！');
-      }
-    } else {
-      navigator.clipboard.writeText(shareText);
+    try {
+      await navigator.clipboard.writeText(shareText);
       toast.success('已複製到剪貼簿！');
+    } catch {
+      toast.error('複製失敗，請手動複製');
     }
   };
 

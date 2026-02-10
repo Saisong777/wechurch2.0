@@ -322,7 +322,9 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     if (!document.fullscreenElement) {
       const requestFs = el.requestFullscreen || (el as any).webkitRequestFullscreen || (el as any).msRequestFullscreen;
       if (requestFs) {
-        requestFs.call(el).catch(() => {
+        requestFs.call(el).then(() => {
+          setIsFullscreen(true);
+        }).catch(() => {
           setIsFullscreen(true);
         });
       } else {
@@ -331,7 +333,9 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     } else {
       const exitFs = document.exitFullscreen || (document as any).webkitExitFullscreen || (document as any).msExitFullscreen;
       if (exitFs) {
-        exitFs.call(document).catch(() => {
+        exitFs.call(document).then(() => {
+          setIsFullscreen(false);
+        }).catch(() => {
           setIsFullscreen(false);
         });
       } else {

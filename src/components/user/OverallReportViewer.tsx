@@ -69,19 +69,7 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
 
   const handleShare = async () => {
     if (!report) return;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: '全體查經報告',
-          text: report,
-        });
-      } catch {
-        handleCopy();
-      }
-    } else {
-      handleCopy();
-    }
+    handleCopy();
   };
 
   const handleCopy = () => {
