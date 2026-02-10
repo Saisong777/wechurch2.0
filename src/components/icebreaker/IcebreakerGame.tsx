@@ -189,7 +189,7 @@ export const IcebreakerGame: React.FC<IcebreakerGameProps> = ({
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
           <Sparkles className="w-6 h-6 text-primary" />
-          {showEnglish ? 'Icebreaker' : '破冰遊戲'}
+          {showEnglish ? 'Truth Without Dare' : '真心話不用冒險'}
         </h1>
         
         {/* Room Code Display */}

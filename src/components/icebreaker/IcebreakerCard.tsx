@@ -22,7 +22,7 @@ const levelConfig: Record<CardLevel, {
   glowClass: string;
 }> = {
   L1: {
-    label: '破冰',
+    label: '真心話',
     labelEn: 'Warm-Up',
     bgClass: 'bg-gradient-to-br from-emerald-400 to-emerald-600',
     borderClass: 'border-emerald-300',

@@ -11,7 +11,7 @@ interface LevelSelectorProps {
 }
 
 const levels: { value: CardLevel; label: string; labelEn: string; color: string; iconColor: string }[] = [
-  { value: 'L1', label: '破冰', labelEn: 'Warm-Up', color: 'bg-emerald-500 border-emerald-400', iconColor: 'text-emerald-200' },
+  { value: 'L1', label: '真心話', labelEn: 'Warm-Up', color: 'bg-emerald-500 border-emerald-400', iconColor: 'text-emerald-200' },
   { value: 'L2', label: '連結', labelEn: 'Connection', color: 'bg-amber-500 border-amber-400', iconColor: 'text-amber-200' },
   { value: 'L3', label: '深度', labelEn: 'Deep', color: 'bg-rose-500 border-rose-400', iconColor: 'text-rose-200' },
 ];

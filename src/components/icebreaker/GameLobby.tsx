@@ -35,8 +35,8 @@ export const GameLobby: React.FC<GameLobbyProps> = ({
             <Sparkles className="w-12 h-12 text-secondary-foreground" />
           </div>
         </div>
-        <h1 className="text-3xl font-bold mb-2">破冰遊戲</h1>
-        <p className="text-muted-foreground">Icebreaker Cards</p>
+        <h1 className="text-3xl font-bold mb-2">真心話不用冒險</h1>
+        <p className="text-muted-foreground">Truth Without Dare</p>
       </div>
 
       {/* Create New Game */}

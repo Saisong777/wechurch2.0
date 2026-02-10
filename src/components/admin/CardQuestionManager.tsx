@@ -56,7 +56,7 @@ interface CardQuestion {
 }
 
 const levelConfig: Record<CardLevel, { label: string; labelEn: string; color: string }> = {
-  L1: { label: '破冰卡', labelEn: 'Warm-Up', color: 'bg-emerald-500' },
+  L1: { label: '真心話卡', labelEn: 'Warm-Up', color: 'bg-emerald-500' },
   L2: { label: '連結卡', labelEn: 'Connection', color: 'bg-amber-500' },
   L3: { label: '深度卡', labelEn: 'Deep', color: 'bg-rose-500' },
 };
@@ -252,7 +252,7 @@ export const CardQuestionManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2">
           <Sparkles className="w-6 h-6 text-primary" />
-          <h2 className="text-xl font-semibold">破冰題庫管理</h2>
+          <h2 className="text-xl font-semibold">真心話題庫管理</h2>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setBulkImportOpen(true)} className="gap-2">
@@ -283,7 +283,7 @@ export const CardQuestionManager: React.FC = () => {
         <Card>
           <CardContent className="py-3 text-center">
             <div className="text-2xl font-bold text-emerald-500">{stats.L1}</div>
-            <div className="text-xs text-muted-foreground">L1 破冰卡</div>
+            <div className="text-xs text-muted-foreground">L1 真心話卡</div>
           </CardContent>
         </Card>
         <Card>
@@ -317,7 +317,7 @@ export const CardQuestionManager: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部等級</SelectItem>
-            <SelectItem value="L1">L1 破冰卡</SelectItem>
+            <SelectItem value="L1">L1 真心話卡</SelectItem>
             <SelectItem value="L2">L2 連結卡</SelectItem>
             <SelectItem value="L3">L3 深度卡</SelectItem>
           </SelectContent>
@@ -440,7 +440,7 @@ export const CardQuestionManager: React.FC = () => {
                   <SelectItem value="L1">
                     <span className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      L1 破冰卡 (Warm-Up)
+                      L1 真心話卡 (Warm-Up)
                     </span>
                   </SelectItem>
                   <SelectItem value="L2">

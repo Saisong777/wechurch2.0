@@ -157,7 +157,7 @@ export const AdminPage: React.FC = () => {
                   className="gap-2 w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm"
                 >
                   <Sparkles className="w-5 h-5 sm:w-4 sm:h-4" />
-                  破冰題庫
+                  真心話題庫
                 </Button>
                 <Button 
                   variant="outline" 

@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, BookMarked, User, Settings, Home, Dumbbell, BookOpen, Gamepad2, Share2, Shield } from 'lucide-react';
+import { LogOut, BookMarked, User, Settings, Home, Dumbbell, BookOpen, Gamepad2, Share2, Shield, Shuffle } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -22,7 +22,8 @@ const navItems = [
   { id: 'home', label: '首頁', href: '/', icon: Home },
   { id: 'live', label: '健身房', href: '/user', icon: Dumbbell },
   { id: 'learn', label: '學習', href: '/learn', icon: BookOpen },
-  { id: 'play', label: '破冰', href: '/icebreaker', icon: Gamepad2 },
+  { id: 'icebreaker', label: '真心話不用冒險', href: '/icebreaker', icon: Gamepad2 },
+  { id: 'grouper', label: '只能說是神的安排', href: '/grouper', icon: Shuffle },
   { id: 'share', label: '分享', href: '/share', icon: Share2 },
 ];
 

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Dumbbell, BookOpen, Gamepad2, Share2, Home } from 'lucide-react';
+import { Dumbbell, BookOpen, Gamepad2, Share2, Home, Shuffle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -22,10 +22,16 @@ const navItems = [
     icon: BookOpen,
   },
   {
-    id: 'play',
-    label: '破冰',
+    id: 'icebreaker',
+    label: '真心話不用冒險',
     href: '/icebreaker',
     icon: Gamepad2,
+  },
+  {
+    id: 'grouper',
+    label: '只能說是神的安排',
+    href: '/grouper',
+    icon: Shuffle,
   },
   {
     id: 'share',

@@ -130,7 +130,7 @@ export const AdminMonitor: React.FC = () => {
     const success = await updateSessionIcebreakerEnabled(currentSession.id, checked);
     if (success) {
       setCurrentSession({ ...currentSession, icebreakerEnabled: checked });
-      toast.success(checked ? '已開啟破冰遊戲環節' : '已關閉破冰遊戲環節');
+      toast.success(checked ? '已開啟真心話不用冒險環節' : '已關閉真心話不用冒險環節');
     } else {
       setIcebreakerEnabled(!checked); // Revert on failure
       toast.error('更新失敗');
@@ -531,7 +531,7 @@ export const AdminMonitor: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Gamepad2 className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">破冰卡牌</span>
+                <span className="text-sm">真心話不用冒險</span>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full ${
                 icebreakerEnabled 

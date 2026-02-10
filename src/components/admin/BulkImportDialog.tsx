@@ -195,7 +195,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
   const invalidCount = parsedQuestions.filter(q => !q.isValid).length;
 
   const levelConfig: Record<CardLevel, { color: string; label: string }> = {
-    L1: { color: 'bg-emerald-500', label: '破冰' },
+    L1: { color: 'bg-emerald-500', label: '真心話' },
     L2: { color: 'bg-amber-500', label: '連結' },
     L3: { color: 'bg-rose-500', label: '深度' },
   };
@@ -209,7 +209,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
             批量匯入題目
           </DialogTitle>
           <DialogDescription>
-            使用 CSV 格式批量匯入破冰問題。格式：level, content_text, content_text_en
+            使用 CSV 格式批量匯入真心話問題。格式：level, content_text, content_text_en
           </DialogDescription>
         </DialogHeader>
 

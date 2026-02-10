@@ -58,7 +58,7 @@ export const GroupIcebreaker: React.FC<GroupIcebreakerProps> = ({
             onClick={onSkip}
             className="text-muted-foreground"
           >
-            跳過破冰，直接開始查經
+            跳過真心話，直接開始查經
           </Button>
         </div>
       )}

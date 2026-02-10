@@ -150,7 +150,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
               <div className="flex items-center gap-2">
                 <Gamepad2 className="w-4 h-4 text-secondary" />
                 <Label htmlFor="icebreaker-toggle" className="text-sm cursor-pointer">
-                  啟用破冰卡牌
+                  啟用真心話不用冒險
                 </Label>
               </div>
               <Switch
@@ -161,7 +161,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
             </div>
             {icebreakerEnabled && (
               <p className="text-xs text-muted-foreground ml-6">
-                🎮 分組後會先進行破冰卡牌環節
+                分組後會先進行真心話不用冒險環節
               </p>
             )}
 

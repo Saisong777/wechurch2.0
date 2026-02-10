@@ -392,7 +392,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary">
           <Sparkles className="w-4 h-4" />
-          <span className="font-medium">第 {groupNumber} 組 破冰時間</span>
+          <span className="font-medium">第 {groupNumber} 組 真心話時間</span>
         </div>
         <p className="text-muted-foreground text-sm">
           輪流翻牌分享，完成後打勾讓下一位繼續
