@@ -17,7 +17,7 @@ import {
   MessageCircle,
   BookMarked
 } from 'lucide-react';
-import { INSIGHT_CATEGORIES, InsightCategory } from '@/types/spiritual-fitness';
+import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 
@@ -29,7 +29,7 @@ interface NotebookEntry {
   title_phrase: string | null;
   heartbeat_verse: string | null;
   observation: string | null;
-  core_insight_category: InsightCategory | null;
+  core_insight_category: string | null;
   core_insight_note: string | null;
   scholars_note: string | null;
   action_plan: string | null;
@@ -91,10 +91,6 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
     );
   }
 
-  const getCategoryInfo = (category: InsightCategory | null) => {
-    if (!category) return null;
-    return INSIGHT_CATEGORIES.find(c => c.value === category);
-  };
 
   return (
     <div className="space-y-4">
@@ -106,7 +102,8 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
 
       {entries.map((entry) => {
         const isExpanded = expandedIds.has(entry.id);
-        const categoryInfo = getCategoryInfo(entry.core_insight_category);
+        const parsedCats = parseCategories(entry.core_insight_category);
+        const parsedNts = parseNotes(entry.core_insight_note, parsedCats);
         
         return (
           <Card 
@@ -162,17 +159,32 @@ export const MyNotebook: React.FC<MyNotebookProps> = ({ userEmail }) => {
                   </div>
                 )}
 
-                {categoryInfo && (
+                {parsedCats.length > 0 && (
                   <div className="flex gap-2">
                     <Dumbbell className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
                     <div>
                       <p className="text-sm font-medium mb-1">核心訓練</p>
-                      <Badge variant="outline" className="mb-1">
-                        {categoryInfo.emoji} {categoryInfo.label}
-                      </Badge>
-                      {entry.core_insight_note && (
-                        <p className="text-sm text-muted-foreground">{entry.core_insight_note}</p>
-                      )}
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {parsedCats.map(catVal => {
+                          const catInfo = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+                          return catInfo ? (
+                            <Badge key={catVal} variant="outline">
+                              {catInfo.emoji} {catInfo.label}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+                      {parsedCats.map(catVal => {
+                        const note = parsedNts[catVal];
+                        if (!note) return null;
+                        const catInfo = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+                        return (
+                          <p key={catVal} className="text-sm text-muted-foreground">
+                            {catInfo && <span className="font-medium">{catInfo.label}: </span>}
+                            {note}
+                          </p>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

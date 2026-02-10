@@ -157,6 +157,30 @@ export const MULTI_NOTE_SYSTEM_PROMPT = `你是「靈修筆記分析與整合助
 - 段落標題用 ## 。
 - 條列使用 - 符號。`;
 
+function parseInsightCategories(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  if (['PROMISE', 'COMMAND', 'WARNING', 'GOD_ATTRIBUTE'].includes(raw)) {
+    return [raw];
+  }
+  return [];
+}
+
+function parseInsightNotes(raw: string | null | undefined, categories: string[]): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch {}
+  if (categories.length > 0 && raw.trim()) {
+    return { [categories[0]]: raw };
+  }
+  return {};
+}
+
 export const CATEGORY_LABEL_MAP: Record<string, string> = {
   'PROMISE': '應許 Promise',
   'COMMAND': '命令 Command',
@@ -184,13 +208,20 @@ export function formatSingleNoteInput(note: {
   lines.push(`最感動的經文：${note.heartbeatVerse || '（未填寫）'}`);
   lines.push(`經文觀察（人事時地物）：${note.observation || '（未填寫）'}`);
 
-  if (note.coreInsightCategory) {
-    const label = CATEGORY_LABEL_MAP[note.coreInsightCategory] || note.coreInsightCategory;
-    lines.push(`標籤選擇：${label}`);
-    lines.push(`思想神的話（默想內容）：${note.coreInsightNote || '（未填寫）'}`);
+  const categories = parseInsightCategories(note.coreInsightCategory);
+  const notesByCategory = parseInsightNotes(note.coreInsightNote, categories);
+
+  if (categories.length > 0) {
+    const labels = categories.map(c => CATEGORY_LABEL_MAP[c] || c);
+    lines.push(`標籤選擇：${labels.join('、')}`);
+    categories.forEach(cat => {
+      const label = CATEGORY_LABEL_MAP[cat] || cat;
+      const noteText = notesByCategory[cat] || '（未填寫）';
+      lines.push(`思想神的話【${label}】：${noteText}`);
+    });
   } else {
     lines.push(`標籤選擇：（未選擇）`);
-    lines.push(`思想神的話（默想內容）：${note.coreInsightNote || '（未填寫）'}`);
+    lines.push(`思想神的話（默想內容）：（未填寫）`);
   }
 
   lines.push(`參考資料/注釋：${note.scholarsNote || '（未填寫）'}`);

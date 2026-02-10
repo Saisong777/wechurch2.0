@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/collapsible';
 import { format, startOfMonth, isThisMonth, subMonths, isSameMonth } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { INSIGHT_CATEGORIES, InsightCategory } from '@/types/spiritual-fitness';
+import { INSIGHT_CATEGORIES, InsightCategory, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -309,8 +309,19 @@ export const HistoryBrowser: React.FC = () => {
       if (response.heartbeatVerse) content += `💓 2. 心跳的時刻：${response.heartbeatVerse}\n`;
       if (response.observation) content += `👁 3. 查看聖經的資訊：${response.observation}\n`;
       if (response.coreInsightNote) {
-        const cat = INSIGHT_CATEGORIES.find(c => c.value === response.coreInsightCategory);
-        content += `💪 4. 思想神的話${cat ? ` (${cat.emoji} ${cat.label})` : ''}：${response.coreInsightNote}\n`;
+        const cats = parseCategories(response.coreInsightCategory as any);
+        const notes = parseNotes(response.coreInsightNote as any, cats);
+        if (cats.length > 0) {
+          cats.forEach(catVal => {
+            const cat = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+            const noteText = notes[catVal] || '';
+            if (noteText) {
+              content += `💪 4. 思想神的話 (${cat?.label || catVal})：${noteText}\n`;
+            }
+          });
+        } else {
+          content += `💪 4. 思想神的話：${typeof response.coreInsightNote === 'string' ? response.coreInsightNote : ''}\n`;
+        }
       }
       if (response.scholarsNote) content += `📖 5. 學長姐的話：${response.scholarsNote}\n`;
       if (response.actionPlan) content += `🎯 6. 我決定要這樣做：${response.actionPlan}\n`;
@@ -743,9 +754,8 @@ const ResponseCard: React.FC<{
   response: StudyResponseWithParticipant;
   onDelete?: (responseId: string) => void;
 }> = ({ response, onDelete }) => {
-  const selectedCategory = INSIGHT_CATEGORIES.find(
-    c => c.value === response.coreInsightCategory
-  );
+  const parsedCats = parseCategories(response.coreInsightCategory as any);
+  const parsedNotes = parseNotes(response.coreInsightNote as any, parsedCats);
 
   return (
     <Card className="bg-muted/30 group relative">
@@ -794,15 +804,30 @@ const ResponseCard: React.FC<{
             <span><strong>看現場：</strong>{response.observation}</span>
           </div>
         )}
-        {response.coreInsightNote && (
+        {response.coreInsightNote && parsedCats.length > 0 ? (
+          parsedCats.map(catVal => {
+            const cat = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+            const noteText = parsedNotes[catVal];
+            if (!noteText) return null;
+            return (
+              <div key={catVal} className="flex items-start gap-2">
+                <Dumbbell className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />
+                <span>
+                  <strong>練核心 ({cat?.label || catVal})：</strong>
+                  {noteText}
+                </span>
+              </div>
+            );
+          })
+        ) : response.coreInsightNote ? (
           <div className="flex items-start gap-2">
             <Dumbbell className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />
             <span>
-              <strong>練核心{selectedCategory ? ` (${selectedCategory.emoji})` : ''}：</strong>
-              {response.coreInsightNote}
+              <strong>練核心：</strong>
+              {typeof response.coreInsightNote === 'string' ? response.coreInsightNote : ''}
             </span>
           </div>
-        )}
+        ) : null}
         {response.scholarsNote && (
           <div className="flex items-start gap-2">
             <BookOpen className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />

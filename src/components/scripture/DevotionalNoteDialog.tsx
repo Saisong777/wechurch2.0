@@ -24,7 +24,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
+import { INSIGHT_CATEGORIES, parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
 import type { InsightCategory } from '@/types/spiritual-fitness';
 
 const CATEGORY_ICONS: Record<string, typeof Star> = {
@@ -46,8 +46,8 @@ interface FormFields {
   titlePhrase: string;
   heartbeatVerse: string;
   observation: string;
-  coreInsightCategory: InsightCategory | null;
-  coreInsightNote: string;
+  coreInsightCategory: InsightCategory[];
+  coreInsightNote: Record<string, string>;
   scholarsNote: string;
   actionPlan: string;
   coolDownNote: string;
@@ -57,8 +57,8 @@ const emptyForm: FormFields = {
   titlePhrase: '',
   heartbeatVerse: '',
   observation: '',
-  coreInsightCategory: null,
-  coreInsightNote: '',
+  coreInsightCategory: [],
+  coreInsightNote: {},
   scholarsNote: '',
   actionPlan: '',
   coolDownNote: '',
@@ -83,6 +83,16 @@ export function DevotionalNoteDialog({
 
   const updateField = useCallback(<K extends keyof FormFields>(key: K, value: FormFields[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const toggleCategory = useCallback((catValue: InsightCategory) => {
+    setForm((prev) => {
+      const current = prev.coreInsightCategory;
+      const updated = current.includes(catValue)
+        ? current.filter(c => c !== catValue)
+        : [...current, catValue];
+      return { ...prev, coreInsightCategory: updated };
+    });
   }, []);
 
   useEffect(() => {
@@ -116,12 +126,13 @@ export function DevotionalNoteDialog({
         setExistingId(data.id);
         if (data.verseReference) setDisplayReference(data.verseReference);
         if (data.verseText) setDisplayText(data.verseText);
+        const parsedCategories = parseCategories(data.coreInsightCategory);
         setForm({
           titlePhrase: data.titlePhrase ?? '',
           heartbeatVerse: data.heartbeatVerse ?? '',
           observation: data.observation ?? '',
-          coreInsightCategory: data.coreInsightCategory ?? null,
-          coreInsightNote: data.coreInsightNote ?? '',
+          coreInsightCategory: parsedCategories,
+          coreInsightNote: parseNotes(data.coreInsightNote, parsedCategories),
           scholarsNote: data.scholarsNote ?? '',
           actionPlan: data.actionPlan ?? '',
           coolDownNote: data.coolDownNote ?? '',
@@ -140,13 +151,20 @@ export function DevotionalNoteDialog({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const { coreInsightCategory, coreInsightNote, ...rest } = form;
+      const payload = {
+        ...rest,
+        coreInsightCategory: serializeCategories(coreInsightCategory),
+        coreInsightNote: serializeNotes(coreInsightNote),
+      };
+
       if (existingId) {
-        await apiRequest('PATCH', `/api/devotional-notes/${existingId}`, form);
+        await apiRequest('PATCH', `/api/devotional-notes/${existingId}`, payload);
       } else {
         await apiRequest('POST', '/api/devotional-notes', {
           verseReference: displayReference,
           verseText: displayText,
-          ...form,
+          ...payload,
         });
       }
 
@@ -180,12 +198,14 @@ export function DevotionalNoteDialog({
     }
   };
 
+  const coreInsightComplete = form.coreInsightCategory.length > 0 && Object.values(form.coreInsightNote).some(v => v.trim());
+
   const filledFields = [
     form.titlePhrase,
     form.heartbeatVerse,
     form.observation,
-    form.coreInsightCategory,
-    form.coreInsightNote,
+    coreInsightComplete,
+    coreInsightComplete,
     form.scholarsNote,
     form.actionPlan,
     form.coolDownNote,
@@ -211,7 +231,6 @@ export function DevotionalNoteDialog({
           </div>
         ) : (
           <div className="space-y-4 pb-24">
-            {/* Verse info */}
             <div className="rounded-md bg-muted/50 p-3 space-y-1">
               <p className="text-xs font-medium text-muted-foreground">經文</p>
               <p className="font-serif font-semibold text-sm" data-testid="text-verse-reference">
@@ -222,7 +241,6 @@ export function DevotionalNoteDialog({
               </p>
             </div>
 
-            {/* Progress */}
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>進度</span>
               <span>{filledFields}/8</span>
@@ -234,7 +252,6 @@ export function DevotionalNoteDialog({
               />
             </div>
 
-            {/* Phase 1: Warm-up (Green) */}
             <section className="pl-3 border-l-4 border-l-green-500 space-y-3">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-green-700 dark:text-green-400">
                 <Eye className="w-4 h-4 shrink-0" />
@@ -292,7 +309,6 @@ export function DevotionalNoteDialog({
               </div>
             </section>
 
-            {/* Phase 2: Core Training (Yellow) */}
             <section className="pl-3 border-l-4 border-l-yellow-500 space-y-3">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-yellow-700 dark:text-yellow-400">
                 <Dumbbell className="w-4 h-4 shrink-0" />
@@ -303,7 +319,7 @@ export function DevotionalNoteDialog({
                 <Label className="flex items-center gap-1.5 text-xs font-medium">
                   <Target className="w-3.5 h-3.5 text-yellow-600 shrink-0" />
                   4. 思想神的話
-                  {form.coreInsightCategory && form.coreInsightNote && <Check className="w-3 h-3 text-green-500" />}
+                  {coreInsightComplete && <Check className="w-3 h-3 text-green-500" />}
                 </Label>
 
                 <div className="grid grid-cols-2 gap-1.5">
@@ -312,12 +328,12 @@ export function DevotionalNoteDialog({
                       key={cat.value}
                       type="button"
                       data-testid={`button-category-${cat.value}`}
-                      onClick={() => updateField('coreInsightCategory', cat.value)}
+                      onClick={() => toggleCategory(cat.value)}
                       className={cn(
                         'px-2 py-2 rounded-lg text-xs font-medium transition-all',
                         'border-2 flex items-center justify-center gap-1',
                         'active:scale-95 touch-manipulation',
-                        form.coreInsightCategory === cat.value
+                        form.coreInsightCategory.includes(cat.value)
                           ? 'border-yellow-500 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 shadow-sm'
                           : 'border-muted bg-background hover:border-yellow-300 hover:bg-yellow-50/50 dark:hover:bg-yellow-950/30'
                       )}
@@ -331,19 +347,36 @@ export function DevotionalNoteDialog({
                   ))}
                 </div>
 
-                <AutoResizeTextarea
-                  id="dn-coreInsightNote"
-                  data-testid="textarea-core-insight-note"
-                  value={form.coreInsightNote}
-                  onChange={(e) => updateField('coreInsightNote', e.target.value)}
-                  placeholder={
-                    form.coreInsightCategory
-                      ? `從這段經文中，${INSIGHT_CATEGORIES.find((c) => c.value === form.coreInsightCategory)?.label}是什麼？`
-                      : '先選一個類別，再寫下你的發現...'
-                  }
-                  minRows={2}
-                  maxRows={6}
-                />
+                {form.coreInsightCategory.length > 0 ? (
+                  <div className="space-y-3">
+                    {INSIGHT_CATEGORIES.filter(cat => form.coreInsightCategory.includes(cat.value)).map(cat => {
+                      const IconComp = CATEGORY_ICONS[cat.value];
+                      return (
+                        <div key={cat.value} className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
+                            {IconComp && <IconComp className="w-3 h-3 shrink-0" />}
+                            <span>{cat.label} {cat.description}</span>
+                          </div>
+                          <AutoResizeTextarea
+                            data-testid={`textarea-core-insight-note-${cat.value}`}
+                            value={form.coreInsightNote[cat.value] || ''}
+                            onChange={(e) => {
+                              const updated = { ...form.coreInsightNote, [cat.value]: e.target.value };
+                              updateField('coreInsightNote', updated);
+                            }}
+                            placeholder={`從這段經文中，${cat.label}是什麼？`}
+                            minRows={2}
+                            maxRows={6}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic py-2">
+                    先選一個或多個類別，再寫下你的發現...
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -364,7 +397,6 @@ export function DevotionalNoteDialog({
               </div>
             </section>
 
-            {/* Phase 3: Stretch (Blue) */}
             <section className="pl-3 border-l-4 border-l-blue-500 space-y-3">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-blue-700 dark:text-blue-400">
                 <Sparkles className="w-4 h-4 shrink-0" />
@@ -406,7 +438,6 @@ export function DevotionalNoteDialog({
               </div>
             </section>
 
-            {/* Save button */}
             <Button
               onClick={handleSave}
               disabled={isSaving}

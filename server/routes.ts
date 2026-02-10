@@ -649,9 +649,26 @@ export async function registerRoutes(app: Express) {
         const members = responses.map(r => r.participantName || '匿名').join('、');
         const titlePhrases = [...new Set(responses.map(r => r.titlePhrase).filter(Boolean))];
         const observations = responses.map(r => r.observation).filter(Boolean);
-        const insightsWithNames = responses
-          .filter(r => r.coreInsightNote)
-          .map(r => ({ name: r.participantName || '匿名', insight: r.coreInsightNote! }));
+        const categoryLabels: Record<string, string> = {
+          'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '認識神'
+        };
+        const insightsWithNames: { name: string; insight: string }[] = [];
+        responses.forEach(r => {
+          if (!r.coreInsightNote) return;
+          const name = r.participantName || '匿名';
+          let noteObj: Record<string, string> | null = null;
+          try { noteObj = JSON.parse(r.coreInsightNote); } catch {}
+          if (noteObj && typeof noteObj === 'object' && !Array.isArray(noteObj)) {
+            Object.entries(noteObj).forEach(([cat, text]) => {
+              if (text && text.trim()) {
+                const label = categoryLabels[cat] || cat;
+                insightsWithNames.push({ name, insight: `【${label}】${text}` });
+              }
+            });
+          } else if (r.coreInsightNote.trim()) {
+            insightsWithNames.push({ name, insight: r.coreInsightNote });
+          }
+        });
         const applications = responses.map(r => r.actionPlan).filter(Boolean);
         
         let content = '';

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { StudyResponse, StudyResponseFormData, emptyFormData, InsightCategory } from '@/types/spiritual-fitness';
+import { StudyResponse, StudyResponseFormData, emptyFormData, parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
 import { toast } from 'sonner';
 import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
 import { apiRequest } from '@/lib/queryClient';
@@ -47,12 +47,13 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
 
   useEffect(() => {
     if (response && !isDirty && !isInitialized.current) {
+      const parsedCategories = parseCategories(response.core_insight_category);
       setLocalFormData({
         title_phrase: response.title_phrase || '',
         heartbeat_verse: response.heartbeat_verse || '',
         observation: response.observation || '',
-        core_insight_category: response.core_insight_category as InsightCategory | null,
-        core_insight_note: response.core_insight_note || '',
+        core_insight_category: parsedCategories,
+        core_insight_note: parseNotes(response.core_insight_note, parsedCategories),
         scholars_note: response.scholars_note || '',
         action_plan: response.action_plan || '',
         cool_down_note: response.cool_down_note || '',
@@ -66,11 +67,19 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       if (!sessionId || !userId) throw new Error('Missing session or user ID');
       if (!participantEmail) throw new Error('Missing participant email');
 
+      const { core_insight_category, core_insight_note, ...rest } = data;
+
       const payload = {
         sessionId,
         participantId: userId,
         participantEmail,
-        ...data,
+        ...rest,
+        ...(core_insight_category !== undefined && {
+          core_insight_category: serializeCategories(core_insight_category as any),
+        }),
+        ...(core_insight_note !== undefined && {
+          core_insight_note: serializeNotes(core_insight_note as any),
+        }),
       };
 
       const result = await apiRequest('POST', '/api/study-responses', payload);
@@ -121,7 +130,6 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       try {
         await upsertMutation.mutateAsync(localFormData);
       } catch {
-        // Error handling is centralized in onError
       }
     }
   }, [isDirty, localFormData, upsertMutation]);

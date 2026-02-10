@@ -5,7 +5,7 @@ import { CheckCircle, Share2, Eye, Heart, Sparkles, BookOpen, Dumbbell, Target, 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudyResponse } from '@/hooks/useStudyResponse';
-import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
+import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { GroupReportViewer } from './GroupReportViewer';
 import { OverallReportViewer } from './OverallReportViewer';
 import { toast } from 'sonner';
@@ -70,7 +70,22 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
     );
   }
 
-  const selectedCategory = INSIGHT_CATEGORIES.find(c => c.value === response.core_insight_category);
+  const parsedCats = parseCategories(response.core_insight_category);
+  const parsedNts = parseNotes(response.core_insight_note, parsedCats);
+  const categoryLabels = parsedCats
+    .map(c => INSIGHT_CATEGORIES.find(ic => ic.value === c))
+    .filter(Boolean)
+    .map(c => `${c!.emoji} ${c!.label}`)
+    .join(', ');
+  const noteSummary = parsedCats
+    .map(c => {
+      const note = parsedNts[c];
+      if (!note) return null;
+      const info = INSIGHT_CATEGORIES.find(ic => ic.value === c);
+      return info ? `【${info.label}】${note}` : note;
+    })
+    .filter(Boolean)
+    .join('\n');
 
   const phases = [
     {
@@ -88,9 +103,9 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
       fields: [
         { 
           key: 'core_insight', 
-          label: `4. 思想神的話 ${selectedCategory ? `(${selectedCategory.emoji} ${selectedCategory.label})` : ''}`, 
+          label: `4. 思想神的話 ${categoryLabels ? `(${categoryLabels})` : ''}`, 
           icon: Dumbbell, 
-          value: response.core_insight_note 
+          value: noteSummary || null
         },
         { key: 'scholars_note', label: '5. 學長姐的話', icon: BookOpen, value: response.scholars_note },
       ],

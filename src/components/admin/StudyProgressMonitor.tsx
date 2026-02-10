@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAdminStudyResponses, ParticipantProgress } from '@/hooks/useAdminStudyResponses';
-import { getProgressStatusLabel, INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
+import { getProgressStatusLabel, INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { Eye, Users, Dumbbell, Sparkles, Loader2, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -155,13 +155,28 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
                   <div className="text-sm space-y-1">
                     <p>
                       <span className="text-muted-foreground">練核心:</span>{' '}
-                      {selectedParticipant.response.core_insight_category && (
-                        <Badge variant="outline" className="mr-2">
-                          {INSIGHT_CATEGORIES.find(c => c.value === selectedParticipant.response?.core_insight_category)?.emoji}{' '}
-                          {INSIGHT_CATEGORIES.find(c => c.value === selectedParticipant.response?.core_insight_category)?.label}
-                        </Badge>
-                      )}
-                      {selectedParticipant.response.core_insight_note || '-'}
+                      {(() => {
+                        const cats = parseCategories(selectedParticipant.response?.core_insight_category ?? null);
+                        const nts = parseNotes(selectedParticipant.response?.core_insight_note ?? null, cats);
+                        return (
+                          <>
+                            {cats.map(catVal => {
+                              const catInfo = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+                              return catInfo ? (
+                                <Badge key={catVal} variant="outline" className="mr-1">
+                                  {catInfo.emoji} {catInfo.label}
+                                </Badge>
+                              ) : null;
+                            })}
+                            {cats.length > 0 ? cats.map(catVal => {
+                              const note = nts[catVal];
+                              if (!note) return null;
+                              const catInfo = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+                              return <span key={catVal} className="block">{catInfo ? `【${catInfo.label}】` : ''}{note}</span>;
+                            }) : '-'}
+                          </>
+                        );
+                      })()}
                     </p>
                     <p><span className="text-muted-foreground">學長姐的話:</span> {selectedParticipant.response.scholars_note || '-'}</p>
                   </div>

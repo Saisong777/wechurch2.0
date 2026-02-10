@@ -7,6 +7,7 @@ import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useSession } from '@/contexts/SessionContext';
 import { useStudyResponse } from '@/hooks/useStudyResponse';
 import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
+import type { InsightCategory } from '@/types/spiritual-fitness';
 import { 
   Dumbbell, 
   Eye, 
@@ -46,28 +47,32 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
     enabled: !!currentSession?.id && !!currentUser?.id,
   });
 
-  // Handle completion with save verification
   const handleSubmit = React.useCallback(async () => {
     if (!handleComplete) return;
     
     setIsSubmitting(true);
     
     try {
-      // Save any pending changes first
       if (isDirty) {
         await saveNow();
       }
       
-      // Navigate to review
       handleComplete();
     } catch (error) {
       console.error('[SpiritualFitnessForm] Error during submission:', error);
-      // Still navigate even if save failed - data is already in localStorage
       handleComplete();
     } finally {
       setIsSubmitting(false);
     }
   }, [handleComplete, isDirty, saveNow]);
+
+  const toggleCategory = React.useCallback((catValue: InsightCategory) => {
+    const current = formData.core_insight_category;
+    const updated = current.includes(catValue)
+      ? current.filter(c => c !== catValue)
+      : [...current, catValue];
+    updateField('core_insight_category', updated);
+  }, [formData.core_insight_category, updateField]);
 
   if (isLoading) {
     return (
@@ -77,13 +82,14 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
     );
   }
 
-  // Calculate progress
+  const coreInsightComplete = formData.core_insight_category.length > 0 && Object.values(formData.core_insight_note).some(v => v.trim());
+
   const filledFields = [
     formData.title_phrase,
     formData.heartbeat_verse,
     formData.observation,
-    formData.core_insight_category,
-    formData.core_insight_note,
+    coreInsightComplete,
+    coreInsightComplete,
     formData.scholars_note,
     formData.action_plan,
     formData.cool_down_note,
@@ -93,7 +99,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
 
   return (
     <div className="w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto animate-fade-in space-y-3 sm:space-y-4 md:space-y-6 pb-24 md:pb-8">
-      {/* Session info card - compact on mobile */}
       <Card variant="highlight">
         <CardContent className="py-3 px-3 sm:px-4 md:py-4">
           <div className="flex items-center justify-between gap-2">
@@ -111,7 +116,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
                 <p className="font-serif font-medium text-xs sm:text-sm md:text-base truncate">{currentSession?.verseReference}</p>
               </div>
             </div>
-            {/* Save status - compact */}
             <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground shrink-0">
               {isSaving ? (
                 <Cloud className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse text-secondary" />
@@ -122,7 +126,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             </div>
           </div>
           
-          {/* Progress bar */}
           <div className="mt-2 sm:mt-3">
             <div className="flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground mb-1">
               <span>進度 Progress</span>
@@ -138,7 +141,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
         </CardContent>
       </Card>
 
-      {/* Phase 1: Warm-up (Green) */}
       <Card className="border-l-4 border-l-green-500 bg-green-50/10 dark:bg-green-950/10 overflow-hidden">
         <CardHeader className="py-3 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg text-green-700 dark:text-green-400">
@@ -148,7 +150,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
           <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">先從簡單的開始</p>
         </CardHeader>
         <CardContent className="px-3 sm:px-4 md:px-6 pb-4 space-y-3 sm:space-y-4">
-          {/* 1. 定標題 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="title_phrase" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Film className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 shrink-0" />
@@ -165,7 +166,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             />
           </div>
 
-          {/* 2. 心跳的時刻 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="heartbeat_verse" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 shrink-0" />
@@ -184,7 +184,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             />
           </div>
 
-          {/* 3. 查看聖經的資訊 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="observation" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 shrink-0" />
@@ -205,7 +204,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
         </CardContent>
       </Card>
 
-      {/* Phase 2: Core Training (Yellow) */}
       <Card className="border-l-4 border-l-yellow-500 bg-yellow-50/10 dark:bg-yellow-950/10 overflow-hidden">
         <CardHeader className="py-3 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg text-yellow-700 dark:text-yellow-400">
@@ -215,27 +213,25 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
           <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">來點重量、查筆記</p>
         </CardHeader>
         <CardContent className="px-3 sm:px-4 md:px-6 pb-4 space-y-3 sm:space-y-4">
-          {/* 4. 思想神的話 */}
           <div className="space-y-2 sm:space-y-3">
             <Label className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600 shrink-0" />
               <span>4. 思想神的話</span>
-              {formData.core_insight_category && formData.core_insight_note && <Check className="w-3 h-3 text-green-500" />}
+              {coreInsightComplete && <Check className="w-3 h-3 text-green-500" />}
             </Label>
-            <p className="text-[10px] sm:text-xs text-muted-foreground -mt-1">至少寫一個類別</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground -mt-1">可選一個或多個類別</p>
             
-            {/* Category selector - responsive grid */}
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
               {INSIGHT_CATEGORIES.map((cat) => (
                 <button
                   key={cat.value}
                   type="button"
-                  onClick={() => updateField('core_insight_category', cat.value)}
+                  onClick={() => toggleCategory(cat.value)}
                   className={cn(
                     "px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all",
                     "border-2 flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5",
                     "active:scale-95 touch-manipulation",
-                    formData.core_insight_category === cat.value
+                    formData.core_insight_category.includes(cat.value)
                       ? "border-yellow-500 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 shadow-sm"
                       : "border-muted bg-background hover:border-yellow-300 hover:bg-yellow-50/50 dark:hover:bg-yellow-950/30"
                   )}
@@ -246,23 +242,36 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               ))}
             </div>
 
-            <AutoResizeTextarea
-              id="core_insight_note"
-              value={formData.core_insight_note}
-              onChange={(e) => updateField('core_insight_note', e.target.value)}
-              onBlur={saveNow}
-              placeholder={
-                formData.core_insight_category 
-                  ? `從這段經文中，${INSIGHT_CATEGORIES.find(c => c.value === formData.core_insight_category)?.label}是什麼？`
-                  : "先選一個類別，再寫下你的發現..."
-              }
-              minRows={3}
-              maxRows={8}
-              className="text-sm sm:text-base"
-            />
+            {formData.core_insight_category.length > 0 ? (
+              <div className="space-y-3">
+                {INSIGHT_CATEGORIES.filter(cat => formData.core_insight_category.includes(cat.value)).map(cat => (
+                  <div key={cat.value} className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
+                      <span>{cat.emoji}</span>
+                      <span>{cat.label} {cat.description}</span>
+                    </div>
+                    <AutoResizeTextarea
+                      value={formData.core_insight_note[cat.value] || ''}
+                      onChange={(e) => {
+                        const updated = { ...formData.core_insight_note, [cat.value]: e.target.value };
+                        updateField('core_insight_note', updated);
+                      }}
+                      onBlur={saveNow}
+                      placeholder={`從這段經文中，${cat.label}是什麼？`}
+                      minRows={2}
+                      maxRows={6}
+                      className="text-sm sm:text-base"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs sm:text-sm text-muted-foreground italic py-2">
+                先選一個或多個類別，再寫下你的發現...
+              </p>
+            )}
           </div>
 
-          {/* 5. 學長姐的話 (Open Book) */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="scholars_note" className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600 shrink-0" />
@@ -286,7 +295,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
         </CardContent>
       </Card>
 
-      {/* Phase 3: Stretch (Blue) */}
       <Card className="border-l-4 border-l-blue-500 bg-blue-50/10 dark:bg-blue-950/10 overflow-hidden">
         <CardHeader className="py-3 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg text-blue-700 dark:text-blue-400">
@@ -296,7 +304,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
           <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground">與神同行，帶出行動</p>
         </CardHeader>
         <CardContent className="px-3 sm:px-4 md:px-6 pb-4 space-y-3 sm:space-y-4">
-          {/* 6. 我決定要這樣做 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="action_plan" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 shrink-0" />
@@ -315,7 +322,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             />
           </div>
 
-          {/* 7. 自由發揮 */}
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="cool_down_note" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium">
               <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 shrink-0" />
@@ -336,7 +342,6 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
         </CardContent>
       </Card>
 
-      {/* Fixed bottom button on mobile */}
       {handleComplete && (
         <div className="fixed bottom-0 left-0 right-0 p-3 bg-background/95 backdrop-blur-sm border-t shadow-lg md:static md:p-0 md:bg-transparent md:border-0 md:shadow-none md:pt-4 z-50">
           <Button
