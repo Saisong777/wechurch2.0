@@ -2,22 +2,14 @@
  * Get the public base URL for the application.
  * Priority: 
  * 1. Environment variable VITE_PUBLIC_BASE_URL if set
- * 2. Published domain (wechurch.lovable.app) if on lovable.app preview
- * 3. Current origin as fallback
+ * 2. Current origin as fallback
  */
 export const getPublicBaseUrl = (): string => {
-  // Use environment variable if explicitly set
   if (import.meta.env.VITE_PUBLIC_BASE_URL) {
     return import.meta.env.VITE_PUBLIC_BASE_URL;
   }
   
-  // If we're on a preview/project URL, use the published domain
-  const origin = window.location.origin;
-  if (origin.includes('lovableproject.com') || origin.includes('-preview--')) {
-    return 'https://wechurch.lovable.app';
-  }
-  
-  return origin;
+  return window.location.origin;
 };
 
 /**

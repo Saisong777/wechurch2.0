@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { lovable } from '@/integrations/lovable';
 import { Settings, Mail, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,15 +24,9 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      const { error } = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin + '/admin',
-      });
-      if (error) {
-        toast.error(error.message);
-      }
+      window.location.href = '/api/login';
     } catch (err) {
       toast.error('Google 登入失敗，請重試');
-    } finally {
       setIsGoogleLoading(false);
     }
   };
