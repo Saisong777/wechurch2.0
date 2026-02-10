@@ -20,7 +20,7 @@ const MOCK_TITLE_PHRASES = [
 ];
 
 const MOCK_HEARTBEAT_VERSES = [
-  '第五節讓我心跳加速！',
+  '第五節深深感動了我！',
   '這句話深深觸動我的心',
   '感覺神在直接對我說話',
   '這是我今年最需要的提醒',
