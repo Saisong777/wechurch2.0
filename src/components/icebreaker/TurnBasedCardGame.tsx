@@ -105,7 +105,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
 
   const initGame = useCallback(async () => {
     try {
-      await staggeredStart(500 + groupNumber * 300);
+      await staggeredStart(300 + Math.random() * 800);
       
       const groupMembers = await withRetry(
         () => fetchGroupMembers(),
@@ -157,12 +157,16 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         throw new Error('Failed to create or find game');
       }
 
-      if (!existingGame.drawerOrder || existingGame.drawerOrder.length === 0) {
+      const needsDrawerSetup = 
+        (!existingGame.drawerOrder || existingGame.drawerOrder.length === 0) ||
+        (!existingGame.currentDrawerId && (!existingGame.sharedMemberIds || existingGame.sharedMemberIds.length === 0));
+
+      if (needsDrawerSetup) {
         const shuffledOrder = groupMembers
           .map(m => m.id)
           .sort(() => Math.random() - 0.5);
 
-        await fetch(`/api/icebreaker/games/${existingGame.id}`, {
+        const patchResponse = await fetch(`/api/icebreaker/games/${existingGame.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -171,8 +175,11 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
           }),
         });
 
-        existingGame.drawerOrder = shuffledOrder;
-        existingGame.currentDrawerId = shuffledOrder[0] || null;
+        if (patchResponse.ok) {
+          const updated = await patchResponse.json();
+          existingGame.drawerOrder = updated.drawerOrder || shuffledOrder;
+          existingGame.currentDrawerId = updated.currentDrawerId || shuffledOrder[0] || null;
+        }
       }
 
       let cardContent = null;

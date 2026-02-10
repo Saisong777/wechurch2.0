@@ -13,6 +13,8 @@ import { pool, getPoolStats } from "./db";
 import { bibleCache, timelineCache, apiCache, sessionCache, prayerCache, cacheKeys } from "./cache";
 import compression from "compression";
 
+const gameCreationLocks = new Map<string, Promise<any>>();
+
 // Configure multer for file uploads
 const messageCardStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -1062,18 +1064,64 @@ export async function registerRoutes(app: Express) {
   });
 
   app.post("/api/icebreaker/games", async (req, res) => {
-    try {
+    const lockKey = req.body.bibleStudySessionId && req.body.groupNumber
+      ? `${req.body.bibleStudySessionId}:${req.body.groupNumber}`
+      : null;
+
+    const findOrCreate = async () => {
       if (req.body.bibleStudySessionId && req.body.groupNumber) {
         const existingGame = await storage.getSessionIcebreakerGame(
           req.body.bibleStudySessionId,
           parseInt(req.body.groupNumber)
         );
         if (existingGame) {
-          return res.status(200).json(existingGame);
+          return existingGame;
         }
       }
-      const game = await storage.createIcebreakerGame(req.body);
-      res.status(201).json(game);
+      const gameData = { ...req.body };
+      if (gameData.mode === 'session') {
+        gameData.status = 'active';
+      }
+      try {
+        return await storage.createIcebreakerGame(gameData);
+      } catch (createError: any) {
+        if (req.body.bibleStudySessionId && req.body.groupNumber) {
+          const fallback = await storage.getSessionIcebreakerGame(
+            req.body.bibleStudySessionId,
+            parseInt(req.body.groupNumber)
+          );
+          if (fallback) return fallback;
+        }
+        throw createError;
+      }
+    };
+
+    try {
+      let game;
+      if (lockKey) {
+        const existingLock = gameCreationLocks.get(lockKey);
+        if (existingLock) {
+          await existingLock;
+          game = await storage.getSessionIcebreakerGame(
+            req.body.bibleStudySessionId,
+            parseInt(req.body.groupNumber)
+          );
+          if (!game) {
+            game = await findOrCreate();
+          }
+        } else {
+          const promise = findOrCreate();
+          gameCreationLocks.set(lockKey, promise);
+          try {
+            game = await promise;
+          } finally {
+            gameCreationLocks.delete(lockKey);
+          }
+        }
+      } else {
+        game = await findOrCreate();
+      }
+      res.status(200).json(game);
     } catch (error) {
       if (req.body.bibleStudySessionId && req.body.groupNumber) {
         try {

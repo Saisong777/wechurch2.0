@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, sql, asc, like, or, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, asc, like, or, isNull, inArray } from "drizzle-orm";
 import { bibleCache, timelineCache, cacheKeys } from "./cache";
 import {
   users, sessions, participants, submissions, aiReports,
@@ -644,7 +644,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(icebreakerGames.bibleStudySessionId, sessionId),
         eq(icebreakerGames.groupNumber, groupNumber),
-        eq(icebreakerGames.status, 'active')
+        inArray(icebreakerGames.status, ['active', 'waiting'])
       ))
       .orderBy(icebreakerGames.createdAt)
       .limit(1);
