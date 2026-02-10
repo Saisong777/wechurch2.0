@@ -799,7 +799,9 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/notebook/sessions", async (req, res) => {
     try {
-      const email = req.query.email as string;
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      const email = user.email || req.query.email as string;
       if (!email) return res.status(400).json({ error: "Email is required" });
       const notebookSessions = await storage.getNotebookSessions(email);
       res.json({ sessions: notebookSessions });
@@ -811,6 +813,8 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/notebook/group-responses", async (req, res) => {
     try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
       const sessionId = req.query.sessionId as string;
       const groupNumber = parseInt(req.query.groupNumber as string);
       if (!sessionId || isNaN(groupNumber)) {
