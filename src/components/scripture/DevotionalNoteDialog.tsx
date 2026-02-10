@@ -76,6 +76,8 @@ export function DevotionalNoteDialog({
   const [existingId, setExistingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [displayReference, setDisplayReference] = useState(verseReference);
   const [displayText, setDisplayText] = useState(verseText);
 
@@ -156,6 +158,25 @@ export function DevotionalNoteDialog({
       toast({ title: '儲存失敗', description: message, variant: 'destructive' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!existingId) {
+      toast({ title: '請先儲存', description: '請先儲存靈修筆記後再進行 AI 分析', variant: 'destructive' });
+      return;
+    }
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      const res = await apiRequest('POST', '/api/devotional-notes/analyze', { noteId: existingId });
+      const data = await res.json();
+      setAnalysisResult(data.analysis);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'AI 分析失敗';
+      toast({ title: '分析失敗', description: message, variant: 'destructive' });
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -401,6 +422,40 @@ export function DevotionalNoteDialog({
                 '儲存'
               )}
             </Button>
+
+            {existingId && (
+              <Button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing}
+                variant="outline"
+                className="w-full"
+                data-testid="button-analyze-devotional-note"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    AI 分析中...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    AI 整理分析
+                  </>
+                )}
+              </Button>
+            )}
+
+            {analysisResult && (
+              <div className="rounded-md bg-muted/50 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <Sparkles className="w-4 h-4" />
+                  AI 分析結果
+                </div>
+                <div className="prose prose-sm dark:prose-invert max-w-none text-xs leading-relaxed whitespace-pre-wrap" data-testid="text-analysis-result">
+                  {analysisResult}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </SheetContent>

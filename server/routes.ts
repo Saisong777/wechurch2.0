@@ -3418,6 +3418,140 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // ============ Devotional Notes AI Analysis ============
+  app.post("/api/devotional-notes/analyze", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const { noteId } = req.body;
+      if (!noteId) {
+        return res.status(400).json({ error: "Missing noteId" });
+      }
+      const note = await storage.getDevotionalNote(noteId);
+      if (!note) {
+        return res.status(404).json({ error: "Devotional note not found" });
+      }
+      if (note.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to analyze this note" });
+      }
+
+      const { SINGLE_NOTE_SYSTEM_PROMPT, formatSingleNoteInput } = await import("./prompts/devotional-analysis");
+      const userContent = formatSingleNoteInput(note);
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: SINGLE_NOTE_SYSTEM_PROMPT },
+          { role: "user", content: `請整理以下靈修筆記：\n\n${userContent}` }
+        ],
+        max_tokens: 4000,
+      });
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        return res.status(500).json({ error: "AI response empty" });
+      }
+      res.json({ analysis: result, noteId });
+    } catch (error) {
+      console.error('Error analyzing devotional note:', error);
+      res.status(500).json({ error: "Failed to analyze devotional note" });
+    }
+  });
+
+  app.post("/api/devotional-notes/analyze-batch", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      const { noteIds, dateFrom, dateTo } = req.body;
+
+      let notes: DevotionalNote[] = [];
+
+      if (noteIds && Array.isArray(noteIds) && noteIds.length > 0) {
+        const allNotes = await storage.getDevotionalNotes(userId);
+        notes = allNotes.filter(n => noteIds.includes(n.id));
+      } else {
+        const allNotes = await storage.getDevotionalNotes(userId);
+        if (dateFrom || dateTo) {
+          notes = allNotes.filter(n => {
+            const noteDate = new Date(n.createdAt);
+            if (dateFrom && noteDate < new Date(dateFrom)) return false;
+            if (dateTo) {
+              const endDate = new Date(dateTo);
+              endDate.setHours(23, 59, 59, 999);
+              if (noteDate > endDate) return false;
+            }
+            return true;
+          });
+        } else {
+          notes = allNotes;
+        }
+      }
+
+      if (notes.length === 0) {
+        return res.status(400).json({ error: "No devotional notes found for the given criteria" });
+      }
+      if (notes.length === 1) {
+        const { SINGLE_NOTE_SYSTEM_PROMPT, formatSingleNoteInput } = await import("./prompts/devotional-analysis");
+        const userContent = formatSingleNoteInput(notes[0]);
+
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI({
+          apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        });
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: SINGLE_NOTE_SYSTEM_PROMPT },
+            { role: "user", content: `請整理以下靈修筆記：\n\n${userContent}` }
+          ],
+          max_tokens: 4000,
+        });
+
+        const result = response.choices[0]?.message?.content;
+        return res.json({ analysis: result || '', noteCount: 1 });
+      }
+
+      const { MULTI_NOTE_SYSTEM_PROMPT, formatMultiNoteInput } = await import("./prompts/devotional-analysis");
+      const userContent = formatMultiNoteInput(notes);
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: MULTI_NOTE_SYSTEM_PROMPT },
+          { role: "user", content: `請整合分析以下 ${notes.length} 篇靈修筆記：\n\n${userContent}` }
+        ],
+        max_tokens: 8000,
+      });
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        return res.status(500).json({ error: "AI response empty" });
+      }
+      res.json({ analysis: result, noteCount: notes.length });
+    } catch (error) {
+      console.error('Error batch analyzing devotional notes:', error);
+      res.status(500).json({ error: "Failed to batch analyze devotional notes" });
+    }
+  });
+
   // ============ Saved Verses API Routes ============
   app.get("/api/saved-verses", async (req, res) => {
     try {
