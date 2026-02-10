@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -113,6 +113,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
   const [presentationGroup, setPresentationGroup] = useState<number>(0);
   const [presentationPageIndex, setPresentationPageIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const presentationRef = useRef<HTMLDivElement>(null);
   
   const [title, setTitle] = useState('禱告會');
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('bySize');
@@ -314,15 +315,42 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     return `${prefix}${letter}`;
   };
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
+    const el = presentationRef.current;
+    if (!el) return;
+    
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.();
-      setIsFullscreen(true);
+      const requestFs = el.requestFullscreen || (el as any).webkitRequestFullscreen || (el as any).msRequestFullscreen;
+      if (requestFs) {
+        requestFs.call(el).catch(() => {
+          setIsFullscreen(true);
+        });
+      } else {
+        setIsFullscreen(true);
+      }
     } else {
-      document.exitFullscreen?.();
-      setIsFullscreen(false);
+      const exitFs = document.exitFullscreen || (document as any).webkitExitFullscreen || (document as any).msExitFullscreen;
+      if (exitFs) {
+        exitFs.call(document).catch(() => {
+          setIsFullscreen(false);
+        });
+      } else {
+        setIsFullscreen(false);
+      }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
 
   const computePresentationPages = () => {
     const pages: PresentationPage[] = [];
@@ -460,7 +488,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
     };
     
     return (
-      <div className={cn("fixed inset-0 z-50 overflow-hidden bg-gradient-to-br", getPageGradient(currentPage.type))}>
+      <div ref={presentationRef} className={cn("fixed inset-0 z-50 overflow-hidden bg-gradient-to-br", getPageGradient(currentPage.type))}>
         <div className="absolute top-4 right-4 flex gap-2 z-10">
           <Button 
             variant="outline" 

@@ -70,8 +70,10 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
     );
   }
 
-  const parsedCats = parseCategories(response.core_insight_category);
-  const parsedNts = parseNotes(response.core_insight_note, parsedCats);
+  const coreCategory = response.coreInsightCategory || response.core_insight_category || null;
+  const coreNote = response.coreInsightNote || response.core_insight_note || null;
+  const parsedCats = parseCategories(coreCategory);
+  const parsedNts = parseNotes(coreNote, parsedCats);
   const categoryLabels = parsedCats
     .map(c => INSIGHT_CATEGORIES.find(ic => ic.value === c))
     .filter(Boolean)
@@ -92,8 +94,8 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
       title: '🟢 暖身 Warm-up',
       color: 'border-green-500 bg-green-50/10',
       fields: [
-        { key: 'title_phrase', label: '1. 定標題', icon: Sparkles, value: response.title_phrase },
-        { key: 'heartbeat_verse', label: '2. 心跳的時刻', icon: Heart, value: response.heartbeat_verse },
+        { key: 'title_phrase', label: '1. 定標題', icon: Sparkles, value: response.titlePhrase || response.title_phrase },
+        { key: 'heartbeat_verse', label: '2. 心跳的時刻', icon: Heart, value: response.heartbeatVerse || response.heartbeat_verse },
         { key: 'observation', label: '3. 查看聖經的資訊', icon: Eye, value: response.observation },
       ],
     },
@@ -107,15 +109,15 @@ export const SubmissionReview: React.FC<SubmissionReviewProps> = ({ onEdit }) =>
           icon: Dumbbell, 
           value: noteSummary || null
         },
-        { key: 'scholars_note', label: '5. 學長姐的話', icon: BookOpen, value: response.scholars_note },
+        { key: 'scholars_note', label: '5. 學長姐的話', icon: BookOpen, value: response.scholarsNote || response.scholars_note },
       ],
     },
     {
       title: '🔵 伸展 Stretch',
       color: 'border-blue-500 bg-blue-50/10',
       fields: [
-        { key: 'action_plan', label: '6. 我決定要這樣做', icon: Target, value: response.action_plan },
-        { key: 'cool_down_note', label: '7. 自由發揮', icon: MessageCircle, value: response.cool_down_note },
+        { key: 'action_plan', label: '6. 我決定要這樣做', icon: Target, value: response.actionPlan || response.action_plan },
+        { key: 'cool_down_note', label: '7. 自由發揮', icon: MessageCircle, value: response.coolDownNote || response.cool_down_note },
       ],
     },
   ];

@@ -141,8 +141,8 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
                     <Eye className="w-4 h-4" /> Phase 1: 暖身
                   </h4>
                   <div className="text-sm space-y-1">
-                    <p><span className="text-muted-foreground">定標題:</span> {selectedParticipant.response.title_phrase || '-'}</p>
-                    <p><span className="text-muted-foreground">抓心跳:</span> {selectedParticipant.response.heartbeat_verse || '-'}</p>
+                    <p><span className="text-muted-foreground">定標題:</span> {selectedParticipant.response.titlePhrase || selectedParticipant.response.title_phrase || '-'}</p>
+                    <p><span className="text-muted-foreground">抓心跳:</span> {selectedParticipant.response.heartbeatVerse || selectedParticipant.response.heartbeat_verse || '-'}</p>
                     <p><span className="text-muted-foreground">看現場:</span> {selectedParticipant.response.observation || '-'}</p>
                   </div>
                 </div>
@@ -156,8 +156,8 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
                     <p>
                       <span className="text-muted-foreground">練核心:</span>{' '}
                       {(() => {
-                        const cats = parseCategories(selectedParticipant.response?.core_insight_category ?? null);
-                        const nts = parseNotes(selectedParticipant.response?.core_insight_note ?? null, cats);
+                        const cats = parseCategories(selectedParticipant.response?.coreInsightCategory || selectedParticipant.response?.core_insight_category || null);
+                        const nts = parseNotes(selectedParticipant.response?.coreInsightNote || selectedParticipant.response?.core_insight_note || null, cats);
                         return (
                           <>
                             {cats.map(catVal => {
@@ -178,7 +178,7 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
                         );
                       })()}
                     </p>
-                    <p><span className="text-muted-foreground">學長姐的話:</span> {selectedParticipant.response.scholars_note || '-'}</p>
+                    <p><span className="text-muted-foreground">學長姐的話:</span> {selectedParticipant.response.scholarsNote || selectedParticipant.response.scholars_note || '-'}</p>
                   </div>
                 </div>
 
@@ -188,8 +188,8 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
                     <Sparkles className="w-4 h-4" /> Phase 3: 伸展
                   </h4>
                   <div className="text-sm space-y-1">
-                    <p><span className="text-muted-foreground">帶一招:</span> {selectedParticipant.response.action_plan || '-'}</p>
-                    <p><span className="text-muted-foreground">自由發揮:</span> {selectedParticipant.response.cool_down_note || '-'}</p>
+                    <p><span className="text-muted-foreground">帶一招:</span> {selectedParticipant.response.actionPlan || selectedParticipant.response.action_plan || '-'}</p>
+                    <p><span className="text-muted-foreground">自由發揮:</span> {selectedParticipant.response.coolDownNote || selectedParticipant.response.cool_down_note || '-'}</p>
                   </div>
                 </div>
               </div>

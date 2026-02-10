@@ -251,6 +251,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSession(id: string): Promise<void> {
+    const sessionGames = await db.select({ id: icebreakerGames.id }).from(icebreakerGames).where(eq(icebreakerGames.bibleStudySessionId, id));
+    if (sessionGames.length > 0) {
+      const gameIds = sessionGames.map(g => g.id);
+      await db.delete(icebreakerPlayers).where(inArray(icebreakerPlayers.gameId, gameIds));
+      await db.delete(icebreakerGames).where(inArray(icebreakerGames.id, gameIds));
+    }
     await db.delete(aiReports).where(eq(aiReports.sessionId, id));
     await db.delete(submissions).where(eq(submissions.sessionId, id));
     await db.delete(studyResponses).where(eq(studyResponses.sessionId, id));

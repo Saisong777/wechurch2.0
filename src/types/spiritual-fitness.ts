@@ -4,25 +4,36 @@ export type InsightCategory = 'PROMISE' | 'COMMAND' | 'WARNING' | 'GOD_ATTRIBUTE
 
 export interface StudyResponse {
   id: string;
-  session_id: string;
-  user_id: string;
+  sessionId: string;
+  userId: string;
   
-  // Phase 1: Warm-up (Green) - 暖身
-  title_phrase: string | null;      // 1. 定標題
-  heartbeat_verse: string | null;   // 2. 抓心跳
-  observation: string | null;       // 3. 看現場
+  titlePhrase: string | null;
+  heartbeatVerse: string | null;
+  observation: string | null;
   
-  // Phase 2: Core Training (Yellow) - 重訓
-  core_insight_category: string | null;  // 4. 練核心 (類別) - JSON string in DB
-  core_insight_note: string | null;      // 4. 練核心 (內容) - JSON string in DB
-  scholars_note: string | null;          // 5. 學長姐的話 (Open Book)
+  coreInsightCategory: string | null;
+  coreInsightNote: string | null;
+  scholarsNote: string | null;
   
-  // Phase 3: Stretch (Blue) - 伸展
-  action_plan: string | null;       // 6. 帶一招
-  cool_down_note: string | null;    // 7. 自由發揮
+  actionPlan: string | null;
+  coolDownNote: string | null;
   
-  created_at: string;
-  updated_at: string;
+  hidden?: boolean;
+  createdAt: string;
+  updatedAt: string;
+
+  // snake_case aliases for backward compat
+  session_id?: string;
+  user_id?: string;
+  title_phrase?: string | null;
+  heartbeat_verse?: string | null;
+  core_insight_category?: string | null;
+  core_insight_note?: string | null;
+  scholars_note?: string | null;
+  action_plan?: string | null;
+  cool_down_note?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface StudyResponseFormData {

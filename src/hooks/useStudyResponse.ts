@@ -47,16 +47,18 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
 
   useEffect(() => {
     if (response && !isDirty && !isInitialized.current) {
-      const parsedCategories = parseCategories(response.core_insight_category);
+      const coreCategory = response.coreInsightCategory || response.core_insight_category || null;
+      const coreNote = response.coreInsightNote || response.core_insight_note || null;
+      const parsedCategories = parseCategories(coreCategory);
       setLocalFormData({
-        title_phrase: response.title_phrase || '',
-        heartbeat_verse: response.heartbeat_verse || '',
+        title_phrase: response.titlePhrase || response.title_phrase || '',
+        heartbeat_verse: response.heartbeatVerse || response.heartbeat_verse || '',
         observation: response.observation || '',
         core_insight_category: parsedCategories,
-        core_insight_note: parseNotes(response.core_insight_note, parsedCategories),
-        scholars_note: response.scholars_note || '',
-        action_plan: response.action_plan || '',
-        cool_down_note: response.cool_down_note || '',
+        core_insight_note: parseNotes(coreNote, parsedCategories),
+        scholars_note: response.scholarsNote || response.scholars_note || '',
+        action_plan: response.actionPlan || response.action_plan || '',
+        cool_down_note: response.coolDownNote || response.cool_down_note || '',
       });
       isInitialized.current = true;
     }
