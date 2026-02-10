@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/queryClient';
+import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
 
 export interface PrayerNotification {
   id: string;
@@ -17,7 +18,7 @@ export const usePrayerNotifications = () => {
   return useQuery({
     queryKey: ['/api/prayer-notifications'],
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: HIGH_CONCURRENCY_CONFIG.PRAYER_NOTIFICATION_FULL_POLL_MS + Math.random() * 5000,
   });
 };
 
@@ -27,7 +28,7 @@ export const useUnreadNotificationCount = () => {
   return useQuery({
     queryKey: ['/api/prayer-notifications/unread-count'],
     enabled: !!user,
-    refetchInterval: 15000,
+    refetchInterval: HIGH_CONCURRENCY_CONFIG.PRAYER_NOTIFICATION_POLL_MS + Math.random() * 3000,
   });
 };
 

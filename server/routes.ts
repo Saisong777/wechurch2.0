@@ -10,7 +10,8 @@ import { db } from "./db";
 import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants } from "@shared/schema";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { pool, getPoolStats } from "./db";
-import { bibleCache, timelineCache, apiCache, sessionCache } from "./cache";
+import { bibleCache, timelineCache, apiCache, sessionCache, prayerCache, cacheKeys } from "./cache";
+import compression from "compression";
 
 // Configure multer for file uploads
 const messageCardStorage = multer.diskStorage({
@@ -41,20 +42,67 @@ const uploadMessageCard = multer({
 });
 
 export async function registerRoutes(app: Express) {
+  app.use(compression());
+
+  const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+  const RATE_LIMIT_WINDOW_MS = 60000;
+  const RATE_LIMIT_MAX_REQUESTS = 200;
+  
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of rateLimitMap.entries()) {
+      if (now > value.resetTime) {
+        rateLimitMap.delete(key);
+      }
+    }
+  }, 30000);
+
+  app.use('/api/', (req, res, next) => {
+    const clientId = (req as any).user?.id || req.ip || 'unknown';
+    const now = Date.now();
+    
+    let entry = rateLimitMap.get(clientId);
+    if (!entry || now > entry.resetTime) {
+      entry = { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
+      rateLimitMap.set(clientId, entry);
+    }
+    
+    entry.count++;
+    
+    res.setHeader('X-RateLimit-Limit', RATE_LIMIT_MAX_REQUESTS.toString());
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, RATE_LIMIT_MAX_REQUESTS - entry.count).toString());
+    
+    if (entry.count > RATE_LIMIT_MAX_REQUESTS) {
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    
+    next();
+  });
+
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Register health check FIRST - before any auth setup that might fail
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", async (req, res) => {
+    const poolStats = getPoolStats();
+    const memUsage = process.memoryUsage();
     res.json({
-      status: "ok",
-      timestamp: new Date().toISOString(),
+      status: 'ok',
       uptime: process.uptime(),
-      env: process.env.NODE_ENV || "development",
+      timestamp: new Date().toISOString(),
+      database: {
+        pool: poolStats,
+        healthy: poolStats.waitingCount < 10,
+      },
       memory: {
-        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
-        unit: "MB"
-      }
+        heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+        rssMB: Math.round(memUsage.rss / 1024 / 1024),
+      },
+      cache: {
+        bible: bibleCache.getStats(),
+        timeline: timelineCache.getStats(),
+        api: apiCache.getStats(),
+      },
     });
   });
 
@@ -726,7 +774,12 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/prayers", async (req, res) => {
     try {
+      const cached = prayerCache.get<any[]>(cacheKeys.prayers());
+      if (cached) {
+        return res.json(cached);
+      }
       const prayers = await storage.getPrayers();
+      prayerCache.set(cacheKeys.prayers(), prayers, 3);
       res.json(prayers);
     } catch (error) {
       res.status(500).json({ error: "Failed to get prayers" });
@@ -736,6 +789,7 @@ export async function registerRoutes(app: Express) {
   app.post("/api/prayers", async (req, res) => {
     try {
       const prayer = await storage.createPrayer(req.body);
+      prayerCache.invalidatePattern('prayers:');
       res.status(201).json(prayer);
     } catch (error) {
       res.status(500).json({ error: "Failed to create prayer" });
@@ -755,6 +809,7 @@ export async function registerRoutes(app: Express) {
       if (!prayer) {
         return res.status(404).json({ error: "Prayer not found" });
       }
+      prayerCache.invalidatePattern('prayers:');
       res.json(prayer);
     } catch (error) {
       console.error("[update-prayer] Error:", error);
@@ -765,6 +820,7 @@ export async function registerRoutes(app: Express) {
   app.delete("/api/prayers/:id", async (req, res) => {
     try {
       await storage.deletePrayer(req.params.id);
+      prayerCache.invalidatePattern('prayers:');
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete prayer" });
@@ -774,6 +830,7 @@ export async function registerRoutes(app: Express) {
   app.post("/api/prayers/:id/amen", async (req, res) => {
     try {
       const amen = await storage.createPrayerAmen(req.params.id, req.body.userId);
+      prayerCache.invalidatePattern('prayers:');
       res.status(201).json(amen);
     } catch (error) {
       console.error("[create-prayer-amen] Error:", error);
@@ -799,6 +856,7 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "userId and content are required" });
       }
       const comment = await storage.createPrayerComment(req.params.id, userId, content);
+      prayerCache.invalidatePattern('prayers:');
       res.status(201).json(comment);
     } catch (error) {
       console.error("[create-prayer-comment] Error:", error);
@@ -809,6 +867,7 @@ export async function registerRoutes(app: Express) {
   app.delete("/api/prayers/:id/comments/:commentId", async (req, res) => {
     try {
       await storage.deletePrayerComment(req.params.commentId);
+      prayerCache.invalidatePattern('prayers:');
       res.json({ success: true });
     } catch (error) {
       console.error("[delete-prayer-comment] Error:", error);
@@ -818,7 +877,12 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/feature-toggles", async (req, res) => {
     try {
+      const cached = apiCache.get<any[]>(cacheKeys.featureToggles());
+      if (cached) {
+        return res.json(cached);
+      }
       const toggles = await storage.getFeatureToggles();
+      apiCache.set(cacheKeys.featureToggles(), toggles, 30);
       res.json(toggles);
     } catch (error) {
       res.status(500).json({ error: "Failed to get feature toggles" });
@@ -840,6 +904,7 @@ export async function registerRoutes(app: Express) {
       if (!toggle) {
         return res.status(404).json({ error: "Feature toggle not found" });
       }
+      apiCache.delete(cacheKeys.featureToggles());
       res.json(toggle);
     } catch (error) {
       res.status(500).json({ error: "Failed to update feature toggle" });

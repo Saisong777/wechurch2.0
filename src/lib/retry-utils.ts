@@ -102,4 +102,9 @@ export const HIGH_CONCURRENCY_CONFIG = {
   
   // Stale time for queries - should be slightly less than poll interval
   STALE_TIME_BUFFER_MS: 500,
+  
+  PRAYER_WALL_POLL_MS: 10000, // 10 seconds (was 5s)
+  PRAYER_NOTIFICATION_POLL_MS: 30000, // 30 seconds (was 15s)
+  PRAYER_NOTIFICATION_FULL_POLL_MS: 60000, // 60 seconds (was 30s)
+  FEATURE_TOGGLE_POLL_MS: 120000, // 2 minutes - toggles rarely change
 } as const;

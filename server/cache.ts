@@ -130,6 +130,8 @@ export const timelineCache = new SimpleCache(3600);
 // General API cache - shorter TTL (5 minutes)
 export const apiCache = new SimpleCache(300);
 
+export const prayerCache = new SimpleCache(5);
+
 // Cache key generators
 export const cacheKeys = {
   bibleBooks: () => 'bible:books',
@@ -139,4 +141,7 @@ export const cacheKeys = {
   timelineSeasons: () => 'timeline:seasons',
   timelineEvents: (seasonId?: string) => seasonId ? `timeline:events:${seasonId}` : 'timeline:events:all',
   blessingVerse: () => 'blessing:random',
+  prayers: () => 'prayers:all',
+  prayerComments: (prayerId: string) => `prayers:comments:${prayerId}`,
+  featureToggles: () => 'feature:toggles',
 };

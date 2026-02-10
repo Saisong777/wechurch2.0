@@ -10,13 +10,13 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Connection pool configuration optimized for 500+ concurrent users
+// Connection pool configuration optimized for 2000+ concurrent users
 const poolConfig = {
   connectionString: process.env.DATABASE_URL,
   // Maximum number of clients in the pool
-  max: 20,
+  max: 50,
   // Minimum number of idle clients maintained
-  min: 5,
+  min: 10,
   // How long a client can sit idle before being closed (30 seconds)
   idleTimeoutMillis: 30000,
   // How long to wait for a connection (10 seconds)
