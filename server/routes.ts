@@ -797,6 +797,33 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/notebook/sessions", async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+      const notebookSessions = await storage.getNotebookSessions(email);
+      res.json({ sessions: notebookSessions });
+    } catch (error) {
+      console.error("[notebook-sessions] Error:", error);
+      res.status(500).json({ error: "Failed to get notebook sessions" });
+    }
+  });
+
+  app.get("/api/notebook/group-responses", async (req, res) => {
+    try {
+      const sessionId = req.query.sessionId as string;
+      const groupNumber = parseInt(req.query.groupNumber as string);
+      if (!sessionId || isNaN(groupNumber)) {
+        return res.status(400).json({ error: "sessionId and groupNumber are required" });
+      }
+      const responses = await storage.getGroupStudyResponses(sessionId, groupNumber);
+      res.json({ responses });
+    } catch (error) {
+      console.error("[group-responses] Error:", error);
+      res.status(500).json({ error: "Failed to get group responses" });
+    }
+  });
+
   app.get("/api/study-responses/:sessionId/:participantId", async (req, res) => {
     try {
       const response = await storage.getStudyResponse(req.params.sessionId, req.params.participantId);
@@ -3434,6 +3461,48 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error updating devotional note:', error);
       res.status(500).json({ error: "Failed to update devotional note" });
+    }
+  });
+
+  app.patch("/api/devotional-notes/:id/hidden", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { hidden } = req.body;
+      if (typeof hidden !== 'boolean') {
+        return res.status(400).json({ error: "hidden must be a boolean" });
+      }
+      const note = await storage.toggleDevotionalNoteHidden(req.params.id, hidden);
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+      res.json(note);
+    } catch (error) {
+      console.error('Error toggling devotional note hidden:', error);
+      res.status(500).json({ error: "Failed to toggle note visibility" });
+    }
+  });
+
+  app.patch("/api/notebook/:id/hidden", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { hidden } = req.body;
+      if (typeof hidden !== 'boolean') {
+        return res.status(400).json({ error: "hidden must be a boolean" });
+      }
+      const entry = await storage.toggleStudyResponseHidden(req.params.id, hidden);
+      if (!entry) {
+        return res.status(404).json({ error: "Entry not found" });
+      }
+      res.json(entry);
+    } catch (error) {
+      console.error('Error toggling study response hidden:', error);
+      res.status(500).json({ error: "Failed to toggle entry visibility" });
     }
   });
 

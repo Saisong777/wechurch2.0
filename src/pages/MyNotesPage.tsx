@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useNavigate, Link } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureGate } from '@/components/ui/feature-gate';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen } from 'lucide-react';
-import { INSIGHT_CATEGORIES } from '@/types/spiritual-fitness';
-import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen, EyeOff, Download } from 'lucide-react';
+import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { Link } from 'react-router-dom';
-import { ChevronRight, Play, Pause } from 'lucide-react';
 
 interface DevotionalNote {
   id: string;
@@ -34,6 +34,21 @@ interface DevotionalNote {
   coolDownNote: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface NotebookEntry {
+  id: string;
+  session_id: string;
+  verse_reference: string;
+  session_date: string;
+  title_phrase: string | null;
+  heartbeat_verse: string | null;
+  observation: string | null;
+  core_insight_category: string | null;
+  core_insight_note: string | null;
+  scholars_note: string | null;
+  action_plan: string | null;
+  cool_down_note: string | null;
 }
 
 const getCategoryInfo = (category: string | null) => {
@@ -56,10 +71,21 @@ const countFilledFields = (note: DevotionalNote): number => {
 const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
   const [expanded, setExpanded] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showHideConfirm, setShowHideConfirm] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
   const filledCount = countFilledFields(note);
   const categoryInfo = getCategoryInfo(note.coreInsightCategory);
   const isFromReadingPlan = !!note.readingPlanId;
+
+  const hideMutation = useMutation({
+    mutationFn: () => apiRequest('PATCH', `/api/devotional-notes/${note.id}/hidden`, { hidden: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
+      toast({ title: '筆記已隱藏' });
+      setShowHideConfirm(false);
+    },
+  });
 
   return (
     <>
@@ -88,17 +114,17 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                   </Badge>
                 )}
               </div>
-              <CardTitle className="text-base font-medium truncate">
+              <CardTitle className="text-base font-medium truncate" data-testid={`text-verse-ref-${note.id}`}>
                 {note.verseReference}
               </CardTitle>
               {note.titlePhrase && (
-                <p className="text-sm text-muted-foreground mt-1 truncate">
+                <p className="text-sm text-muted-foreground mt-1 truncate" data-testid={`text-title-phrase-${note.id}`}>
                   {note.titlePhrase}
                 </p>
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs" data-testid={`text-filled-count-${note.id}`}>
                 {filledCount}/7
               </Badge>
               {expanded ? (
@@ -189,7 +215,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               </div>
             )}
 
-            <div className="pt-2 border-t">
+            <div className="flex items-center justify-between gap-2 pt-2 border-t">
               {isFromReadingPlan ? (
                 <Button
                   variant="outline"
@@ -217,6 +243,39 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                   編輯筆記
                 </Button>
               )}
+              <AlertDialog open={showHideConfirm} onOpenChange={setShowHideConfirm}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    data-testid={`button-hide-note-${note.id}`}
+                  >
+                    <EyeOff className="w-3.5 h-3.5 mr-1" />
+                    隱藏
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>隱藏筆記</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      確定要隱藏這筆筆記嗎？隱藏後不會刪除資料，但不再顯示。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => hideMutation.mutate()}
+                      disabled={hideMutation.isPending}
+                    >
+                      確定隱藏
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </CardContent>
         )}
@@ -235,117 +294,231 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
   );
 };
 
-interface UserReadingPlan {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string | null;
-  isActive: boolean;
-  totalDays: number | null;
-  createdAt: string;
-}
+const StudyNoteCard = ({ entry, userEmail }: { entry: NotebookEntry; userEmail: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [showHideConfirm, setShowHideConfirm] = useState(false);
+  const { toast } = useToast();
+  const parsedCats = parseCategories(entry.core_insight_category);
+  const parsedNts = parseNotes(entry.core_insight_note, parsedCats);
 
-const getReadingProgress = (plan: UserReadingPlan) => {
-  const totalDays = plan.totalDays || 0;
-  const startMs = new Date(plan.startDate).getTime();
-  const nowMs = Date.now();
-  const daysSinceStart = Math.max(0, Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24)));
-  const currentDay = Math.min(daysSinceStart + 1, totalDays);
-  const percentage = totalDays > 0 ? Math.min(Math.round((currentDay / totalDays) * 100), 100) : 0;
-  return { completedDays: currentDay, totalDays, percentage };
-};
-
-const ReadingProgressTab = () => {
-  const { data: plans, isLoading } = useQuery<UserReadingPlan[]>({
-    queryKey: ['/api/user-reading-plans'],
+  const hideMutation = useMutation({
+    mutationFn: () => apiRequest('PATCH', `/api/notebook/${entry.id}/hidden`, { hidden: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notebook', userEmail] });
+      toast({ title: '筆記已隱藏' });
+      setShowHideConfirm(false);
+    },
   });
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="h-24 w-full rounded-md bg-muted animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (!plans || plans.length === 0) {
-    return (
-      <Card className="text-center py-12">
-        <CardContent>
-          <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2" data-testid="text-empty-reading">尚無讀經計劃</h3>
-          <p className="text-muted-foreground text-sm mb-4">
-            建立一個讀經計劃，開始每日靈修之旅
-          </p>
-          <Link to="/learn/reading-plans">
-            <Button data-testid="button-create-plan">
-              前往建立讀經計劃
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      {plans.map((plan) => {
-        const { completedDays, totalDays, percentage } = getReadingProgress(plan);
+    <Card
+      className="overflow-visible cursor-pointer hover-elevate"
+      onClick={() => setExpanded(!expanded)}
+      data-testid={`card-study-note-${entry.id}`}
+    >
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1 flex-wrap">
+              <Calendar className="w-4 h-4" />
+              <span data-testid={`text-study-date-${entry.id}`}>
+                {format(new Date(entry.session_date), 'yyyy年M月d日', { locale: zhTW })}
+              </span>
+              <Badge variant="outline" className="text-xs" data-testid={`text-study-badge-${entry.id}`}>
+                <Dumbbell className="w-3 h-3 mr-1" />
+                Soul Gym
+              </Badge>
+            </div>
+            <CardTitle className="text-base font-medium truncate" data-testid={`text-study-verse-${entry.id}`}>
+              {entry.verse_reference}
+            </CardTitle>
+            {entry.title_phrase && (
+              <p className="text-sm text-muted-foreground mt-1 truncate" data-testid={`text-study-title-${entry.id}`}>
+                {entry.title_phrase}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center shrink-0">
+            {expanded ? (
+              <ChevronUp className="w-5 h-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-muted-foreground" />
+            )}
+          </div>
+        </div>
+      </CardHeader>
 
-        return (
-          <Link key={plan.id} to={`/learn/reading-plans/${plan.id}/read`} className="block" data-testid={`link-plan-${plan.id}`}>
-            <Card className="hover-elevate cursor-pointer">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-semibold text-foreground truncate" data-testid={`text-plan-name-${plan.id}`}>
-                        {plan.name}
-                      </h3>
-                      {plan.isActive ? (
-                        <Badge variant="secondary" className="text-xs gap-1 shrink-0">
-                          <Play className="w-3 h-3" />
-                          進行中
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs gap-1 shrink-0">
-                          <Pause className="w-3 h-3" />
-                          已暫停
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                      <Calendar className="w-3 h-3" />
-                      <span>{format(new Date(plan.startDate), 'yyyy/M/d', { locale: zhTW })}</span>
-                      <span>已完成 {completedDays} / {totalDays} 天</span>
-                    </div>
-                    <Progress value={percentage} className="h-2" data-testid={`progress-plan-${plan.id}`} />
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+      {expanded && (
+        <CardContent className="pt-0 space-y-4 border-t">
+          {entry.heartbeat_verse && (
+            <div className="flex gap-2" data-testid={`text-study-heartbeat-${entry.id}`}>
+              <Heart className="w-4 h-4 text-red-500 shrink-0 mt-1" />
+              <div>
+                <p className="text-sm font-medium mb-1">心動經文</p>
+                <p className="text-sm text-muted-foreground">{entry.heartbeat_verse}</p>
+              </div>
+            </div>
+          )}
+
+          {entry.observation && (
+            <div className="flex gap-2" data-testid={`text-study-observation-${entry.id}`}>
+              <Eye className="w-4 h-4 text-blue-500 shrink-0 mt-1" />
+              <div>
+                <p className="text-sm font-medium mb-1">觀察</p>
+                <p className="text-sm text-muted-foreground">{entry.observation}</p>
+              </div>
+            </div>
+          )}
+
+          {parsedCats.length > 0 && (
+            <div className="flex gap-2" data-testid={`text-study-core-insight-${entry.id}`}>
+              <Dumbbell className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
+              <div>
+                <p className="text-sm font-medium mb-1">核心訓練</p>
+                <div className="flex flex-wrap gap-1 mb-1">
+                  {parsedCats.map(catVal => {
+                    const catInfo = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+                    return catInfo ? (
+                      <Badge key={catVal} variant="outline">
+                        {catInfo.emoji} {catInfo.label}
+                      </Badge>
+                    ) : null;
+                  })}
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
-        );
-      })}
+                {parsedCats.map(catVal => {
+                  const note = parsedNts[catVal];
+                  if (!note) return null;
+                  const catInfo = INSIGHT_CATEGORIES.find(c => c.value === catVal);
+                  return (
+                    <p key={catVal} className="text-sm text-muted-foreground">
+                      {catInfo && <span className="font-medium">{catInfo.label}: </span>}
+                      {note}
+                    </p>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      <div className="text-center pt-2">
-        <Link to="/learn/reading-plans">
-          <Button variant="outline" size="sm" data-testid="button-manage-plans">
-            管理讀經計劃
-          </Button>
-        </Link>
-      </div>
-    </div>
+          {entry.scholars_note && (
+            <div className="flex gap-2" data-testid={`text-study-scholars-${entry.id}`}>
+              <MessageCircle className="w-4 h-4 text-purple-500 shrink-0 mt-1" />
+              <div>
+                <p className="text-sm font-medium mb-1">學者分享</p>
+                <p className="text-sm text-muted-foreground">{entry.scholars_note}</p>
+              </div>
+            </div>
+          )}
+
+          {entry.action_plan && (
+            <div className="flex gap-2" data-testid={`text-study-action-${entry.id}`}>
+              <Target className="w-4 h-4 text-green-500 shrink-0 mt-1" />
+              <div>
+                <p className="text-sm font-medium mb-1">行動計劃</p>
+                <p className="text-sm text-muted-foreground">{entry.action_plan}</p>
+              </div>
+            </div>
+          )}
+
+          {entry.cool_down_note && (
+            <div className="flex gap-2" data-testid={`text-study-cooldown-${entry.id}`}>
+              <Heart className="w-4 h-4 text-indigo-500 shrink-0 mt-1" />
+              <div>
+                <p className="text-sm font-medium mb-1">緩和心得</p>
+                <p className="text-sm text-muted-foreground">{entry.cool_down_note}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t">
+            <AlertDialog open={showHideConfirm} onOpenChange={setShowHideConfirm}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  data-testid={`button-hide-note-${entry.id}`}
+                >
+                  <EyeOff className="w-3.5 h-3.5 mr-1" />
+                  隱藏
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>隱藏筆記</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    確定要隱藏這筆筆記嗎？隱藏後不會刪除資料，但不再顯示。
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => hideMutation.mutate()}
+                    disabled={hideMutation.isPending}
+                  >
+                    確定隱藏
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </CardContent>
+      )}
+    </Card>
   );
+};
+
+const formatDevotionalNoteMarkdown = (note: DevotionalNote): string => {
+  const date = format(new Date(note.updatedAt), 'yyyy-MM-dd', { locale: zhTW });
+  const lines: string[] = [];
+  lines.push(`## ${note.verseReference} (${date})`);
+  if (note.titlePhrase) lines.push(`**1. 定標題:** ${note.titlePhrase}`);
+  if (note.heartbeatVerse) lines.push(`**2. 心跳的時刻:** ${note.heartbeatVerse}`);
+  if (note.observation) lines.push(`**3. 查看聖經的資訊:** ${note.observation}`);
+  if (note.coreInsightNote) {
+    const catInfo = getCategoryInfo(note.coreInsightCategory);
+    lines.push(`**4. 思想神的話${catInfo ? ` (${catInfo.label})` : ''}:** ${note.coreInsightNote}`);
+  }
+  if (note.scholarsNote) lines.push(`**5. 學長姐的話:** ${note.scholarsNote}`);
+  if (note.actionPlan) lines.push(`**6. 帶一招:** ${note.actionPlan}`);
+  if (note.coolDownNote) lines.push(`**7. 安靜的心:** ${note.coolDownNote}`);
+  return lines.join('\n\n');
+};
+
+const formatStudyNoteMarkdown = (entry: NotebookEntry): string => {
+  const date = format(new Date(entry.session_date), 'yyyy-MM-dd', { locale: zhTW });
+  const lines: string[] = [];
+  lines.push(`## ${entry.verse_reference} - Soul Gym (${date})`);
+  if (entry.title_phrase) lines.push(`**定標題:** ${entry.title_phrase}`);
+  if (entry.heartbeat_verse) lines.push(`**心動經文:** ${entry.heartbeat_verse}`);
+  if (entry.observation) lines.push(`**觀察:** ${entry.observation}`);
+  if (entry.core_insight_note) lines.push(`**核心訓練:** ${entry.core_insight_note}`);
+  if (entry.scholars_note) lines.push(`**學者分享:** ${entry.scholars_note}`);
+  if (entry.action_plan) lines.push(`**行動計劃:** ${entry.action_plan}`);
+  if (entry.cool_down_note) lines.push(`**緩和心得:** ${entry.cool_down_note}`);
+  return lines.join('\n\n');
+};
+
+const downloadMarkdown = (content: string, filename: string) => {
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 
 const MyNotesPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState('reading-plan');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -358,6 +531,58 @@ const MyNotesPage = () => {
     queryKey: ['/api/devotional-notes'],
     enabled: !!user,
   });
+
+  const userEmail = user?.email || localStorage.getItem('bible_study_guest_email') || '';
+
+  const { data: notebookEntries, isLoading: notebookLoading } = useQuery<NotebookEntry[]>({
+    queryKey: ['/api/notebook', userEmail],
+    queryFn: async () => {
+      const res = await fetch(`/api/notebook?email=${encodeURIComponent(userEmail)}`);
+      if (!res.ok) throw new Error('Failed to fetch notebook');
+      const data = await res.json();
+      return (data?.entries || []) as NotebookEntry[];
+    },
+    enabled: !!user && !!userEmail,
+    staleTime: 60000,
+  });
+
+  const readingPlanNotes = devotionalNotes?.filter(n => n.readingPlanId !== null) || [];
+  const devotionalOnlyNotes = devotionalNotes?.filter(n => n.readingPlanId === null) || [];
+
+  const handleExport = () => {
+    let content = '';
+    let filename = '';
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    if (activeTab === 'reading-plan') {
+      if (readingPlanNotes.length === 0) {
+        toast({ title: '沒有可匯出的筆記', variant: 'destructive' });
+        return;
+      }
+      content = `# 讀經計劃筆記\n\n匯出日期: ${today}\n\n---\n\n` +
+        readingPlanNotes.map(formatDevotionalNoteMarkdown).join('\n\n---\n\n');
+      filename = `讀經計劃筆記_${today}.md`;
+    } else if (activeTab === 'devotional') {
+      if (devotionalOnlyNotes.length === 0) {
+        toast({ title: '沒有可匯出的筆記', variant: 'destructive' });
+        return;
+      }
+      content = `# 經文感動\n\n匯出日期: ${today}\n\n---\n\n` +
+        devotionalOnlyNotes.map(formatDevotionalNoteMarkdown).join('\n\n---\n\n');
+      filename = `經文感動_${today}.md`;
+    } else if (activeTab === 'study') {
+      if (!notebookEntries || notebookEntries.length === 0) {
+        toast({ title: '沒有可匯出的筆記', variant: 'destructive' });
+        return;
+      }
+      content = `# 共同查經筆記\n\n匯出日期: ${today}\n\n---\n\n` +
+        notebookEntries.map(formatStudyNoteMarkdown).join('\n\n---\n\n');
+      filename = `共同查經筆記_${today}.md`;
+    }
+
+    downloadMarkdown(content, filename);
+    toast({ title: '筆記已匯出' });
+  };
 
   if (loading || !user) {
     return (
@@ -382,18 +607,59 @@ const MyNotesPage = () => {
         <Header variant="compact" title="我的筆記" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
           <div className="max-w-2xl md:max-w-3xl mx-auto">
-            <Tabs defaultValue="reading-progress" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6" data-testid="notes-tabs">
-                <TabsTrigger value="reading-progress" data-testid="tab-reading-progress">
-                  讀經進度
-                </TabsTrigger>
-                <TabsTrigger value="devotional" data-testid="tab-devotional">
-                  經文感動
-                </TabsTrigger>
-              </TabsList>
+            <Tabs defaultValue="reading-plan" value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
+                <TabsList className="grid grid-cols-3 flex-1 min-w-0" data-testid="notes-tabs">
+                  <TabsTrigger value="reading-plan" data-testid="tab-reading-plan">
+                    讀經計劃
+                  </TabsTrigger>
+                  <TabsTrigger value="devotional" data-testid="tab-devotional">
+                    經文感動
+                  </TabsTrigger>
+                  <TabsTrigger value="study" data-testid="tab-study">
+                    共同查經
+                  </TabsTrigger>
+                </TabsList>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExport}
+                  data-testid="button-export-notes"
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  匯出
+                </Button>
+              </div>
 
-              <TabsContent value="reading-progress" data-testid="tab-content-reading-progress">
-                <ReadingProgressTab />
+              <TabsContent value="reading-plan" data-testid="tab-content-reading-plan">
+                {notesLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-24 w-full rounded-md bg-muted animate-pulse" />
+                    ))}
+                  </div>
+                ) : readingPlanNotes.length === 0 ? (
+                  <Card className="text-center py-12">
+                    <CardContent>
+                      <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2" data-testid="text-empty-reading-plan">尚無讀經計劃筆記</h3>
+                      <p className="text-muted-foreground text-sm mb-4">
+                        加入讀經計劃，開始每日靈修之旅
+                      </p>
+                      <Link to="/learn/reading-plans" data-testid="link-reading-plans">
+                        <Button data-testid="button-go-reading-plans">
+                          前往讀經計劃
+                        </Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {readingPlanNotes.map((note) => (
+                      <DevotionalNoteCard key={note.id} note={note} />
+                    ))}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="devotional" data-testid="tab-content-devotional">
@@ -403,7 +669,7 @@ const MyNotesPage = () => {
                       <div key={i} className="h-24 w-full rounded-md bg-muted animate-pulse" />
                     ))}
                   </div>
-                ) : !devotionalNotes || devotionalNotes.length === 0 ? (
+                ) : devotionalOnlyNotes.length === 0 ? (
                   <Card className="text-center py-12">
                     <CardContent>
                       <BookMarked className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -415,8 +681,34 @@ const MyNotesPage = () => {
                   </Card>
                 ) : (
                   <div className="space-y-4">
-                    {devotionalNotes.map((note) => (
+                    {devotionalOnlyNotes.map((note) => (
                       <DevotionalNoteCard key={note.id} note={note} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="study" data-testid="tab-content-study">
+                {notebookLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-24 w-full rounded-md bg-muted animate-pulse" />
+                    ))}
+                  </div>
+                ) : !notebookEntries || notebookEntries.length === 0 ? (
+                  <Card className="text-center py-12">
+                    <CardContent>
+                      <Dumbbell className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2" data-testid="text-empty-study">尚無查經筆記</h3>
+                      <p className="text-muted-foreground text-sm">
+                        參加 Soul Gym 共同查經後，您的查經筆記會自動儲存在這裡
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {notebookEntries.map((entry) => (
+                      <StudyNoteCard key={entry.id} entry={entry} userEmail={userEmail} />
                     ))}
                   </div>
                 )}

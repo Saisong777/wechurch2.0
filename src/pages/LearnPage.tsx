@@ -36,7 +36,7 @@ const LearnPage = () => {
     {
       featureKey: 'we_learn',
       title: '我的筆記',
-      description: '讀經進度與經文感動紀錄',
+      description: '個人讀經筆記與查經紀錄',
       icon: BookMarked,
       href: '/learn/my-notes',
       color: 'bg-rose-500',

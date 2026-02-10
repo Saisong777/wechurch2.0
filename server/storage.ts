@@ -59,6 +59,8 @@ export interface IStorage {
   upsertStudyResponse(response: InsertStudyResponse & { sessionId: string; userId: string }): Promise<StudyResponse>;
   deleteStudyResponse(id: string): Promise<void>;
   getNotebookEntries(email: string): Promise<any[]>;
+  getNotebookSessions(email: string): Promise<any[]>;
+  getGroupStudyResponses(sessionId: string, groupNumber: number): Promise<any[]>;
   
   getPrayers(): Promise<Prayer[]>;
   createPrayer(prayer: InsertPrayer): Promise<Prayer>;
@@ -373,7 +375,7 @@ export class DatabaseStorage implements IStorage {
       .from(studyResponses)
       .innerJoin(participants, eq(studyResponses.userId, participants.id))
       .innerJoin(sessions, eq(studyResponses.sessionId, sessions.id))
-      .where(eq(participants.email, email))
+      .where(and(eq(participants.email, email), eq(studyResponses.hidden, false)))
       .orderBy(desc(studyResponses.createdAt));
 
     return results.map(row => ({
@@ -390,6 +392,71 @@ export class DatabaseStorage implements IStorage {
       action_plan: row.actionPlan,
       cool_down_note: row.coolDownNote,
     }));
+  }
+
+  async getNotebookSessions(email: string): Promise<any[]> {
+    const results = await db
+      .select({
+        sessionId: sessions.id,
+        verseReference: sessions.verseReference,
+        sessionDate: sessions.createdAt,
+        groupNumber: participants.groupNumber,
+        participantId: participants.id,
+      })
+      .from(participants)
+      .innerJoin(sessions, eq(participants.sessionId, sessions.id))
+      .where(eq(participants.email, email))
+      .orderBy(desc(sessions.createdAt));
+    return results.map(row => ({
+      session_id: row.sessionId,
+      verse_reference: row.verseReference,
+      session_date: row.sessionDate?.toISOString() || '',
+      group_number: row.groupNumber,
+      participant_id: row.participantId,
+    }));
+  }
+
+  async getGroupStudyResponses(sessionId: string, groupNumber: number): Promise<any[]> {
+    const results = await db
+      .select({
+        id: studyResponses.id,
+        titlePhrase: studyResponses.titlePhrase,
+        heartbeatVerse: studyResponses.heartbeatVerse,
+        observation: studyResponses.observation,
+        coreInsightCategory: studyResponses.coreInsightCategory,
+        coreInsightNote: studyResponses.coreInsightNote,
+        scholarsNote: studyResponses.scholarsNote,
+        actionPlan: studyResponses.actionPlan,
+        coolDownNote: studyResponses.coolDownNote,
+        participantName: participants.name,
+        participantEmail: participants.email,
+      })
+      .from(studyResponses)
+      .innerJoin(participants, eq(studyResponses.userId, participants.id))
+      .where(and(
+        eq(studyResponses.sessionId, sessionId),
+        eq(participants.groupNumber, groupNumber),
+        eq(studyResponses.hidden, false)
+      ))
+      .orderBy(studyResponses.createdAt);
+    return results.map(row => ({
+      id: row.id,
+      title_phrase: row.titlePhrase,
+      heartbeat_verse: row.heartbeatVerse,
+      observation: row.observation,
+      core_insight_category: row.coreInsightCategory,
+      core_insight_note: row.coreInsightNote,
+      scholars_note: row.scholarsNote,
+      action_plan: row.actionPlan,
+      cool_down_note: row.coolDownNote,
+      participant_name: row.participantName,
+      participant_email: row.participantEmail,
+    }));
+  }
+
+  async toggleStudyResponseHidden(id: string, hidden: boolean): Promise<any> {
+    const [updated] = await db.update(studyResponses).set({ hidden, updatedAt: new Date() }).where(eq(studyResponses.id, id)).returning();
+    return updated;
   }
 
   async getPrayers(): Promise<Prayer[]> {
@@ -1056,7 +1123,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDevotionalNotes(userId: string): Promise<DevotionalNote[]> {
-    return db.select().from(devotionalNotes).where(eq(devotionalNotes.userId, userId)).orderBy(desc(devotionalNotes.createdAt));
+    return db.select().from(devotionalNotes).where(and(eq(devotionalNotes.userId, userId), eq(devotionalNotes.hidden, false))).orderBy(desc(devotionalNotes.createdAt));
+  }
+
+  async toggleDevotionalNoteHidden(id: string, hidden: boolean): Promise<DevotionalNote | undefined> {
+    const [updated] = await db.update(devotionalNotes).set({ hidden, updatedAt: new Date() }).where(eq(devotionalNotes.id, id)).returning();
+    return updated;
   }
 
   async getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined> {

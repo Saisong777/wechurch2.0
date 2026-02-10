@@ -113,6 +113,7 @@ export const studyResponses = pgTable("study_responses", {
   scholarsNote: text("scholars_note"),
   actionPlan: text("action_plan"),
   coolDownNote: text("cool_down_note"),
+  hidden: boolean("hidden").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -369,6 +370,7 @@ export const devotionalNotes = pgTable("devotional_notes", {
   coolDownNote: text("cool_down_note"),
   readingPlanId: uuid("reading_plan_id").references(() => userReadingPlans.id),
   dayNumber: integer("day_number"),
+  hidden: boolean("hidden").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
