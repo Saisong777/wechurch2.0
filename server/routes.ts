@@ -390,7 +390,12 @@ export async function registerRoutes(app: Express) {
 
   app.delete("/api/sessions/:id", async (req, res) => {
     try {
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
       await storage.deleteSession(req.params.id);
+      sessionCache.invalidate(`poll:${req.params.id}`);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete session" });
@@ -841,9 +846,38 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/study-responses", async (req, res) => {
     try {
-      const response = await storage.upsertStudyResponse(req.body);
+      const {
+        participantId, participantEmail,
+        title_phrase, heartbeat_verse, observation,
+        core_insight_category, core_insight_note,
+        scholars_note, action_plan, cool_down_note,
+        sessionId, userId: bodyUserId,
+        titlePhrase, heartbeatVerse, coreInsightCategory,
+        coreInsightNote, scholarsNote, actionPlan, coolDownNote,
+      } = req.body;
+
+      const resolvedUserId = bodyUserId || participantId;
+      if (!sessionId || !resolvedUserId) {
+        return res.status(400).json({ error: "sessionId and userId/participantId are required" });
+      }
+
+      const cleanData = {
+        sessionId,
+        userId: resolvedUserId,
+        titlePhrase: titlePhrase || title_phrase || null,
+        heartbeatVerse: heartbeatVerse || heartbeat_verse || null,
+        observation: observation || null,
+        coreInsightCategory: coreInsightCategory || core_insight_category || null,
+        coreInsightNote: coreInsightNote || core_insight_note || null,
+        scholarsNote: scholarsNote || scholars_note || null,
+        actionPlan: actionPlan || action_plan || null,
+        coolDownNote: coolDownNote || cool_down_note || null,
+      };
+
+      const response = await storage.upsertStudyResponse(cleanData);
       res.json(response);
     } catch (error) {
+      console.error("Error saving study response:", error);
       res.status(500).json({ error: "Failed to save study response" });
     }
   });

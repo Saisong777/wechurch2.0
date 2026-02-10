@@ -456,9 +456,9 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
                 <p className="text-muted-foreground">
                   等待 <span className="font-medium text-foreground">{currentDrawer?.name || '...'}</span> 分享
                 </p>
-                {gameState.currentCardContent && (
+                {!gameState.currentCardContent && (
                   <p className="text-xs text-muted-foreground">
-                    正在回答問題中...
+                    等待抽牌中...
                   </p>
                 )}
               </div>

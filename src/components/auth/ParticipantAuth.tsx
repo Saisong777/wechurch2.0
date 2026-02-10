@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { BookOpen, Mail, Lock, User, UserX } from 'lucide-react';
+import { SiGoogle } from 'react-icons/si';
 import { toast } from 'sonner';
 
 interface ParticipantAuthProps {
@@ -266,6 +267,20 @@ export const ParticipantAuth: React.FC<ParticipantAuthProps> = ({ onSuccess, onG
         </div>
       </CardHeader>
       <CardContent>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full mb-3 h-12 gap-3 font-medium"
+          onClick={() => {
+            window.location.href = '/api/login';
+          }}
+          data-testid="button-google-login-participant"
+        >
+          <SiGoogle className="w-5 h-5 text-[#4285F4]" />
+          使用 Google 帳號繼續
+        </Button>
+
         <Button
           type="button"
           variant="ghost"

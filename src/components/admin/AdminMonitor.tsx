@@ -8,7 +8,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/api-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants, endStudySession } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye } from 'lucide-react';
+import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -299,6 +299,26 @@ export const AdminMonitor: React.FC = () => {
     } else {
       toast.error(`操作失敗: ${result.error}`);
       setIsEndingSession(false);
+    }
+  };
+
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
+
+  const handleDeleteSession = async () => {
+    if (!currentSession?.id) return;
+
+    setIsDeletingSession(true);
+    try {
+      const response = await fetch(`/api/sessions/${currentSession.id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete session');
+
+      toast.success('活動已刪除');
+      setCurrentSession(null);
+      setTimeout(() => navigate('/'), 500);
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      toast.error('刪除失敗，請重試');
+      setIsDeletingSession(false);
     }
   };
 
@@ -593,6 +613,44 @@ export const AdminMonitor: React.FC = () => {
                       <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
                       <AlertDialogAction onClick={handleEndSession} className="bg-destructive hover:bg-destructive/90 h-11 sm:h-10">
                         確定結束
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isDeletingSession}
+                      data-testid="button-delete-session"
+                    >
+                      {isDeletingSession ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      刪除活動
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-lg">確定要刪除此活動嗎？</AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-2">
+                        <p>此操作將永久刪除：</p>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          <li>所有參與者資料</li>
+                          <li>所有查經筆記和回應</li>
+                          <li>所有 AI 報告</li>
+                        </ul>
+                        <p className="text-destructive font-medium mt-2">此操作無法復原！資料將永久刪除。</p>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                      <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteSession} className="bg-destructive hover:bg-destructive/90 h-11 sm:h-10">
+                        確定刪除
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
