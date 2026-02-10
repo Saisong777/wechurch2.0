@@ -81,6 +81,40 @@ export async function registerRoutes(app: Express) {
 
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+  async function resolveUserId(req: any): Promise<string | null> {
+    const user = req.user;
+    if (!user) return null;
+    
+    const claims = user.claims || {};
+    const authUserId = claims.sub;
+    if (!authUserId) return null;
+    
+    if (typeof authUserId === 'string' && authUserId.startsWith('local_')) {
+      const localId = authUserId.replace('local_', '');
+      const localUser = await storage.getUser(localId);
+      if (localUser) return localId;
+    }
+    
+    try {
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const fullUser = await authStorage.getUser(authUserId);
+      if (fullUser?.legacyUserId) return fullUser.legacyUserId;
+      if (fullUser?.email) {
+        const legacyUser = await storage.getUserByEmail(fullUser.email);
+        if (legacyUser) return legacyUser.id;
+      }
+    } catch (error) {
+      console.error('[resolveUserId] Error resolving user:', error);
+    }
+    
+    if (claims.email) {
+      const legacyUser = await storage.getUserByEmail(claims.email);
+      if (legacyUser) return legacyUser.id;
+    }
+    
+    return null;
+  }
+
   // Register health check FIRST - before any auth setup that might fail
   app.get("/api/health", async (req, res) => {
     const poolStats = getPoolStats();
@@ -943,9 +977,29 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/icebreaker/games", async (req, res) => {
     try {
+      if (req.body.bibleStudySessionId && req.body.groupNumber) {
+        const existingGame = await storage.getSessionIcebreakerGame(
+          req.body.bibleStudySessionId,
+          parseInt(req.body.groupNumber)
+        );
+        if (existingGame) {
+          return res.status(200).json(existingGame);
+        }
+      }
       const game = await storage.createIcebreakerGame(req.body);
       res.status(201).json(game);
     } catch (error) {
+      if (req.body.bibleStudySessionId && req.body.groupNumber) {
+        try {
+          const existingGame = await storage.getSessionIcebreakerGame(
+            req.body.bibleStudySessionId,
+            parseInt(req.body.groupNumber)
+          );
+          if (existingGame) {
+            return res.status(200).json(existingGame);
+          }
+        } catch {}
+      }
       res.status(500).json({ error: "Failed to create game" });
     }
   });
@@ -3267,19 +3321,7 @@ export async function registerRoutes(app: Express) {
   // ============ Devotional Notes API Routes ============
   app.get("/api/devotional-notes", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
+      const userId = await resolveUserId(req);
       if (!userId) {
         return res.status(401).json({ error: "User not found" });
       }
@@ -3293,19 +3335,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/devotional-notes/by-reference", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
+      const userId = await resolveUserId(req);
       if (!userId) {
         return res.status(401).json({ error: "User not found" });
       }
@@ -3355,19 +3385,7 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/devotional-notes", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
+      const userId = await resolveUserId(req);
       if (!userId) {
         return res.status(401).json({ error: "User not found" });
       }

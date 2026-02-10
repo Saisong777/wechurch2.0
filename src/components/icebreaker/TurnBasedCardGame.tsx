@@ -105,7 +105,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
 
   const initGame = useCallback(async () => {
     try {
-      await staggeredStart(1500);
+      await staggeredStart(500 + groupNumber * 300);
       
       const groupMembers = await withRetry(
         () => fetchGroupMembers(),
@@ -143,6 +143,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         if (createResponse.ok) {
           existingGame = await createResponse.json();
         } else {
+          await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
           const retryResponse = await fetch(
             `/api/icebreaker/session-game?sessionId=${sessionId}&groupNumber=${groupNumber}`
           );
