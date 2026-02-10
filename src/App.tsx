@@ -12,7 +12,9 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 // Lazy load pages for better code splitting and FCP
 const Index = lazy(() => import("./pages/Index"));
+const WeLiveLandingPage = lazy(() => import("./pages/WeLiveLandingPage").then(m => ({ default: m.WeLiveLandingPage })));
 const UserPage = lazy(() => import("./pages/UserPage").then(m => ({ default: m.UserPage })));
+const SoulGymNotebookPage = lazy(() => import("./pages/SoulGymNotebookPage").then(m => ({ default: m.SoulGymNotebookPage })));
 const AdminPage = lazy(() => import("./pages/AdminPage").then(m => ({ default: m.AdminPage })));
 const CRMPage = lazy(() => import("./pages/CRMPage"));
 const NotebookPage = lazy(() => import("./pages/NotebookPage"));
@@ -63,7 +65,9 @@ const App = () => (
               <AppLayout>
                 <Routes>
                   <Route path="/" element={<Index />} />
-                  <Route path="/user" element={<UserPage />} />
+                  <Route path="/user" element={<WeLiveLandingPage />} />
+                  <Route path="/user/study" element={<UserPage />} />
+                  <Route path="/user/notebook" element={<SoulGymNotebookPage />} />
                   <Route path="/admin" element={<AdminPage />} />
                   <Route path="/admin/crm" element={<CRMPage />} />
                   <Route path="/notebook" element={<NotebookPage />} />

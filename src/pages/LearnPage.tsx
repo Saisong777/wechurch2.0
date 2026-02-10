@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FeatureGate } from '@/components/ui/feature-gate';
-import { Book, Calendar, BookOpen } from 'lucide-react';
+import { Book, Calendar, BookOpen, BookMarked } from 'lucide-react';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 
 const LearnPage = () => {
@@ -32,6 +32,14 @@ const LearnPage = () => {
       icon: BookOpen,
       href: '/learn/reading-plans',
       color: 'bg-emerald-500',
+    },
+    {
+      featureKey: 'we_learn',
+      title: '我的筆記',
+      description: '讀經進度與經文感動紀錄',
+      icon: BookMarked,
+      href: '/learn/my-notes',
+      color: 'bg-rose-500',
     },
   ];
 

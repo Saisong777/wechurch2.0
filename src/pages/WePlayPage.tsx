@@ -11,7 +11,6 @@ const features = [
     href: '/icebreaker',
     bgColor: 'bg-emerald-500/15',
     iconColor: 'text-emerald-600',
-    hoverBorder: 'hover:border-emerald-400/40',
     featureKeys: ['we_play', 'icebreaker_game'] as string[],
   },
   {
@@ -22,7 +21,6 @@ const features = [
     href: '/grouper',
     bgColor: 'bg-amber-500/15',
     iconColor: 'text-amber-600',
-    hoverBorder: 'hover:border-amber-400/40',
     featureKeys: ['we_play', 'random_grouper'] as string[],
   },
 ];
@@ -45,7 +43,7 @@ export const WePlayPage = () => {
               const Icon = feature.icon;
               return (
                 <Link key={feature.id} to={feature.href} className="block" data-testid={`link-feature-${feature.id}`}>
-                  <Card className={`transition-all duration-300 border ${feature.hoverBorder} hover:shadow-md cursor-pointer`}>
+                  <Card className="hover-elevate active-elevate-2 cursor-pointer">
                     <CardContent className="p-4 sm:p-5">
                       <div className="flex items-center gap-3">
                         <div className={`w-12 h-12 rounded-xl ${feature.bgColor} flex items-center justify-center flex-shrink-0`}>
@@ -55,7 +53,7 @@ export const WePlayPage = () => {
                           <h3 className="text-base font-semibold text-foreground" data-testid={`text-feature-title-${feature.id}`}>
                             {feature.title}
                           </h3>
-                          <p className="text-sm text-muted-foreground mt-0.5">
+                          <p className="text-sm text-muted-foreground mt-0.5" data-testid={`text-feature-subtitle-${feature.id}`}>
                             {feature.subtitle}
                           </p>
                         </div>

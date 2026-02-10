@@ -125,7 +125,7 @@ const Index = () => {
   useEffect(() => {
     const sessionId = searchParams.get('session');
     if (sessionId) {
-      navigate(`/user?session=${sessionId}`);
+      navigate(`/user/study?session=${sessionId}`);
     }
   }, [searchParams, navigate]);
 

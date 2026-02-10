@@ -24,7 +24,7 @@ export const getPublicBaseUrl = (): string => {
  * Generate a join URL for a session using short code.
  */
 export const getSessionJoinUrl = (sessionIdOrShortCode: string): string => {
-  return `${getPublicBaseUrl()}/user?session=${sessionIdOrShortCode}`;
+  return `${getPublicBaseUrl()}/user/study?session=${sessionIdOrShortCode}`;
 };
 
 /**
