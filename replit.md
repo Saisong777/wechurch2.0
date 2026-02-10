@@ -53,8 +53,14 @@ Preferred communication style: Simple, everyday language.
 - **Database Indexes**: `idx_participants_session_id`, `idx_participants_session_group`, `idx_submissions_session_id`, `idx_study_responses_session_user`, `idx_ai_reports_session` for fast queries.
 - **Efficient Comparisons**: Field-by-field comparison (groupNumber, readyConfirmed, status, verseReference) instead of JSON.stringify for change detection in polling hooks.
 - **Optimized Queries**: `getStudyResponses` uses LEFT JOIN instead of N+1 separate queries for participants/users.
-- **Database**: Connection pool with max 20 connections.
-- **Caching**: In-memory caching for Bible data and timeline events (1 hour), plus session poll cache (2s TTL).
+- **Database**: Connection pool with max 50 connections, min 10 idle.
+- **Caching**: In-memory caching for Bible data and timeline events (1 hour), session poll cache (2s TTL), prayer wall cache (3s TTL), feature toggles cache (30s TTL).
+- **Response Compression**: gzip compression via `compression` middleware for all API responses.
+- **Rate Limiting**: In-memory per-client rate limiter (200 req/min) with automatic cleanup, returns 429 when exceeded.
+- **Prayer Wall Polling**: 10s interval + 0-2s random jitter (was 5s hardcoded).
+- **Prayer Notification Polling**: 30s for unread count, 60s for full list (was 15s/30s).
+- **Feature Toggle Polling**: 120s interval (rarely changes).
+- **Health Monitoring**: `GET /api/health` returns pool stats, memory usage, and cache stats.
 
 ### Responsive Design
 - Standardized responsive patterns with consistent horizontal padding, progressive content max-widths, and responsive navigation (bottom bar on mobile, top bar on tablet/desktop).
