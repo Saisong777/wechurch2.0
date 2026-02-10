@@ -649,7 +649,9 @@ export async function registerRoutes(app: Express) {
         const members = responses.map(r => r.participantName || '匿名').join('、');
         const titlePhrases = [...new Set(responses.map(r => r.titlePhrase).filter(Boolean))];
         const observations = responses.map(r => r.observation).filter(Boolean);
-        const insights = responses.map(r => r.coreInsightNote).filter(Boolean);
+        const insightsWithNames = responses
+          .filter(r => r.coreInsightNote)
+          .map(r => ({ name: r.participantName || '匿名', insight: r.coreInsightNote! }));
         const applications = responses.map(r => r.actionPlan).filter(Boolean);
         
         let content = '';
@@ -672,9 +674,9 @@ export async function registerRoutes(app: Express) {
           content += '\n';
         }
         
-        if (insights.length > 0) {
+        if (insightsWithNames.length > 0) {
           content += `**💡 獨特亮光（Unique Insights）：**\n`;
-          insights.slice(0, 5).forEach(i => { content += `• ${i}\n`; });
+          insightsWithNames.slice(0, 5).forEach(({ name, insight }) => { content += `• **${name}**：${insight}\n`; });
           content += '\n';
         }
         

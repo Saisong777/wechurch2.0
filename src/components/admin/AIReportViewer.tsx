@@ -16,16 +16,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation, Search } from 'lucide-react';
+import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-// Import from refactored modules
 import {
   parseReportContent,
   generateSectionMarkdown,
   generatePrintHTML,
-  generatePPTHTML,
   downloadBlob,
   openPrintWindow,
   GroupSection,
@@ -50,6 +48,12 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   const printRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'overall' | 'compare' | number>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  React.useEffect(() => {
+    if (!open) setPresentationMode(false);
+  }, [open]);
   
   const parsedSections = reportContent ? parseReportContent(reportContent) : [];
   
@@ -129,20 +133,44 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     toast.success(groupNumber === 0 ? '全組總結 Markdown 已下載！' : `第 ${groupNumber} 組 Markdown 已下載！`);
   };
 
-  // --- Presentation mode handler (web-based slideshow) ---
-  const handleDownloadPPT = () => {
+  const handlePresentationMode = () => {
     if (!parsedSections.length) return;
-    
-    const html = generatePPTHTML(parsedSections, verseReference);
-    const pptWindow = window.open('', '_blank');
-    if (pptWindow) {
-      pptWindow.document.write(html);
-      pptWindow.document.close();
-      toast.success('簡報已開啟！使用方向鍵或點擊換頁');
-    } else {
-      toast.error('無法開啟簡報視窗，請檢查彈出式視窗設定');
-    }
+    setCurrentSlide(0);
+    setPresentationMode(true);
   };
+
+  const presentationSlides = React.useMemo(() => {
+    if (!parsedSections.length) return [];
+    const groupReportsSorted = parsedSections.filter(s => s.groupNumber > 0).sort((a, b) => a.groupNumber - b.groupNumber);
+    const overallReport = parsedSections.find(s => s.groupNumber === 0);
+    const slides: { type: 'title' | 'content' | 'end'; title?: string; subtitle?: string; section?: GroupReport }[] = [];
+    slides.push({ type: 'title', title: '查經分析報告', subtitle: verseReference || '靈魂健身房' });
+    if (overallReport) {
+      slides.push({ type: 'content', title: '全會眾綜合分析', section: overallReport });
+    }
+    for (const section of groupReportsSorted) {
+      slides.push({ type: 'content', title: `第 ${section.groupNumber} 組`, section });
+    }
+    slides.push({ type: 'end', title: '感謝參與', subtitle: '願神的話語常存在我們心中' });
+    return slides;
+  }, [parsedSections, verseReference]);
+
+  React.useEffect(() => {
+    if (!presentationMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        setCurrentSlide(prev => Math.min(prev + 1, presentationSlides.length - 1));
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setCurrentSlide(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'Escape') {
+        setPresentationMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [presentationMode, presentationSlides.length]);
 
   // Get current content based on active tab
   const getCurrentContent = () => {
@@ -160,6 +188,137 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
 
   const { overallReports: visibleOverall, groupReports: visibleGroups, showAll, showCompare } = getCurrentContent();
   
+  if (presentationMode) {
+    const slide = presentationSlides[currentSlide];
+    const formatSlideContent = (text?: string) => {
+      if (!text) return null;
+      return text.replace(/\*\*/g, '').replace(/^[-•]\s*/gm, '').split('\n').filter(l => l.trim()).map((line, i) => (
+        <div key={i} className="py-0.5 text-sm sm:text-base leading-relaxed">{line.trim()}</div>
+      ));
+    };
+    return (
+      <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+          <span className="text-white/60 text-xs sm:text-sm">
+            {currentSlide + 1} / {presentationSlides.length}
+          </span>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setPresentationMode(false)}
+            className="text-white/70 hover:text-white"
+            data-testid="button-close-presentation"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-auto">
+          {slide?.type === 'title' || slide?.type === 'end' ? (
+            <div className="text-center">
+              <h1 className="text-3xl sm:text-5xl font-bold text-white mb-4" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.3)' }}>
+                {slide.title}
+              </h1>
+              {slide.subtitle && (
+                <p className="text-xl sm:text-2xl text-white/80">{slide.subtitle}</p>
+              )}
+              {slide.type === 'title' && (
+                <p className="mt-6 text-white/50 text-sm">
+                  {new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              )}
+            </div>
+          ) : slide?.section ? (
+            <div className="w-full max-w-5xl">
+              <div className="flex items-center gap-3 mb-4 flex-wrap">
+                <h2 className={cn(
+                  "text-2xl sm:text-3xl font-bold",
+                  slide.section.groupNumber === 0 ? "text-purple-300" : "text-teal-300"
+                )}>
+                  {slide.title}
+                </h2>
+                {slide.section.members && (
+                  <span className="text-sm text-white/50 bg-white/10 px-3 py-1 rounded-full">
+                    {slide.section.members}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {slide.section.themes && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-green-400">
+                    <h3 className="text-green-300 font-semibold text-sm mb-2">主題</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.themes)}</div>
+                  </div>
+                )}
+                {slide.section.observations && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-teal-400">
+                    <h3 className="text-teal-300 font-semibold text-sm mb-2">事實發現</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.observations)}</div>
+                  </div>
+                )}
+                {slide.section.insights && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-amber-400">
+                    <h3 className="text-amber-300 font-semibold text-sm mb-2">獨特亮光</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.insights)}</div>
+                  </div>
+                )}
+                {slide.section.applications && (
+                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-blue-400">
+                    <h3 className="text-blue-300 font-semibold text-sm mb-2">如何應用</h3>
+                    <div className="text-white/90">{formatSlideContent(slide.section.applications)}</div>
+                  </div>
+                )}
+              </div>
+              {slide.section.contributions && (
+                <div className="mt-3 sm:mt-4 bg-white/5 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-purple-400">
+                  <h3 className="text-purple-300 font-semibold text-sm mb-2">個人貢獻摘要</h3>
+                  <div className="text-white/80 text-sm">{formatSlideContent(slide.section.contributions)}</div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-center gap-4 pb-4">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setCurrentSlide(prev => Math.max(prev - 1, 0))}
+            disabled={currentSlide === 0}
+            className="text-white/70 hover:text-white disabled:opacity-30"
+            data-testid="button-prev-slide"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
+          <div className="flex gap-1.5">
+            {presentationSlides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentSlide(i)}
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all",
+                  i === currentSlide ? "bg-white w-6" : "bg-white/30"
+                )}
+                data-testid={`button-slide-dot-${i}`}
+              />
+            ))}
+          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setCurrentSlide(prev => Math.min(prev + 1, presentationSlides.length - 1))}
+            disabled={currentSlide === presentationSlides.length - 1}
+            className="text-white/70 hover:text-white disabled:opacity-30"
+            data-testid="button-next-slide"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </Button>
+        </div>
+        <p className="text-center text-white/30 text-xs pb-3">使用方向鍵或點擊導航 · ESC 退出</p>
+      </div>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] sm:max-h-[90vh] h-[100dvh] sm:h-auto p-0 flex flex-col">
@@ -306,7 +465,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                 <FileDown className="w-4 h-4 mr-2" />
                 全部報告 (PDF)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDownloadPPT}>
+              <DropdownMenuItem onClick={handlePresentationMode}>
                 <Presentation className="w-4 h-4 mr-2" />
                 簡報模式 (PPT)
               </DropdownMenuItem>
