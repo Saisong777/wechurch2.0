@@ -130,7 +130,7 @@ export const useRealtimeSecure = ({
 
           if (userId && p.id === userId) {
             onCurrentUserRefetchedRef.current?.(user);
-            if (user.groupNumber && sessionRef.current?.status === 'verification') {
+            if (user.groupNumber && (sessionRef.current?.status === 'grouping' || sessionRef.current?.status === 'verification')) {
               onGroupingDetectedRef.current?.();
             }
           }

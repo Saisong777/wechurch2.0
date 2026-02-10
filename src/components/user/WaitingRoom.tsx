@@ -43,6 +43,10 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
       if (sessionUpdate.status && currentSession) {
         setCurrentSession({ ...currentSession, ...sessionUpdate } as any);
       }
+      if (sessionUpdate.status === 'grouping') {
+        console.log('[WaitingRoom] Session status changed to grouping, triggering transition');
+        onGroupingStarted();
+      }
       if (sessionUpdate.status === 'completed' && onSessionEnded) {
         onSessionEnded();
       }

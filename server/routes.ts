@@ -310,7 +310,9 @@ export async function registerRoutes(app: Express) {
       let participants: any[] | null = null;
       let submissions: any[] | null = null;
 
-      if (phase !== 'waiting') {
+      const effectivePhase = (phase === 'waiting' && session.status !== 'waiting') ? 'grouping' : phase;
+
+      if (effectivePhase !== 'waiting') {
         participants = await storage.getParticipants(sessionId, groupNumber ? { groupNumber } : undefined);
       }
 
