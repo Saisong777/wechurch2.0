@@ -261,7 +261,7 @@ export function DevotionalNoteDialog({
               <div className="space-y-1.5">
                 <Label htmlFor="dn-titlePhrase" className="flex items-center gap-1.5 text-xs font-medium">
                   <Film className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                  1. 定標題
+                  1. 標題分段
                   {form.titlePhrase && <Check className="w-3 h-3 text-green-500" />}
                 </Label>
                 <Input
@@ -277,7 +277,7 @@ export function DevotionalNoteDialog({
               <div className="space-y-1.5">
                 <Label htmlFor="dn-heartbeatVerse" className="flex items-center gap-1.5 text-xs font-medium">
                   <Heart className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                  2. 心跳的時刻
+                  2. 最感動的經文
                   {form.heartbeatVerse && <Check className="w-3 h-3 text-green-500" />}
                 </Label>
                 <AutoResizeTextarea
@@ -294,7 +294,7 @@ export function DevotionalNoteDialog({
               <div className="space-y-1.5">
                 <Label htmlFor="dn-observation" className="flex items-center gap-1.5 text-xs font-medium">
                   <Eye className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                  3. 查看聖經的資訊
+                  3. 經文上的資訊
                   {form.observation && <Check className="w-3 h-3 text-green-500" />}
                 </Label>
                 <AutoResizeTextarea
@@ -382,7 +382,7 @@ export function DevotionalNoteDialog({
               <div className="space-y-1.5">
                 <Label htmlFor="dn-scholarsNote" className="flex items-center gap-1.5 text-xs font-medium">
                   <BookOpen className="w-3.5 h-3.5 text-yellow-600 shrink-0" />
-                  5. 學長姐的話
+                  5. 注釋書或其他的參考資料
                   {form.scholarsNote && <Check className="w-3 h-3 text-green-500" />}
                 </Label>
                 <AutoResizeTextarea
@@ -406,7 +406,7 @@ export function DevotionalNoteDialog({
               <div className="space-y-1.5">
                 <Label htmlFor="dn-actionPlan" className="flex items-center gap-1.5 text-xs font-medium">
                   <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  6. 我決定要這樣做
+                  6. 與神同行的行動
                   {form.actionPlan && <Check className="w-3 h-3 text-green-500" />}
                 </Label>
                 <AutoResizeTextarea
@@ -423,7 +423,7 @@ export function DevotionalNoteDialog({
               <div className="space-y-1.5">
                 <Label htmlFor="dn-coolDownNote" className="flex items-center gap-1.5 text-xs font-medium">
                   <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  7. 自由發揮
+                  7. 其他
                   {form.coolDownNote && <Check className="w-3 h-3 text-green-500" />}
                 </Label>
                 <AutoResizeTextarea

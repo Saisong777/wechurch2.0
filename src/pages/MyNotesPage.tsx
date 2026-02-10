@@ -145,7 +145,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               <div className="flex gap-2">
                 <BookMarked className="w-4 h-4 text-green-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">1. 定標題</p>
+                  <p className="text-sm font-medium mb-1">1. 標題分段</p>
                   <p className="text-sm text-muted-foreground">{note.titlePhrase}</p>
                 </div>
               </div>
@@ -155,7 +155,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               <div className="flex gap-2">
                 <Heart className="w-4 h-4 text-red-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">2. 心跳的時刻</p>
+                  <p className="text-sm font-medium mb-1">2. 最感動的經文</p>
                   <p className="text-sm text-muted-foreground">{note.heartbeatVerse}</p>
                 </div>
               </div>
@@ -165,7 +165,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               <div className="flex gap-2">
                 <Eye className="w-4 h-4 text-blue-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">3. 查看聖經的資訊</p>
+                  <p className="text-sm font-medium mb-1">3. 經文上的資訊</p>
                   <p className="text-sm text-muted-foreground">{note.observation}</p>
                 </div>
               </div>
@@ -192,7 +192,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               <div className="flex gap-2">
                 <MessageCircle className="w-4 h-4 text-purple-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">5. 學長姐的話</p>
+                  <p className="text-sm font-medium mb-1">5. 注釋書或其他的參考資料</p>
                   <p className="text-sm text-muted-foreground">{note.scholarsNote}</p>
                 </div>
               </div>
@@ -202,7 +202,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               <div className="flex gap-2">
                 <Target className="w-4 h-4 text-teal-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">6. 帶一招</p>
+                  <p className="text-sm font-medium mb-1">6. 與神同行的行動</p>
                   <p className="text-sm text-muted-foreground">{note.actionPlan}</p>
                 </div>
               </div>
@@ -212,7 +212,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               <div className="flex gap-2">
                 <Heart className="w-4 h-4 text-indigo-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">7. 安靜的心</p>
+                  <p className="text-sm font-medium mb-1">7. 其他</p>
                   <p className="text-sm text-muted-foreground">{note.coolDownNote}</p>
                 </div>
               </div>
@@ -339,13 +339,13 @@ const StudyNoteEditDialog = ({ entry, userEmail, open, onOpenChange }: { entry: 
   };
 
   const fields = [
-    { key: 'titlePhrase' as const, label: '1. 定標題', icon: <BookMarked className="w-4 h-4 text-green-500" /> },
-    { key: 'heartbeatVerse' as const, label: '2. 心跳的時刻', icon: <Heart className="w-4 h-4 text-red-500" /> },
-    { key: 'observation' as const, label: '3. 查看聖經的資訊', icon: <Eye className="w-4 h-4 text-blue-500" /> },
-    { key: 'coreInsightNote' as const, label: '4. 核心訓練筆記', icon: <Dumbbell className="w-4 h-4 text-orange-500" /> },
-    { key: 'scholarsNote' as const, label: '5. 學長姐的話', icon: <MessageCircle className="w-4 h-4 text-purple-500" /> },
-    { key: 'actionPlan' as const, label: '6. 帶一招', icon: <Target className="w-4 h-4 text-teal-500" /> },
-    { key: 'coolDownNote' as const, label: '7. 安靜的心', icon: <Heart className="w-4 h-4 text-indigo-500" /> },
+    { key: 'titlePhrase' as const, label: '1. 標題分段', icon: <BookMarked className="w-4 h-4 text-green-500" /> },
+    { key: 'heartbeatVerse' as const, label: '2. 最感動的經文', icon: <Heart className="w-4 h-4 text-red-500" /> },
+    { key: 'observation' as const, label: '3. 經文上的資訊', icon: <Eye className="w-4 h-4 text-blue-500" /> },
+    { key: 'coreInsightNote' as const, label: '4. 思想神的話', icon: <Dumbbell className="w-4 h-4 text-orange-500" /> },
+    { key: 'scholarsNote' as const, label: '5. 注釋書或其他的參考資料', icon: <MessageCircle className="w-4 h-4 text-purple-500" /> },
+    { key: 'actionPlan' as const, label: '6. 與神同行的行動', icon: <Target className="w-4 h-4 text-teal-500" /> },
+    { key: 'coolDownNote' as const, label: '7. 其他', icon: <Heart className="w-4 h-4 text-indigo-500" /> },
   ];
 
   return (
@@ -590,16 +590,16 @@ const formatDevotionalNoteMarkdown = (note: DevotionalNote): string => {
   const date = format(new Date(note.updatedAt), 'yyyy-MM-dd', { locale: zhTW });
   const lines: string[] = [];
   lines.push(`## ${note.verseReference} (${date})`);
-  if (note.titlePhrase) lines.push(`**1. 定標題:** ${note.titlePhrase}`);
-  if (note.heartbeatVerse) lines.push(`**2. 心跳的時刻:** ${note.heartbeatVerse}`);
-  if (note.observation) lines.push(`**3. 查看聖經的資訊:** ${note.observation}`);
+  if (note.titlePhrase) lines.push(`**1. 標題分段:** ${note.titlePhrase}`);
+  if (note.heartbeatVerse) lines.push(`**2. 最感動的經文:** ${note.heartbeatVerse}`);
+  if (note.observation) lines.push(`**3. 經文上的資訊:** ${note.observation}`);
   if (note.coreInsightNote) {
     const catInfo = getCategoryInfo(note.coreInsightCategory);
     lines.push(`**4. 思想神的話${catInfo ? ` (${catInfo.label})` : ''}:** ${note.coreInsightNote}`);
   }
-  if (note.scholarsNote) lines.push(`**5. 學長姐的話:** ${note.scholarsNote}`);
-  if (note.actionPlan) lines.push(`**6. 帶一招:** ${note.actionPlan}`);
-  if (note.coolDownNote) lines.push(`**7. 安靜的心:** ${note.coolDownNote}`);
+  if (note.scholarsNote) lines.push(`**5. 注釋書或其他的參考資料:** ${note.scholarsNote}`);
+  if (note.actionPlan) lines.push(`**6. 與神同行的行動:** ${note.actionPlan}`);
+  if (note.coolDownNote) lines.push(`**7. 其他:** ${note.coolDownNote}`);
   return lines.join('\n\n');
 };
 
@@ -607,13 +607,13 @@ const formatStudyNoteMarkdown = (entry: NotebookEntry): string => {
   const date = format(new Date(entry.session_date), 'yyyy-MM-dd', { locale: zhTW });
   const lines: string[] = [];
   lines.push(`## ${entry.verse_reference} - Soul Gym (${date})`);
-  if (entry.title_phrase) lines.push(`**定標題:** ${entry.title_phrase}`);
-  if (entry.heartbeat_verse) lines.push(`**心動經文:** ${entry.heartbeat_verse}`);
-  if (entry.observation) lines.push(`**觀察:** ${entry.observation}`);
-  if (entry.core_insight_note) lines.push(`**核心訓練:** ${entry.core_insight_note}`);
-  if (entry.scholars_note) lines.push(`**學者分享:** ${entry.scholars_note}`);
-  if (entry.action_plan) lines.push(`**行動計劃:** ${entry.action_plan}`);
-  if (entry.cool_down_note) lines.push(`**緩和心得:** ${entry.cool_down_note}`);
+  if (entry.title_phrase) lines.push(`**1. 標題分段:** ${entry.title_phrase}`);
+  if (entry.heartbeat_verse) lines.push(`**2. 最感動的經文:** ${entry.heartbeat_verse}`);
+  if (entry.observation) lines.push(`**3. 經文上的資訊:** ${entry.observation}`);
+  if (entry.core_insight_note) lines.push(`**4. 思想神的話:** ${entry.core_insight_note}`);
+  if (entry.scholars_note) lines.push(`**5. 注釋書或其他的參考資料:** ${entry.scholars_note}`);
+  if (entry.action_plan) lines.push(`**6. 與神同行的行動:** ${entry.action_plan}`);
+  if (entry.cool_down_note) lines.push(`**7. 其他:** ${entry.cool_down_note}`);
   return lines.join('\n\n');
 };
 

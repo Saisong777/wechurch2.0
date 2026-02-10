@@ -13,13 +13,13 @@ interface StudyFormProps {
 }
 
 const formFields = [
-  { id: 'theme', label: '主題 Theme', icon: BookOpen, placeholder: '這段經文的主題是什麼？' },
-  { id: 'movingVerse', label: '最感動的經文 Most Moving Verse', icon: Heart, placeholder: '哪一節經文最觸動您？' },
-  { id: 'factsDiscovered', label: '發現的事實 Facts Discovered', icon: Sparkles, placeholder: '您從經文中發現了什麼事實？' },
-  { id: 'traditionalExegesis', label: '傳統解經 Traditional Exegesis', icon: BookOpen, placeholder: '傳統上如何解釋這段經文？' },
-  { id: 'inspirationFromGod', label: '神的啟示 Inspiration from God', icon: Lightbulb, placeholder: '神透過這段經文對您說什麼？' },
-  { id: 'applicationInLife', label: '生活應用 Application in Life', icon: CheckCircle, placeholder: '您如何將這段經文應用在生活中？' },
-  { id: 'others', label: '其他 Others', icon: Sparkles, placeholder: '其他想法或問題' },
+  { id: 'theme', label: '1. 標題分段', icon: BookOpen, placeholder: '這段經文的主題是什麼？' },
+  { id: 'movingVerse', label: '2. 最感動的經文', icon: Heart, placeholder: '哪一節經文最觸動您？' },
+  { id: 'factsDiscovered', label: '3. 經文上的資訊', icon: Sparkles, placeholder: '您從經文中發現了什麼事實？' },
+  { id: 'traditionalExegesis', label: '4. 思想神的話', icon: Lightbulb, placeholder: '從這段經文中，有什麼應許、命令、警戒、或對神的認識？' },
+  { id: 'inspirationFromGod', label: '5. 注釋書或其他的參考資料', icon: BookOpen, placeholder: '查看相關注釋書或參考資料' },
+  { id: 'applicationInLife', label: '6. 與神同行的行動', icon: CheckCircle, placeholder: '具體的行動計畫' },
+  { id: 'others', label: '7. 其他', icon: Sparkles, placeholder: '其他想法或問題' },
 ];
 
 const DRAFT_STORAGE_KEY = 'bible_study_draft';

@@ -342,9 +342,9 @@ export const HistoryBrowser: React.FC = () => {
     content += `【個人筆記】\n${'─'.repeat(25)}\n\n`;
     session.responses.forEach((response) => {
       content += `【${response.participantName}】${response.groupNumber ? ` (第 ${response.groupNumber} 組)` : ''}\n`;
-      if (response.titlePhrase) content += `📌 1. 定標題：${response.titlePhrase}\n`;
-      if (response.heartbeatVerse) content += `💓 2. 心跳的時刻：${response.heartbeatVerse}\n`;
-      if (response.observation) content += `👁 3. 查看聖經的資訊：${response.observation}\n`;
+      if (response.titlePhrase) content += `📌 1. 標題分段：${response.titlePhrase}\n`;
+      if (response.heartbeatVerse) content += `💓 2. 最感動的經文：${response.heartbeatVerse}\n`;
+      if (response.observation) content += `👁 3. 經文上的資訊：${response.observation}\n`;
       if (response.coreInsightNote) {
         const cats = parseCategories(response.coreInsightCategory as any);
         const notes = parseNotes(response.coreInsightNote as any, cats);
@@ -360,9 +360,9 @@ export const HistoryBrowser: React.FC = () => {
           content += `💪 4. 思想神的話：${typeof response.coreInsightNote === 'string' ? response.coreInsightNote : ''}\n`;
         }
       }
-      if (response.scholarsNote) content += `📖 5. 學長姐的話：${response.scholarsNote}\n`;
-      if (response.actionPlan) content += `🎯 6. 我決定要這樣做：${response.actionPlan}\n`;
-      if (response.coolDownNote) content += `💬 7. 自由發揮：${response.coolDownNote}\n`;
+      if (response.scholarsNote) content += `📖 5. 注釋書或其他的參考資料：${response.scholarsNote}\n`;
+      if (response.actionPlan) content += `🎯 6. 與神同行的行動：${response.actionPlan}\n`;
+      if (response.coolDownNote) content += `💬 7. 其他：${response.coolDownNote}\n`;
       content += '\n';
     });
 
@@ -1026,19 +1026,19 @@ const ResponseCard: React.FC<{
         {response.titlePhrase && (
           <div className="flex items-start gap-2">
             <Sparkles className="w-3.5 h-3.5 mt-0.5 text-accent flex-shrink-0" />
-            <span><strong>定標題：</strong>{response.titlePhrase}</span>
+            <span><strong>標題分段：</strong>{response.titlePhrase}</span>
           </div>
         )}
         {response.heartbeatVerse && (
           <div className="flex items-start gap-2">
             <Heart className="w-3.5 h-3.5 mt-0.5 text-accent flex-shrink-0" />
-            <span><strong>抓心跳：</strong>{response.heartbeatVerse}</span>
+            <span><strong>最感動的經文：</strong>{response.heartbeatVerse}</span>
           </div>
         )}
         {response.observation && (
           <div className="flex items-start gap-2">
             <Eye className="w-3.5 h-3.5 mt-0.5 text-accent flex-shrink-0" />
-            <span><strong>看現場：</strong>{response.observation}</span>
+            <span><strong>經文上的資訊：</strong>{response.observation}</span>
           </div>
         )}
         {response.coreInsightNote && parsedCats.length > 0 ? (
@@ -1050,7 +1050,7 @@ const ResponseCard: React.FC<{
               <div key={catVal} className="flex items-start gap-2">
                 <Dumbbell className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />
                 <span>
-                  <strong>練核心 ({cat?.label || catVal})：</strong>
+                  <strong>思想神的話 ({cat?.label || catVal})：</strong>
                   {noteText}
                 </span>
               </div>
@@ -1060,7 +1060,7 @@ const ResponseCard: React.FC<{
           <div className="flex items-start gap-2">
             <Dumbbell className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />
             <span>
-              <strong>練核心：</strong>
+              <strong>思想神的話：</strong>
               {typeof response.coreInsightNote === 'string' ? response.coreInsightNote : ''}
             </span>
           </div>
@@ -1068,19 +1068,19 @@ const ResponseCard: React.FC<{
         {response.scholarsNote && (
           <div className="flex items-start gap-2">
             <BookOpen className="w-3.5 h-3.5 mt-0.5 text-secondary flex-shrink-0" />
-            <span><strong>學長姐的話：</strong>{response.scholarsNote}</span>
+            <span><strong>注釋書或其他的參考資料：</strong>{response.scholarsNote}</span>
           </div>
         )}
         {response.actionPlan && (
           <div className="flex items-start gap-2">
             <Target className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" />
-            <span><strong>帶一招：</strong>{response.actionPlan}</span>
+            <span><strong>與神同行的行動：</strong>{response.actionPlan}</span>
           </div>
         )}
         {response.coolDownNote && (
           <div className="flex items-start gap-2">
             <MessageCircle className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" />
-            <span><strong>自由發揮：</strong>{response.coolDownNote}</span>
+            <span><strong>其他：</strong>{response.coolDownNote}</span>
           </div>
         )}
       </CardContent>

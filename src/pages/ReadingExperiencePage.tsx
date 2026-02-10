@@ -766,7 +766,7 @@ const ReadingExperiencePage = () => {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dev-titlePhrase" className="text-xs sm:text-sm">
-                    1. 定標題
+                    1. 標題分段
                   </Label>
                   <Input
                     id="dev-titlePhrase"
@@ -779,13 +779,13 @@ const ReadingExperiencePage = () => {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dev-heartbeatVerse" className="text-xs sm:text-sm">
-                    2. 心跳的時刻
+                    2. 最感動的經文
                   </Label>
                   <AutoResizeTextarea
                     id="dev-heartbeatVerse"
                     value={devotionalForm.heartbeatVerse}
                     onChange={(e) => updateDevotionalField('heartbeatVerse', e.target.value)}
-                    placeholder="哪一節經文讓你心跳加速？"
+                    placeholder="哪一節經文最感動你？"
                     minRows={2}
                     data-testid="textarea-heartbeat-verse"
                   />
@@ -793,7 +793,7 @@ const ReadingExperiencePage = () => {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dev-observation" className="text-xs sm:text-sm">
-                    3. 查看聖經的資訊
+                    3. 經文上的資訊
                   </Label>
                   <AutoResizeTextarea
                     id="dev-observation"
@@ -842,7 +842,7 @@ const ReadingExperiencePage = () => {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dev-scholarsNote" className="text-xs sm:text-sm">
-                    5. 學長姐的話
+                    5. 注釋書或其他的參考資料
                   </Label>
                   <AutoResizeTextarea
                     id="dev-scholarsNote"
@@ -863,7 +863,7 @@ const ReadingExperiencePage = () => {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dev-actionPlan" className="text-xs sm:text-sm">
-                    6. 帶一招
+                    6. 與神同行的行動
                   </Label>
                   <AutoResizeTextarea
                     id="dev-actionPlan"
@@ -877,7 +877,7 @@ const ReadingExperiencePage = () => {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dev-coolDownNote" className="text-xs sm:text-sm">
-                    7. 安靜的心
+                    7. 其他
                   </Label>
                   <AutoResizeTextarea
                     id="dev-coolDownNote"
