@@ -108,3 +108,44 @@ export const HIGH_CONCURRENCY_CONFIG = {
   PRAYER_NOTIFICATION_FULL_POLL_MS: 60000, // 60 seconds (was 30s)
   FEATURE_TOGGLE_POLL_MS: 120000, // 2 minutes - toggles rarely change
 } as const;
+
+/**
+ * Mobile polling multiplier for adaptive intervals on mobile devices
+ * Polling intervals are increased by this factor on mobile to reduce battery drain
+ */
+export const MOBILE_POLLING_MULTIPLIER = 1.5;
+
+/**
+ * Detect if the device is a mobile device
+ * Checks user agent for mobile patterns and falls back to window width check
+ * Returns false on server-side (SSR environments)
+ */
+export function isMobileDevice(): boolean {
+  // Server-side check
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  // Check user agent for common mobile patterns
+  const mobilePatterns = /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i;
+  if (mobilePatterns.test(navigator.userAgent)) {
+    return true;
+  }
+
+  // Fallback: check viewport width (tablets and phones typically under 768px)
+  return window.innerWidth < 768;
+}
+
+/**
+ * Get adaptive polling interval based on device type
+ * Increases intervals on mobile devices to reduce battery drain
+ * Adds jitter to prevent thundering herd
+ * @param baseMs - Base polling interval in milliseconds
+ * @returns Adjusted polling interval with jitter in milliseconds
+ */
+export function getPollingInterval(baseMs: number): number {
+  const multiplier = isMobileDevice() ? MOBILE_POLLING_MULTIPLIER : 1;
+  const adjustedMs = baseMs * multiplier;
+  const jitter = Math.random() * 2000;
+  return adjustedMs + jitter;
+}

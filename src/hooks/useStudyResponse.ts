@@ -2,9 +2,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { StudyResponse, StudyResponseFormData, emptyFormData, parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
 import { toast } from 'sonner';
-import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
+import { HIGH_CONCURRENCY_CONFIG, getPollingInterval } from '@/lib/retry-utils';
 
-const POLLING_INTERVAL = HIGH_CONCURRENCY_CONFIG.STUDY_RESPONSE_POLL_MS;
+const POLLING_INTERVAL = getPollingInterval(HIGH_CONCURRENCY_CONFIG.STUDY_RESPONSE_POLL_MS);
 const DEBOUNCE_DELAY = HIGH_CONCURRENCY_CONFIG.SAVE_DEBOUNCE_MS;
 
 interface UseStudyResponseOptions {

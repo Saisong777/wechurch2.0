@@ -44,6 +44,11 @@ const uploadMessageCard = multer({
 });
 
 export async function registerRoutes(app: Express) {
+  app.use('/assets', express.static(path.join(process.cwd(), 'dist/public/assets'), {
+    maxAge: '30d',
+    immutable: true,
+  }));
+
   app.use(compression());
 
   const rateLimitMap = new Map<string, { count: number; resetTime: number }>();

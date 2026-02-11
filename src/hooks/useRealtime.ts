@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { User, Session, StudySubmission } from "@/types/bible-study";
-import { HIGH_CONCURRENCY_CONFIG } from "@/lib/retry-utils";
+import { HIGH_CONCURRENCY_CONFIG, getPollingInterval } from "@/lib/retry-utils";
 
 export type RealtimePhase = 'waiting' | 'grouping' | 'studying' | 'all';
 
@@ -149,7 +149,7 @@ export const useRealtime = ({
 
     pollData();
 
-    const interval = setInterval(pollData, HIGH_CONCURRENCY_CONFIG.HEARTBEAT_INTERVAL_MS);
+    const interval = setInterval(pollData, getPollingInterval(HIGH_CONCURRENCY_CONFIG.HEARTBEAT_INTERVAL_MS));
 
     return () => {
       clearInterval(interval);

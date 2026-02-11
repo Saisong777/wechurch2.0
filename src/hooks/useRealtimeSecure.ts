@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { User, Session, StudySubmission } from "@/types/bible-study";
-import { HIGH_CONCURRENCY_CONFIG } from "@/lib/retry-utils";
+import { HIGH_CONCURRENCY_CONFIG, getPollingInterval } from "@/lib/retry-utils";
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
@@ -217,9 +217,7 @@ export const useRealtimeSecure = ({
 
     pollData();
 
-    const baseInterval = HIGH_CONCURRENCY_CONFIG.HEARTBEAT_INTERVAL_MS;
-    const jitter = Math.random() * 2000;
-    const interval = setInterval(pollData, baseInterval + jitter);
+    const interval = setInterval(pollData, getPollingInterval(HIGH_CONCURRENCY_CONFIG.HEARTBEAT_INTERVAL_MS));
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {

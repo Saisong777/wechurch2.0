@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AppRole } from '@/hooks/useUserRole';
+import { getPollingInterval } from '@/lib/retry-utils';
 
 export interface PotentialMember {
   id: string;
@@ -129,7 +130,7 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
 
       return members;
     },
-    refetchInterval: 5000,
+    refetchInterval: getPollingInterval(8000),
   });
 
   const stats = useQuery({
@@ -190,7 +191,7 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
         newPotentialWeek,
       };
     },
-    refetchInterval: 5000,
+    refetchInterval: getPollingInterval(8000),
   });
 
   const updateRole = useMutation({

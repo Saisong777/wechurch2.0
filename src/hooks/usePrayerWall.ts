@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { HIGH_CONCURRENCY_CONFIG } from '@/lib/retry-utils';
+import { HIGH_CONCURRENCY_CONFIG, getPollingInterval } from '@/lib/retry-utils';
 
 export type PrayerCategory = 'thanksgiving' | 'supplication' | 'praise' | 'other';
 
@@ -59,7 +59,7 @@ export const usePrayerWall = () => {
       })) as Prayer[];
     },
     enabled: !!user,
-    refetchInterval: HIGH_CONCURRENCY_CONFIG.PRAYER_WALL_POLL_MS + Math.random() * 2000,
+    refetchInterval: getPollingInterval(HIGH_CONCURRENCY_CONFIG.PRAYER_WALL_POLL_MS),
     refetchOnWindowFocus: true,
   });
 };

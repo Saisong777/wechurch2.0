@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { StudyResponsePublic, ProgressStatus } from '@/types/spiritual-fitness';
+import { getPollingInterval } from '@/lib/retry-utils';
 
-const POLLING_INTERVAL = 3000;
+const POLLING_INTERVAL = getPollingInterval(5000);
 
 interface UseAdminStudyResponsesOptions {
   sessionId: string | undefined;
