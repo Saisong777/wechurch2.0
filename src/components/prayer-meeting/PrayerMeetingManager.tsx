@@ -589,7 +589,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
                       </Button>
                     </div>
                     {meeting?.shortCode && (
-                      <img src={getQRCodeUrl(meeting.shortCode)} alt="QR Code" className="w-24 h-24" />
+                      <img src={getQRCodeUrl(meeting.shortCode)} alt="QR Code" className="w-24 h-24" loading="lazy" />
                     )}
                   </div>
 

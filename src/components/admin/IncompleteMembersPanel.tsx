@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getPollingInterval } from '@/lib/retry-utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -82,7 +83,7 @@ export const IncompleteMembersPanel = () => {
 
       return members;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: getPollingInterval(30000),
   });
 
   // Send notification mutation using API

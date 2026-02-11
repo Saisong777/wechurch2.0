@@ -1086,7 +1086,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
                   {copiedCode ? '已複製' : '複製代碼'}
                 </Button>
               </div>
-              <img src={getQRCodeUrl(meeting.shortCode)} alt="QR Code" className="w-24 h-24" data-testid="img-qrcode" />
+              <img src={getQRCodeUrl(meeting.shortCode)} alt="QR Code" className="w-24 h-24" loading="lazy" data-testid="img-qrcode" />
             </div>
 
             <div

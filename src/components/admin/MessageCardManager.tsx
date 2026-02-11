@@ -474,7 +474,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                 {previewUrl ? (
                   <div className="space-y-2">
                     <div className="rounded-lg overflow-hidden bg-muted">
-                      <img src={previewUrl} alt="Preview" className="w-full h-auto" />
+                      <img src={previewUrl} alt="Preview" className="w-full h-auto" loading="lazy" />
                     </div>
                     <Button
                       variant="outline"
@@ -898,6 +898,7 @@ export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }
                       src={editPreviewUrl || getImageUrl(selectedCard.imagePath)} 
                       alt="Preview" 
                       className="w-full h-auto"
+                      loading="lazy"
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Button

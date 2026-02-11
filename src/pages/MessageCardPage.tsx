@@ -400,6 +400,7 @@ export const MessageCardPage: React.FC = () => {
                 src={imageUrl} 
                 alt={card?.title}
                 className="w-full h-full object-cover blur-sm opacity-70"
+                loading="lazy"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <Lock className="w-12 h-12 text-white/80" />
@@ -490,6 +491,7 @@ export const MessageCardPage: React.FC = () => {
                 src={imageUrl} 
                 alt={card?.title}
                 className="w-full h-auto"
+                loading="lazy"
               />
             </div>
           )}

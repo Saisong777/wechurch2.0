@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useCallback } from 'react';
+import { getPollingInterval } from '@/lib/retry-utils';
 
 export interface SessionAnalysis {
   id: string;
@@ -53,7 +54,7 @@ export function useSessionAnalysis({ sessionId, groupNumber, reportType, isParti
     refetchInterval: (query) => {
       const data = query.state.data;
       if (data && data.length > 0 && data[0].status === 'PENDING') {
-        return 3000;
+        return getPollingInterval(5000);
       }
       return false;
     },

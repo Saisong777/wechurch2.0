@@ -511,6 +511,7 @@ export const RandomGrouper = () => {
                     src={getQRCodeUrl(activity.shortCode)} 
                     alt="QR Code"
                     className="w-24 h-24 rounded-lg border bg-white"
+                    loading="lazy"
                   />
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <QrCode className="w-3 h-3" />

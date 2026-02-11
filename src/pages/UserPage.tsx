@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { getPollingInterval } from '@/lib/retry-utils';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { JoinForm } from '@/components/user/JoinForm';
@@ -339,7 +340,7 @@ export const UserPage: React.FC = () => {
       }
     };
 
-    const interval = setInterval(pollSessionStatus, 5000);
+    const interval = setInterval(pollSessionStatus, getPollingInterval(5000));
     return () => clearInterval(interval);
   }, [currentSession?.id, currentSession?.status, step]);
 
