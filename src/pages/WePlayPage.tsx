@@ -34,7 +34,7 @@ export const WePlayPage = () => {
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/15 mb-3">
               <Gamepad2 className="w-7 h-7 text-emerald-600" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">We Play</h1>
+            <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">實用小工具</h1>
             <p className="text-sm text-muted-foreground mt-1">互動遊戲與分組工具</p>
           </div>
 

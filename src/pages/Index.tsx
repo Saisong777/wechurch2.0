@@ -58,7 +58,7 @@ const featureConfig = [
   {
     id: 'live',
     featureKey: 'we_live',
-    title: 'We Live',
+    title: 'Soul Gym',
     subtitle: '靈魂健身房',
     icon: Dumbbell,
     href: '/user',
@@ -69,7 +69,7 @@ const featureConfig = [
   {
     id: 'learn',
     featureKey: 'we_learn',
-    title: 'We Learn',
+    title: '讀聖經',
     subtitle: '學習成長',
     icon: BookOpen,
     href: '/learn',
@@ -80,7 +80,7 @@ const featureConfig = [
   {
     id: 'play',
     featureKey: 'we_play',
-    title: 'We Play',
+    title: '實用小工具',
     subtitle: '互動遊戲',
     icon: Gamepad2,
     href: '/play',
@@ -91,7 +91,7 @@ const featureConfig = [
   {
     id: 'share',
     featureKey: 'we_share',
-    title: 'We Share',
+    title: '來禱告',
     subtitle: '分享代禱',
     icon: Share2,
     href: '/share',
@@ -179,10 +179,10 @@ const Index = () => {
           <nav className="hidden md:flex items-center gap-1" data-testid="nav-top-index">
             {[
               { id: 'home', label: '首頁', href: '/', icon: Home },
-              { id: 'live', label: '健身房', href: '/user', icon: Dumbbell },
-              { id: 'learn', label: '學習', href: '/learn', icon: BookOpen },
-              { id: 'play', label: 'We Play', href: '/play', icon: Gamepad2 },
-              { id: 'share', label: '分享', href: '/share', icon: Share2 },
+              { id: 'live', label: 'Soul Gym', href: '/user', icon: Dumbbell },
+              { id: 'learn', label: '讀聖經', href: '/learn', icon: BookOpen },
+              { id: 'play', label: '實用小工具', href: '/play', icon: Gamepad2 },
+              { id: 'share', label: '來禱告', href: '/share', icon: Share2 },
             ].map((item) => {
               const Icon = item.icon;
               const active = item.href === '/' ? location.pathname === '/' : location.pathname.startsWith(item.href);
@@ -413,7 +413,7 @@ const Index = () => {
             </div>
             <div className="flex items-center gap-1">
               <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
-                v1.0.0
+                v2.0.0版
               </span>
             </div>
           </div>

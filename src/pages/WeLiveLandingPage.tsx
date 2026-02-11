@@ -30,10 +30,10 @@ export const WeLiveLandingPage = () => {
     <FeatureGate
       featureKeys={["we_live"]}
       title="靈魂健身房維護中"
-      description="We Live 功能目前暫時關閉，請稍後再試"
+      description="Soul Gym 功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-        <Header title="We Live" subtitle="靈魂健身房" variant="compact" />
+        <Header title="Soul Gym" subtitle="靈魂健身房" variant="compact" />
         <div className="container mx-auto px-4 py-6 md:py-10">
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-6 md:mb-8">

@@ -162,7 +162,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               onChange={(e) => updateField('title_phrase', e.target.value)}
               onBlur={saveNow}
               placeholder="幫這段經文下一個標題"
-              className="text-sm sm:text-base h-10 sm:h-11"
+              className="text-base md:text-sm h-10 sm:h-11"
             />
           </div>
 
@@ -180,7 +180,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               placeholder="哪一句話讓你感動"
               minRows={2}
               maxRows={5}
-              className="text-sm sm:text-base"
+              className="text-base md:text-sm"
             />
           </div>
 
@@ -198,7 +198,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               placeholder="有什麼人事時地物或有趣的事"
               minRows={2}
               maxRows={5}
-              className="text-sm sm:text-base"
+              className="text-base md:text-sm"
             />
           </div>
         </CardContent>
@@ -260,7 +260,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
                       placeholder={`從這段經文中，${cat.label}是什麼？`}
                       minRows={2}
                       maxRows={6}
-                      className="text-sm sm:text-base"
+                      className="text-base md:text-sm"
                     />
                   </div>
                 ))}
@@ -289,7 +289,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               placeholder="注釋書或其他參考資料"
               minRows={3}
               maxRows={8}
-              className="text-sm sm:text-base"
+              className="text-base md:text-sm"
             />
           </div>
         </CardContent>
@@ -318,7 +318,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               placeholder="本週具體可以做的小練習"
               minRows={2}
               maxRows={5}
-              className="text-sm sm:text-base"
+              className="text-base md:text-sm"
             />
           </div>
 
@@ -336,7 +336,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
               placeholder="隨意發揮～"
               minRows={2}
               maxRows={5}
-              className="text-sm sm:text-base"
+              className="text-base md:text-sm"
             />
           </div>
         </CardContent>

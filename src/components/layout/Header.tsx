@@ -20,10 +20,10 @@ import { useUserRole } from '@/hooks/useUserRole';
 
 const navItems = [
   { id: 'home', label: '首頁', href: '/', icon: Home },
-  { id: 'live', label: '健身房', href: '/user', icon: Dumbbell },
-  { id: 'learn', label: '學習', href: '/learn', icon: BookOpen },
-  { id: 'play', label: 'We Play', href: '/play', icon: Gamepad2 },
-  { id: 'share', label: '分享', href: '/share', icon: Share2 },
+  { id: 'live', label: 'Soul Gym', href: '/user', icon: Dumbbell },
+  { id: 'learn', label: '讀聖經', href: '/learn', icon: BookOpen },
+  { id: 'play', label: '實用小工具', href: '/play', icon: Gamepad2 },
+  { id: 'share', label: '來禱告', href: '/share', icon: Share2 },
 ];
 
 interface HeaderProps {

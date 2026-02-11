@@ -53,10 +53,10 @@ const SharePage: React.FC = () => {
     <FeatureGate 
       featureKey="we_share" 
       title="分享功能維護中"
-      description="We Share 功能目前暫時關閉，請稍後再試"
+      description="來禱告功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background">
-        <Header title="We Share" subtitle="分享代禱" variant="compact" />
+        <Header title="來禱告" subtitle="分享代禱" variant="compact" />
         
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="max-w-2xl md:max-w-3xl mx-auto">

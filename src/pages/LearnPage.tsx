@@ -47,10 +47,10 @@ const LearnPage = () => {
     <FeatureGate 
       featureKey="we_learn" 
       title="學習功能維護中"
-      description="We Learn 功能目前暫時關閉，請稍後再試"
+      description="讀聖經功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background">
-        <Header title="We Learn" subtitle="學習成長" variant="compact" />
+        <Header title="讀聖經" subtitle="學習成長" variant="compact" />
         
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="max-w-3xl lg:max-w-4xl mx-auto">
