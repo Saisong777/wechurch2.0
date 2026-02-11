@@ -104,10 +104,11 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
   const generateCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
     if (!cardRef.current) return null;
     
+    let clone: HTMLElement | null = null;
     try {
       const html2canvas = (await import('html2canvas')).default;
       
-      const clone = cardRef.current.cloneNode(true) as HTMLElement;
+      clone = cardRef.current.cloneNode(true) as HTMLElement;
       clone.style.transform = 'none';
       clone.style.position = 'absolute';
       clone.style.left = '-9999px';
@@ -134,6 +135,9 @@ export const ScriptureCardCreator = ({ open, onOpenChange, verse }: ScriptureCar
       return canvas;
     } catch (err) {
       console.error('Canvas generation failed:', err);
+      if (clone && clone.parentNode) {
+        clone.parentNode.removeChild(clone);
+      }
       return null;
     }
   }, [cardRenderHeight]);

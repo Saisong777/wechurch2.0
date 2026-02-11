@@ -90,6 +90,10 @@ class SessionCache {
   private cache = new Map<string, SessionCacheEntry<any>>();
   private defaultTTL = 2000;
 
+  constructor() {
+    setInterval(() => this.cleanup(), 10000);
+  }
+
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
     if (!entry) return null;
@@ -117,6 +121,19 @@ class SessionCache {
 
   clear(): void {
     this.cache.clear();
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.expiresAt) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  getStats() {
+    return { size: this.cache.size };
   }
 }
 
