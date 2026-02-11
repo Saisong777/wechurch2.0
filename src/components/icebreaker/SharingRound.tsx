@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { getPollingInterval } from '@/lib/retry-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -100,7 +101,7 @@ export const SharingRound: React.FC<SharingRoundProps> = ({
       } catch (error) {
         console.error('[SharingRound] Poll error:', error);
       }
-    }, 5000);
+    }, getPollingInterval(5000));
 
     return () => clearInterval(pollInterval);
   }, [sharingState.gameId, sessionId, groupNumber, members.length, onComplete]);

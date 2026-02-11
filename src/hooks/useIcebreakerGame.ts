@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { withRetry, staggeredStart } from '@/lib/retry-utils';
+import { withRetry, staggeredStart, getPollingInterval } from '@/lib/retry-utils';
 
 type CardLevel = 'L1' | 'L2' | 'L3';
 type GameMode = 'standalone' | 'session';
@@ -112,7 +112,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
   useEffect(() => {
     if (!state.gameId || state.mode === 'standalone') return;
 
-    pollingRef.current = setInterval(pollGameState, 3000);
+    pollingRef.current = setInterval(pollGameState, getPollingInterval(5000));
 
     return () => {
       if (pollingRef.current) {

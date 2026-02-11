@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getPollingInterval } from '@/lib/retry-utils';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -79,13 +80,13 @@ export const RandomGrouper = () => {
   const { data: myActivitiesData, refetch: refetchMyActivities } = useQuery<{ activities: { activity: GroupingActivity; participants: GroupingParticipant[] }[] }>({
     queryKey: ['/api/grouping/my-activities'],
     enabled: isLeaderOrAbove,
-    refetchInterval: viewMode === 'host' ? 3000 : false,
+    refetchInterval: viewMode === 'host' ? getPollingInterval(5000) : false,
   });
 
   const { data: activityData, refetch: refetchActivity, error: activityError } = useQuery<{ activity: GroupingActivity; participants: GroupingParticipant[] }>({
     queryKey: [`/api/grouping/${currentActivityId}`],
     enabled: !!currentActivityId && viewMode === 'activity',
-    refetchInterval: 3000,
+    refetchInterval: getPollingInterval(5000),
     retry: false,
   });
 

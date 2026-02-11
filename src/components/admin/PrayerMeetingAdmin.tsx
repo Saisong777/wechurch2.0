@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getPollingInterval } from '@/lib/retry-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -134,7 +135,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       if (!res.ok) return [];
       return res.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: getPollingInterval(5000),
   });
 
   const { data: closedMeetings = [] } = useQuery<PrayerMeeting[]>({
@@ -155,7 +156,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       return res.json();
     },
     enabled: !!currentMeetingId && (step === 'manage' || step === 'presentation' || step === 'prayer-list'),
-    refetchInterval: step === 'manage' || step === 'presentation' ? 3000 : false,
+    refetchInterval: step === 'manage' || step === 'presentation' ? getPollingInterval(5000) : false,
   });
 
   const { data: participants = [], refetch: refetchParticipants } = useQuery<PrayerMeetingParticipant[]>({
@@ -166,7 +167,7 @@ export const PrayerMeetingAdmin = ({ onBack }: PrayerMeetingAdminProps) => {
       return res.json();
     },
     enabled: !!currentMeetingId && (step === 'manage' || step === 'presentation' || step === 'prayer-list'),
-    refetchInterval: step === 'manage' || step === 'presentation' ? 3000 : false,
+    refetchInterval: step === 'manage' || step === 'presentation' ? getPollingInterval(5000) : false,
   });
 
   const isGrouped = meeting?.status === 'grouped' || meeting?.status === 'praying' || meeting?.status === 'completed' || meeting?.status === 'closed';

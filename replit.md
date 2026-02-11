@@ -45,6 +45,14 @@ Preferred communication style: Simple, everyday language.
 - **Reading Reminder Simulation**: `ReadingReminderPopup` component (`src/components/reading/ReadingReminderPopup.tsx`) with `useReminderSimulation` hook. Provides a test popup with greeting, today's reading summary, TTS playback, and navigation to reading page. Test triggers on ReadingPlansPage for morning/noon/evening time slots.
 - **Notebook System**: Consolidated note management at `/learn/my-notes` (MyNotesPage) with 3 category tabs: 讀經計劃 (reading plan notes), 經文感動 (scripture insights), 共同查經 (group study). Features soft-delete via `hidden` boolean column on `devotional_notes` and `study_responses` tables (PATCH endpoints toggle visibility without data loss). Markdown export per category via Download button. Header avatar menu links to notebook. Soul Gym Notebook (`/user/notebook`, SoulGymNotebookPage) has 3 sub-tabs: 個人 (personal study responses via MyNotebook), 小組 (group-level AI reports + members' responses), 全體 (all-group session AI reports). Backend: `GET /api/notebook/sessions`, `GET /api/notebook/group-responses`, `PATCH /api/devotional-notes/:id/hidden`, `PATCH /api/notebook/:id/hidden`.
 
+### Mobile Performance Optimization
+- **Adaptive Polling**: `getPollingInterval()` in `retry-utils.ts` detects mobile devices via user agent and applies 1.5x polling multiplier to reduce battery/bandwidth usage. All polling hooks and components use this utility.
+- **Vite Build Splitting**: Manual chunks for vendor-react, vendor-ui, vendor-query, vendor-editor, vendor-utils, vendor-heavy enable independent browser caching of stable libraries.
+- **Static Asset Caching**: Express serves `/assets` with 30-day immutable cache headers (Vite content-hashed filenames).
+- **CSS Touch Optimizations**: Tap highlight removal, momentum scrolling, overscroll containment, reduced-motion respect.
+- **BiblePage Memoization**: `useMemo` for book filtering and savedVersesMap, `useCallback` for handlers to prevent unnecessary re-renders.
+- **Visibility-Aware Polling**: `useVisibilityPolling` hook pauses polling when tab is hidden.
+
 ### High-Concurrency Design
 - Optimized for 500+ concurrent users with staggered requests, exponential backoff, extended polling, debounced auto-save, and non-blocking operations.
 - **Merged Poll Endpoint**: `GET /api/sessions/:id/poll` combines session + participants + submissions into a single HTTP request, reducing per-poll requests from 3 to 1. Supports `phase`, `groupNumber`, and `v` (version hash) query params.

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
@@ -176,39 +176,38 @@ const BiblePage = () => {
     },
   });
 
-  const oldTestamentBooks = books.filter(b => b.bookNumber <= 39);
-  const newTestamentBooks = books.filter(b => b.bookNumber > 39);
+  const oldTestamentBooks = useMemo(() => books.filter(b => b.bookNumber <= 39), [books]);
+  const newTestamentBooks = useMemo(() => books.filter(b => b.bookNumber > 39), [books]);
 
-  const isVerseSaved = (verse: BibleVerse) => {
-    return savedVerses.some(sv => 
-      sv.bookName === verse.bookName && 
-      sv.chapter === verse.chapter && 
-      sv.verseStart === verse.verse
-    );
-  };
+  const savedVersesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    savedVerses.forEach(sv => {
+      map.set(`${sv.bookName}:${sv.chapter}:${sv.verseStart}`, sv.id);
+    });
+    return map;
+  }, [savedVerses]);
 
-  const getSavedVerseId = (verse: BibleVerse) => {
-    const saved = savedVerses.find(sv => 
-      sv.bookName === verse.bookName && 
-      sv.chapter === verse.chapter && 
-      sv.verseStart === verse.verse
-    );
-    return saved?.id;
-  };
+  const isVerseSaved = useCallback((verse: BibleVerse) => {
+    return savedVersesMap.has(`${verse.bookName}:${verse.chapter}:${verse.verse}`);
+  }, [savedVersesMap]);
 
-  const handleSearch = () => {
+  const getSavedVerseId = useCallback((verse: BibleVerse) => {
+    return savedVersesMap.get(`${verse.bookName}:${verse.chapter}:${verse.verse}`);
+  }, [savedVersesMap]);
+
+  const handleSearch = useCallback(() => {
     if (searchQuery.length >= 2) {
       setIsSearching(true);
       setSelectedBook(null);
       setSelectedChapter(null);
     }
-  };
+  }, [searchQuery]);
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchQuery('');
     setIsSearching(false);
     setSearchExpanded(false);
-  };
+  }, []);
 
   const FONT_SIZE_CONFIG = [
     { label: '小', verse: 'text-sm sm:text-base', verseNum: 'text-xs sm:text-sm', paragraph: 'text-sm sm:text-base leading-relaxed', sup: 'text-[9px] sm:text-[10px]' },
@@ -225,12 +224,12 @@ const BiblePage = () => {
     try { localStorage.setItem('wechurch-bible-font-size', String(next)); } catch {}
   };
 
-  const getCurrentBookChapterCount = () => {
+  const getCurrentBookChapterCount = useCallback(() => {
     const currentBook = books.find(b => b.bookName === selectedBook);
     return currentBook?.chapterCount || chapters.length;
-  };
+  }, [books, selectedBook, chapters.length]);
 
-  const navigateChapter = (delta: number) => {
+  const navigateChapter = useCallback((delta: number) => {
     if (!selectedBook || !selectedChapter) return;
     const totalChapters = getCurrentBookChapterCount();
     const nextChapter = selectedChapter + delta;
@@ -253,9 +252,9 @@ const BiblePage = () => {
       setSelectedChapter(prevBook.chapterCount);
       setSelectedVerseNums(new Set());
     }
-  };
+  }, [selectedBook, selectedChapter, books, getCurrentBookChapterCount]);
 
-  const getChapterLabel = (delta: number): string | null => {
+  const getChapterLabel = useCallback((delta: number): string | null => {
     if (!selectedBook || !selectedChapter) return null;
     const totalChapters = getCurrentBookChapterCount();
     const nextChapter = selectedChapter + delta;
@@ -272,9 +271,9 @@ const BiblePage = () => {
       return `${prevBook.bookName} ${prevBook.chapterCount}章`;
     }
     return null;
-  };
+  }, [selectedBook, selectedChapter, books, getCurrentBookChapterCount]);
 
-  const toggleVerseSelection = (verseNum: number) => {
+  const toggleVerseSelection = useCallback((verseNum: number) => {
     setSelectedVerseNums(prev => {
       const newSet = new Set(prev);
       if (newSet.has(verseNum)) {
@@ -284,11 +283,11 @@ const BiblePage = () => {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const getSelectedVerses = () => {
+  const getSelectedVerses = useCallback(() => {
     return verses.filter(v => selectedVerseNums.has(v.verse)).sort((a, b) => a.verse - b.verse);
-  };
+  }, [verses, selectedVerseNums]);
 
   const copyVerse = async (verse: BibleVerse) => {
     const text = `${verse.bookName} ${verse.chapter}:${verse.verse}\n${verse.text}`;

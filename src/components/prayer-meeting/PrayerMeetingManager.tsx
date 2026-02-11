@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getPollingInterval } from '@/lib/retry-utils';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -103,7 +104,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
       return res.json();
     },
     enabled: !!currentMeetingId && (viewMode === 'host' || viewMode === 'meeting' || viewMode === 'praying' || viewMode === 'presentation'),
-    refetchInterval: 3000,
+    refetchInterval: getPollingInterval(5000),
     retry: false,
   });
 
@@ -115,7 +116,7 @@ export const PrayerMeetingManager = ({ initialCode }: PrayerMeetingManagerProps)
       return res.json();
     },
     enabled: !!currentMeetingId && (viewMode === 'meeting' || viewMode === 'praying' || viewMode === 'presentation' || viewMode === 'host'),
-    refetchInterval: 3000,
+    refetchInterval: getPollingInterval(5000),
   });
 
   const meeting = meetingData;
