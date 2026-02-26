@@ -24,7 +24,7 @@ const WePlayPage = lazy(() => import("./pages/WePlayPage").then(m => ({ default:
 const IcebreakerPage = lazy(() => import("./pages/IcebreakerPage").then(m => ({ default: m.IcebreakerPage })));
 const GrouperPage = lazy(() => import("./pages/GrouperPage").then(m => ({ default: m.GrouperPage })));
 const PrayerWallPage = lazy(() => import("./pages/PrayerWallPage"));
-const MessageCardPage = lazy(() => import("./pages/MessageCardPage"));
+
 const SharePage = lazy(() => import("./pages/SharePage"));
 const LearnPage = lazy(() => import("./pages/LearnPage"));
 const BiblePage = lazy(() => import("./pages/BiblePage").catch(() => ({ default: () => {
@@ -77,7 +77,6 @@ const App = () => (
                   <Route path="/icebreaker" element={<IcebreakerPage />} />
                   <Route path="/grouper" element={<GrouperPage />} />
                   <Route path="/prayer-wall" element={<PrayerWallPage />} />
-                  <Route path="/card" element={<MessageCardPage />} />
                   <Route path="/share" element={<SharePage />} />
                   <Route path="/learn" element={<LearnPage />} />
                   <Route path="/learn/bible" element={<BiblePage />} />
@@ -87,7 +86,6 @@ const App = () => (
                   <Route path="/learn/reading-plans" element={<ReadingPlansPage />} />
                   <Route path="/learn/reading-plans/:planId/read" element={<ReadingExperiencePage />} />
                   <Route path="/learn/my-notes" element={<MyNotesPage />} />
-                  <Route path="/cards" element={<MessageCardPage />} />
                   <Route path="/prayer-meeting" element={<PrayerMeetingPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

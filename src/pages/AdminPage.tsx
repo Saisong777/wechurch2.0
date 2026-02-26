@@ -9,20 +9,20 @@ import { AdminWaitingRoom } from '@/components/admin/AdminWaitingRoom';
 import { AdminMonitor } from '@/components/admin/AdminMonitor';
 import { HistoryBrowser } from '@/components/admin/HistoryBrowser';
 import { CardQuestionManager } from '@/components/admin/CardQuestionManager';
-import { MessageCardManager } from '@/components/admin/MessageCardManager';
+
 import { FeatureToggleManager } from '@/components/admin/FeatureToggleManager';
-import { QuickShareMessageCard } from '@/components/admin/QuickShareMessageCard';
+
 import { PrayerMeetingAdmin } from '@/components/admin/PrayerMeetingAdmin';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, ToggleLeft, Crown } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
-type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'create' | 'waiting' | 'monitor';
+type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'feature-toggles' | 'prayer-meeting' | 'create' | 'waiting' | 'monitor';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -160,15 +160,6 @@ export const AdminPage: React.FC = () => {
                   真心話題庫
                 </Button>
                 <Button 
-                  variant="outline" 
-                  size="default"
-                  onClick={() => setStep('message-cards')}
-                  className="gap-2 w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm"
-                >
-                  <Image className="w-5 h-5 sm:w-4 sm:h-4" />
-                  信息卡片
-                </Button>
-                <Button 
                   variant="default" 
                   size="default"
                   onClick={() => navigate('/admin/crm')}
@@ -199,11 +190,6 @@ export const AdminPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Share Message Card */}
-            <div className="mb-6">
-              <QuickShareMessageCard onManageCards={() => setStep('message-cards')} />
-            </div>
-
             <SessionHistory 
               onCreateNew={() => setStep('create')} 
               onSelectSession={handleSelectSession}
@@ -220,12 +206,6 @@ export const AdminPage: React.FC = () => {
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
             <CardQuestionManager />
-          </div>
-        );
-      case 'message-cards':
-        return (
-          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            <MessageCardManager onBack={handleBackToDashboard} />
           </div>
         );
       case 'feature-toggles':
