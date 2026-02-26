@@ -2,7 +2,7 @@
 
 ## Overview
 
-WeChurch is a comprehensive Christian community platform designed to foster community engagement through Bible study, prayer sharing, and small group interactions. It supports high-concurrency usage (500+ users) with real-time features like Bible study sessions, AI-powered study reports, interactive prayer walls, and icebreaker games. The project aims to provide a robust, scalable, and engaging platform for Christian communities.
+WeChurch is a comprehensive Christian community platform designed to foster community engagement through Bible study, prayer sharing, and small group interactions. It supports high-concurrency usage (500+ users) with real-time features like Bible study sessions, AI-powered study reports, interactive prayer walls, icebreaker games, and message card sharing. The project aims to provide a robust, scalable, and engaging platform for Christian communities.
 
 The platform is a full-stack TypeScript application, utilizing React for the frontend, Express.js for the backend, and PostgreSQL with Drizzle ORM for data persistence.
 
@@ -29,7 +29,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM for type-safe schema and migrations.
-- **Key Tables**: `users`, `sessions`, `participants`, `study_responses`, `ai_reports`, `prayers`, `icebreaker_games`, `grouping_activities`, `feature_toggles`, `user_reading_plans`, `password_reset_tokens`.
+- **Key Tables**: `users`, `sessions`, `participants`, `study_responses`, `ai_reports`, `prayers`, `icebreaker_games`, `grouping_activities`, `message_cards`, `feature_toggles`, `user_reading_plans`, `password_reset_tokens`.
 
 ### Core Features
 - **Prayer Wall**: Supports prayer sharing, categorization, anonymous posting, scripture references, and interactive features like 'Amen' and comments.

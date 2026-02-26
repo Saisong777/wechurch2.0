@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, ChevronRight, Sparkles } from 'lucide-react';
+import { Heart, ImageIcon, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
@@ -31,6 +31,18 @@ const shareFeatures = [
     color: 'from-purple-500 to-pink-600',
     bgColor: 'bg-purple-500/10',
     iconColor: 'text-purple-600',
+  },
+  {
+    id: 'card',
+    featureKey: 'message_cards',
+    title: '信息圖卡',
+    subtitle: 'Message Cards',
+    description: '下載本週信息摘要圖片',
+    icon: ImageIcon,
+    href: '/card',
+    color: 'from-violet-500 to-purple-600',
+    bgColor: 'bg-violet-500/10',
+    iconColor: 'text-violet-600',
   },
 ];
 

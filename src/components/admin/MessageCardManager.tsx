@@ -1,0 +1,958 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import { Plus, Upload, Trash2, QrCode, Download, Copy, Image, Loader2, Users, ChevronLeft, Pencil, RefreshCw, TrendingUp, Calendar, BarChart3 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { zhTW } from 'date-fns/locale';
+import { getMessageCardUrl } from '@/lib/storage-helpers';
+import { DownloadRecordsDialog } from './DownloadRecordsDialog';
+
+interface MessageCard {
+  id: string;
+  title: string;
+  shortCode: string;
+  imagePath: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface Download {
+  id: string;
+  cardId: string;
+  userName: string;
+  userEmail: string;
+  downloadedAt: string;
+}
+
+interface CardStats {
+  cardId: string;
+  cardTitle: string;
+  totalDownloads: number;
+  weeklyDownloads: number;
+  uniqueUsers: number;
+}
+
+interface MessageCardManagerProps {
+  onBack?: () => void;
+}
+
+export const MessageCardManager: React.FC<MessageCardManagerProps> = ({ onBack }) => {
+  const [cards, setCards] = useState<MessageCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [showDownloadsDialog, setShowDownloadsDialog] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<MessageCard | null>(null);
+  const [downloads, setDownloads] = useState<Download[]>([]);
+  const [downloadsLoading, setDownloadsLoading] = useState(false);
+  const [allDownloads, setAllDownloads] = useState<Download[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  
+  // Create form state
+  const [newTitle, setNewTitle] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // Edit form state
+  const [editTitle, setEditTitle] = useState('');
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editPreviewUrl, setEditPreviewUrl] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchCards();
+    fetchAllDownloads();
+  }, []);
+
+  const fetchAllDownloads = async () => {
+    setStatsLoading(true);
+    try {
+      const response = await fetch('/api/message-card-downloads');
+      if (!response.ok) throw new Error('Failed to fetch downloads');
+      const data = await response.json();
+      setAllDownloads(data || []);
+    } catch (err) {
+      console.error('Error fetching all downloads:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Calculate statistics including deleted cards
+  const calculateStats = (): { totalDownloads: number; weeklyDownloads: number; uniqueUsers: number; cardStats: CardStats[] } => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
+
+    const weeklyDownloads = allDownloads.filter(d => {
+      const downloadedAt = d.downloadedAt;
+      if (!downloadedAt) return false;
+      return isWithinInterval(new Date(downloadedAt), { start: weekStart, end: weekEnd });
+    }).length;
+
+    const uniqueEmails = new Set(allDownloads.filter(d => d.userEmail).map(d => d.userEmail.toLowerCase()));
+    
+    const cardStatsMap = new Map<string, { total: number; weekly: number; users: Set<string>; title: string }>();
+    
+    // First, initialize with existing cards
+    cards.forEach(card => {
+      cardStatsMap.set(card.id, { total: 0, weekly: 0, users: new Set(), title: card.title });
+    });
+    
+    // Then, process all downloads (including from deleted cards)
+    allDownloads.forEach(d => {
+      const cardId = d.cardId;
+      if (!cardId) return;
+      if (!cardStatsMap.has(cardId)) {
+        // This is a download from a deleted card
+        cardStatsMap.set(cardId, { total: 0, weekly: 0, users: new Set(), title: '（已刪除卡片）' });
+      }
+      const stats = cardStatsMap.get(cardId)!;
+      stats.total++;
+      if (d.userEmail) stats.users.add(d.userEmail.toLowerCase());
+      const downloadedAt = d.downloadedAt;
+      if (downloadedAt && isWithinInterval(new Date(downloadedAt), { start: weekStart, end: weekEnd })) {
+        stats.weekly++;
+      }
+    });
+
+    // Convert to array and include deleted card flag
+    const cardStats: CardStats[] = Array.from(cardStatsMap.entries())
+      .filter(([_, stats]) => stats.total > 0) // Only show cards with downloads
+      .map(([cardId, stats]) => ({
+        cardId,
+        cardTitle: stats.title,
+        totalDownloads: stats.total,
+        weeklyDownloads: stats.weekly,
+        uniqueUsers: stats.users.size,
+      }))
+      .sort((a, b) => b.totalDownloads - a.totalDownloads);
+
+    return {
+      totalDownloads: allDownloads.length,
+      weeklyDownloads,
+      uniqueUsers: uniqueEmails.size,
+      cardStats,
+    };
+  };
+
+  const stats = calculateStats();
+
+  const fetchCards = async () => {
+    try {
+      const response = await fetch('/api/message-cards/all');
+      if (!response.ok) throw new Error('Failed to fetch cards');
+      const data = await response.json();
+      setCards(data || []);
+    } catch (err) {
+      console.error('Error fetching cards:', err);
+      toast.error('載入失敗');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDownloads = async (cardId: string) => {
+    setDownloadsLoading(true);
+    try {
+      const response = await fetch(`/api/message-card-downloads/by-card/${cardId}`);
+      if (!response.ok) throw new Error('Failed to fetch downloads');
+      const data = await response.json();
+      setDownloads(data || []);
+    } catch (err) {
+      console.error('Error fetching downloads:', err);
+      toast.error('載入下載記錄失敗');
+    } finally {
+      setDownloadsLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('請選擇圖片檔案');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('圖片大小不能超過 10MB');
+      return;
+    }
+
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleCreate = async () => {
+    if (!newTitle.trim()) {
+      toast.error('請輸入標題');
+      return;
+    }
+
+    if (!selectedFile) {
+      toast.error('請選擇圖片');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Upload image to storage
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+      
+      const uploadResponse = await fetch('/api/message-cards/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) throw new Error('Failed to upload image');
+      const { imagePath } = await uploadResponse.json();
+
+      // Create database record
+      const createResponse = await fetch('/api/message-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newTitle.trim(),
+          imagePath,
+        }),
+      });
+
+      if (!createResponse.ok) throw new Error('Failed to create card');
+      const data = await createResponse.json();
+
+      toast.success('建立成功！');
+      setCards(prev => [data, ...prev]);
+      setShowCreateDialog(false);
+      
+      // Show QR code for new card
+      setSelectedCard(data);
+      setShowQRDialog(true);
+      
+      // Reset form
+      setNewTitle('');
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    } catch (err) {
+      console.error('Error creating card:', err);
+      toast.error('建立失敗');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (card: MessageCard) => {
+    try {
+      // Delete image from storage
+      await fetch(`/api/message-cards/image/${card.imagePath}`, { method: 'DELETE' });
+      
+      // Delete from database (downloads are preserved)
+      const response = await fetch(`/api/message-cards/${card.id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete card');
+
+      toast.success('已刪除（下載記錄已保留）');
+      setCards(prev => prev.filter(c => c.id !== card.id));
+      // Refresh downloads to show updated stats
+      fetchAllDownloads();
+    } catch (err) {
+      console.error('Error deleting card:', err);
+      toast.error('刪除失敗');
+    }
+  };
+
+  const handleOpenEdit = (card: MessageCard) => {
+    setSelectedCard(card);
+    setEditTitle(card.title);
+    setEditFile(null);
+    setEditPreviewUrl(null);
+    setShowEditDialog(true);
+  };
+
+  const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('請選擇圖片檔案');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('圖片大小不能超過 10MB');
+      return;
+    }
+
+    setEditFile(file);
+    setEditPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedCard) return;
+    
+    if (!editTitle.trim()) {
+      toast.error('請輸入標題');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      let newImagePath = selectedCard.imagePath;
+
+      // If new image selected, upload it
+      if (editFile) {
+        const formData = new FormData();
+        formData.append('image', editFile);
+        
+        const uploadResponse = await fetch('/api/message-cards/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) throw new Error('Failed to upload image');
+        const { imagePath } = await uploadResponse.json();
+
+        // Delete old image
+        await fetch(`/api/message-cards/image/${selectedCard.imagePath}`, { method: 'DELETE' });
+        
+        newImagePath = imagePath;
+      }
+
+      // Update database record
+      const updateResponse = await fetch(`/api/message-cards/${selectedCard.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          imagePath: newImagePath,
+        }),
+      });
+
+      if (!updateResponse.ok) throw new Error('Failed to update card');
+      const data = await updateResponse.json();
+
+      toast.success('更新成功！');
+      setCards(prev => prev.map(c => c.id === selectedCard.id ? data : c));
+      setShowEditDialog(false);
+      
+      // Reset form
+      setEditTitle('');
+      setEditFile(null);
+      setEditPreviewUrl(null);
+    } catch (err) {
+      console.error('Error updating card:', err);
+      toast.error('更新失敗');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const getDownloadUrl = (card: MessageCard) => {
+    return `${window.location.origin}/card?code=${card.shortCode}`;
+  };
+
+  const handleCopyLink = (card: MessageCard) => {
+    navigator.clipboard.writeText(getDownloadUrl(card));
+    toast.success('已複製連結');
+  };
+
+  const handleShowDownloads = (card: MessageCard) => {
+    setSelectedCard(card);
+    fetchDownloads(card.id);
+    setShowDownloadsDialog(true);
+  };
+
+  // Show downloads for a card (including deleted cards from stats)
+  const handleShowDownloadsById = (cardId: string, cardTitle: string) => {
+    // Create a minimal card object for the dialog
+    setSelectedCard({ id: cardId, title: cardTitle, shortCode: '', imagePath: '', isActive: false, createdAt: '' });
+    fetchDownloads(cardId);
+    setShowDownloadsDialog(true);
+  };
+
+  const handleToggleActive = async (card: MessageCard) => {
+    const newStatus = !card.isActive;
+    
+    try {
+      const response = await fetch(`/api/message-cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: newStatus }),
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle status');
+      const updatedCard = await response.json();
+
+      setCards(prev => prev.map(c => 
+        c.id === card.id ? updatedCard : c
+      ));
+      
+      toast.success(newStatus ? '已啟用' : '已停用');
+    } catch (err) {
+      console.error('Error toggling card status:', err);
+      toast.error('操作失敗');
+    }
+  };
+
+  // Use proxy URL to hide Supabase Storage URL from browser network tab
+  const getImageUrl = (imagePath: string) => getMessageCardUrl(imagePath, 'view');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+          )}
+          <div>
+            <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+              <Image className="w-5 h-5 sm:w-6 sm:h-6 text-secondary" />
+              信息摘要卡片
+            </h2>
+            <p className="text-sm text-muted-foreground">管理與分享週報圖片</p>
+          </div>
+        </div>
+        
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogTrigger asChild>
+            <Button variant="gold" className="gap-2">
+              <Plus className="w-4 h-4" />
+              新增卡片
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>新增信息卡片</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">標題</Label>
+                <Input
+                  id="title"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="例如：2024/01/28 主日信息"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>圖片</Label>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                />
+                {previewUrl ? (
+                  <div className="space-y-2">
+                    <div className="rounded-lg overflow-hidden bg-muted">
+                      <img src={previewUrl} alt="Preview" className="w-full h-auto" loading="lazy" />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      更換圖片
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full h-32 border-dashed"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-muted-foreground" />
+                      <span className="text-muted-foreground">點擊上傳圖片</span>
+                    </div>
+                  </Button>
+                )}
+              </div>
+
+              <Button
+                variant="gold"
+                className="w-full"
+                onClick={handleCreate}
+                disabled={uploading || !newTitle.trim() || !selectedFile}
+              >
+                {uploading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />上傳中...</>
+                ) : (
+                  '建立卡片'
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Download Statistics */}
+      {cards.length > 0 && (
+        <div className="space-y-4">
+          {/* Stats Summary Cards */}
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">總下載次數</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {statsLoading ? '...' : stats.totalDownloads}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-primary/10">
+                    <Download className="w-5 h-5 text-primary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-secondary/10 to-secondary/5">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">本週下載</p>
+                    <p className="text-2xl font-bold text-secondary">
+                      {statsLoading ? '...' : stats.weeklyDownloads}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-secondary/10">
+                    <Calendar className="w-5 h-5 text-secondary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-accent/10 to-accent/5">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">獨立用戶</p>
+                    <p className="text-2xl font-bold text-accent-foreground">
+                      {statsLoading ? '...' : stats.uniqueUsers}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-accent/10">
+                    <Users className="w-5 h-5 text-accent-foreground" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-muted to-muted/50">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">卡片數量</p>
+                    <p className="text-2xl font-bold">
+                      {cards.length}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-full bg-muted-foreground/10">
+                    <Image className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Per-Card Stats Table */}
+          {!statsLoading && stats.cardStats.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  各卡片下載統計
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>卡片名稱</TableHead>
+                        <TableHead className="text-right">總下載</TableHead>
+                        <TableHead className="text-right">本週</TableHead>
+                        <TableHead className="text-right">獨立用戶</TableHead>
+                        <TableHead className="w-16"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stats.cardStats.map((cardStat) => {
+                        const isDeleted = cardStat.cardTitle === '（已刪除卡片）';
+                        return (
+                          <TableRow key={cardStat.cardId} className={isDeleted ? 'opacity-60' : ''}>
+                            <TableCell className="font-medium max-w-[200px] truncate">
+                              <span className="flex items-center gap-2">
+                                {cardStat.cardTitle}
+                                {isDeleted && (
+                                  <Badge variant="outline" className="text-xs">已刪除</Badge>
+                                )}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {cardStat.totalDownloads}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              <span className={cardStat.weeklyDownloads > 0 ? 'text-secondary font-semibold' : 'text-muted-foreground'}>
+                                {cardStat.weeklyDownloads}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {cardStat.uniqueUsers}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2"
+                                onClick={() => handleShowDownloadsById(cardStat.cardId, cardStat.cardTitle)}
+                              >
+                                <Users className="w-3 h-3 mr-1" />
+                                記錄
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Cards List */}
+      {cards.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Image className="w-12 h-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground text-center">
+              尚未建立任何信息卡片
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setShowCreateDialog(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              新增第一張卡片
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card) => (
+            <Card key={card.id} className={`overflow-hidden ${!card.isActive ? 'opacity-60' : ''}`}>
+              <div className="aspect-video bg-muted relative">
+                <img
+                  src={getImageUrl(card.imagePath)}
+                  alt={card.title}
+                  className={`w-full h-full object-cover ${!card.isActive ? 'grayscale' : ''}`}
+                />
+                {!card.isActive && (
+                  <div className="absolute top-2 left-2">
+                    <Badge variant="outline" className="bg-background/80">
+                      已停用
+                    </Badge>
+                  </div>
+                )}
+              </div>
+              <CardHeader className="py-3 px-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-base truncate">{card.title}</CardTitle>
+                    <CardDescription className="text-xs">
+                      {format(new Date(card.createdAt), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={card.isActive}
+                      onCheckedChange={() => handleToggleActive(card)}
+                      aria-label={card.isActive ? '停用' : '啟用'}
+                    />
+                    <Badge variant={card.isActive ? "secondary" : "outline"} className="font-mono text-sm">
+                      {card.shortCode}
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 px-4 pb-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenEdit(card)}
+                  >
+                    <Pencil className="w-4 h-4 mr-1" />
+                    編輯
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCard(card);
+                      setShowQRDialog(true);
+                    }}
+                  >
+                    <QrCode className="w-4 h-4 mr-1" />
+                    QR
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyLink(card)}
+                  >
+                    <Copy className="w-4 h-4 mr-1" />
+                    連結
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleShowDownloads(card)}
+                  >
+                    <Users className="w-4 h-4 mr-1" />
+                    記錄
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>確定要刪除嗎？</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          此操作無法復原，圖片將會被永久刪除。下載記錄會保留以供日後查閱。
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => handleDelete(card)}
+                        >
+                          刪除
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* QR Code Dialog */}
+      <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">{selectedCard?.title}</DialogTitle>
+          </DialogHeader>
+          {selectedCard && (
+            <div className="flex flex-col items-center space-y-4">
+              <div className="bg-white p-4 rounded-xl">
+                <QRCodeSVG
+                  value={getDownloadUrl(selectedCard)}
+                  size={200}
+                  level="H"
+                />
+              </div>
+              
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-1">輸入代碼下載圖片</p>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-4xl font-mono font-bold tracking-widest text-primary">
+                    {selectedCard.shortCode}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedCard.shortCode);
+                      toast.success('已複製代碼');
+                    }}
+                    title="複製代碼"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex gap-2 w-full">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => handleCopyLink(selectedCard)}
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  複製連結
+                </Button>
+                <Button
+                  variant="gold"
+                  className="flex-1"
+                  onClick={() => {
+                    const svg = document.querySelector('#qr-download-svg');
+                    if (svg) {
+                      const svgData = new XMLSerializer().serializeToString(svg);
+                      const canvas = document.createElement('canvas');
+                      const ctx = canvas.getContext('2d');
+                      const img = new window.Image();
+                      img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx?.drawImage(img, 0, 0);
+                        const link = document.createElement('a');
+                        link.download = `qr-${selectedCard.shortCode}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                      };
+                      img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  下載 QR
+                </Button>
+              </div>
+
+              {/* Hidden SVG for download */}
+              <div className="hidden">
+                <QRCodeSVG
+                  id="qr-download-svg"
+                  value={getDownloadUrl(selectedCard)}
+                  size={400}
+                  level="H"
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>編輯信息卡片</DialogTitle>
+          </DialogHeader>
+          {selectedCard && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">標題</Label>
+                <Input
+                  id="edit-title"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="例如：2024/01/28 主日信息"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>圖片</Label>
+                <input
+                  type="file"
+                  ref={editFileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleEditFileSelect}
+                />
+                <div className="space-y-2">
+                  <div className="rounded-lg overflow-hidden bg-muted relative group">
+                    <img 
+                      src={editPreviewUrl || getImageUrl(selectedCard.imagePath)} 
+                      alt="Preview" 
+                      className="w-full h-auto"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => editFileInputRef.current?.click()}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        更換圖片
+                      </Button>
+                    </div>
+                  </div>
+                  {editFile && (
+                    <p className="text-xs text-muted-foreground">
+                      已選擇新圖片：{editFile.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowEditDialog(false)}
+                >
+                  取消
+                </Button>
+                <Button
+                  variant="gold"
+                  className="flex-1"
+                  onClick={handleUpdate}
+                  disabled={updating || !editTitle.trim()}
+                >
+                  {updating ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />更新中...</>
+                  ) : (
+                    '儲存變更'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Downloads Dialog */}
+      <DownloadRecordsDialog
+        open={showDownloadsDialog}
+        onOpenChange={setShowDownloadsDialog}
+        cardTitle={selectedCard?.title || ''}
+        downloads={downloads}
+        loading={downloadsLoading}
+      />
+    </div>
+  );
+};
