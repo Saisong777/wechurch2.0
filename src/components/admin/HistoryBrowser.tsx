@@ -35,6 +35,7 @@ import {
   ChevronRight,
   ChevronLeft,
   ChevronDown,
+  ChevronUp,
   BarChart3,
   Clock,
   CheckCircle2,
@@ -43,7 +44,12 @@ import {
   Copy,
   Trash2,
   Presentation,
-  X
+  X,
+  Pencil,
+  Church,
+  Save,
+  ChevronsUpDown,
+  Building2,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -76,6 +82,7 @@ interface SessionMetadata {
   status: string;
   createdAt: string;
   participantCount: number;
+  churchUnit: string | null;
 }
 
 interface SessionWithResponses extends SessionMetadata {
@@ -99,18 +106,26 @@ interface StudyResponseWithParticipant {
 }
 
 type TimeFilter = 'all' | 'this-month' | 'last-month' | 'older';
+type GroupByMode = 'month' | 'churchUnit';
 
 export const HistoryBrowser: React.FC = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterChurchUnit, setFilterChurchUnit] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const [groupByMode, setGroupByMode] = useState<GroupByMode>('month');
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'notes' | 'groups' | 'reports'>('notes');
   const [notesSearchTerm, setNotesSearchTerm] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [collapsedListGroups, setCollapsedListGroups] = useState<Record<string, boolean>>({});
   const [presentationMode, setPresentationMode] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [editingSession, setEditingSession] = useState<SessionMetadata | null>(null);
+  const [editVerseReference, setEditVerseReference] = useState('');
+  const [editChurchUnit, setEditChurchUnit] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const toggleGroup = (groupNum: string) => {
     setCollapsedGroups(prev => ({
@@ -132,6 +147,7 @@ export const HistoryBrowser: React.FC = () => {
         status: session.status,
         createdAt: session.createdAt,
         participantCount: session.participantCount || 0,
+        churchUnit: session.churchUnit || null,
       }));
     },
     enabled: !!user?.id,
@@ -269,14 +285,25 @@ export const HistoryBrowser: React.FC = () => {
     return (sessions || []).filter(session => {
       const matchesSearch = 
         session.verseReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.shortCode?.toLowerCase().includes(searchTerm.toLowerCase());
+        session.shortCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (session.churchUnit?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
 
       const matchesStatus = filterStatus === 'all' || session.status === filterStatus;
       const matchesTime = filterByTime(session);
+      const matchesChurchUnit = filterChurchUnit === 'all' || 
+        (filterChurchUnit === '__none__' ? !session.churchUnit : session.churchUnit === filterChurchUnit);
 
-      return matchesSearch && matchesStatus && matchesTime;
+      return matchesSearch && matchesStatus && matchesTime && matchesChurchUnit;
     });
-  }, [sessions, searchTerm, filterStatus, timeFilter]);
+  }, [sessions, searchTerm, filterStatus, filterChurchUnit, timeFilter]);
+
+  const uniqueChurchUnits = useMemo(() => {
+    const units = new Set<string>();
+    (sessions || []).forEach(s => {
+      if (s.churchUnit) units.add(s.churchUnit);
+    });
+    return Array.from(units).sort();
+  }, [sessions]);
 
   const groupedByMonth = useMemo(() => {
     const groups: Record<string, SessionMetadata[]> = {};
@@ -291,6 +318,40 @@ export const HistoryBrowser: React.FC = () => {
 
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filteredSessions]);
+
+  const groupedByChurchUnit = useMemo(() => {
+    const groups: Record<string, SessionMetadata[]> = {};
+    
+    filteredSessions.forEach(session => {
+      const key = session.churchUnit || '未分類';
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(session);
+    });
+
+    return Object.entries(groups).sort((a, b) => {
+      if (a[0] === '未分類') return 1;
+      if (b[0] === '未分類') return -1;
+      return a[0].localeCompare(b[0], 'zh-TW');
+    });
+  }, [filteredSessions]);
+
+  const displayGroups = groupByMode === 'month' ? groupedByMonth : groupedByChurchUnit;
+
+  const toggleListGroup = (key: string) => {
+    setCollapsedListGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const collapseAll = () => {
+    const allKeys: Record<string, boolean> = {};
+    displayGroups.forEach(([key]) => { allKeys[key] = true; });
+    setCollapsedListGroups(allKeys);
+  };
+
+  const expandAll = () => {
+    setCollapsedListGroups({});
+  };
 
   const stats = useMemo(() => {
     const allSessions = sessions || [];
@@ -329,6 +390,57 @@ export const HistoryBrowser: React.FC = () => {
     } catch (err) {
       console.error('Error deleting response:', err);
       toast.error('刪除失敗');
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm('確定要刪除此聚會嗎？所有相關的筆記和報告都會一併刪除，此操作無法復原。')) return;
+    
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('刪除失敗');
+      
+      toast.success('聚會已刪除');
+      queryClient.invalidateQueries({ queryKey: ['admin_history_sessions'] });
+    } catch (err) {
+      console.error('Error deleting session:', err);
+      toast.error('刪除失敗');
+    }
+  };
+
+  const handleEditSession = (session: SessionMetadata) => {
+    setEditingSession(session);
+    setEditVerseReference(session.verseReference);
+    setEditChurchUnit(session.churchUnit || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSession) return;
+    if (!editVerseReference.trim()) {
+      toast.error('經文不能為空');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/sessions/${editingSession.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          verseReference: editVerseReference.trim(),
+          churchUnit: editChurchUnit.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error('更新失敗');
+      
+      toast.success('已更新聚會資料');
+      setEditingSession(null);
+      queryClient.invalidateQueries({ queryKey: ['admin_history_sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['admin_history_detail', editingSession.id] });
+    } catch (err) {
+      console.error('Error updating session:', err);
+      toast.error('更新失敗');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -579,6 +691,12 @@ export const HistoryBrowser: React.FC = () => {
               <div>
                 <CardTitle className="text-xl">{selectedSession.verseReference}</CardTitle>
                 <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+                  {selectedSession.churchUnit && (
+                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                      <Building2 className="w-3.5 h-3.5" />
+                      {selectedSession.churchUnit}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
                     {format(new Date(selectedSession.createdAt), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
@@ -870,14 +988,15 @@ export const HistoryBrowser: React.FC = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="搜尋經文、參與者、內容..."
+            placeholder="搜尋經文、單位、代碼..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
+            data-testid="input-history-search"
           />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full sm:w-[140px]">
+          <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-filter-status">
             <Filter className="w-4 h-4 mr-2" />
             <SelectValue placeholder="狀態" />
           </SelectTrigger>
@@ -888,14 +1007,128 @@ export const HistoryBrowser: React.FC = () => {
             <SelectItem value="waiting">等待中</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterChurchUnit} onValueChange={setFilterChurchUnit}>
+          <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-filter-church-unit">
+            <Building2 className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="單位" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            <SelectItem value="all">全部單位</SelectItem>
+            {uniqueChurchUnits.map(unit => (
+              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+            ))}
+            <SelectItem value="__none__">未分類</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Results Count */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>找到 {filteredSessions.length} 場聚會</span>
+      {/* Group By Controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>找到 {filteredSessions.length} 場聚會</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border rounded-lg overflow-hidden">
+            <Button
+              variant={groupByMode === 'month' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => { setGroupByMode('month'); setCollapsedListGroups({}); }}
+              className="rounded-none gap-1.5 h-8"
+              data-testid="button-group-by-month"
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              月份
+            </Button>
+            <Button
+              variant={groupByMode === 'churchUnit' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => { setGroupByMode('churchUnit'); setCollapsedListGroups({}); }}
+              className="rounded-none gap-1.5 h-8"
+              data-testid="button-group-by-church"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              單位
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={collapseAll}
+            className="h-8 px-2"
+            title="全部收起"
+            data-testid="button-collapse-all"
+          >
+            <ChevronsUpDown className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Sessions List Grouped by Month */}
+      {/* Edit Session Dialog */}
+      {editingSession && (
+        <Card className="border-accent/50 bg-accent/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-accent" />
+                編輯聚會資料
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingSession(null)}
+                className="px-1.5"
+                data-testid="button-cancel-edit"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">訓練經文</label>
+              <Input
+                value={editVerseReference}
+                onChange={(e) => setEditVerseReference(e.target.value)}
+                placeholder="例如: 約翰福音 3:16"
+                className="text-base md:text-sm"
+                data-testid="input-edit-verse"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">課程單位</label>
+              <Input
+                value={editChurchUnit}
+                onChange={(e) => setEditChurchUnit(e.target.value)}
+                placeholder="例如: 台北靈糧堂"
+                className="text-base md:text-sm"
+                data-testid="input-edit-church-unit"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingSession(null)}
+                data-testid="button-cancel-edit-2"
+              >
+                取消
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveEdit}
+                disabled={isSaving}
+                className="gap-1.5"
+                data-testid="button-save-edit"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {isSaving ? '儲存中...' : '儲存'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sessions List */}
       {filteredSessions.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
@@ -909,33 +1142,52 @@ export const HistoryBrowser: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <ScrollArea className="h-[calc(100vh-520px)]">
-          <div className="space-y-6 pr-4">
-            {groupedByMonth.map(([monthKey, monthSessions]) => (
-              <div key={monthKey}>
-                {/* Month Header */}
-                <div className="flex items-center gap-2 mb-3 sticky top-0 bg-background/95 backdrop-blur py-2 z-10">
-                  <CalendarDays className="w-4 h-4 text-secondary" />
-                  <span className="font-medium">
-                    {format(new Date(monthKey + '-01'), 'yyyy 年 M 月', { locale: zhTW })}
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {monthSessions.length} 場
-                  </Badge>
-                </div>
+        <ScrollArea className="h-[calc(100vh-560px)]">
+          <div className="space-y-3 pr-4">
+            {displayGroups.map(([groupKey, groupSessions]) => {
+              const isCollapsed = !!collapsedListGroups[groupKey];
+              const groupLabel = groupByMode === 'month'
+                ? format(new Date(groupKey + '-01'), 'yyyy 年 M 月', { locale: zhTW })
+                : groupKey;
+              const GroupIcon = groupByMode === 'month' ? CalendarDays : Building2;
 
-                {/* Sessions Grid */}
-                <div className="grid gap-3">
-                  {monthSessions.map((session) => (
-                    <SessionCard
-                      key={session.id}
-                      session={session}
-                      onClick={() => setSelectedSessionId(session.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+              return (
+                <Collapsible
+                  key={groupKey}
+                  open={!isCollapsed}
+                  onOpenChange={() => toggleListGroup(groupKey)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded-lg px-2 py-2 sticky top-0 bg-background/95 backdrop-blur z-[100] transition-colors" data-testid={`trigger-group-${groupKey}`}>
+                      <GroupIcon className="w-4 h-4 text-secondary flex-shrink-0" />
+                      <span className="font-medium text-sm">{groupLabel}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {groupSessions.length} 場
+                      </Badge>
+                      <div className="flex-1" />
+                      {isCollapsed ? (
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="grid gap-3 pt-1">
+                      {groupSessions.map((session) => (
+                        <SessionCard
+                          key={session.id}
+                          session={session}
+                          onClick={() => setSelectedSessionId(session.id)}
+                          onEdit={() => handleEditSession(session)}
+                          onDelete={() => handleDeleteSession(session.id)}
+                        />
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </div>
         </ScrollArea>
       )}
@@ -946,16 +1198,19 @@ export const HistoryBrowser: React.FC = () => {
 const SessionCard: React.FC<{
   session: SessionMetadata;
   onClick: () => void;
-}> = ({ session, onClick }) => {
+  onEdit?: () => void;
+  onDelete?: () => void;
+}> = ({ session, onClick, onEdit, onDelete }) => {
   return (
     <Card 
       className="cursor-pointer hover:border-secondary/50 hover:shadow-md transition-all group"
       onClick={onClick}
+      data-testid={`card-session-${session.id}`}
     >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1">
               <span className="font-medium text-base truncate">{session.verseReference}</span>
               <Badge 
                 variant={session.status === 'completed' ? 'default' : 'secondary'}
@@ -968,6 +1223,12 @@ const SessionCard: React.FC<{
                 ) : '等待中'}
               </Badge>
             </div>
+            {session.churchUnit && (
+              <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mb-1.5">
+                <Building2 className="w-3 h-3" />
+                {session.churchUnit}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
@@ -979,7 +1240,37 @@ const SessionCard: React.FC<{
               </span>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-secondary transition-colors flex-shrink-0" />
+          <div className="flex flex-col items-center gap-1 flex-shrink-0">
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-accent px-1.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                data-testid={`button-edit-session-${session.id}`}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive px-1.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                data-testid={`button-delete-session-${session.id}`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-secondary transition-colors" />
+          </div>
         </div>
       </CardContent>
     </Card>
