@@ -897,118 +897,169 @@ export const HistoryBrowser: React.FC = () => {
 
   // List View
   return (
-    <div className="space-y-3">
-      {/* Header with inline stats */}
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-secondary" />
           <h2 className="text-lg font-semibold">歷史查經資料</h2>
         </div>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <FolderOpen className="w-3.5 h-3.5" />
-            共 <strong className="text-foreground">{stats.totalSessions}</strong> 場
-          </span>
-          <span className="hidden sm:flex items-center gap-1">
-            <CalendarDays className="w-3.5 h-3.5" />
-            本月 <strong className="text-foreground">{stats.thisMonthSessions}</strong> 場
-          </span>
-        </div>
       </div>
 
-      {/* Search + All Filters in One Row */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/20">
+                <FolderOpen className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.totalSessions}</p>
+                <p className="text-xs text-muted-foreground">總聚會數</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-secondary/10 to-secondary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-secondary/20">
+                <CalendarDays className="w-4 h-4 text-secondary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.thisMonthSessions}</p>
+                <p className="text-xs text-muted-foreground">本月聚會</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-accent/10 to-accent/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-accent/20">
+                <FileText className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">-</p>
+                <p className="text-xs text-muted-foreground">筆記總數</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/20">
+                <Brain className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">-</p>
+                <p className="text-xs text-muted-foreground">AI 報告</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Time Filter Tabs */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { value: 'all', label: '全部', icon: FolderOpen },
+          { value: 'this-month', label: '本月', icon: Calendar },
+          { value: 'last-month', label: '上月', icon: Clock },
+          { value: 'older', label: '更早', icon: CalendarDays },
+        ].map(({ value, label, icon: Icon }) => (
+          <Button
+            key={value}
+            variant={timeFilter === value ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setTimeFilter(value as TimeFilter)}
+            className="gap-1.5"
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="搜尋經文、單位、代碼..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-9"
+            className="pl-10"
             data-testid="input-history-search"
           />
         </div>
-        <div className="flex gap-2">
-          <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
-            <SelectTrigger className="w-[100px] sm:w-[110px] h-9" data-testid="select-filter-time">
-              <Clock className="w-3.5 h-3.5 mr-1.5" />
-              <SelectValue placeholder="時間" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="all">全部時間</SelectItem>
-              <SelectItem value="this-month">本月</SelectItem>
-              <SelectItem value="last-month">上月</SelectItem>
-              <SelectItem value="older">更早</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[100px] sm:w-[110px] h-9" data-testid="select-filter-status">
-              <Filter className="w-3.5 h-3.5 mr-1.5" />
-              <SelectValue placeholder="狀態" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="all">全部狀態</SelectItem>
-              <SelectItem value="completed">已完成</SelectItem>
-              <SelectItem value="studying">進行中</SelectItem>
-              <SelectItem value="waiting">等待中</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterChurchUnit} onValueChange={setFilterChurchUnit}>
-            <SelectTrigger className="w-[100px] sm:w-[110px] h-9" data-testid="select-filter-church-unit">
-              <Building2 className="w-3.5 h-3.5 mr-1.5" />
-              <SelectValue placeholder="單位" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="all">全部單位</SelectItem>
-              {uniqueChurchUnits.map(unit => (
-                <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-              ))}
-              <SelectItem value="__none__">未分類</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-full sm:w-[140px]" data-testid="select-filter-status">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="狀態" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            <SelectItem value="all">全部狀態</SelectItem>
+            <SelectItem value="completed">已完成</SelectItem>
+            <SelectItem value="studying">進行中</SelectItem>
+            <SelectItem value="waiting">等待中</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterChurchUnit} onValueChange={setFilterChurchUnit}>
+          <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-filter-church-unit">
+            <Building2 className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="單位" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            <SelectItem value="all">全部單位</SelectItem>
+            {uniqueChurchUnits.map(unit => (
+              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+            ))}
+            <SelectItem value="__none__">未分類</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Result Count + Group-by Toggle */}
+      {/* Group By Controls */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          找到 {filteredSessions.length} 場聚會
-        </span>
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center border rounded-md overflow-hidden">
-            <button
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>找到 {filteredSessions.length} 場聚會</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border rounded-lg overflow-hidden">
+            <Button
+              variant={groupByMode === 'month' ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => { setGroupByMode('month'); setCollapsedListGroups({}); }}
-              className={cn(
-                "px-2.5 py-1 text-xs font-medium transition-colors",
-                groupByMode === 'month' 
-                  ? "bg-primary text-primary-foreground" 
-                  : "hover:bg-muted text-muted-foreground"
-              )}
+              className="rounded-none gap-1.5 h-8"
               data-testid="button-group-by-month"
             >
+              <CalendarDays className="w-3.5 h-3.5" />
               月份
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={groupByMode === 'churchUnit' ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => { setGroupByMode('churchUnit'); setCollapsedListGroups({}); }}
-              className={cn(
-                "px-2.5 py-1 text-xs font-medium transition-colors",
-                groupByMode === 'churchUnit' 
-                  ? "bg-primary text-primary-foreground" 
-                  : "hover:bg-muted text-muted-foreground"
-              )}
+              className="rounded-none gap-1.5 h-8"
               data-testid="button-group-by-church"
             >
+              <Building2 className="w-3.5 h-3.5" />
               單位
-            </button>
+            </Button>
           </div>
-          <button
-            onClick={Object.keys(collapsedListGroups).length > 0 ? expandAll : collapseAll}
-            className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors"
-            title={Object.keys(collapsedListGroups).length > 0 ? '全部展開' : '全部收起'}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={collapseAll}
+            className="h-8 px-2"
+            title="全部收起"
             data-testid="button-collapse-all"
           >
-            <ChevronsUpDown className="w-3.5 h-3.5" />
-          </button>
+            <ChevronsUpDown className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
@@ -1091,8 +1142,8 @@ export const HistoryBrowser: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <ScrollArea className="h-[calc(100vh-340px)]">
-          <div className="space-y-2 pr-4">
+        <ScrollArea className="h-[calc(100vh-560px)]">
+          <div className="space-y-3 pr-4">
             {displayGroups.map(([groupKey, groupSessions]) => {
               const isCollapsed = !!collapsedListGroups[groupKey];
               const groupLabel = groupByMode === 'month'
@@ -1122,7 +1173,7 @@ export const HistoryBrowser: React.FC = () => {
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="grid gap-2 pt-1">
+                    <div className="grid gap-3 pt-1">
                       {groupSessions.map((session) => (
                         <SessionCard
                           key={session.id}
@@ -1156,11 +1207,11 @@ const SessionCard: React.FC<{
       onClick={onClick}
       data-testid={`card-session-${session.id}`}
     >
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-start justify-between gap-2">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-medium text-sm sm:text-base truncate">{session.verseReference}</span>
+              <span className="font-medium text-base truncate">{session.verseReference}</span>
               <Badge 
                 variant={session.status === 'completed' ? 'default' : 'secondary'}
                 className="flex-shrink-0"
