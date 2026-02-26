@@ -23,6 +23,7 @@ import { getSessionJoinUrl } from '@/lib/url-helpers';
 interface PastSession {
   id: string;
   shortCode: string | null;
+  churchUnit: string | null;
   verseReference: string;
   status: string;
   createdAt: string;
@@ -65,6 +66,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
             return {
               id: session.id,
               shortCode: session.shortCode,
+              churchUnit: session.churchUnit || null,
               verseReference: session.verseReference,
               status: session.status,
               createdAt: session.createdAt,
@@ -201,6 +203,11 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                 <CardContent className="py-4 sm:py-5 px-4 sm:px-6">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
+                      {session.churchUnit && (
+                        <p className="text-xs text-primary font-medium mb-1 truncate" data-testid={`text-church-unit-${session.id}`}>
+                          {session.churchUnit}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                         <p className="font-serif text-base sm:text-lg font-semibold truncate">
                           {session.verseReference}

@@ -49,6 +49,7 @@ export const userRoles = pgTable("user_roles", {
 
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  churchUnit: text("church_unit"),
   verseReference: text("verse_reference").notNull(),
   status: text("status").notNull().default("waiting"),
   groupSize: integer("group_size").default(4),

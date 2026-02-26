@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Dumbbell, Download, CheckCircle, Copy, Flame, Gamepad2, Clock } from 'lucide-react';
+import { Dumbbell, Download, CheckCircle, Copy, Flame, Gamepad2, Clock, Church } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import { getSessionJoinUrl } from '@/lib/url-helpers';
@@ -19,6 +19,7 @@ interface CreateSessionProps {
 export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
   const { setCurrentSession, setIsAdmin } = useSession();
   const { user } = useAuth();
+  const [churchUnit, setChurchUnit] = useState('');
   const [verseReference, setVerseReference] = useState('');
   const [icebreakerEnabled, setIcebreakerEnabled] = useState(true);
   const [allowLatecomers, setAllowLatecomers] = useState(true);
@@ -44,6 +45,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          churchUnit: churchUnit || undefined,
           verseReference,
           status: 'waiting',
           ownerId: user.id,
@@ -125,6 +127,24 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6">
+          <div className="space-y-2">
+            <Label htmlFor="church-unit" className="text-base font-semibold flex items-center gap-2">
+              <Church className="w-4 h-4 text-primary" />
+              課程單位 Church Unit
+            </Label>
+            <Input
+              id="church-unit"
+              value={churchUnit}
+              onChange={(e) => setChurchUnit(e.target.value)}
+              placeholder="例如: 台北靈糧堂 / Taipei Bread of Life Church"
+              className="h-12 sm:h-14 text-base sm:text-lg"
+              data-testid="input-church-unit"
+            />
+            <p className="text-sm text-muted-foreground">
+              輸入開課的教會或單位名稱，方便日後搜尋
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="verse" className="text-base font-semibold">
               訓練經文 Training Scripture
