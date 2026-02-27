@@ -139,6 +139,18 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     setShowEmailDialog(true);
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -148,36 +160,33 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
-      // Check file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         toast.error(`${file.name} 超過 10MB 限制`);
         continue;
       }
 
-      // Create local URL for preview (file storage not yet migrated)
-      const localUrl = URL.createObjectURL(file);
-      const attachment: Attachment = { 
-        file, 
-        uploading: false,
-        url: localUrl,
-        path: file.name 
-      };
-      newAttachments.push(attachment);
+      try {
+        const base64 = await fileToBase64(file);
+        const attachment: Attachment = { 
+          file, 
+          uploading: false,
+          url: base64,
+          path: file.name 
+        };
+        newAttachments.push(attachment);
+      } catch {
+        toast.error(`無法讀取 ${file.name}`);
+      }
     }
 
     setAttachments(prev => [...prev, ...newAttachments]);
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const removeAttachment = async (attachment: Attachment) => {
-    // Revoke local URL if exists
-    if (attachment.url && attachment.url.startsWith('blob:')) {
-      URL.revokeObjectURL(attachment.url);
-    }
     setAttachments(prev => prev.filter(a => a !== attachment));
   };
 
@@ -199,7 +208,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
         .filter(a => a.url)
         .map(a => ({
           filename: a.file.name,
-          url: a.url,
+          content: a.url,
         }));
 
       // TODO: Migrate email sending to API endpoint
@@ -207,6 +216,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
       const response = await fetch('/api/send-bulk-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           recipients: emailRecipients,
           subject: emailSubject,

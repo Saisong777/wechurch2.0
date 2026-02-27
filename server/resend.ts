@@ -89,11 +89,17 @@ export interface BulkEmailRecipient {
   name?: string;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+}
+
 export async function sendBulkEmail(
   recipients: BulkEmailRecipient[],
   subject: string,
   body: string,
-  isHtml: boolean = true
+  isHtml: boolean = true,
+  attachments?: EmailAttachment[]
 ) {
   const { client, fromEmail } = await getResendClient();
   
@@ -105,18 +111,23 @@ export async function sendBulkEmail(
   
   console.log('[Resend] Bulk sending to', recipients.length, 'recipients from:', fromEmail);
   
+  const resendAttachments = attachments?.map(a => ({
+    filename: a.filename,
+    content: Buffer.from(a.content, 'base64'),
+  }));
+  
   for (const recipient of recipients) {
     try {
       const sendResult = await client.emails.send({
         from: fromEmail,
         to: recipient.email,
         subject: subject,
-        ...(isHtml ? { html: body } : { text: body })
+        ...(isHtml ? { html: body } : { text: body }),
+        ...(resendAttachments && resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
       });
       
       console.log('[Resend] Sent to', recipient.email, ':', JSON.stringify(sendResult));
       
-      // Check for error in response
       if ('error' in sendResult && sendResult.error) {
         throw new Error((sendResult.error as any).message || 'Unknown error');
       }

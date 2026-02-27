@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { toast } from 'sonner';
-import { Mail, Send, Loader2, Users, Search, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { Mail, Send, Loader2, Users, Search, ChevronLeft, CheckCircle2, Paperclip, X, File, Image as ImageIcon } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 interface EmailUser {
@@ -23,6 +23,11 @@ interface EmailUser {
 
 type RecipientMode = 'all' | 'role' | 'church' | 'individual';
 
+interface AttachmentFile {
+  file: File;
+  base64: string;
+}
+
 const ROLE_LABELS: Record<string, string> = {
   admin: '管理員',
   leader: '小組長',
@@ -34,6 +39,19 @@ interface AdminMailComposerProps {
   onBack: () => void;
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) => {
   const [recipientMode, setRecipientMode] = useState<RecipientMode>('all');
   const [selectedRole, setSelectedRole] = useState<string>('');
@@ -42,7 +60,9 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: allUsers = [], isLoading: usersLoading } = useQuery<EmailUser[]>({
     queryKey: ['/api/admin/users-for-email'],
@@ -91,11 +111,16 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
         email: u.email,
         name: u.displayName || undefined,
       }));
+      const attachmentData = attachments.map(a => ({
+        filename: a.file.name,
+        content: a.base64,
+      }));
       const res = await apiRequest('POST', '/api/send-bulk-email', {
         recipients: recipientList,
         subject,
         body,
         isHtml: true,
+        ...(attachmentData.length > 0 ? { attachments: attachmentData } : {}),
       });
       return res.json();
     },
@@ -136,6 +161,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
     setSelectedChurch('');
     setSelectedUserIds(new Set());
     setSearchQuery('');
+    setAttachments([]);
     setSendResult(null);
   };
 
@@ -162,6 +188,40 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
       filteredUsers.forEach(u => next.delete(u.id));
       return next;
     });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} 超過 10MB 限制`);
+        continue;
+      }
+      try {
+        const base64 = await fileToBase64(file);
+        setAttachments(prev => [...prev, { file, base64 }]);
+      } catch {
+        toast.error(`無法讀取 ${file.name}`);
+      }
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      return <ImageIcon className="w-4 h-4 text-muted-foreground" />;
+    }
+    return <File className="w-4 h-4 text-muted-foreground" />;
   };
 
   if (sendResult) {
@@ -350,6 +410,57 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
               placeholder="撰寫郵件內容..."
               minHeight="200px"
             />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>附件</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-add-attachment"
+              >
+                <Paperclip className="w-4 h-4 mr-1" />
+                新增附件
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+              />
+            </div>
+
+            {attachments.length > 0 && (
+              <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                {attachments.map((attachment, index) => (
+                  <div key={index} className="flex items-center gap-2 text-sm">
+                    {getFileIcon(attachment.file)}
+                    <span className="flex-1 truncate">{attachment.file.name}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {(attachment.file.size / 1024).toFixed(0)} KB
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => removeAttachment(index)}
+                      data-testid={`button-remove-attachment-${index}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              支援圖片、PDF、Office 文件，單檔最大 10MB
+            </p>
           </div>
         </CardContent>
       </Card>

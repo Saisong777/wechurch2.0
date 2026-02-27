@@ -2995,11 +2995,31 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const { recipients, subject, body, isHtml } = req.body;
+      const { recipients, subject, body, isHtml, attachments } = req.body;
+
+      if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+        return res.status(400).json({ error: "Recipients required" });
+      }
+      if (!subject || typeof subject !== 'string') {
+        return res.status(400).json({ error: "Subject required" });
+      }
+      if (!body || typeof body !== 'string') {
+        return res.status(400).json({ error: "Body required" });
+      }
+      if (attachments && Array.isArray(attachments)) {
+        if (attachments.length > 5) {
+          return res.status(400).json({ error: "Maximum 5 attachments allowed" });
+        }
+        for (const att of attachments) {
+          if (!att.filename || !att.content) {
+            return res.status(400).json({ error: "Invalid attachment format" });
+          }
+        }
+      }
       
       const { sendBulkEmail } = await import('./resend');
       
-      const result = await sendBulkEmail(recipients, subject, body, isHtml !== false);
+      const result = await sendBulkEmail(recipients, subject, body, isHtml !== false, attachments);
       
       res.json(result);
     } catch (error: any) {

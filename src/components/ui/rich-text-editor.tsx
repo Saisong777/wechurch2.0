@@ -4,8 +4,6 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import { Button } from '@/components/ui/button';
-import { Toggle } from '@/components/ui/toggle';
 import { Separator } from '@/components/ui/separator';
 import {
   Bold,
@@ -32,6 +30,38 @@ interface RichTextEditorProps {
   minHeight?: string;
 }
 
+const ToolbarButton = ({
+  active,
+  disabled,
+  onClick,
+  children,
+  title,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  title?: string;
+}) => (
+  <button
+    type="button"
+    onMouseDown={(e) => {
+      e.preventDefault();
+      onClick();
+    }}
+    disabled={disabled}
+    title={title}
+    className={cn(
+      'inline-flex items-center justify-center rounded h-8 w-8 text-sm transition-colors',
+      'hover:bg-muted hover:text-foreground',
+      'disabled:pointer-events-none disabled:opacity-50',
+      active ? 'bg-muted text-foreground' : 'text-muted-foreground'
+    )}
+  >
+    {children}
+  </button>
+);
+
 const MenuBar = ({ editor }: { editor: Editor | null }) => {
   if (!editor) return null;
 
@@ -51,126 +81,110 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
 
   return (
     <div className="flex flex-wrap items-center gap-0.5 p-2 border-b bg-muted/30">
-      <Toggle
-        size="sm"
-        pressed={editor.isActive('bold')}
-        onPressedChange={() => editor.chain().focus().toggleBold().run()}
-        aria-label="粗體"
+      <ToolbarButton
+        active={editor.isActive('bold')}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        title="粗體"
       >
         <Bold className="h-4 w-4" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive('italic')}
-        onPressedChange={() => editor.chain().focus().toggleItalic().run()}
-        aria-label="斜體"
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive('italic')}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        title="斜體"
       >
         <Italic className="h-4 w-4" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive('underline')}
-        onPressedChange={() => editor.chain().focus().toggleUnderline().run()}
-        aria-label="底線"
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive('underline')}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        title="底線"
       >
         <UnderlineIcon className="h-4 w-4" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive('strike')}
-        onPressedChange={() => editor.chain().focus().toggleStrike().run()}
-        aria-label="刪除線"
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive('strike')}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+        title="刪除線"
       >
         <Strikethrough className="h-4 w-4" />
-      </Toggle>
+      </ToolbarButton>
       
       <Separator orientation="vertical" className="mx-1 h-6" />
       
-      <Toggle
-        size="sm"
-        pressed={editor.isActive('bulletList')}
-        onPressedChange={() => editor.chain().focus().toggleBulletList().run()}
-        aria-label="項目符號"
+      <ToolbarButton
+        active={editor.isActive('bulletList')}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        title="項目符號"
       >
         <List className="h-4 w-4" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive('orderedList')}
-        onPressedChange={() => editor.chain().focus().toggleOrderedList().run()}
-        aria-label="編號清單"
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive('orderedList')}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        title="編號清單"
       >
         <ListOrdered className="h-4 w-4" />
-      </Toggle>
+      </ToolbarButton>
       
       <Separator orientation="vertical" className="mx-1 h-6" />
       
-      <Toggle
-        size="sm"
-        pressed={editor.isActive({ textAlign: 'left' })}
-        onPressedChange={() => editor.chain().focus().setTextAlign('left').run()}
-        aria-label="靠左"
+      <ToolbarButton
+        active={editor.isActive({ textAlign: 'left' })}
+        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+        title="靠左"
       >
         <AlignLeft className="h-4 w-4" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive({ textAlign: 'center' })}
-        onPressedChange={() => editor.chain().focus().setTextAlign('center').run()}
-        aria-label="置中"
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive({ textAlign: 'center' })}
+        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+        title="置中"
       >
         <AlignCenter className="h-4 w-4" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive({ textAlign: 'right' })}
-        onPressedChange={() => editor.chain().focus().setTextAlign('right').run()}
-        aria-label="靠右"
+      </ToolbarButton>
+      <ToolbarButton
+        active={editor.isActive({ textAlign: 'right' })}
+        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+        title="靠右"
       >
         <AlignRight className="h-4 w-4" />
-      </Toggle>
+      </ToolbarButton>
       
       <Separator orientation="vertical" className="mx-1 h-6" />
       
-      <Toggle
-        size="sm"
-        pressed={editor.isActive('link')}
-        onPressedChange={setLink}
-        aria-label="連結"
+      <ToolbarButton
+        active={editor.isActive('link')}
+        onClick={setLink}
+        title="連結"
       >
         <LinkIcon className="h-4 w-4" />
-      </Toggle>
+      </ToolbarButton>
       {editor.isActive('link') && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2"
+        <ToolbarButton
           onClick={() => editor.chain().focus().unsetLink().run()}
+          title="移除連結"
         >
           <Unlink className="h-4 w-4" />
-        </Button>
+        </ToolbarButton>
       )}
       
       <div className="flex-1" />
       
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 px-2"
+      <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
+        title="復原"
       >
         <Undo className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 px-2"
+      </ToolbarButton>
+      <ToolbarButton
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
+        title="重做"
       >
         <Redo className="h-4 w-4" />
-      </Button>
+      </ToolbarButton>
     </div>
   );
 };
