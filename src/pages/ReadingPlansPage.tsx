@@ -15,14 +15,13 @@ import {
 } from '@/components/ui/dialog';
 import {
   BookOpen, Plus, ChevronRight, Clock, Trash2, Play, Pause,
-  Calendar, Bell, AlertCircle, BookMarked, Library, X, Sparkles,
+  Calendar, AlertCircle, BookMarked, Library, X, Sparkles,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useReadingReminder } from '@/hooks/useReadingReminder';
-import { ReadingReminderPopup, useReminderSimulation } from '@/components/reading/ReadingReminderPopup';
 import { DevotionalAnalysisBatchDialog } from '@/components/scripture/DevotionalAnalysisBatchDialog';
 
 interface BibleBook {
@@ -76,7 +75,6 @@ const ReadingPlansPage = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { requestPermission, startReminder, stopReminder, isSupported } = useReadingReminder();
-  const { showReminder, setShowReminder, reminderTimeSlot, summary: reminderSummary, triggerReminder } = useReminderSimulation();
   const [viewMode, setViewMode] = useState<ViewMode>('my-plans');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<string | null>(null);
@@ -333,51 +331,6 @@ const ReadingPlansPage = () => {
               </Button>
             </div>
 
-            <Card className="mb-4 border-amber-300/30 bg-amber-50/30 dark:bg-amber-950/10">
-              <CardContent className="py-3 px-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Bell className="w-4 h-4 text-amber-600" />
-                  <span className="text-sm font-medium">模擬提醒測試</span>
-                  <Badge variant="outline" className="text-[10px]">測試功能</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  點擊下方按鈕模擬不同時段的靈修提醒彈窗
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => triggerReminder('morning')}
-                    data-testid="button-test-reminder-morning"
-                  >
-                    <Bell className="w-3.5 h-3.5" />
-                    早安提醒
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => triggerReminder('noon')}
-                    data-testid="button-test-reminder-noon"
-                  >
-                    <Bell className="w-3.5 h-3.5" />
-                    午安提醒
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => triggerReminder('evening')}
-                    data-testid="button-test-reminder-evening"
-                  >
-                    <Bell className="w-3.5 h-3.5" />
-                    晚安提醒
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
             {viewMode === 'my-plans' && (
               <MyPlansView
                 plans={userPlans}
@@ -454,13 +407,6 @@ const ReadingPlansPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        <ReadingReminderPopup
-          open={showReminder}
-          onOpenChange={setShowReminder}
-          summary={reminderSummary}
-          timeSlot={reminderTimeSlot}
-        />
 
         <DevotionalAnalysisBatchDialog
           open={showBatchAnalysis}
