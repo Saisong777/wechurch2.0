@@ -59,6 +59,7 @@ export interface SendEmailOptions {
   html?: string;
   text?: string;
   from?: string;
+  replyTo?: string;
 }
 
 export async function sendEmail(options: SendEmailOptions) {
@@ -71,7 +72,8 @@ export async function sendEmail(options: SendEmailOptions) {
     to: options.to,
     subject: options.subject,
     html: options.html,
-    text: options.text
+    text: options.text,
+    reply_to: options.replyTo || 'reply@wechurch.online',
   });
   
   console.log('[Resend] Send result:', JSON.stringify(result));
@@ -122,6 +124,7 @@ export async function sendBulkEmail(
         from: fromEmail,
         to: recipient.email,
         subject: subject,
+        reply_to: 'reply@wechurch.online',
         ...(isHtml ? { html: body } : { text: body }),
         ...(resendAttachments && resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
       });

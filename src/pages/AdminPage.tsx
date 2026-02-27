@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// Force clean rebuild for HMR cache issue
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { AuthForm } from '@/components/auth/AuthForm';
@@ -13,16 +13,18 @@ import { MessageCardManager } from '@/components/admin/MessageCardManager';
 import { FeatureToggleManager } from '@/components/admin/FeatureToggleManager';
 import { PrayerMeetingAdmin } from '@/components/admin/PrayerMeetingAdmin';
 import { AdminMailComposer } from '@/components/admin/AdminMailComposer';
+import { AdminInbox } from '@/components/admin/AdminInbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown, Mail, Plus, BookOpen } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown, Mail, Inbox, Plus, BookOpen } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { apiRequest } from '@/lib/queryClient';
 
-type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'mail' | 'create' | 'waiting' | 'monitor';
+type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'mail' | 'inbox' | 'create' | 'waiting' | 'monitor';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +32,16 @@ export const AdminPage: React.FC = () => {
   const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
   const { currentSession, setCurrentSession, setUsers, setSubmissions, setIsAdmin } = useSession();
   const [step, setStep] = useState<AdminStep>('auth');
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ['/api/admin/inbox/unread-count'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/admin/inbox/unread-count');
+      return res.json();
+    },
+    enabled: step === 'dashboard' && !!user,
+    refetchInterval: 60000,
+  });
 
   const loading = authLoading || roleLoading;
 
@@ -155,18 +167,24 @@ export const AdminPage: React.FC = () => {
               {([
                 { icon: History, label: '歷史資料', desc: '查看過往課程', action: () => setStep('history'), testId: 'button-history' },
                 { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
-                { icon: Mail, label: '信件系統', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
+                { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
+                { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
                 { icon: Crown, label: '禱告會管理', desc: '建立與管理禱告會', action: () => setStep('prayer-meeting'), testId: 'button-prayer-meeting-admin' },
                 { icon: Sparkles, label: '真心話題庫', desc: '管理破冰遊戲題目', action: () => setStep('cards'), testId: 'button-cards' },
                 { icon: Image, label: '信息卡片', desc: '上傳管理信息卡片', action: () => setStep('message-cards'), testId: 'button-message-cards' },
                 { icon: ToggleLeft, label: '功能開關', desc: '啟用或停用系統功能', action: () => setStep('feature-toggles'), testId: 'button-feature-toggles' },
-              ] as const).map(({ icon: Icon, label, desc, action, testId }) => (
+              ] as Array<{ icon: any; label: string; desc: string; action: () => void; testId: string; badge?: number }>).map(({ icon: Icon, label, desc, action, testId, badge }) => (
                 <button
                   key={testId}
                   onClick={action}
-                  className="flex flex-col items-center gap-2 p-4 sm:p-5 rounded-xl border bg-card text-card-foreground hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all duration-200 cursor-pointer group"
+                  className="relative flex flex-col items-center gap-2 p-4 sm:p-5 rounded-xl border bg-card text-card-foreground hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all duration-200 cursor-pointer group"
                   data-testid={testId}
                 >
+                  {badge && badge > 0 ? (
+                    <span className="absolute top-2 right-2 bg-destructive text-destructive-foreground text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                      {badge}
+                    </span>
+                  ) : null}
                   <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                     <Icon className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-primary" />
                   </div>
@@ -224,6 +242,12 @@ export const AdminPage: React.FC = () => {
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
             <AdminMailComposer onBack={handleBackToDashboard} />
+          </div>
+        );
+      case 'inbox':
+        return (
+          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+            <AdminInbox onBack={handleBackToDashboard} />
           </div>
         );
       case 'create':

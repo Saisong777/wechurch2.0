@@ -3028,6 +3028,148 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // ============ Inbox / Inbound Email Routes ============
+  app.post("/api/webhooks/resend/inbound", async (req, res) => {
+    try {
+      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        const providedSecret = req.headers['x-webhook-secret'] || req.query.secret;
+        if (providedSecret !== webhookSecret) {
+          console.warn('[Inbound] Invalid webhook secret');
+          return res.status(401).json({ error: "Invalid webhook secret" });
+        }
+      }
+
+      const body = req.body;
+      if (!body || typeof body !== 'object') {
+        return res.status(400).json({ error: "Invalid payload" });
+      }
+
+      const from = body.from;
+      const to = body.to;
+      const subject = body.subject;
+      const text = body.text;
+      const html = body.html;
+
+      if (!from || typeof from !== 'string') {
+        return res.status(400).json({ error: "Missing or invalid 'from' field" });
+      }
+      if (!to) {
+        return res.status(400).json({ error: "Missing 'to' field" });
+      }
+
+      let fromEmail = from;
+      let fromName: string | undefined;
+      const emailMatch = from.match(/^(.+?)\s*<(.+?)>$/);
+      if (emailMatch) {
+        fromName = emailMatch[1].trim();
+        fromEmail = emailMatch[2].trim();
+      }
+
+      const toEmail = typeof to === 'string' ? to : Array.isArray(to) ? to[0] : to;
+
+      await storage.createInboxEmail({
+        fromEmail,
+        fromName: fromName || null,
+        toEmail: typeof toEmail === 'string' ? toEmail.replace(/<|>/g, '').trim() : String(toEmail),
+        subject: (typeof subject === 'string' ? subject : null) || '(無主旨)',
+        bodyText: typeof text === 'string' ? text : null,
+        bodyHtml: typeof html === 'string' ? html : null,
+        isRead: false,
+        isArchived: false,
+        resendEmailId: null,
+      });
+
+      console.log('[Inbound] Received email from:', fromEmail, 'subject:', subject);
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('[Inbound] Error processing inbound email:', error);
+      res.status(500).json({ error: "Failed to process inbound email" });
+    }
+  });
+
+  app.get("/api/admin/inbox", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const userRole = await storage.getUserRole(userId);
+      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const archived = req.query.archived === 'true';
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const emails = await storage.getInboxEmails({ archived, limit, offset });
+      res.json(emails);
+    } catch (error: any) {
+      console.error('Error fetching inbox:', error);
+      res.status(500).json({ error: "Failed to fetch inbox" });
+    }
+  });
+
+  app.get("/api/admin/inbox/unread-count", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const userRole = await storage.getUserRole(userId);
+      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const count = await storage.getInboxUnreadCount();
+      res.json({ count });
+    } catch (error: any) {
+      console.error('Error fetching unread count:', error);
+      res.status(500).json({ error: "Failed to get unread count" });
+    }
+  });
+
+  app.patch("/api/admin/inbox/:id/read", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const userRole = await storage.getUserRole(userId);
+      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+      const isRead = req.body.isRead !== false;
+      const email = await storage.markInboxEmailRead(id, isRead);
+      if (!email) return res.status(404).json({ error: "Email not found" });
+      res.json(email);
+    } catch (error: any) {
+      console.error('Error marking email read:', error);
+      res.status(500).json({ error: "Failed to update email" });
+    }
+  });
+
+  app.patch("/api/admin/inbox/:id/archive", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const userRole = await storage.getUserRole(userId);
+      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+      const isArchived = req.body.isArchived !== false;
+      const email = await storage.archiveInboxEmail(id, isArchived);
+      if (!email) return res.status(404).json({ error: "Email not found" });
+      res.json(email);
+    } catch (error: any) {
+      console.error('Error archiving email:', error);
+      res.status(500).json({ error: "Failed to archive email" });
+    }
+  });
+
   // ============ Bible API Routes ============
   app.get("/api/bible/books", async (req, res) => {
     try {

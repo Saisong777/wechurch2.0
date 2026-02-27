@@ -567,6 +567,24 @@ export type ReadingPlanTemplateItem = typeof readingPlanTemplateItems.$inferSele
 export type UserReadingPlan = typeof userReadingPlans.$inferSelect;
 export type UserReadingProgress = typeof userReadingProgress.$inferSelect;
 
+export const inboxEmails = pgTable("inbox_emails", {
+  id: serial("id").primaryKey(),
+  fromEmail: text("from_email").notNull(),
+  fromName: text("from_name"),
+  toEmail: text("to_email").notNull(),
+  subject: text("subject"),
+  bodyText: text("body_text"),
+  bodyHtml: text("body_html"),
+  isRead: boolean("is_read").default(false).notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
+  resendEmailId: text("resend_email_id"),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+});
+
+export type InboxEmail = typeof inboxEmails.$inferSelect;
+export type InsertInboxEmail = z.infer<typeof insertInboxEmailSchema>;
+export const insertInboxEmailSchema = createInsertSchema(inboxEmails).omit({ id: true, receivedAt: true });
+
 export const insertDevotionalNoteSchema = createInsertSchema(devotionalNotes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSavedVerseSchema = createInsertSchema(savedVerses).omit({ id: true, createdAt: true });
 export const insertReadingPlanTemplateSchema = createInsertSchema(readingPlanTemplates).omit({ id: true, createdAt: true, updatedAt: true });

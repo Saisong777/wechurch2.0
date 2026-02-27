@@ -18,7 +18,8 @@ import {
   UserReadingPlan, InsertUserReadingPlan, UserReadingProgress, InsertUserReadingProgress,
   DevotionalNote, InsertDevotionalNote, InsertReadingPlanTemplate,
   PrayerMeeting, InsertPrayerMeeting, PrayerMeetingParticipant, InsertPrayerMeetingParticipant,
-  GroupingActivity, GroupingParticipant, InsertGroupingActivity, InsertGroupingParticipant
+  GroupingActivity, GroupingParticipant, InsertGroupingActivity, InsertGroupingParticipant,
+  inboxEmails, InboxEmail, InsertInboxEmail
 } from "@shared/schema";
 
 export interface IStorage {
@@ -182,6 +183,13 @@ export interface IStorage {
 
   createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate>;
   createReadingPlanTemplateItems(items: Array<{templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string}>): Promise<void>;
+
+  getInboxEmails(options?: { archived?: boolean; limit?: number; offset?: number }): Promise<InboxEmail[]>;
+  getInboxEmail(id: number): Promise<InboxEmail | undefined>;
+  createInboxEmail(email: InsertInboxEmail): Promise<InboxEmail>;
+  markInboxEmailRead(id: number, isRead: boolean): Promise<InboxEmail | undefined>;
+  archiveInboxEmail(id: number, isArchived: boolean): Promise<InboxEmail | undefined>;
+  getInboxUnreadCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1200,6 +1208,44 @@ export class DatabaseStorage implements IStorage {
   async createReadingPlanTemplateItems(items: Array<{templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string}>): Promise<void> {
     if (items.length === 0) return;
     await db.insert(readingPlanTemplateItems).values(items);
+  }
+
+  async getInboxEmails(options?: { archived?: boolean; limit?: number; offset?: number }): Promise<InboxEmail[]> {
+    const archived = options?.archived ?? false;
+    const limit = options?.limit ?? 50;
+    const offset = options?.offset ?? 0;
+    return db.select().from(inboxEmails)
+      .where(eq(inboxEmails.isArchived, archived))
+      .orderBy(desc(inboxEmails.receivedAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getInboxEmail(id: number): Promise<InboxEmail | undefined> {
+    const [email] = await db.select().from(inboxEmails).where(eq(inboxEmails.id, id)).limit(1);
+    return email;
+  }
+
+  async createInboxEmail(email: InsertInboxEmail): Promise<InboxEmail> {
+    const [created] = await db.insert(inboxEmails).values(email).returning();
+    return created;
+  }
+
+  async markInboxEmailRead(id: number, isRead: boolean): Promise<InboxEmail | undefined> {
+    const [updated] = await db.update(inboxEmails).set({ isRead }).where(eq(inboxEmails.id, id)).returning();
+    return updated;
+  }
+
+  async archiveInboxEmail(id: number, isArchived: boolean): Promise<InboxEmail | undefined> {
+    const [updated] = await db.update(inboxEmails).set({ isArchived }).where(eq(inboxEmails.id, id)).returning();
+    return updated;
+  }
+
+  async getInboxUnreadCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(inboxEmails)
+      .where(and(eq(inboxEmails.isRead, false), eq(inboxEmails.isArchived, false)));
+    return result[0]?.count ?? 0;
   }
 }
 
