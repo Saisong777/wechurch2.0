@@ -12,16 +12,17 @@ import { CardQuestionManager } from '@/components/admin/CardQuestionManager';
 import { MessageCardManager } from '@/components/admin/MessageCardManager';
 import { FeatureToggleManager } from '@/components/admin/FeatureToggleManager';
 import { PrayerMeetingAdmin } from '@/components/admin/PrayerMeetingAdmin';
+import { AdminMailComposer } from '@/components/admin/AdminMailComposer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown, Mail } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
-type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'create' | 'waiting' | 'monitor';
+type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'mail' | 'create' | 'waiting' | 'monitor';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -195,6 +196,16 @@ export const AdminPage: React.FC = () => {
                   <Crown className="w-5 h-5 sm:w-4 sm:h-4" />
                   禱告會管理
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="default"
+                  onClick={() => setStep('mail')}
+                  className="gap-2 w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm"
+                  data-testid="button-mail-system"
+                >
+                  <Mail className="w-5 h-5 sm:w-4 sm:h-4" />
+                  信件系統
+                </Button>
               </div>
             </div>
 
@@ -232,6 +243,12 @@ export const AdminPage: React.FC = () => {
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
             <PrayerMeetingAdmin onBack={handleBackToDashboard} />
+          </div>
+        );
+      case 'mail':
+        return (
+          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+            <AdminMailComposer onBack={handleBackToDashboard} />
           </div>
         );
       case 'create':

@@ -2940,9 +2940,61 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Bulk email endpoint using Resend integration
+  app.get("/api/admin/users-for-email", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const userRole = await storage.getUserRole(userId);
+      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const { role, church } = req.query;
+      const allUsers = await storage.getUsers();
+      const allRoles = await storage.getUserRoles();
+
+      const roleMap = new Map<string, string>();
+      for (const r of allRoles) {
+        roleMap.set(r.userId, r.role);
+      }
+
+      let result = allUsers
+        .filter(u => u.email)
+        .map(u => ({
+          id: u.id,
+          email: u.email,
+          displayName: u.displayName || null,
+          church: (u as any).church || null,
+          role: roleMap.get(u.id) || 'member',
+        }));
+
+      if (role && typeof role === 'string') {
+        result = result.filter(u => u.role === role);
+      }
+      if (church && typeof church === 'string') {
+        result = result.filter(u => u.church === church);
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error fetching users for email:', error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
   app.post("/api/send-bulk-email", async (req, res) => {
     try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const userRole = await storage.getUserRole(userId);
+      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       const { recipients, subject, body, isHtml } = req.body;
       
       const { sendBulkEmail } = await import('./resend');
