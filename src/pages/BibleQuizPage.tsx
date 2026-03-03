@@ -27,6 +27,8 @@ export const BibleQuizPage = () => {
         className="flex-1 w-full border-0"
         style={{ minHeight: 'calc(100vh - 57px)' }}
         title="聖經問答遊戲"
+        allow="autoplay; web-share"
+        sandbox="allow-scripts allow-same-origin allow-popups"
       />
     </div>
   );
