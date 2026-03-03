@@ -11,6 +11,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 // Lazy load pages for better code splitting and FCP
+const BibleQuizPage = lazy(() => import("./pages/BibleQuizPage").then(m => ({ default: m.BibleQuizPage })));
 const Index = lazy(() => import("./pages/Index"));
 const WeLiveLandingPage = lazy(() => import("./pages/WeLiveLandingPage").then(m => ({ default: m.WeLiveLandingPage })));
 const UserPage = lazy(() => import("./pages/UserPage").then(m => ({ default: m.UserPage })));
@@ -76,6 +77,7 @@ const App = () => (
                   <Route path="/play" element={<WePlayPage />} />
                   <Route path="/icebreaker" element={<IcebreakerPage />} />
                   <Route path="/grouper" element={<GrouperPage />} />
+                  <Route path="/play/bible-quiz" element={<BibleQuizPage />} />
                   <Route path="/prayer-wall" element={<PrayerWallPage />} />
                   <Route path="/card" element={<MessageCardPage />} />
                   <Route path="/share" element={<SharePage />} />

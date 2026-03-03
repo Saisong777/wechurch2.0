@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>聖經問答 Quiz</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Georgia, serif; background: #1a2a3a; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.container { background: #243447; border: 2px solid #d4af37; border-radius: 20px; padding: 28px 20px; max-width: 420px; width: 100%; color: #f0e6c8; }
+h1 { text-align:center; color:#d4af37; font-size:1.6rem; margin-bottom:4px; }
+.subtitle { text-align:center; color:#aaa; font-size:0.83rem; margin-bottom:18px; }
+.cross { font-size:2.2rem; text-align:center; margin-bottom:6px; }
+.cat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
+.cat-btn { background:#1a2a3a; border:2px solid #555; border-radius:10px; color:#ccc; padding:10px 6px; font-size:0.85rem; cursor:pointer; font-family:Georgia,serif; text-align:center; }
+.cat-btn.on { border-color:#d4af37; color:#d4af37; background:#1e2f3f; }
+.start-btn { background:#d4af37; color:#1a2a3a; border:none; border-radius:12px; padding:14px; width:100%; font-size:1.05rem; font-family:Georgia,serif; cursor:pointer; margin-top:8px; font-weight:bold; }
+.top-bar { display:flex; justify-content:space-between; margin-bottom:10px; font-size:0.88rem; }
+.score-lbl { color:#d4af37; } .q-lbl { color:#aaa; }
+.tbar-wrap { background:#333; border-radius:6px; height:8px; margin-bottom:14px; overflow:hidden; }
+.tbar { height:100%; background:#d4af37; border-radius:6px; transition:width 1s linear; width:100%; }
+.cat-tag { display:inline-block; background:rgba(212,175,55,0.15); color:#d4af37; font-size:0.72rem; border-radius:20px; padding:3px 10px; margin-bottom:10px; border:1px solid #d4af37; }
+.question { color:#f0e6c8; font-size:1rem; line-height:1.6; margin-bottom:18px; min-height:55px; }
+.options { display:flex; flex-direction:column; gap:9px; }
+.opt { background:#1e2f3f; border:2px solid #3a4f60; border-radius:11px; color:#f0e6c8; padding:12px 14px; font-size:0.93rem; font-family:Georgia,serif; cursor:pointer; text-align:left; }
+.opt:hover:not(:disabled) { border-color:#d4af37; background:#243447; }
+.opt.correct { background:#1a3d2b; border-color:#2eb85c; color:#7fffa0; }
+.opt.wrong { background:#3d1a1a; border-color:#dc3545; color:#ffaaaa; }
+.opt:disabled { cursor:default; }
+.feedback { margin-top:12px; padding:10px 12px; border-radius:10px; font-size:0.85rem; line-height:1.5; display:none; }
+.feedback.ok { background:#1a3d2b; color:#7fffa0; border:1px solid #2eb85c; }
+.feedback.bad { background:#3d1a1a; color:#ffaaaa; border:1px solid #dc3545; }
+.streak { text-align:center; color:#d4af37; font-size:0.82rem; margin-top:7px; min-height:18px; }
+.trophy { font-size:2.2rem; text-align:center; margin-bottom:6px; }
+.r-stars { font-size:1.8rem; text-align:center; margin:6px 0; }
+.r-score { font-size:3.2rem; color:#d4af37; font-weight:bold; text-align:center; }
+.r-max { text-align:center; color:#aaa; font-size:0.83rem; margin-bottom:10px; }
+.stats { display:flex; justify-content:space-around; margin:12px 0; }
+.stat { text-align:center; }
+.stat-n { color:#d4af37; font-size:1.3rem; font-weight:bold; }
+.stat-l { color:#aaa; font-size:0.7rem; }
+.r-msg { text-align:center; color:#ccc; font-size:0.88rem; margin:8px 0 14px; }
+.verse { background:rgba(212,175,55,0.08); border-left:3px solid #d4af37; border-radius:8px; padding:12px 14px; font-size:0.85rem; line-height:1.7; margin-bottom:16px; }
+.verse small { color:#d4af37; display:block; margin-top:4px; }
+.btn-row { display:flex; gap:10px; }
+.btn-gold { flex:1; background:#d4af37; color:#1a2a3a; border:none; border-radius:11px; padding:13px; font-size:0.92rem; font-family:Georgia,serif; cursor:pointer; font-weight:bold; }
+.btn-out { flex:1; background:transparent; color:#d4af37; border:2px solid #d4af37; border-radius:11px; padding:13px; font-size:0.92rem; font-family:Georgia,serif; cursor:pointer; }
+.toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:#2eb85c; color:#fff; padding:10px 22px; border-radius:30px; font-size:0.88rem; opacity:0; pointer-events:none; transition:opacity 0.3s; z-index:99; }
+.toast.show { opacity:1; }
+.screen { display:none; }
+.screen.active { display:block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div id="s-start" class="screen active">
+    <div class="cross">✝️</div>
+    <h1>聖經問答</h1>
+    <p class="subtitle">Bible Quiz · 208題完整版</p>
+    <p style="color:#aaa;font-size:0.8rem;text-align:center;">選擇題目類別（可多選）：</p>
+    <div class="cat-grid">
+      <button class="cat-btn on" data-cat="舊約">📜 舊約故事</button>
+      <button class="cat-btn on" data-cat="新約">✝️ 新約故事</button>
+      <button class="cat-btn on" data-cat="人物">👤 聖經人物</button>
+      <button class="cat-btn on" data-cat="金句">📖 聖經金句</button>
+    </div>
+    <button class="start-btn" id="btn-start">開始挑戰 🎮</button>
+  </div>
+  <div id="s-quiz" class="screen">
+    <div class="top-bar">
+      <span class="score-lbl">⭐ <span id="d-score">0</span> 分</span>
+      <span class="q-lbl">第 <span id="d-qn">1</span> / <span id="d-qt">10</span> 題</span>
+    </div>
+    <div class="tbar-wrap"><div class="tbar" id="tbar"></div></div>
+    <div class="cat-tag" id="d-cat"></div>
+    <div class="question" id="d-q"></div>
+    <div class="options" id="d-opts"></div>
+    <div class="feedback" id="d-fb"></div>
+    <div class="streak" id="d-streak"></div>
+  </div>
+  <div id="s-result" class="screen">
+    <div class="trophy">🏆</div>
+    <h1>挑戰完成！</h1>
+    <div class="r-stars" id="r-stars"></div>
+    <div class="r-score" id="r-score"></div>
+    <div class="r-max">總分（滿分 <span id="r-max"></span> 分）</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="r-correct"></div><div class="stat-l">答對題數</div></div>
+      <div class="stat"><div class="stat-n" id="r-streak"></div><div class="stat-l">最長連線</div></div>
+      <div class="stat"><div class="stat-n" id="r-time"></div><div class="stat-l">平均秒數</div></div>
+    </div>
+    <div class="r-msg" id="r-msg"></div>
+    <div class="verse" id="r-verse"></div>
+    <div class="btn-row">
+      <button class="btn-out" id="btn-share">📤 分享成績</button>
+      <button class="btn-gold" id="btn-restart">🔄 再玩一次</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast">✅ 成績已複製！去貼給朋友吧 😊</div>
+<script>
+var QS = [
+// ===== 舊約 (52題) =====
+{cat:"舊約",q:"神用幾天創造天地萬物？",opts:["5天","6天","7天","40天"],ans:1,exp:"創世記1-2章：神用六天創造萬物，第七天安息。"},
+{cat:"舊約",q:"挪亞方舟上，潔淨的動物各取幾對？",opts:["1對","2對","7對","10對"],ans:2,exp:"創世記7:2，潔淨的動物各取七對。"},
+{cat:"舊約",q:"約瑟的彩衣是誰送的？",opts:["母親拉結","父親雅各","哥哥猶大","祖父以撒"],ans:1,exp:"雅各偏愛約瑟，送給他彩衣（創世記37:3）。"},
+{cat:"舊約",q:"摩西在哪座山上領受十誡？",opts:["迦密山","橄欖山","西奈山","大衛山"],ans:2,exp:"神在西奈山（何烈山）將十誡賜給摩西（出埃及記19-20章）。"},
+{cat:"舊約",q:"大衛用什麼打敗巨人歌利亞？",opts:["刀劍","弓箭","石頭與機弦","長矛"],ans:2,exp:"大衛用機弦甩出石頭，擊中歌利亞的額頭（撒上17章）。"},
+{cat:"舊約",q:"約拿在大魚腹中待了多少天？",opts:["1天","3天","7天","40天"],ans:1,exp:"約拿在大魚腹中三天三夜（約拿書1:17）。"},
+{cat:"舊約",q:"亞當和夏娃住在哪個園子裡？",opts:["橄欖園","客西馬尼園","伊甸園","葡萄園"],ans:2,exp:"神把亞當安置在伊甸園（創世記2:8）。"},
+{cat:"舊約",q:"該隱殺了誰？",opts:["以諾","亞伯","塞特","拿鶴"],ans:1,exp:"該隱嫉妒弟弟亞伯，將他殺害（創世記4章）。"},
+{cat:"舊約",q:"挪亞方舟最後停在哪座山？",opts:["西奈山","西珥山","亞拉臘山","赫門山"],ans:2,exp:"方舟停在亞拉臘山上（創世記8:4）。"},
+{cat:"舊約",q:"亞伯拉罕的正妻叫什麼名字？",opts:["利百加","拉結","撒拉","夏甲"],ans:2,exp:"撒拉是亞伯拉罕的妻子（創世記17:15）。"},
+{cat:"舊約",q:"以撒的妻子是誰？",opts:["利百加","拉結","撒拉","夏甲"],ans:0,exp:"亞伯拉罕的僕人為以撒求得利百加為妻（創世記24章）。"},
+{cat:"舊約",q:"雅各共有幾個兒子？",opts:["10個","11個","12個","13個"],ans:2,exp:"雅各有十二個兒子，成為以色列十二支派的祖先（創世記35:22）。"},
+{cat:"舊約",q:"約瑟被哥哥們賣到哪個國家？",opts:["迦南","埃及","巴比倫","波斯"],ans:1,exp:"約瑟被賣給以實瑪利人，帶往埃及（創世記37:28）。"},
+{cat:"舊約",q:"以色列人出埃及前，神共降了幾個災？",opts:["7個","8個","10個","12個"],ans:2,exp:"神降十災逼使法老釋放以色列人（出埃及記7-12章）。"},
+{cat:"舊約",q:"神在燃燒的什麼中向摩西說話？",opts:["雲柱","荊棘","火焰","星光"],ans:1,exp:"神在燃燒的荊棘中向摩西顯現（出埃及記3:2）。"},
+{cat:"舊約",q:"以色列人在曠野漂流了多少年？",opts:["20年","30年","40年","50年"],ans:2,exp:"因以色列人不信，在曠野漂流四十年（民數記14:33）。"},
+{cat:"舊約",q:"約書亞記中，哪座城的城牆應聲倒塌？",opts:["迦薩","耶利哥","耶路撒冷","示劍"],ans:1,exp:"以色列人繞行耶利哥城七天後，城牆倒塌（約書亞記6章）。"},
+{cat:"舊約",q:"大衛王的父親是誰？",opts:["撒母耳","掃羅","耶西","約拿單"],ans:2,exp:"大衛是伯利恆人耶西之子（撒上16:1）。"},
+{cat:"舊約",q:"參孫的力量來源是什麼？",opts:["腰帶","頭髮","力量之石","寶劍"],ans:1,exp:"參孫的力量在於從未剪過的頭髮（士師記16:17）。"},
+{cat:"舊約",q:"以利亞如何升天？",opts:["平靜離世","旋風火車","被天使帶走","消失在雲中"],ans:1,exp:"以利亞坐火車，駕旋風升天（列王記下2:11）。"},
+{cat:"舊約",q:"所羅門王建造了什麼偉大的建築？",opts:["城牆","聖殿","巴別塔","方舟"],ans:1,exp:"所羅門王在耶路撒冷建造了輝煌的聖殿（列王記上6章）。"},
+{cat:"舊約",q:"以色列十二支派是誰的後代？",opts:["亞伯拉罕","以撒","雅各","摩西"],ans:2,exp:"雅各（以色列）的十二個兒子成為十二支派的祖先。"},
+{cat:"舊約",q:"路得記中，路得嫁給了誰？",opts:["波阿斯","以利米勒","瑪倫","基連"],ans:0,exp:"路得忠心跟隨拿俄米，後來嫁給了波阿斯（路得記4章）。"},
+{cat:"舊約",q:"撒母耳的母親是誰？",opts:["米利暗","底波拉","哈拿","拿俄米"],ans:2,exp:"哈拿向神許願，求神賜她兒子，後來生了撒母耳（撒上1章）。"},
+{cat:"舊約",q:"基甸用多少人打敗米甸大軍？",opts:["100人","200人","300人","1000人"],ans:2,exp:"神揀選三百人與基甸，大敗米甸人（士師記7章）。"},
+{cat:"舊約",q:"路得來自哪個地方？",opts:["亞捫","摩押","以東","非利士"],ans:1,exp:"路得是摩押女子，嫁給了拿俄米的兒子（路得記1:4）。"},
+{cat:"舊約",q:"雅各在夢中看見什麼？",opts:["大魚","天梯","燃燒的荊棘","分開的海"],ans:1,exp:"雅各夢見天梯，天使在其上下往來（創世記28:12）。"},
+{cat:"舊約",q:"哪位先知乘火車火馬升天？",opts:["以賽亞","以西結","耶利米","以利亞"],ans:3,exp:"以利亞在以利沙眼前，坐火車駕旋風升天（列王記下2:11）。"},
+{cat:"舊約",q:"亞伯拉罕最初住在哪裡？",opts:["耶路撒冷","迦南","吾珥","埃及"],ans:2,exp:"神呼召亞伯拉罕離開迦勒底的吾珥（創世記11:31）。"},
+{cat:"舊約",q:"以西結先知看見了什麼異象？",opts:["大魚","枯骨復生","天梯","火車"],ans:1,exp:"以西結看見枯骨復生的異象，代表以色列的復興（以西結書37章）。"},
+{cat:"舊約",q:"但以理在獅子坑中安然無恙，原因是什麼？",opts:["獅子睡著了","神差天使閉上獅子的口","他有神奇力量","他帶了武器"],ans:1,exp:"神差天使閉上獅子的口，保護但以理（但以理書6:22）。"},
+{cat:"舊約",q:"出埃及第十災是什麼？",opts:["蝗蟲","黑暗","長子死亡","洪水"],ans:2,exp:"第十災是埃及地所有長子死亡，法老才放以色列人離去（出12章）。"},
+{cat:"舊約",q:"摩西的姐姐叫什麼名字？",opts:["底波拉","路得","米利暗","以斯帖"],ans:2,exp:"米利暗是摩西的姐姐，也是一位女先知（民數記26:59）。"},
+{cat:"舊約",q:"亞伯拉罕預備獻祭的兒子是誰？",opts:["以實瑪利","以撒","雅各","約瑟"],ans:1,exp:"神考驗亞伯拉罕，叫他獻上兒子以撒（創世記22章）。"},
+{cat:"舊約",q:"詩篇共有幾篇？",opts:["100篇","120篇","150篇","180篇"],ans:2,exp:"詩篇共150篇，是聖經中最長的一卷書。"},
+{cat:"舊約",q:"箴言的主要作者是誰？",opts:["大衛","所羅門","摩西","以賽亞"],ans:1,exp:"箴言大部分由所羅門王寫成（箴言1:1）。"},
+{cat:"舊約",q:"尼希米回耶路撒冷是為了什麼目的？",opts:["重建聖殿","重建城牆","教導律法","帶領敬拜"],ans:1,exp:"尼希米得到王的許可，回去重建耶路撒冷的城牆（尼希米記2章）。"},
+{cat:"舊約",q:"雅各的名字後來被改為什麼？",opts:["亞伯拉罕","以撒","以色列","猶大"],ans:2,exp:"雅各與神摔跤後，名字改為以色列（創世記32:28）。"},
+{cat:"舊約",q:"以色列人出埃及時，逾越節羔羊的血塗在哪裡？",opts:["額頭上","門框上","手腕上","腳踝上"],ans:1,exp:"以色列人將羊羔的血塗在門框上，使死亡天使越過（出12:7）。"},
+{cat:"舊約",q:"以色列人在曠野時，神賜給他們吃什麼食物？",opts:["麵包","嗎哪","魚","葡萄"],ans:1,exp:"神每天早晨降下嗎哪，供應以色列人在曠野的食糧（出16章）。"},
+{cat:"舊約",q:"摩西帶領以色列人過了哪片海？",opts:["死海","紅海","地中海","加利利海"],ans:1,exp:"神使紅海分開，以色列人走乾地過海（出埃及記14章）。"},
+{cat:"舊約",q:"大衛王被立為王後，與哪個王的女兒成婚？",opts:["掃羅的女兒","基利波王的女兒","非利士王的女兒","亞捫王的女兒"],ans:0,exp:"大衛娶了掃羅的女兒米甲（撒上18:27）。"},
+{cat:"舊約",q:"哪三個人被扔進火窯卻安然無恙？",opts:["摩西、亞倫、米利暗","但以理、以西結、以賽亞","沙得拉、米煞、亞伯尼歌","以利亞、以利沙、約拿"],ans:2,exp:"但以理的三個朋友被扔進火窯，神保護他們毫髮無傷（但以理書3章）。"},
+{cat:"舊約",q:"約伯承受苦難時，態度如何？",opts:["埋怨神","離開神","仍信靠神","尋求偶像"],ans:2,exp:"儘管受苦，約伯仍說「我所仰望的救贖主活著」（約伯記19:25）。"},
+{cat:"舊約",q:"以賽亞書53章預言了什麼？",opts:["以色列復興","耶穌的受苦與救贖","聖殿重建","先知的使命"],ans:1,exp:"以賽亞書53章預言了彌賽亞的受苦、被拒絕和代贖。"},
+{cat:"舊約",q:"巴別塔的人為何要建塔？",opts:["要塔頂通天傳揚自己的名","要躲避洪水","要敬拜神","要觀察星象"],ans:0,exp:"人要建塔頂通天，傳揚自己的名（創世記11:4）。"},
+{cat:"舊約",q:"所羅門王請求神賜給他什麼？",opts:["長壽","財富","智慧","軍事勝利"],ans:2,exp:"所羅門向神求智慧，神大悅，又賜他財富和尊榮（列王記上3章）。"},
+{cat:"舊約",q:"哪位先知預言「童女懷孕生子，給他起名叫以馬內利」？",opts:["耶利米","以西結","以賽亞","但以理"],ans:2,exp:"這是以賽亞書7:14的著名彌賽亞預言。"},
+{cat:"舊約",q:"掃羅王在哪座山上陣亡？",opts:["西奈山","赫門山","基利波山","橄欖山"],ans:2,exp:"掃羅在基利波山與非利士人爭戰陣亡（撒上31章）。"},
+{cat:"舊約",q:"先知以利亞在哪條溪旁被烏鴉供養食物？",opts:["汲淪溪","基立溪","約旦河","幼發拉底河"],ans:1,exp:"神命令以利亞住在基立溪旁，烏鴉早晚供應食物（列王記上17章）。"},
+{cat:"舊約",q:"誰是帶領以色列人進入迦南地的領袖？",opts:["摩西","亞倫","約書亞","迦勒"],ans:2,exp:"摩西去世後，約書亞帶領以色列人進入迦南地（約書亞記1章）。"},
+{cat:"舊約",q:"哪位女士師帶領以色列人打敗迦南人？",opts:["米利暗","以斯帖","底波拉","路得"],ans:2,exp:"底波拉是以色列的女先知和士師，帶領軍隊得勝（士師記4章）。"},
+{cat:"舊約",q:"約瑟在埃及成為什麼官職？",opts:["大祭司","宰相（總理）","將軍","財政官"],ans:1,exp:"約瑟解了法老的夢，被立為埃及全地的宰相（創世記41:40）。"},
+
+// ===== 新約 (52題) =====
+{cat:"新約",q:"耶穌在哪裡出生？",opts:["耶路撒冷","拿撒勒","伯利恆","迦拿"],ans:2,exp:"耶穌降生在猶大的伯利恆（馬太福音2:1）。"},
+{cat:"新約",q:"耶穌揀選了幾位使徒？",opts:["10位","12位","70位","100位"],ans:1,exp:"耶穌揀選了十二位使徒（馬可福音3:14）。"},
+{cat:"新約",q:"耶穌在曠野禁食了多少天？",opts:["3天","7天","40天","100天"],ans:2,exp:"耶穌在曠野禁食四十天四十夜（馬太福音4:2）。"},
+{cat:"新約",q:"誰出賣了耶穌？",opts:["彼得","約翰","猶大","多馬"],ans:2,exp:"加略人猶大以三十塊銀子出賣了耶穌（馬太福音26:15）。"},
+{cat:"新約",q:"五餅二魚的神蹟餵飽了多少男人？",opts:["1000人","2000人","5000人","10000人"],ans:2,exp:"除了婦女孩子，男人約有五千（馬太福音14:21）。"},
+{cat:"新約",q:"耶穌復活後幾天升天？",opts:["第3天","第7天","第40天","第50天"],ans:2,exp:"耶穌在復活後四十天升天（使徒行傳1:3）。"},
+{cat:"新約",q:"耶穌的母親叫什麼名字？",opts:["抹大拉的馬利亞","馬利亞","馬大","撒羅米"],ans:1,exp:"天使加百列向童女馬利亞報告她要生下耶穌（路加福音1:31）。"},
+{cat:"新約",q:"耶穌的養父叫什麼名字？",opts:["約翰","西門","約瑟","撒迦利亞"],ans:2,exp:"約瑟是馬利亞的未婚夫，後來成為耶穌的養父（馬太福音1:16）。"},
+{cat:"新約",q:"誰為耶穌施洗？",opts:["彼得","使徒約翰","施洗約翰","亞拿尼亞"],ans:2,exp:"施洗約翰在約旦河為耶穌施洗（馬太福音3:13-17）。"},
+{cat:"新約",q:"耶穌在哪條河受洗？",opts:["死海","加利利海","地中海","約旦河"],ans:3,exp:"耶穌在約旦河受洗，聖靈如鴿子降下（馬太福音3:16）。"},
+{cat:"新約",q:"耶穌的第一個神蹟是什麼？",opts:["餵飽五千人","使水變酒","醫治瞎子","趕出污鬼"],ans:1,exp:"耶穌在迦拿婚宴上使水變酒，這是祂第一個神蹟（約翰福音2:11）。"},
+{cat:"新約",q:"最後的晚餐在哪個節日前夕舉行？",opts:["聖誕節","五旬節","逾越節","住棚節"],ans:2,exp:"耶穌在逾越節前與門徒共進最後的晚餐（馬太福音26:17）。"},
+{cat:"新約",q:"彼得在雞叫幾次前不認主？",opts:["一次","兩次","三次","四次"],ans:2,exp:"耶穌預言彼得在雞叫以前，要三次不認祂（馬太福音26:34）。"},
+{cat:"新約",q:"耶穌在哪裡被釘十字架？",opts:["橄欖山","各各他","伯大尼","客西馬尼"],ans:1,exp:"耶穌被釘十字架的地方叫「各各他」，意思是髑髏地（馬太26:33）。"},
+{cat:"新約",q:"耶穌復活後，誰第一個看見祂？",opts:["彼得","約翰","抹大拉的馬利亞","多馬"],ans:2,exp:"抹大拉的馬利亞在空墳墓旁遇見復活的耶穌（約翰福音20:16）。"},
+{cat:"新約",q:"五旬節聖靈降臨後，有多少人受洗歸主？",opts:["約1000人","約2000人","約3000人","約5000人"],ans:2,exp:"彼得講道後，當天約有三千人受洗（使徒行傳2:41）。"},
+{cat:"新約",q:"拉撒路死了幾天後被耶穌復活？",opts:["1天","2天","3天","4天"],ans:3,exp:"耶穌到達時，拉撒路已死了四天（約翰福音11:39）。"},
+{cat:"新約",q:"哪位門徒懷疑耶穌復活，要親眼看到才信？",opts:["彼得","約翰","多馬","馬太"],ans:2,exp:"多馬說除非親眼看見釘痕，否則不信（約翰福音20:25）。"},
+{cat:"新約",q:"「我是道路、真理、生命」記載在哪本福音書？",opts:["馬太福音","馬可福音","路加福音","約翰福音"],ans:3,exp:"這是耶穌在約翰福音14:6說的名言。"},
+{cat:"新約",q:"保羅在哪條路上遇見耶穌從而歸主？",opts:["耶路撒冷路","耶利哥路","大馬士革路","腓力比路"],ans:2,exp:"保羅往大馬士革路上，被一道光照下，聽見耶穌的聲音（使徒行傳9章）。"},
+{cat:"新約",q:"哥林多前書13章的主題是什麼？",opts:["信心","盼望","愛","救恩"],ans:2,exp:"哥林多前書13章是著名的「愛的頌歌」。"},
+{cat:"新約",q:"啟示錄是誰寫的？",opts:["保羅","彼得","約翰","雅各"],ans:2,exp:"使徒約翰在拔摩海島被聖靈感動，寫下啟示錄（啟示錄1:9）。"},
+{cat:"新約",q:"啟示錄中記載了幾個教會？",opts:["5個","7個","10個","12個"],ans:1,exp:"啟示錄2-3章記載了亞西亞的七個教會。"},
+{cat:"新約",q:"耶穌在山上變像時，出現了哪兩位舊約人物？",opts:["亞伯拉罕和以撒","摩西和以利亞","大衛和所羅門","以賽亞和以西結"],ans:1,exp:"摩西和以利亞與耶穌一同出現在山上（馬太福音17:3）。"},
+{cat:"新約",q:"彼得走在水上後，因為什麼開始下沉？",opts:["太累了","看見風浪心生恐懼","跌倒了","忘記禱告"],ans:1,exp:"彼得看見風浪就懼怕，信心動搖，開始下沉（馬太福音14:30）。"},
+{cat:"新約",q:"耶穌醫治了幾個痲瘋病人，卻只有一個回來感謝？",opts:["5個","7個","10個","12個"],ans:2,exp:"耶穌醫治十個痲瘋病人，只有一個回來感謝（路加福音17:17）。"},
+{cat:"新約",q:"使徒行傳的作者是誰？",opts:["馬可","保羅","路加","約翰"],ans:2,exp:"路加是路加福音和使徒行傳的作者，他是一位醫生（歌羅西書4:14）。"},
+{cat:"新約",q:"聖靈的果子共有幾樣（加拉太書5章）？",opts:["7樣","9樣","12樣","3樣"],ans:1,exp:"聖靈的果子有九樣：仁愛、喜樂、和平、忍耐、恩慈、良善、信實、溫柔、節制（加5:22-23）。"},
+{cat:"新約",q:"馬太福音記載的耶穌家譜從誰開始？",opts:["亞當","挪亞","亞伯拉罕","大衛"],ans:2,exp:"馬太福音1:1「亞伯拉罕的後裔，大衛的子孫，耶穌基督的家譜。」"},
+{cat:"新約",q:"聖經最短的一節「耶穌哭了」在哪本書？",opts:["馬太福音","路加福音","約翰福音","馬可福音"],ans:2,exp:"「耶穌哭了」是約翰福音11:35，也是聖經最短的一節。"},
+{cat:"新約",q:"耶穌說天國好像哪種種子，雖小卻能長大成樹？",opts:["葡萄種","麥種","芥菜種","無花果種"],ans:2,exp:"天國好像一粒芥菜種，是最小的種子卻能長成大樹（馬太福音13:31-32）。"},
+{cat:"新約",q:"浪子回頭的比喻中，父親看見兒子回來時做了什麼？",opts:["責備他","叫僕人趕走他","跑去迎接並擁抱他","讓他先悔改"],ans:2,exp:"父親遠遠看見兒子，就跑去抱他（路加福音15:20）。"},
+{cat:"新約",q:"好撒瑪利亞人的比喻中，哪類人先路過卻沒有幫助？",opts:["稅吏和罪人","祭司和利未人","法利賽人和文士","撒瑪利亞人"],ans:1,exp:"祭司和利未人先後路過卻置之不理（路加福音10:31-32）。"},
+{cat:"新約",q:"耶穌登山寶訓記載在哪本福音書？",opts:["馬可福音","路加福音","馬太福音","約翰福音"],ans:2,exp:"登山寶訓（八福等教導）記載在馬太福音5-7章。"},
+{cat:"新約",q:"保羅第一次宣教之旅的主要同伴是誰？",opts:["西拉","提摩太","巴拿巴","路加"],ans:2,exp:"巴拿巴和保羅被聖靈差派出發，展開第一次宣教之旅（使徒行傳13章）。"},
+{cat:"新約",q:"約翰福音第一章說「太初有___」？",opts:["光","愛","道","神"],ans:2,exp:"「太初有道，道與神同在，道就是神」（約翰福音1:1）。"},
+{cat:"新約",q:"誰是第一位殉道的執事？",opts:["腓力","巴拿巴","司提反","提摩太"],ans:2,exp:"司提反被人用石頭打死，是新約第一位殉道的執事（使徒行傳7章）。"},
+{cat:"新約",q:"誰是第一位殉道的使徒？（被希律王用刀殺死）",opts:["彼得","約翰","雅各","安得烈"],ans:2,exp:"約翰的兄弟雅各被希律王用刀殺死（使徒行傳12:2）。"},
+{cat:"新約",q:"哥尼流是第一個信主的外邦人，他的職業是？",opts:["稅吏","漁夫","羅馬百夫長","祭司"],ans:2,exp:"哥尼流是羅馬百夫長，彼得去傳福音，他全家信主受洗（使徒行傳10章）。"},
+{cat:"新約",q:"保羅在腓立比遇見的第一個信主的歐洲人是誰？",opts:["百基拉","呂底亞","以哥尼","土拿"],ans:1,exp:"呂底亞是賣紫色布料的商人，是歐洲第一個信主的人（使徒行傳16:14）。"},
+{cat:"新約",q:"雅各書的主要主題是什麼？",opts:["恩典","信心與行為","盼望","預言"],ans:1,exp:"雅各書強調真正的信心必有行為表現（雅各書2:17）。"},
+{cat:"新約",q:"「神就是___」（約翰一書4:8）？",opts:["光","善","愛","真理"],ans:2,exp:"「神就是愛」（約翰一書4:8）。"},
+{cat:"新約",q:"彼得後書第三章說，主看一日如___年？",opts:["一百","五百","一千","一萬"],ans:2,exp:"「主看一日如千年，千年如一日」（彼得後書3:8）。"},
+{cat:"新約",q:"路加福音獨有的哪個比喻？",opts:["撒種的比喻","浪子回頭","登山寶訓","餵飽五千人"],ans:1,exp:"浪子回頭的比喻只出現在路加福音15章。"},
+{cat:"新約",q:"耶穌說「你們要彼此相愛，像我___你們一樣」？",opts:["憐憫","饒恕","愛","幫助"],ans:2,exp:"「你們要彼此相愛，像我愛你們一樣」（約翰福音13:34）。"},
+{cat:"新約",q:"耶穌說「我就是葡萄樹，你們是___」？",opts:["根","果子","葉子","枝子"],ans:3,exp:"「我是葡萄樹，你們是枝子」（約翰福音15:5）。"},
+{cat:"新約",q:"哪本福音書最短、最簡潔？",opts:["馬太福音","馬可福音","路加福音","約翰福音"],ans:1,exp:"馬可福音是四福音書中最短的，共16章，風格簡潔有力。"},
+{cat:"新約",q:"耶穌說「我來，是要叫人得___，並且得的更豐盛」？",opts:["平安","喜樂","生命","智慧"],ans:2,exp:"「我來了，是要叫羊得生命，並且得的更豐盛」（約翰福音10:10）。"},
+{cat:"新約",q:"耶穌在哪裡禱告後被捕？",opts:["客西馬尼園","伯大尼","橄欖山頂","聖殿"],ans:0,exp:"耶穌在客西馬尼園切切禱告後被猶大帶人逮捕（馬太福音26:36）。"},
+{cat:"新約",q:"保羅書信中，哪封被稱為「喜樂書信」？",opts:["以弗所書","腓立比書","哥羅西書","帖撒羅尼迦書"],ans:1,exp:"腓立比書充滿喜樂，「喜樂」一詞在其中出現多次，被稱為喜樂書信。"},
+{cat:"新約",q:"耶穌醫治生來瞎眼的人，記載在約翰福音第幾章？",opts:["第5章","第7章","第9章","第11章"],ans:2,exp:"耶穌用泥抹在瞎子眼上，使他得見光明（約翰福音9章）。"},
+{cat:"新約",q:"啟示錄描述新天新地時，說神要擦去人一切的___？",opts:["罪惡","記憶","眼淚","傷痛"],ans:2,exp:"「神要擦去他們一切的眼淚」（啟示錄21:4）。"},
+
+// ===== 人物 (52題) =====
+{cat:"人物",q:"「信心之父」是指哪位人物？",opts:["摩西","亞伯拉罕","以撒","雅各"],ans:1,exp:"亞伯拉罕因信心順服神，被稱為信心之父（羅馬書4章）。"},
+{cat:"人物",q:"誰藏匿了以色列的探子？",opts:["底波拉","路得","喇合","拿俄米"],ans:2,exp:"喇合藏匿了約書亞派出的探子（約書亞記2章）。"},
+{cat:"人物",q:"以色列第一位王是誰？",opts:["大衛","掃羅","所羅門","約沙法"],ans:1,exp:"掃羅是以色列第一位受膏的王（撒母耳記上10章）。"},
+{cat:"人物",q:"保羅原來的名字叫什麼？",opts:["西拉","巴拿巴","掃羅","提摩太"],ans:2,exp:"保羅在歸主前名叫掃羅（使徒行傳13:9）。"},
+{cat:"人物",q:"哪位女性成為波斯王后，拯救了以色列人？",opts:["以斯帖","底波拉","米甲","亞比該"],ans:0,exp:"以斯帖成為波斯王亞哈隨魯的王后（以斯帖記2章）。"},
+{cat:"人物",q:"誰建造了方舟？",opts:["亞伯拉罕","摩西","挪亞","亞當"],ans:2,exp:"神命令挪亞建造方舟，躲避洪水（創世記6章）。"},
+{cat:"人物",q:"亞當和夏娃的長子是誰？",opts:["亞伯","塞特","以諾","該隱"],ans:3,exp:"該隱是亞當和夏娃所生的第一個兒子（創世記4:1）。"},
+{cat:"人物",q:"以撒的妻子叫什麼名字？",opts:["拉結","撒拉","利百加","夏甲"],ans:2,exp:"亞伯拉罕的僕人為以撒求得利百加為妻（創世記24章）。"},
+{cat:"人物",q:"雅各最愛的妻子是誰？",opts:["利亞","拉結","辟拉","悉帕"],ans:1,exp:"雅各為了迎娶拉結，為拉班工作了十四年（創世記29:30）。"},
+{cat:"人物",q:"誰是以色列著名的女士師？",opts:["米利暗","以斯帖","底波拉","路得"],ans:2,exp:"底波拉是以色列的女先知和士師，帶領以色列人得勝（士師記4章）。"},
+{cat:"人物",q:"參孫愛上了哪位女子，最終被她出賣？",opts:["底拿","大利拉","路得","拿俄米"],ans:1,exp:"大利拉三番四次問參孫力量的秘密，最終出賣他（士師記16章）。"},
+{cat:"人物",q:"大衛王最好的朋友是誰？",opts:["亞比篩","約押","約拿單","押沙龍"],ans:2,exp:"約拿單（掃羅的兒子）與大衛結為摯友，「愛他如同愛自己的心」（撒上18:1）。"},
+{cat:"人物",q:"以利沙從哪位先知手中接過衣缽？",opts:["以賽亞","耶利米","以利亞","但以理"],ans:2,exp:"以利亞將外衣投在以利沙身上，揀選他為繼任先知（列王記上19:19）。"},
+{cat:"人物",q:"施洗約翰的父親叫什麼名字？",opts:["以利亞","撒迦利亞","亞拿","約西亞"],ans:1,exp:"撒迦利亞是祭司，天使告訴他，他的妻子以利沙伯將生約翰（路加福音1章）。"},
+{cat:"人物",q:"門徒中的稅吏是誰？",opts:["西門","馬太","猶大","多馬"],ans:1,exp:"馬太（又名利未）原是稅吏，耶穌呼召他「來跟從我」（馬太福音9:9）。"},
+{cat:"人物",q:"誰被稱為「耶穌所愛的門徒」？",opts:["彼得","雅各","約翰","安得烈"],ans:2,exp:"約翰在自己的福音書中以「耶穌所愛的門徒」自稱（約翰福音13:23）。"},
+{cat:"人物",q:"路加是什麼職業？",opts:["漁夫","木匠","醫生","稅吏"],ans:2,exp:"保羅稱路加為「所親愛的醫生」（歌羅西書4:14）。"},
+{cat:"人物",q:"誰是第一位殉道的執事？",opts:["腓利","巴拿巴","司提反","提摩太"],ans:2,exp:"司提反被用石頭打死，是新約最早的殉道者（使徒行傳7:60）。"},
+{cat:"人物",q:"哥尼流的職業是？",opts:["稅吏","漁夫","羅馬百夫長","祭司"],ans:2,exp:"哥尼流是羅馬百夫長，敬畏神，彼得去傳福音，他全家信主（使徒行傳10章）。"},
+{cat:"人物",q:"提摩太的母親叫什麼名字？",opts:["百基拉","友尼基","呂底亞","以斯帖"],ans:1,exp:"提摩太的母親友尼基和祖母羅以都有真實的信心（提摩太後書1:5）。"},
+{cat:"人物",q:"大衛在被立為王之前，主要的職業是？",opts:["木匠","士師","牧羊人","祭司"],ans:2,exp:"大衛年少時是牧羊人，常在曠野照顧父親耶西的羊（撒上16:11）。"},
+{cat:"人物",q:"所羅門王請求神賜給他什麼？",opts:["長壽","財富","智慧","軍事勝利"],ans:2,exp:"所羅門向神求聰明智慧，神大悅並賜他財富（列王記上3章）。"},
+{cat:"人物",q:"摩西的哥哥叫什麼名字？",opts:["米利暗","以利亞撒","亞倫","迦勒"],ans:2,exp:"亞倫是摩西的哥哥，成為以色列第一任大祭司（出埃及記4:14）。"},
+{cat:"人物",q:"誰帶領以色列人進入迦南地？",opts:["摩西","亞倫","約書亞","迦勒"],ans:2,exp:"摩西去世後，神呼召約書亞帶領以色列人進入應許地（約書亞記1章）。"},
+{cat:"人物",q:"路得的婆婆是誰？",opts:["以斯帖","底波拉","哈拿","拿俄米"],ans:3,exp:"拿俄米是路得的婆婆，路得說「你往哪裡去，我也往那裡去」（路得記1:16）。"},
+{cat:"人物",q:"波阿斯娶了誰為妻？",opts:["以斯帖","路得","哈拿","底波拉"],ans:1,exp:"波阿斯盡了親屬的本分，娶路得為妻（路得記4章）。"},
+{cat:"人物",q:"撒母耳的母親是誰？",opts:["米利暗","底波拉","哈拿","拿俄米"],ans:2,exp:"哈拿向神禱告、許願求子，神垂聽，她生了撒母耳（撒上1章）。"},
+{cat:"人物",q:"以利是誰的師父（主要教導他的人）？",opts:["大衛","所羅門","撒母耳","約書亞"],ans:2,exp:"撒母耳從小被母親獻給神，在祭司以利門下事奉（撒上2:11）。"},
+{cat:"人物",q:"亞拿尼亞和撒非喇因為什麼事被神擊打？",opts:["謊報賣地的錢","拜偶像","打架","偷竊"],ans:0,exp:"他們謊稱把賣地的錢全部奉獻，卻私自留下一部分（使徒行傳5章）。"},
+{cat:"人物",q:"先知以利亞躲避哪個王后的追殺？",opts:["以斯帖","亞他利雅","耶洗別","米甲"],ans:2,exp:"耶洗別威脅要殺以利亞，他逃往曠野（列王記上19:2）。"},
+{cat:"人物",q:"約拿逃跑時要往哪裡去？",opts:["巴比倫","埃及","他施","尼尼微"],ans:2,exp:"約拿不肯去尼尼微，反而逃往他施（約拿書1:3）。"},
+{cat:"人物",q:"以斯帖的養父（表哥）叫什麼名字？",opts:["末底改","哈曼","亞哈隨魯","尼希米"],ans:0,exp:"末底改養育了孤女以斯帖，後來也被高舉（以斯帖記2:7）。"},
+{cat:"人物",q:"詩篇23篇「耶和華是我的牧者」的作者是誰？",opts:["亞薩","摩西","大衛","所羅門"],ans:2,exp:"詩篇23篇的標題寫明是「大衛的詩」。"},
+{cat:"人物",q:"亞伯拉罕與誰分開，各佔一方的土地？",opts:["以實瑪利","以撒","羅得","以東"],ans:2,exp:"亞伯拉罕讓侄子羅得先選地，他們就分開了（創世記13章）。"},
+{cat:"人物",q:"雅各的舅舅（也是岳父）叫什麼名字？",opts:["以掃","拉班","以利米勒","亞比米勒"],ans:1,exp:"拉班是利百加的哥哥，也是雅各兩位妻子利亞和拉結的父親（創世記29章）。"},
+{cat:"人物",q:"大衛犯了哪項重大的罪？",opts:["拜偶像","與拔示巴通姦並謀殺其夫","欺騙父親","背叛神"],ans:1,exp:"大衛犯了與拔示巴通姦，並設計讓拔示巴的丈夫烏利亞陣亡（撒下11章）。"},
+{cat:"人物",q:"誰用帳篷釘子殺了迦南軍長西西拉？",opts:["底波拉","雅億","米利暗","路得"],ans:1,exp:"雅億是英勇的女子，用帳篷的釘子刺入西西拉的太陽穴（士師記4:21）。"},
+{cat:"人物",q:"掃羅王在哪座山上陣亡？",opts:["西奈山","赫門山","基利波山","橄欖山"],ans:2,exp:"掃羅在基利波山戰敗，自刎而死（撒母耳記上31章）。"},
+{cat:"人物",q:"使徒中，誰帶希臘人去見耶穌？",opts:["彼得","約翰","腓力","巴多羅買"],ans:2,exp:"腓力告訴安得烈，他們一同去通知耶穌（約翰福音12:22）。"},
+{cat:"人物",q:"百基拉和亞居拉的職業是？",opts:["漁夫","帳棚製造者","農夫","商人"],ans:1,exp:"百基拉和亞居拉與保羅同業，都是製造帳棚的（使徒行傳18:3）。"},
+{cat:"人物",q:"誰在保羅第二次宣教旅程中加入他？",opts:["巴拿巴","提摩太","以巴弗","亞波羅"],ans:1,exp:"保羅揀選提摩太與他同行出發（使徒行傳16:3）。"},
+{cat:"人物",q:"誰問耶穌「我可以再投母腹重生嗎？」",opts:["猶大","尼哥底母","彼得","約翰"],ans:1,exp:"法利賽人尼哥底母夜裡來見耶穌，問到重生的問題（約翰福音3章）。"},
+{cat:"人物",q:"新約中誰寫的書信最多？",opts:["彼得","約翰","保羅","雅各"],ans:2,exp:"保羅共寫了13封書信，是新約中書信最多的作者。"},
+{cat:"人物",q:"路加福音和使徒行傳都是獻給誰的？",opts:["提摩太","提阿非羅","腓利門","哥尼流"],ans:1,exp:"路加在兩卷書的開頭都說是寫給「提阿非羅大人」（路1:3；徒1:1）。"},
+{cat:"人物",q:"哪位先知被稱為「哭泣的先知」？",opts:["以賽亞","以西結","耶利米","但以理"],ans:2,exp:"耶利米因看見猶大的罪和滅亡而痛哭，被稱為「哭泣的先知」。"},
+{cat:"人物",q:"以西結枯骨復生的異象代表什麼？",opts:["以色列的罪惡","以色列的復興","外邦的滅亡","末世審判"],ans:1,exp:"枯骨復生代表以色列雖如死骸，神必使他們復興（以西結書37:11-14）。"},
+{cat:"人物",q:"摩西的岳父（也給他治國建議）叫什麼名字？",opts:["亞倫","葉忒羅","迦勒","約書亞"],ans:1,exp:"葉忒羅是摩西的岳父，建議摩西設立千夫長百夫長（出埃及記18章）。"},
+{cat:"人物",q:"是誰把嬰孩摩西放在蘆葦箱裡，漂在尼羅河上？",opts:["摩西的母親約基別","摩西的姐姐米利暗","法老的女兒","埃及的助產士"],ans:0,exp:"摩西的母親約基別把他放在蒲草箱中，藏在河邊（出埃及記2:3）。"},
+{cat:"人物",q:"誰在新約中接待了逃走的奴隸阿尼西母並讓他歸還主人？",opts:["保羅","腓利門","巴拿巴","提摩太"],ans:0,exp:"保羅為逃奴阿尼西母寫了腓利門書，求腓利門接納他（腓利門書1章）。"},
+
+// ===== 金句 (52題) =====
+{cat:"金句",q:"「耶和華是我的牧者，我必不至___」（詩23:1）",opts:["死亡","缺乏","孤單","害怕"],ans:1,exp:"詩篇23:1「耶和華是我的牧者，我必不至缺乏。」"},
+{cat:"金句",q:"約翰福音3:16說，神愛世人，甚至將祂的___賜給他們",opts:["福音","應許","獨生子","靈魂"],ans:2,exp:"「神愛世人，甚至將他的獨生子賜給他們，叫一切信他的，不至滅亡，反得永生。」"},
+{cat:"金句",q:"「我靠著那加給我力量的，凡事___」（腓4:13）",opts:["感恩","都能做","順服","平安"],ans:1,exp:"腓立比書4:13「我靠著那加給我力量的，凡事都能做。」"},
+{cat:"金句",q:"「你要___耶和華你的神，要盡心盡性盡力」（申6:5）",opts:["敬畏","遵守","信靠","愛"],ans:3,exp:"申命記6:5「你要盡心、盡性、盡力愛耶和華你的神。」"},
+{cat:"金句",q:"腓4:6「應當一無掛慮，只要凡事藉著___告訴神」",opts:["信心","讚美","禱告","感謝"],ans:2,exp:"「應當一無掛慮，只要凡事藉著禱告、祈求，將你們所要的告訴神。」"},
+{cat:"金句",q:"「起初，神創造___和地」（創1:1）",opts:["日月","星辰","天","山"],ans:2,exp:"創世記1:1「起初，神創造天地。」"},
+{cat:"金句",q:"「神看著一切所造的都甚___」（創1:31）",opts:["美麗","奇妙","好","榮耀"],ans:2,exp:"神在第六天看著一切所造的，都甚好（創世記1:31）。"},
+{cat:"金句",q:"「你們要先求神的___和義，這些東西都要加給你們了」（太6:33）",opts:["恩典","國","愛","智慧"],ans:1,exp:"馬太福音6:33「你們要先求他的國和他的義，這些東西都要加給你們了。」"},
+{cat:"金句",q:"「愛是___的，又是恩慈的」（哥前13:4）",opts:["美好","恆久忍耐","永遠","純潔"],ans:1,exp:"哥林多前書13:4「愛是恆久忍耐，又有恩慈。」"},
+{cat:"金句",q:"「我是道路、真理、___」（約14:6）",opts:["平安","喜樂","生命","盼望"],ans:2,exp:"約翰福音14:6「我就是道路、真理、生命。」"},
+{cat:"金句",q:"「神就是___」（約一4:8）",opts:["光","善","愛","真理"],ans:2,exp:"約翰一書4:8「神就是愛。」"},
+{cat:"金句",q:"「___的人有福了，因為他們必得安慰」（太5:4）",opts:["虛心","溫柔","哀慟","清心"],ans:2,exp:"馬太福音5:4「哀慟的人有福了，因為他們必得安慰。」"},
+{cat:"金句",q:"「使人和睦的人有福了，因為他們必稱為___的兒子」（太5:9）",opts:["神","天使","以色列","人"],ans:0,exp:"馬太福音5:9「使人和睦的人有福了，因為他們必稱為神的兒子。」"},
+{cat:"金句",q:"「太初有___，道與神同在，道就是神」（約1:1）",opts:["光","愛","道","神"],ans:2,exp:"約翰福音1:1「太初有道，道與神同在，道就是神。」"},
+{cat:"金句",q:"「我是世界的___；跟從我的，必不在黑暗裡走」（約8:12）",opts:["鹽","光","路","門"],ans:1,exp:"約翰福音8:12「我是世界的光，跟從我的，必不在黑暗裡走。」"},
+{cat:"金句",q:"「你們要休息，要知道我是___」（詩46:10）",opts:["愛","神","主","救主"],ans:1,exp:"詩篇46:10「你們要休息，要知道我是神。」"},
+{cat:"金句",q:"「要嘗嘗主恩的滋味，便知道他是___」（詩34:8）",opts:["慈愛的","美善的","憐憫的","公義的"],ans:1,exp:"詩篇34:8「你們要嘗嘗主恩的滋味，便知道他是美善的。」"},
+{cat:"金句",q:"「信就是所望之事的___，是未見之事的確據」（來11:1）",opts:["憑據","實底","根基","盼望"],ans:1,exp:"希伯來書11:1「信就是所望之事的實底，是未見之事的確據。」"},
+{cat:"金句",q:"「你的話是我腳前的___，是我路上的光」（詩119:105）",opts:["力量","燈","指引","平安"],ans:1,exp:"詩篇119:105「你的話是我腳前的燈，是我路上的光。」"},
+{cat:"金句",q:"「萬事都互相效力，叫愛神的人得___」（羅8:28）",opts:["喜樂","平安","益處","勝利"],ans:2,exp:"羅馬書8:28「萬事都互相效力，叫愛神的人得益處。」"},
+{cat:"金句",q:"「你們要去，使萬民作我的___」（太28:19）",opts:["子民","門徒","僕人","信徒"],ans:1,exp:"馬太福音28:19「你們要去，使萬民作我的門徒。」"},
+{cat:"金句",q:"「喜樂的心乃是___」（箴17:22）",opts:["智慧","良藥","能力","力量"],ans:1,exp:"箴言17:22「喜樂的心乃是良藥。」"},
+{cat:"金句",q:"「你所做的，要交託___」（箴16:3）",opts:["人","時間","耶和華","教會"],ans:2,exp:"箴言16:3「你所做的事要交託耶和華，你所謀的就必成立。」"},
+{cat:"金句",q:"「愛裡沒有懼怕；愛既完全，就把懼怕___出去」（約一4:18）",opts:["趕","擠","除","推"],ans:2,exp:"約翰一書4:18「愛裡沒有懼怕；愛既完全，就把懼怕除去。」"},
+{cat:"金句",q:"「聖靈所結的果子，就是仁愛、___、和平…」（加5:22）",opts:["信心","喜樂","盼望","忍耐"],ans:1,exp:"加拉太書5:22「聖靈所結的果子，就是仁愛、喜樂、和平…」"},
+{cat:"金句",q:"「你們得救是本乎恩，也因著___」（弗2:8）",opts:["行為","愛","信","禱告"],ans:2,exp:"以弗所書2:8「你們得救是本乎恩，也因著信，這並不是出於自己，乃是神所賜的。」"},
+{cat:"金句",q:"「你要保守你的___，勝過保守一切，因為一生的果效是由心發出」（箴4:23）",opts:["口","眼","手","心"],ans:3,exp:"箴言4:23「你要保守你心，勝過保守一切，因為一生的果效是由心發出。」"},
+{cat:"金句",q:"「敬畏耶和華是智慧的___」（箴9:10）",opts:["終結","果效","開端","根基"],ans:2,exp:"箴言9:10「敬畏耶和華是智慧的開端，認識至聖者便是聰明。」"},
+{cat:"金句",q:"「你要___耶和華，不要倚靠自己的聰明」（箴3:5）",opts:["愛","敬畏","信靠","順服"],ans:2,exp:"箴言3:5「你要專心仰賴耶和華，不可倚靠自己的聰明。」"},
+{cat:"金句",q:"「凡勞苦擔重擔的人，可以到我這裡來，我就使你們___」（太11:28）",opts:["得力","得勝","得安息","得喜樂"],ans:2,exp:"馬太福音11:28「凡勞苦擔重擔的人，可以到我這裡來，我就使你們得安息。」"},
+{cat:"金句",q:"「這是耶和華所定的日子，我們在其中要___」（詩118:24）",opts:["感恩","禱告","高興喜樂","讚美"],ans:2,exp:"詩篇118:24「這是耶和華所定的日子，我們在其中要高興喜樂。」"},
+{cat:"金句",q:"「神的道是活潑的，是___的」（來4:12）",opts:["永遠","美好","有功效","完全"],ans:2,exp:"希伯來書4:12「神的道是活潑的，是有功效的，比一切兩刃的劍更快。」"},
+{cat:"金句",q:"「人子來，為要尋找、拯救___的人」（路19:10）",opts:["有罪","迷失","失喪","軟弱"],ans:2,exp:"路加福音19:10「人子來，為要尋找、拯救失喪的人。」"},
+{cat:"金句",q:"「天地要廢去，我的話卻___」（太24:35）",opts:["永遠長存","必不廢去","常在人心","不能廢去"],ans:3,exp:"馬太福音24:35「天地要廢去，我的話卻不能廢去。」"},
+{cat:"金句",q:"「信、望、___，這三樣，其中最大的是愛」（哥前13:13）",opts:["愛","恩","喜","力"],ans:0,exp:"哥林多前書13:13「如今常存的有信、有望、有愛，這三樣，其中最大的是愛。」"},
+{cat:"金句",q:"「我的神必照他榮耀的豐富，___你們一切所需用的」（腓4:19）",opts:["給予","充足地供給","滿足","賜下"],ans:1,exp:"腓立比書4:19「我的神必照他榮耀的豐富，在基督耶穌裡，使你們一切所需用的都充足。」"},
+{cat:"金句",q:"「你要___你的父母，使你的日子在地上得以長久」（出20:12）",opts:["服從","尊重","孝敬","聽從"],ans:2,exp:"出埃及記20:12「當孝敬父母，使你的日子在耶和華你神所賜你的地上，得以長久。」"},
+{cat:"金句",q:"「愛是不求___的」（哥前13:5）",opts:["讚美","平安","自己益處","他人的好"],ans:2,exp:"哥林多前書13:5「愛是不求自己的益處。」"},
+{cat:"金句",q:"「我必不撇下你，也不___你」（書1:5）",opts:["離開","忘記","丟棄","放棄"],ans:2,exp:"約書亞記1:5「我必不撇下你，也不丟棄你。」"},
+{cat:"金句",q:"「少年人，要趁著年輕紀念造你的___」（傳12:1）",opts:["父母","主","神","耶和華"],ans:2,exp:"傳道書12:1「你趁著年幼、衰敗的日子尚未來到，要紀念造你的主。」"},
+{cat:"金句",q:"「不要效法這個世界，只要心意___而變化」（羅12:2）",opts:["更新","更好","更深","更強"],ans:0,exp:"羅馬書12:2「不要效法這個世界，只要心意更新而變化。」"},
+{cat:"金句",q:"「以利、以利、拉馬撒巴各大尼」是什麼意思？",opts:["我主，我主，求你憐憫我","我的神，我的神，為何離棄我","父啊，原諒他們","我渴了"],ans:1,exp:"這是耶穌在十字架上呼喊的話，意思是「我的神，我的神，為何離棄我？」（馬可福音15:34）。"},
+{cat:"金句",q:"「因為我活著就是基督，我死了就有___」（腓1:21）",opts:["平安","喜樂","益處","永生"],ans:2,exp:"腓立比書1:21「因我活著就是基督，我死了就有益處。」"},
+{cat:"金句",q:"「親愛的，你在一切事上順利，身體健壯，正如你的___興盛一樣」（約三1:2）",opts:["工作","事業","靈魂","信心"],ans:2,exp:"約翰三書1:2「我願你在一切事上興盛，身體健壯，正如你的靈魂興盛一樣。」"},
+{cat:"金句",q:"「要剛強壯膽，不要懼怕」出自哪本書？",opts:["詩篇","申命記","約書亞記","出埃及記"],ans:2,exp:"約書亞記1:9「你當剛強壯膽，不要懼怕，也不要驚惶；因為你無論往哪裡去，耶和華你的神必與你同在。」"},
+{cat:"金句",q:"「耶和華賜福，使人富足；並不加上憂慮」出自哪本書？",opts:["詩篇","傳道書","箴言","約伯記"],ans:2,exp:"箴言10:22「耶和華所賜的福，使人富足，並不加上憂慮。」"},
+{cat:"金句",q:"「你必曉得真理，真理必叫你___」（約8:32）",opts:["得生命","自由","平安","喜樂"],ans:1,exp:"約翰福音8:32「你們必曉得真理，真理必叫你們得以自由。」"},
+{cat:"金句",q:"「沒有人能事奉兩個主…你們不能又事奉神，又事奉___」（太6:24）",opts:["罪","撒旦","金錢（瑪門）","世界"],ans:2,exp:"馬太福音6:24「你們不能又事奉神，又事奉瑪門（即金錢）。」"},
+{cat:"金句",q:"「要常常喜樂，不住地禱告，凡事___」（帖前5:16-18）",opts:["忍耐","感恩","讚美","信靠"],ans:1,exp:"帖撒羅尼迦前書5:16-18「要常常喜樂，不住地禱告，凡事謝恩。」"},
+{cat:"金句",q:"「你們祈求，就給你們；尋找，就___；叩門，就給你們開門」（太7:7）",opts:["得到","尋見","蒙恩","得安慰"],ans:1,exp:"馬太福音7:7「你們祈求，就給你們；尋找，就尋見；叩門，就給你們開門。」"},
+{cat:"金句",q:"「我們是他的工作，在基督耶穌裡造成的，為要叫我們行___」（弗2:10）",opts:["公義","善事","誡命","神蹟"],ans:1,exp:"以弗所書2:10「我們原是他的工作，在基督耶穌裡造成的，為要叫我們行善。」"},
+];
+
+// ===== 音效 (Web Audio API) =====
+var AC = null;
+function getAC(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;}
+
+function playTone(freq,type,dur,vol,delay){
+  try{
+    var ac=getAC(),o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);
+    o.type=type||"sine";o.frequency.value=freq;
+    g.gain.setValueAtTime(vol||0.3,ac.currentTime+(delay||0));
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+(delay||0)+dur);
+    o.start(ac.currentTime+(delay||0));
+    o.stop(ac.currentTime+(delay||0)+dur);
+  }catch(e){}
+}
+
+function sfxCorrect(){
+  playTone(523,"sine",0.12,0.3,0);
+  playTone(659,"sine",0.12,0.3,0.1);
+  playTone(784,"sine",0.2,0.3,0.2);
+}
+function sfxStreak(){
+  [523,659,784,1047].forEach(function(f,i){playTone(f,"sine",0.12,0.35,i*0.08);});
+}
+function sfxWrong(){
+  playTone(220,"sawtooth",0.15,0.25,0);
+  playTone(180,"sawtooth",0.2,0.2,0.15);
+}
+function sfxTick(){playTone(880,"sine",0.04,0.1,0);}
+function sfxTimeup(){
+  playTone(300,"square",0.1,0.2,0);
+  playTone(200,"square",0.2,0.2,0.12);
+}
+function sfxWin(){
+  var notes=[523,659,784,1047,784,1047,1319];
+  notes.forEach(function(f,i){playTone(f,"sine",0.18,0.3,i*0.1);});
+}
+function sfxClick(){playTone(660,"sine",0.06,0.15,0);}
+
+var selCats=["舊約","新約","人物","金句"];
+var qs=[],idx=0,score=0,streak=0,maxStreak=0,correctCount=0,totalTime=0;
+var timer=null,timeLeft=15;
+
+function show(id){["s-start","s-quiz","s-result"].forEach(function(s){document.getElementById(s).className=s===id?"screen active":"screen";});}
+
+document.querySelectorAll(".cat-btn").forEach(function(btn){
+  btn.addEventListener("click",function(){
+    var c=btn.getAttribute("data-cat");
+    if(btn.classList.contains("on")){if(selCats.length===1)return;selCats=selCats.filter(function(x){return x!==c;});btn.classList.remove("on");}
+    else{selCats.push(c);btn.classList.add("on");}
+  });
+});
+document.getElementById("btn-start").addEventListener("click",function(){sfxClick();startGame();});
+document.getElementById("btn-restart").addEventListener("click",function(){sfxClick();show("s-start");});
+document.getElementById("btn-share").addEventListener("click",function(){sfxClick();shareResult();});
+
+function shuffle(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+
+function startGame(){
+  var pool=QS.filter(function(q){return selCats.indexOf(q.cat)>=0;});
+  qs=shuffle(pool).slice(0,Math.min(10,pool.length));
+  idx=0;score=0;streak=0;maxStreak=0;correctCount=0;totalTime=0;
+  document.getElementById("d-qt").textContent=qs.length;
+  show("s-quiz");loadQ();
+}
+
+function loadQ(){
+  if(idx>=qs.length){showResult();return;}
+  var q=qs[idx];
+  document.getElementById("d-qn").textContent=idx+1;
+  document.getElementById("d-score").textContent=score;
+  document.getElementById("d-cat").textContent=q.cat;
+  document.getElementById("d-q").textContent=q.q;
+  document.getElementById("d-fb").style.display="none";
+  document.getElementById("d-streak").textContent="";
+  var wrap=document.getElementById("d-opts");wrap.innerHTML="";
+  var L=["Ａ","Ｂ","Ｃ","Ｄ"];
+  q.opts.forEach(function(o,i){
+    var b=document.createElement("button");b.className="opt";b.textContent=L[i]+"  "+o;
+    b.addEventListener("click",function(){pick(i);});wrap.appendChild(b);
+  });
+  timeLeft=15;setBar();clearInterval(timer);
+  timer=setInterval(function(){timeLeft--;totalTime++;setBar();if(timeLeft===3)sfxTick();if(timeLeft===2)sfxTick();if(timeLeft===1)sfxTick();if(timeLeft<=0){clearInterval(timer);autoFail();}},1000);
+}
+
+function setBar(){var pct=(timeLeft/15)*100,bar=document.getElementById("tbar");bar.style.width=pct+"%";bar.style.background=pct>50?"#d4af37":pct>25?"#f0a500":"#dc3545";}
+
+function pick(chosen){
+  clearInterval(timer);totalTime+=(15-timeLeft);
+  var q=qs[idx],btns=document.querySelectorAll(".opt");
+  btns.forEach(function(b){b.disabled=true;});
+  var fb=document.getElementById("d-fb");fb.style.display="block";
+  if(chosen===q.ans){
+    btns[chosen].classList.add("correct");streak++;correctCount++;
+    var bonus=streak>=3?20:10;score+=bonus;maxStreak=Math.max(maxStreak,streak);
+    fb.className="feedback ok";fb.textContent="✅ 答對了！+"+bonus+"分　"+q.exp;
+    if(streak>=3){document.getElementById("d-streak").textContent="🔥 連續答對 "+streak+" 題！";sfxStreak();}else{sfxCorrect();}
+  }else{
+    btns[chosen].classList.add("wrong");btns[q.ans].classList.add("correct");streak=0;
+    fb.className="feedback bad";fb.textContent="❌ 答錯！正確答案是「"+q.opts[q.ans]+"」。"+q.exp;
+    sfxWrong();
+  }
+  document.getElementById("d-score").textContent=score;
+  setTimeout(function(){idx++;loadQ();},2200);
+}
+
+function autoFail(){
+  var q=qs[idx],btns=document.querySelectorAll(".opt");
+  btns.forEach(function(b){b.disabled=true;});btns[q.ans].classList.add("correct");streak=0;
+  var fb=document.getElementById("d-fb");fb.style.display="block";
+  fb.className="feedback bad";fb.textContent="⏰ 時間到！正確答案是「"+q.opts[q.ans]+"」。"+q.exp;
+  sfxTimeup();
+  setTimeout(function(){idx++;loadQ();},2200);
+}
+
+var VERSES=[
+  {t:"「耶和華是我的牧者，我必不至缺乏。」",r:"詩篇 23:1"},
+  {t:"「我靠著那加給我力量的，凡事都能做。」",r:"腓立比書 4:13"},
+  {t:"「神愛世人，甚至將他的獨生子賜給他們，叫一切信他的，不至滅亡，反得永生。」",r:"約翰福音 3:16"},
+  {t:"「你們祈求，就給你們；尋找，就尋見；叩門，就給你們開門。」",r:"馬太福音 7:7"},
+  {t:"「萬事都互相效力，叫愛神的人得益處。」",r:"羅馬書 8:28"},
+  {t:"「你的話是我腳前的燈，是我路上的光。」",r:"詩篇 119:105"},
+];
+
+function showResult(){
+  show("s-result");sfxWin();
+  var total=qs.length*20,pct=correctCount/qs.length;
+  document.getElementById("r-score").textContent=score;
+  document.getElementById("r-max").textContent=total;
+  document.getElementById("r-correct").textContent=correctCount+"/"+qs.length;
+  document.getElementById("r-streak").textContent=maxStreak;
+  var avg=qs.length>0?Math.round(totalTime/qs.length):0;
+  document.getElementById("r-time").textContent=avg+"秒";
+  var stars="⭐",msg="";
+  if(pct>=0.9){stars="🌟🌟🌟";msg="太厲害了！你對聖經瞭如指掌！"}
+  else if(pct>=0.7){stars="⭐⭐⭐";msg="非常好！繼續深入認識神的話語！"}
+  else if(pct>=0.5){stars="⭐⭐";msg="不錯！多讀聖經，你會更厲害的！"}
+  else{stars="⭐";msg="繼續加油！神的話語等著你去探索！"}
+  document.getElementById("r-stars").textContent=stars;
+  document.getElementById("r-msg").textContent=msg;
+  var v=VERSES[Math.floor(Math.random()*VERSES.length)];
+  document.getElementById("r-verse").innerHTML=v.t+"<small>— "+v.r+"</small>";
+}
+
+function shareResult(){
+  var pct=Math.round((correctCount/qs.length)*100);
+  var text="✝️ 聖經問答 Quiz 成績 ✝️\n\n我答對了 "+correctCount+"/"+qs.length+" 題，得了 "+score+" 分！("+pct+"%)\n\n📖 來一起挑戰聖經知識吧！";
+  if(navigator.share){navigator.share({title:"聖經問答成績",text:text}).catch(function(){});}
+  else{navigator.clipboard.writeText(text).then(function(){var t=document.getElementById("toast");t.classList.add("show");setTimeout(function(){t.classList.remove("show");},2500);}).catch(function(){alert(text);});}
+}
+</script>
+</body>
+</html>
