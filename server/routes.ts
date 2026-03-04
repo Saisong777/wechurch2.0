@@ -2279,7 +2279,7 @@ export async function registerRoutes(app: Express) {
 - 只回覆JSON，不要其他文字。`;
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gemini-2.0-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: prayerInputText }
@@ -3899,7 +3899,7 @@ export async function registerRoutes(app: Express) {
       });
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gemini-2.0-flash",
         messages: [
           { role: "system", content: SINGLE_NOTE_SYSTEM_PROMPT },
           { role: "user", content: `請整理以下靈修筆記：\n\n${userContent}` }
@@ -3963,7 +3963,7 @@ export async function registerRoutes(app: Express) {
         });
 
         const response = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gemini-2.0-flash",
           messages: [
             { role: "system", content: SINGLE_NOTE_SYSTEM_PROMPT },
             { role: "user", content: `請整理以下靈修筆記：\n\n${userContent}` }
@@ -3985,7 +3985,7 @@ export async function registerRoutes(app: Express) {
       });
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gemini-2.0-flash",
         messages: [
           { role: "system", content: MULTI_NOTE_SYSTEM_PROMPT },
           { role: "user", content: `請整合分析以下 ${notes.length} 篇靈修筆記：\n\n${userContent}` }
