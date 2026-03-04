@@ -40,13 +40,19 @@ app.use((req, res, next) => {
 (async () => {
   const server = createServer(app);
 
+  app.get("/__healthcheck", (_req, res) => {
+    res.status(200).send("ok");
+  });
+
   await registerRoutes(app);
 
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    res.status(status).json({ message });
-    throw err;
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
+    console.error(err);
   });
 
   if (app.get("env") === "development") {

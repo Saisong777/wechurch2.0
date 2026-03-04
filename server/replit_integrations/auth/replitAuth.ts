@@ -40,6 +40,8 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+  passport.serializeUser((user: Express.User, cb) => cb(null, user));
+  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
   passport.use(new GoogleStrategy({ clientID: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET!, callbackURL: "/api/callback" },
     async (_at, _rt, profile, done) => {
       try {
@@ -48,8 +50,6 @@ export async function setupAuth(app: Express) {
       } catch (err) { done(err as Error); }
     }
   ));
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
   app.get("/api/login", passport.authenticate("google", { scope: ["openid", "email", "profile"] }));
   app.get("/api/callback", passport.authenticate("google", { failureRedirect: "/api/login" }), (_req, res) => res.redirect("/"));
   app.get("/api/logout", (req, res) => { req.logout(() => res.redirect("/")); });
