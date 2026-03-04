@@ -14,7 +14,7 @@ async function upsertUser(profile: any) {
   await pool.query(
     `INSERT INTO auth_users (id, email, first_name, last_name, profile_image_url, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-     ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, profile_image_url=EXCLUDED.profile_image_url, updated_at=NOW()`,
+     ON CONFLICT (email) DO UPDATE SET id=EXCLUDED.id, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, profile_image_url=EXCLUDED.profile_image_url, updated_at=NOW()`,
     [googleId, email, firstName, lastName, profileImageUrl]
   );
   if (email) {
