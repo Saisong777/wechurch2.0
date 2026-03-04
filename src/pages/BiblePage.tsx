@@ -45,23 +45,21 @@ interface SavedVerse {
 interface BookCategory {
   name: string;
   books: number[];
-  bgClass: string;
-  darkBgClass: string;
-  labelClass: string;
+  colorDot: string;
 }
 
 const OLD_TESTAMENT_CATEGORIES: BookCategory[] = [
-  { name: '摩西五經', books: [1, 2, 3, 4, 5], bgClass: 'bg-amber-50', darkBgClass: 'dark:bg-amber-950/30', labelClass: 'text-amber-700 dark:text-amber-400' },
-  { name: '舊約歷史', books: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], bgClass: 'bg-emerald-50', darkBgClass: 'dark:bg-emerald-950/30', labelClass: 'text-emerald-700 dark:text-emerald-400' },
-  { name: '智慧詩體', books: [18, 19, 20, 21, 22], bgClass: 'bg-violet-50', darkBgClass: 'dark:bg-violet-950/30', labelClass: 'text-violet-700 dark:text-violet-400' },
-  { name: '舊約先知書', books: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39], bgClass: 'bg-rose-50', darkBgClass: 'dark:bg-rose-950/30', labelClass: 'text-rose-700 dark:text-rose-400' },
+  { name: '摩西五經', books: [1, 2, 3, 4, 5], colorDot: 'bg-amber-500' },
+  { name: '舊約歷史', books: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], colorDot: 'bg-emerald-500' },
+  { name: '智慧詩體', books: [18, 19, 20, 21, 22], colorDot: 'bg-violet-500' },
+  { name: '舊約先知書', books: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39], colorDot: 'bg-rose-500' },
 ];
 
 const NEW_TESTAMENT_CATEGORIES: BookCategory[] = [
-  { name: '四福音', books: [40, 41, 42, 43], bgClass: 'bg-sky-50', darkBgClass: 'dark:bg-sky-950/30', labelClass: 'text-sky-700 dark:text-sky-400' },
-  { name: '教會歷史', books: [44], bgClass: 'bg-teal-50', darkBgClass: 'dark:bg-teal-950/30', labelClass: 'text-teal-700 dark:text-teal-400' },
-  { name: '新約書信', books: [45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65], bgClass: 'bg-indigo-50', darkBgClass: 'dark:bg-indigo-950/30', labelClass: 'text-indigo-700 dark:text-indigo-400' },
-  { name: '新約先知書', books: [66], bgClass: 'bg-orange-50', darkBgClass: 'dark:bg-orange-950/30', labelClass: 'text-orange-700 dark:text-orange-400' },
+  { name: '四福音', books: [40, 41, 42, 43], colorDot: 'bg-sky-500' },
+  { name: '教會歷史', books: [44], colorDot: 'bg-teal-500' },
+  { name: '新約書信', books: [45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65], colorDot: 'bg-indigo-500' },
+  { name: '新約先知書', books: [66], colorDot: 'bg-orange-500' },
 ];
 
 const BiblePage = () => {
@@ -210,10 +208,10 @@ const BiblePage = () => {
   }, []);
 
   const FONT_SIZE_CONFIG = [
-    { label: '小', verse: 'text-sm sm:text-base', verseNum: 'text-xs sm:text-sm', paragraph: 'text-sm sm:text-base leading-relaxed', sup: 'text-[9px] sm:text-[10px]' },
-    { label: '中', verse: 'text-base sm:text-lg md:text-lg', verseNum: 'text-sm sm:text-lg', paragraph: 'text-base sm:text-lg md:text-lg leading-relaxed', sup: 'text-[10px] sm:text-xs' },
-    { label: '大', verse: 'text-lg sm:text-xl md:text-xl', verseNum: 'text-base sm:text-xl', paragraph: 'text-lg sm:text-xl md:text-xl leading-loose', sup: 'text-xs sm:text-sm' },
-    { label: '特大', verse: 'text-xl sm:text-2xl md:text-2xl', verseNum: 'text-lg sm:text-2xl', paragraph: 'text-xl sm:text-2xl md:text-2xl leading-loose', sup: 'text-sm sm:text-base' },
+    { label: '小', verse: 'text-[15px] sm:text-base', verseNum: 'text-xs', paragraph: 'text-[15px] sm:text-base', sup: 'text-[9px]' },
+    { label: '中', verse: 'text-[18px]', verseNum: 'text-sm', paragraph: 'text-[18px]', sup: 'text-[11px]' },
+    { label: '大', verse: 'text-[21px] sm:text-[22px]', verseNum: 'text-base', paragraph: 'text-[21px] sm:text-[22px]', sup: 'text-xs' },
+    { label: '特大', verse: 'text-2xl', verseNum: 'text-lg', paragraph: 'text-2xl', sup: 'text-sm' },
   ];
 
   const currentFontConfig = FONT_SIZE_CONFIG[fontSizeLevel];
@@ -567,30 +565,54 @@ const BiblePage = () => {
     );
   };
 
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  const toggleCategory = (name: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
   const renderCategorySection = (category: BookCategory, allBooks: BibleBook[]) => {
     const categoryBooks = getBooksByCategory(category, allBooks);
     if (categoryBooks.length === 0) return null;
+    const isExpanded = expandedCategories.has(category.name);
+    const totalChapters = categoryBooks.reduce((sum, b) => sum + b.chapterCount, 0);
 
     return (
-      <div key={category.name} className={`rounded-md p-3 sm:p-3 ${category.bgClass} ${category.darkBgClass}`}>
-        <p className={`text-sm sm:text-sm font-semibold mb-2 ${category.labelClass}`} data-testid={`text-category-${category.name}`}>
-          {category.name}
-        </p>
-        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          {categoryBooks.map((book) => (
-            <Button
-              key={book.bookNumber}
-              variant="ghost"
-              size="sm"
-              className="h-auto py-1.5 px-2.5 text-sm sm:text-sm bg-background/60 dark:bg-background/40"
-              onClick={() => setSelectedBook(book.bookName)}
-              data-testid={`button-book-${book.bookNumber}`}
-            >
-              {book.bookName}
-              <span className="text-xs text-muted-foreground ml-0.5">{book.chapterCount}</span>
-            </Button>
-          ))}
-        </div>
+      <div key={category.name} className="bg-white rounded-2xl shadow-card mx-3 mb-3 overflow-hidden">
+        <button
+          className="w-full flex items-center gap-2.5 px-4 py-3 text-left"
+          onClick={() => toggleCategory(category.name)}
+          data-testid={`button-category-${category.name}`}
+        >
+          <span className={`w-3 h-3 rounded-sm flex-shrink-0 ${category.colorDot}`} />
+          <span className="font-bold text-sm text-gray-800 flex-1">{category.name}</span>
+          <span className="text-xs text-gray-400">{totalChapters}章</span>
+          {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
+        {isExpanded && (
+          <div className="px-3 pb-3 grid grid-cols-3 gap-2">
+            {categoryBooks.map((book) => (
+              <button
+                key={book.bookNumber}
+                className={`h-11 rounded-lg text-sm flex flex-col items-center justify-center transition-colors ${
+                  selectedBook === book.bookName
+                    ? 'bg-brand-amber text-white font-bold'
+                    : 'bg-brand-soft text-gray-700 hover:bg-brand-sky/10'
+                }`}
+                onClick={() => setSelectedBook(book.bookName)}
+                data-testid={`button-book-${book.bookNumber}`}
+              >
+                <span>{book.bookName}</span>
+                <span className={`text-[10px] ${selectedBook === book.bookName ? 'text-white/80' : 'text-gray-400'}`}>{book.chapterCount}章</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -602,23 +624,44 @@ const BiblePage = () => {
       title="聖經閱讀功能維護中"
       description="聖經閱讀功能目前暫時關閉，請稍後再試"
     >
-    <div className="bg-background min-h-screen">
-      <Header
-        title="聖經閱讀"
-        subtitle="和合本"
-        variant="compact"
-        rightContent={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="sm:hidden text-muted-foreground"
-            onClick={() => setSearchExpanded(true)}
-            data-testid="button-expand-search"
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-        }
-      />
+    <div className="bg-brand-warm min-h-screen">
+      <div className="sticky top-0 z-40 bg-white border-b border-brand-border">
+        <div className="container mx-auto max-w-5xl flex items-center justify-between h-12 px-3 sm:px-4">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {selectedBook ? (
+              <span className="font-semibold text-sm text-gray-800 truncate" data-testid="text-current-book">
+                {selectedBook}{selectedChapter ? ` ${selectedChapter}章` : ''}
+              </span>
+            ) : (
+              <span className="font-semibold text-sm text-gray-800">聖經閱讀</span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="sm:hidden text-muted-foreground w-8 h-8"
+              onClick={() => setSearchExpanded(true)}
+              data-testid="button-expand-search"
+            >
+              <Search className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <button
+              className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100'}`}
+              onClick={() => changeFontSize(-1)}
+              disabled={fontSizeLevel === 0}
+              data-testid="button-font-decrease"
+            >A-</button>
+            <span className="text-xs text-gray-400 w-6 text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
+            <button
+              className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 3 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100'}`}
+              onClick={() => changeFontSize(1)}
+              disabled={fontSizeLevel === 3}
+              data-testid="button-font-increase"
+            >A+</button>
+          </div>
+        </div>
+      </div>
       
       <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
         <div className="max-w-5xl lg:max-w-6xl mx-auto w-full">
@@ -755,75 +798,44 @@ const BiblePage = () => {
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-1 mb-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setToolbarCollapsed(!toolbarCollapsed)}
-                    title={toolbarCollapsed ? '展開工具列' : '收合工具列'}
-                    data-testid="button-toggle-toolbar"
-                    className="gap-1 text-muted-foreground"
-                  >
-                    {toolbarCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                    <span className="text-xs">{toolbarCollapsed ? '展開工具' : '收合工具'}</span>
-                  </Button>
-                  {toolbarCollapsed && (
-                    <span className="text-xs text-muted-foreground">
-                      {FONT_SIZE_CONFIG[fontSizeLevel].label} · {displayMode === 'list' ? '條列' : '段落'}
-                      {selectedVerseNums.size > 0 && ` · 已選${selectedVerseNums.size}節`}
-                    </span>
-                  )}
-                  {!toolbarCollapsed && (
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      {selectedVerseNums.size > 0 ? `已選 ${selectedVerseNums.size} 節` : ''}
-                    </span>
+                <div className="flex items-center gap-1 sm:gap-2 mb-2">
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      variant={displayMode === 'list' ? 'default' : 'outline'}
+                      size="icon"
+                      className="w-8 h-8"
+                      onClick={() => {
+                        setDisplayMode('list');
+                        try { localStorage.setItem('wechurch-bible-display-mode', 'list'); } catch {}
+                      }}
+                      title="條列式"
+                      data-testid="button-display-list"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={displayMode === 'paragraph' ? 'default' : 'outline'}
+                      size="icon"
+                      className="w-8 h-8"
+                      onClick={() => {
+                        setDisplayMode('paragraph');
+                        try { localStorage.setItem('wechurch-bible-display-mode', 'paragraph'); } catch {}
+                      }}
+                      title="段落式"
+                      data-testid="button-display-paragraph"
+                    >
+                      <AlignLeft className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <ScriptureTTS
+                    text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
+                    compact
+                    label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
+                  />
+                  {selectedVerseNums.size > 0 && (
+                    <span className="text-xs text-muted-foreground ml-auto">已選 {selectedVerseNums.size} 節</span>
                   )}
                 </div>
-                {!toolbarCollapsed && (
-                  <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
-                    <div className="flex items-center gap-0.5 mr-1">
-                      <Type className="w-3.5 h-3.5 text-muted-foreground" />
-                      <Button variant="ghost" size="sm" onClick={() => changeFontSize(-1)} disabled={fontSizeLevel === 0} title="縮小字體" data-testid="button-font-decrease">
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <span className="text-xs text-muted-foreground min-w-[1.5rem] text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
-                      <Button variant="ghost" size="sm" onClick={() => changeFontSize(1)} disabled={fontSizeLevel === 3} title="放大字體" data-testid="button-font-increase">
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      <Button
-                        variant={displayMode === 'list' ? 'default' : 'outline'}
-                        size="icon"
-                        onClick={() => {
-                          setDisplayMode('list');
-                          try { localStorage.setItem('wechurch-bible-display-mode', 'list'); } catch {}
-                        }}
-                        title="條列式"
-                        data-testid="button-display-list"
-                      >
-                        <List className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant={displayMode === 'paragraph' ? 'default' : 'outline'}
-                        size="icon"
-                        onClick={() => {
-                          setDisplayMode('paragraph');
-                          try { localStorage.setItem('wechurch-bible-display-mode', 'paragraph'); } catch {}
-                        }}
-                        title="段落式"
-                        data-testid="button-display-paragraph"
-                      >
-                        <AlignLeft className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <ScriptureTTS
-                      text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
-                      compact
-                      label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
-                    />
-                  </div>
-                )}
 
                 {versesLoading ? (
                   <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">載入中...</div>
