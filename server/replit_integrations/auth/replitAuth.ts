@@ -42,34 +42,48 @@ export async function setupAuth(app: Express) {
   app.use(passport.session());
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
-  passport.use(new GoogleStrategy({ clientID: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET!, callbackURL: "/api/callback" },
-    async (_at, _rt, profile, done) => {
-      try {
-        await upsertUser(profile);
-        done(null, { claims: { sub: profile.id, email: profile.emails?.[0]?.value, first_name: profile.name?.givenName || "", last_name: profile.name?.familyName || "", profile_image_url: profile.photos?.[0]?.value }, expires_at: Math.floor(Date.now() / 1000) + 86400 * 7 });
-      } catch (err) { done(err as Error); }
-    }
-  ));
-  app.get("/api/login", passport.authenticate("google", { scope: ["openid", "email", "profile"] }));
-  app.get("/api/callback", passport.authenticate("google", { failureRedirect: "/api/login" }), (_req, res) => res.redirect("/"));
-  app.get("/api/logout", (req, res) => { req.logout(() => res.redirect("/")); });
   if (process.env.NODE_ENV === "development") {
     app.get("/api/dev-login", async (req, res) => {
-      const devUserId = "99999999"; const devEmail = "dev@wechurch.test";
+      const devEmail = "saisong@gmail.com";
       try {
-        await pool.query(`DELETE FROM auth_users WHERE id=$1 OR email=$2`, [devUserId, devEmail]);
-        await pool.query(`INSERT INTO auth_users (id, email, first_name, last_name, created_at, updated_at) VALUES ($1,$2,'開發','管理員',NOW(),NOW())`, [devUserId, devEmail]);
-        const r = await pool.query(`INSERT INTO users (id,email,password,display_name,created_at,updated_at) VALUES (gen_random_uuid(),$1,'dev','開發管理員',NOW(),NOW()) ON CONFLICT (email) DO UPDATE SET updated_at=NOW() RETURNING id`, [devEmail]);
-        const lid = r.rows[0].id;
-        const rc = await pool.query(`SELECT id FROM user_roles WHERE user_id=$1`, [lid]);
-        if (rc.rows.length > 0) { await pool.query(`UPDATE user_roles SET role='admin',updated_at=NOW() WHERE user_id=$1`, [lid]); }
-        else { await pool.query(`INSERT INTO user_roles (id,user_id,role,created_at,updated_at) VALUES (gen_random_uuid(),$1,'admin',NOW(),NOW())`, [lid]); }
-      } catch(e) { console.error("[Dev Login]", e); }
-      req.login({ claims: { sub: devUserId, email: devEmail, first_name: "開發", last_name: "管理員" }, expires_at: Math.floor(Date.now()/1000)+86400*7 } as any, (err) => {
-        if (err) return res.status(500).json({ message: "Login failed" });
-        req.session.save(() => res.redirect("/"));
-      });
+        const userResult = await pool.query(`SELECT id, display_name FROM users WHERE email=$1`, [devEmail]);
+        if (userResult.rows.length === 0) {
+          return res.status(404).json({ message: `User ${devEmail} not found in database` });
+        }
+        const userId = userResult.rows[0].id;
+        const displayName = userResult.rows[0].display_name || devEmail.split("@")[0];
+        const authResult = await pool.query(`SELECT id FROM auth_users WHERE email=$1`, [devEmail]);
+        const devAuthId = `dev_${userId}`;
+        if (authResult.rows.length === 0) {
+          await pool.query(`INSERT INTO auth_users (id, email, first_name, last_name, created_at, updated_at) VALUES ($1,$2,$3,'',NOW(),NOW())`, [devAuthId, devEmail, displayName]);
+        } else {
+          await pool.query(`UPDATE auth_users SET id=$1, updated_at=NOW() WHERE email=$2`, [devAuthId, devEmail]);
+        }
+        const rc = await pool.query(`SELECT id FROM user_roles WHERE user_id=$1`, [userId]);
+        if (rc.rows.length > 0) { await pool.query(`UPDATE user_roles SET role='admin',updated_at=NOW() WHERE user_id=$1`, [userId]); }
+        else { await pool.query(`INSERT INTO user_roles (id,user_id,role,created_at,updated_at) VALUES (gen_random_uuid(),$1,'admin',NOW(),NOW())`, [userId]); }
+        req.login({ claims: { sub: devAuthId, email: devEmail, first_name: displayName, last_name: "" }, expires_at: Math.floor(Date.now()/1000)+86400*7 } as any, (err) => {
+          if (err) return res.status(500).json({ message: "Login failed" });
+          req.session.save(() => res.redirect("/"));
+        });
+      } catch(e) { console.error("[Dev Login]", e); return res.status(500).json({ message: "Dev login error" }); }
     });
+  }
+  app.get("/api/logout", (req, res) => { req.logout(() => res.redirect("/")); });
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport.use(new GoogleStrategy({ clientID: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, callbackURL: "/api/callback" },
+      async (_at, _rt, profile, done) => {
+        try {
+          await upsertUser(profile);
+          done(null, { claims: { sub: profile.id, email: profile.emails?.[0]?.value, first_name: profile.name?.givenName || "", last_name: profile.name?.familyName || "", profile_image_url: profile.photos?.[0]?.value }, expires_at: Math.floor(Date.now() / 1000) + 86400 * 7 });
+        } catch (err) { done(err as Error); }
+      }
+    ));
+    app.get("/api/login", passport.authenticate("google", { scope: ["openid", "email", "profile"] }));
+    app.get("/api/callback", passport.authenticate("google", { failureRedirect: "/api/login" }), (_req, res) => res.redirect("/"));
+  } else {
+    console.log("[Auth] Google OAuth not configured (missing GOOGLE_CLIENT_ID), skipping Google strategy");
+    app.get("/api/login", (_req, res) => res.redirect("/login"));
   }
 }
 
@@ -78,6 +92,6 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (!req.isAuthenticated() || !user?.expires_at) return res.status(401).json({ message: "Unauthorized" });
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) { if (req.session) req.session.touch(); return next(); }
-  if (user.claims?.sub?.startsWith("local_")) { user.expires_at = Math.floor(Date.now()/1000)+86400*7; if (req.session) req.session.touch(); return next(); }
+  if (user.claims?.sub?.startsWith("local_") || user.claims?.sub?.startsWith("dev_")) { user.expires_at = Math.floor(Date.now()/1000)+86400*7; if (req.session) req.session.touch(); return next(); }
   res.status(401).json({ message: "Unauthorized" });
 };

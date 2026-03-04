@@ -93,7 +93,16 @@ const LoginPage = () => {
           <LoginForm />
         </div>
 
-        <p className="mt-8 text-xs text-white/40">Powered by Replit</p>
+        {import.meta.env.DEV && (
+          <a
+            href="/api/dev-login"
+            className="mt-6 text-xs text-white/50 hover:text-white/80 underline transition-colors"
+            data-testid="link-dev-login"
+          >
+            開發者快速登入
+          </a>
+        )}
+        <p className="mt-4 text-xs text-white/40">Powered by Replit</p>
       </main>
     </div>
   );
