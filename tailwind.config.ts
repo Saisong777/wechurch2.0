@@ -16,9 +16,19 @@ export default {
       fontFamily: {
         serif: ['Nunito', 'sans-serif'],
         display: ['Nunito', 'sans-serif'],
-        sans: ['Inter', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'sans-serif'],
       },
       colors: {
+        brand: {
+          indigo: '#1E3A5F',
+          amber: '#E8A020',
+          sky: '#4A90D9',
+          warm: '#FAFAF7',
+          soft: '#F2F2EE',
+          border: '#E0DED8',
+          orange: '#E8841A',
+          blue: '#2B6CB0',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -67,6 +77,14 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "12px",
+        "2xl": "16px",
+        "3xl": "24px",
+      },
+      boxShadow: {
+        card: "0 2px 12px rgba(0,0,0,0.08)",
+        "card-hover": "0 4px 20px rgba(0,0,0,0.12)",
+        sheet: "0 8px 32px rgba(0,0,0,0.16)",
       },
       keyframes: {
         "accordion-down": {

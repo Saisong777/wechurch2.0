@@ -5,6 +5,13 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background-color: #FAFAF7;
+    font-family: var(--font-sans);
+  }
   :root {
     /* WeChurch - Joyful & Modern Palette (Sky Blue + Warm Accents) */
     --background: 210 40% 98%;
