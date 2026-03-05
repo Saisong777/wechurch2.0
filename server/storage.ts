@@ -63,6 +63,7 @@ export interface IStorage {
   deleteStudyResponse(id: string): Promise<void>;
   getNotebookEntries(email: string): Promise<any[]>;
   getNotebookSessions(email: string): Promise<any[]>;
+  getNotebookSessionsWithData(email: string): Promise<any[]>;
   getGroupStudyResponses(sessionId: string, groupNumber: number): Promise<any[]>;
 
   getPrayers(): Promise<Prayer[]>;
@@ -355,16 +356,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertStudyResponse(response: InsertStudyResponse & { sessionId: string; userId: string }): Promise<StudyResponse> {
-    const existing = await this.getStudyResponse(response.sessionId, response.userId);
-    if (existing) {
-      const [updated] = await db.update(studyResponses)
-        .set({ ...response, updatedAt: new Date() })
-        .where(eq(studyResponses.id, existing.id))
-        .returning();
-      return updated;
-    }
-    const [newResponse] = await db.insert(studyResponses).values(response).returning();
-    return newResponse;
+    const [result] = await db
+      .insert(studyResponses)
+      .values(response)
+      .onConflictDoUpdate({
+        target: [studyResponses.sessionId, studyResponses.userId],
+        set: {
+          titlePhrase: response.titlePhrase,
+          heartbeatVerse: response.heartbeatVerse,
+          observation: response.observation,
+          coreInsightCategory: response.coreInsightCategory,
+          coreInsightNote: response.coreInsightNote,
+          scholarsNote: response.scholarsNote,
+          actionPlan: response.actionPlan,
+          coolDownNote: response.coolDownNote,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result;
   }
 
   async updateStudyResponseById(id: string, data: Partial<InsertStudyResponse>): Promise<StudyResponse | undefined> {
@@ -451,6 +461,22 @@ export class DatabaseStorage implements IStorage {
       session_date: row.sessionDate?.toISOString() || '',
       group_number: row.groupNumber,
       participant_id: row.participantId,
+    }));
+  }
+
+  async getNotebookSessionsWithData(email: string): Promise<any[]> {
+    const sessionRows = await this.getNotebookSessions(email);
+    if (sessionRows.length === 0) return [];
+
+    const sessionIds = [...new Set(sessionRows.map((r: any) => r.session_id))];
+    const reports = await db
+      .select()
+      .from(aiReports)
+      .where(inArray(aiReports.sessionId, sessionIds as string[]));
+
+    return sessionRows.map((session: any) => ({
+      ...session,
+      reports: reports.filter(r => r.sessionId === session.session_id),
     }));
   }
 

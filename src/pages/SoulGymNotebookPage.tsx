@@ -144,7 +144,7 @@ const ResponseDetail = ({ response }: { response: GroupResponse }) => {
   );
 };
 
-const GroupSessionCard = ({ session }: { session: SessionInfo }) => {
+const GroupSessionCard = ({ session, preloadedReports }: { session: SessionInfo; preloadedReports?: AiReport[] }) => {
   const [expanded, setExpanded] = useState(false);
 
   const { data: groupResponses, isLoading: loadingResponses } = useQuery({
@@ -159,16 +159,18 @@ const GroupSessionCard = ({ session }: { session: SessionInfo }) => {
     staleTime: 60000,
   });
 
-  const { data: reports, isLoading: loadingReports } = useQuery({
+  const { data: fetchedReports, isLoading: loadingReports } = useQuery({
     queryKey: ['/api/sessions', session.session_id, 'reports'],
     queryFn: async () => {
       const res = await fetch(`/api/sessions/${session.session_id}/reports`);
       if (!res.ok) throw new Error('Failed to fetch');
       return (await res.json()) as AiReport[];
     },
-    enabled: expanded,
+    enabled: expanded && !preloadedReports,
     staleTime: 60000,
   });
+
+  const reports = preloadedReports ?? fetchedReports;
 
   const groupReport = reports?.find(
     r => r.reportType === 'group' && r.groupNumber === session.group_number && r.status === 'COMPLETED'
@@ -252,19 +254,21 @@ const GroupSessionCard = ({ session }: { session: SessionInfo }) => {
   );
 };
 
-const OverallSessionCard = ({ session, allSessions }: { session: SessionInfo; allSessions: SessionInfo[] }) => {
+const OverallSessionCard = ({ session, preloadedReports }: { session: SessionInfo; preloadedReports?: AiReport[] }) => {
   const [expanded, setExpanded] = useState(false);
 
-  const { data: reports, isLoading: loadingReports } = useQuery({
+  const { data: fetchedReports, isLoading: loadingReports } = useQuery({
     queryKey: ['/api/sessions', session.session_id, 'reports'],
     queryFn: async () => {
       const res = await fetch(`/api/sessions/${session.session_id}/reports`);
       if (!res.ok) throw new Error('Failed to fetch');
       return (await res.json()) as AiReport[];
     },
-    enabled: expanded,
+    enabled: expanded && !preloadedReports,
     staleTime: 60000,
   });
+
+  const reports = preloadedReports ?? fetchedReports;
 
   const overallReport = reports?.find(
     r => r.reportType === 'overall' && r.status === 'COMPLETED'
@@ -354,14 +358,16 @@ const OverallSessionCard = ({ session, allSessions }: { session: SessionInfo; al
   );
 };
 
+type SessionWithData = SessionInfo & { reports: AiReport[] };
+
 const GroupTab = ({ userEmail }: { userEmail: string }) => {
   const { data: sessionsData, isLoading } = useQuery({
-    queryKey: ['/api/notebook/sessions', userEmail],
+    queryKey: ['/api/notebook/sessions-with-data', userEmail],
     queryFn: async () => {
-      const res = await fetch(`/api/notebook/sessions?email=${encodeURIComponent(userEmail)}`);
+      const res = await fetch('/api/notebook/sessions-with-data');
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      return (data?.sessions || []) as SessionInfo[];
+      return (data?.sessions || []) as SessionWithData[];
     },
     enabled: !!userEmail,
     staleTime: 60000,
@@ -399,7 +405,11 @@ const GroupTab = ({ userEmail }: { userEmail: string }) => {
         <Badge variant="secondary">{sessionsData.length} 場</Badge>
       </div>
       {sessionsData.map(session => (
-        <GroupSessionCard key={`${session.session_id}-${session.participant_id}`} session={session} />
+        <GroupSessionCard
+          key={`${session.session_id}-${session.participant_id}`}
+          session={session}
+          preloadedReports={session.reports}
+        />
       ))}
     </div>
   );
@@ -407,12 +417,12 @@ const GroupTab = ({ userEmail }: { userEmail: string }) => {
 
 const OverallTab = ({ userEmail }: { userEmail: string }) => {
   const { data: sessionsData, isLoading } = useQuery({
-    queryKey: ['/api/notebook/sessions', userEmail],
+    queryKey: ['/api/notebook/sessions-with-data', userEmail],
     queryFn: async () => {
-      const res = await fetch(`/api/notebook/sessions?email=${encodeURIComponent(userEmail)}`);
+      const res = await fetch('/api/notebook/sessions-with-data');
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      return (data?.sessions || []) as SessionInfo[];
+      return (data?.sessions || []) as SessionWithData[];
     },
     enabled: !!userEmail,
     staleTime: 60000,
@@ -457,7 +467,7 @@ const OverallTab = ({ userEmail }: { userEmail: string }) => {
         <OverallSessionCard
           key={session.session_id}
           session={session}
-          allSessions={sessionsData || []}
+          preloadedReports={session.reports}
         />
       ))}
     </div>

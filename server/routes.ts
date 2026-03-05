@@ -765,6 +765,7 @@ export async function registerRoutes(app: Express) {
 
       res.status(201).json(report);
     } catch (error) {
+      console.error("[report-generation] Failed for session", req.params.sessionId, ":", error);
       res.status(500).json({ error: "Failed to generate report" });
     }
   });
@@ -799,10 +800,10 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/notebook", async (req, res) => {
     try {
-      const email = req.query.email as string;
-      if (!email) {
-        return res.status(400).json({ error: "Email is required" });
-      }
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      const email = user.email || user.claims?.email;
+      if (!email) return res.status(401).json({ error: "User email not found" });
       const entries = await storage.getNotebookEntries(email);
       res.json({ entries });
     } catch (error) {
@@ -821,6 +822,20 @@ export async function registerRoutes(app: Express) {
       res.json({ sessions: notebookSessions });
     } catch (error) {
       console.error("[notebook-sessions] Error:", error);
+      res.status(500).json({ error: "Failed to get notebook sessions" });
+    }
+  });
+
+  app.get("/api/notebook/sessions-with-data", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      const email = user.email || user.claims?.email;
+      if (!email) return res.status(401).json({ error: "User email not found" });
+      const sessions = await storage.getNotebookSessionsWithData(email);
+      res.json({ sessions });
+    } catch (error) {
+      console.error("[notebook-sessions-with-data] Error:", error);
       res.status(500).json({ error: "Failed to get notebook sessions" });
     }
   });
@@ -851,21 +866,54 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  const studyResponseBodySchema = z.object({
+    sessionId: z.string().uuid(),
+    participantId: z.string().uuid().optional(),
+    userId: z.string().uuid().optional(),
+    participantEmail: z.string().optional(),
+    titlePhrase: z.string().max(500).nullable().optional(),
+    title_phrase: z.string().max(500).nullable().optional(),
+    heartbeatVerse: z.string().max(500).nullable().optional(),
+    heartbeat_verse: z.string().max(500).nullable().optional(),
+    observation: z.string().max(5000).nullable().optional(),
+    coreInsightCategory: z.string().max(100).nullable().optional(),
+    core_insight_category: z.string().max(100).nullable().optional(),
+    coreInsightNote: z.string().max(5000).nullable().optional(),
+    core_insight_note: z.string().max(5000).nullable().optional(),
+    scholarsNote: z.string().max(5000).nullable().optional(),
+    scholars_note: z.string().max(5000).nullable().optional(),
+    actionPlan: z.string().max(5000).nullable().optional(),
+    action_plan: z.string().max(5000).nullable().optional(),
+    coolDownNote: z.string().max(5000).nullable().optional(),
+    cool_down_note: z.string().max(5000).nullable().optional(),
+  });
+
   app.post("/api/study-responses", async (req, res) => {
     try {
+      const parsed = studyResponseBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request body", details: parsed.error.issues });
+      }
+
       const {
-        participantId, participantEmail,
+        participantId,
         title_phrase, heartbeat_verse, observation,
         core_insight_category, core_insight_note,
         scholars_note, action_plan, cool_down_note,
         sessionId, userId: bodyUserId,
         titlePhrase, heartbeatVerse, coreInsightCategory,
         coreInsightNote, scholarsNote, actionPlan, coolDownNote,
-      } = req.body;
+      } = parsed.data;
 
       const resolvedUserId = bodyUserId || participantId;
       if (!sessionId || !resolvedUserId) {
         return res.status(400).json({ error: "sessionId and userId/participantId are required" });
+      }
+
+      // Verify the participant belongs to this session
+      const participant = await storage.getParticipant(resolvedUserId);
+      if (!participant || participant.sessionId !== sessionId) {
+        return res.status(403).json({ error: "Participant not found in this session" });
       }
 
       const cleanData = {

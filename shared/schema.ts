@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, uuid, pgEnum, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uuid, pgEnum, date, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -105,7 +105,7 @@ export const aiReports = pgTable("ai_reports", {
 export const studyResponses = pgTable("study_responses", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   sessionId: uuid("session_id").references(() => sessions.id).notNull(),
-  userId: uuid("user_id").notNull(),
+  userId: uuid("user_id").notNull(), // stores participants.id (not users.id)
   titlePhrase: text("title_phrase"),
   heartbeatVerse: text("heartbeat_verse"),
   observation: text("observation"),
@@ -117,7 +117,10 @@ export const studyResponses = pgTable("study_responses", {
   hidden: boolean("hidden").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  sessionUserUnique: uniqueIndex("study_responses_session_user_unique").on(table.sessionId, table.userId),
+  sessionIdIdx: index("study_responses_session_id_idx").on(table.sessionId),
+}));
 
 export const potentialMembers = pgTable("potential_members", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
