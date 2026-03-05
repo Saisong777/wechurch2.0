@@ -55,14 +55,10 @@ export const useUserProfile = () => {
     }
 
     let cancelled = false;
-    const delay = Math.random() * 1500;
-    const timeoutId = setTimeout(() => {
-      if (!cancelled) fetchProfile();
-    }, delay);
+    if (!cancelled) fetchProfile();
 
     return () => {
       cancelled = true;
-      clearTimeout(timeoutId);
     };
   }, [user]);
 

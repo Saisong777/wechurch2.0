@@ -19,10 +19,10 @@ async function upsertUser(profile: any) {
   );
   if (email) {
     await pool.query(
-      `INSERT INTO users (id, email, display_name, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, NOW(), NOW())
-       ON CONFLICT (email) DO UPDATE SET display_name=COALESCE(users.display_name, EXCLUDED.display_name), updated_at=NOW()`,
-      [email, `${firstName}${lastName}`.trim() || email.split("@")[0]]
+      `INSERT INTO users (id, email, display_name, avatar_url, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE SET display_name=COALESCE(users.display_name, EXCLUDED.display_name), avatar_url=COALESCE(EXCLUDED.avatar_url, users.avatar_url), updated_at=NOW()`,
+      [email, `${firstName}${lastName}`.trim() || email.split("@")[0], profileImageUrl || null]
     );
   }
 }
