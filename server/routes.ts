@@ -665,101 +665,77 @@ export async function registerRoutes(app: Express) {
         );
       }
 
-      // Generate markdown-formatted report content
-      const generateMarkdownReport = (responses: typeof filteredResponses, grpNum?: number) => {
-        const members = responses.map(r => r.participantName || '匿名').join('、');
-        const titlePhrases = [...new Set(responses.map(r => r.titlePhrase).filter(Boolean))];
-        const observations = responses.map(r => r.observation).filter(Boolean);
-        const categoryLabels: Record<string, string> = {
-          'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '認識神'
-        };
-        const insightsWithNames: { name: string; insight: string }[] = [];
-        responses.forEach(r => {
-          if (!r.coreInsightNote) return;
-          const name = r.participantName || '匿名';
-          let noteObj: Record<string, string> | null = null;
-          try { noteObj = JSON.parse(r.coreInsightNote); } catch { }
-          if (noteObj && typeof noteObj === 'object' && !Array.isArray(noteObj)) {
-            Object.entries(noteObj).forEach(([cat, text]) => {
-              if (text && text.trim()) {
-                const label = categoryLabels[cat] || cat;
-                insightsWithNames.push({ name, insight: `【${label}】${text}` });
-              }
-            });
-          } else if (r.coreInsightNote.trim()) {
-            insightsWithNames.push({ name, insight: r.coreInsightNote });
-          }
-        });
-        const applications = responses.map(r => r.actionPlan).filter(Boolean);
-
-        let content = '';
-        if (grpNum) {
-          content += `**組別：** 第 ${grpNum} 組\n`;
-        } else {
-          content += `**📊 全會眾綜合分析**\n`;
-        }
-        content += `**組員：** ${members}\n\n`;
-
-        if (titlePhrases.length > 0) {
-          content += `**📖 主題（Themes）：**\n`;
-          titlePhrases.forEach(t => { content += `• ${t}\n`; });
-          content += '\n';
-        }
-
-        if (observations.length > 0) {
-          content += `**🔍 事實發現（Observations）：**\n`;
-          observations.slice(0, 5).forEach(o => { content += `• ${o}\n`; });
-          content += '\n';
-        }
-
-        if (insightsWithNames.length > 0) {
-          content += `**💡 獨特亮光（Unique Insights）：**\n`;
-          insightsWithNames.slice(0, 5).forEach(({ name, insight }) => { content += `• **${name}**：${insight}\n`; });
-          content += '\n';
-        }
-
-        if (applications.length > 0) {
-          content += `**🎯 如何應用（Applications）：**\n`;
-          applications.slice(0, 5).forEach(a => { content += `• ${a}\n`; });
-          content += '\n';
-        }
-
-        content += `**👤 個人貢獻摘要：**\n`;
-        responses.forEach(r => {
-          content += `• **${r.participantName || '匿名'}**：${r.titlePhrase || ''}${r.heartbeatVerse ? ' - ' + r.heartbeatVerse : ''}\n`;
-        });
-
-        return content;
+      // Convert a study response to member content string for AI
+      const INSIGHT_LABELS: Record<string, string> = {
+        'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '對神的認識'
       };
+      const responseToContent = (r: typeof filteredResponses[0]): string => {
+        const parts: string[] = [];
+        if (r.titlePhrase) parts.push(`標題：${r.titlePhrase}`);
+        if (r.heartbeatVerse) parts.push(`最感動的經文：${r.heartbeatVerse}`);
+        if (r.observation) parts.push(`經文觀察：${r.observation}`);
+        if (r.coreInsightNote) {
+          try {
+            const obj = JSON.parse(r.coreInsightNote);
+            if (typeof obj === 'object' && !Array.isArray(obj)) {
+              Object.entries(obj).forEach(([cat, text]) => {
+                if (text && String(text).trim()) {
+                  parts.push(`神學亮光【${INSIGHT_LABELS[cat] || cat}】：${text}`);
+                }
+              });
+            } else {
+              parts.push(`神學亮光：${r.coreInsightNote}`);
+            }
+          } catch {
+            parts.push(`神學亮光：${r.coreInsightNote}`);
+          }
+        }
+        if (r.scholarsNote) parts.push(`學者筆記：${r.scholarsNote}`);
+        if (r.actionPlan) parts.push(`行動計畫：${r.actionPlan}`);
+        if (r.coolDownNote) parts.push(`冷靜筆記：${r.coolDownNote}`);
+        return parts.join('\n');
+      };
+
+      const { GROUP_SMALL_SYSTEM_PROMPT, GROUP_LARGE_SYSTEM_PROMPT, formatGroupNotesInput } = await import("./prompts/devotional-analysis");
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
 
       let content: string;
       if (reportType === 'group' && groupNumber) {
-        content = generateMarkdownReport(filteredResponses, groupNumber);
+        // Single group → small group prompt (with member names)
+        const members = filteredResponses.map(r => ({
+          name: r.participantName || '匿名',
+          content: responseToContent(r),
+        }));
+        const userContent = formatGroupNotesInput(members);
+        const aiResponse = await openai.chat.completions.create({
+          model: "gemini-2.0-flash",
+          messages: [
+            { role: "system", content: GROUP_SMALL_SYSTEM_PROMPT },
+            { role: "user", content: userContent }
+          ],
+          max_tokens: 4000,
+        });
+        content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
       } else {
-        // Overall report - first add combined summary, then group-by-group sections
-        const sections: string[] = [];
-
-        // Add overall combined summary (全會眾綜合分析) first
-        sections.push(generateMarkdownReport(filteredResponses, undefined));
-
-        // Then add individual group sections
-        const groupedResponses = new Map<number, typeof filteredResponses>();
-        filteredResponses.forEach(r => {
-          const grp = r.groupNumber || 0;
-          if (grp > 0) { // Only include actual groups, not ungrouped responses
-            if (!groupedResponses.has(grp)) groupedResponses.set(grp, []);
-            groupedResponses.get(grp)!.push(r);
-          }
+        // Overall (all participants) → large group prompt (anonymous)
+        const members = filteredResponses.map(r => ({
+          name: r.participantName || '匿名',
+          content: responseToContent(r),
+        }));
+        const userContent = formatGroupNotesInput(members);
+        const aiResponse = await openai.chat.completions.create({
+          model: "gemini-2.0-flash",
+          messages: [
+            { role: "system", content: GROUP_LARGE_SYSTEM_PROMPT },
+            { role: "user", content: userContent }
+          ],
+          max_tokens: 6000,
         });
-
-        const sortedGroups = [...groupedResponses.keys()].sort((a, b) => a - b);
-        sortedGroups.forEach(grp => {
-          const grpResponses = groupedResponses.get(grp)!;
-          if (grpResponses.length > 0) {
-            sections.push(generateMarkdownReport(grpResponses, grp));
-          }
-        });
-        content = sections.join('\n========================================\n\n');
+        content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
       }
 
       const report = await storage.createAiReport({
