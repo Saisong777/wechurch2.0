@@ -4100,6 +4100,50 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Group Bible study note integration (small group or large group)
+  app.post("/api/devotional-notes/analyze-group", isAuthenticated, async (req, res) => {
+    try {
+      const { mode, verseRange, members } = req.body;
+
+      if (!members || !Array.isArray(members) || members.length === 0) {
+        return res.status(400).json({ error: "No member notes provided" });
+      }
+      for (const m of members) {
+        if (typeof m.name !== 'string' || typeof m.content !== 'string') {
+          return res.status(400).json({ error: "Each member must have name and content fields" });
+        }
+      }
+
+      const { GROUP_SMALL_SYSTEM_PROMPT, GROUP_LARGE_SYSTEM_PROMPT, formatGroupNotesInput } = await import("./prompts/devotional-analysis");
+      const systemPrompt = mode === 'large' ? GROUP_LARGE_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
+      const userContent = formatGroupNotesInput(members, verseRange);
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gemini-2.0-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent }
+        ],
+        max_tokens: mode === 'large' ? 6000 : 4000,
+      });
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        return res.status(500).json({ error: "AI response empty" });
+      }
+      res.json({ analysis: result, memberCount: members.length, mode: mode || 'small' });
+    } catch (error) {
+      console.error('[analyze-group] Error:', error);
+      res.status(500).json({ error: "Failed to analyze group notes" });
+    }
+  });
+
   // ============ Saved Verses API Routes ============
   app.get("/api/saved-verses", async (req, res) => {
     try {
