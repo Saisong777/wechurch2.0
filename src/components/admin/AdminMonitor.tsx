@@ -333,12 +333,18 @@ export const AdminMonitor: React.FC = () => {
       description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
     });
     
-    // Generate groups sequentially to avoid Gemini rate limits
+    // Generate groups in batches of 2 — ~2x faster than sequential, avoids full-parallel rate limit storm
+    const BATCH_SIZE = 2;
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
-    for (const group of groups) {
-      const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
-      setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
-      results.push({ groupNumber: group.number, result });
+    for (let i = 0; i < groups.length; i += BATCH_SIZE) {
+      const batch = groups.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map(async (group) => {
+          const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
+          setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
+          results.push({ groupNumber: group.number, result });
+        })
+      );
     }
     
     // Sort by group number and combine
@@ -374,12 +380,12 @@ export const AdminMonitor: React.FC = () => {
     if (!currentSession?.id) return;
     
     setIsGeneratingOverall(true);
-    toast.info('正在生成整體洞察報告 (高品質模式)...', {
+    const overallModeLabel = fastMode ? '快速模式' : '高品質模式';
+    toast.info(`正在生成整體洞察報告 (${overallModeLabel})...`, {
       description: filledOnly ? '僅分析有填寫內容的成員' : undefined,
     });
-    
-    // Overall always uses high-quality model (fastMode=false)
-    const result = await generateAIReport(currentSession.id, 'overall', undefined, { fastMode: false, filledOnly });
+
+    const result = await generateAIReport(currentSession.id, 'overall', undefined, { fastMode, filledOnly });
     
     if (result.success && result.report) {
       setReportContent(result.report);
