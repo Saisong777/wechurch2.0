@@ -24,9 +24,8 @@ export const WeChurchLogo: React.FC<WeChurchLogoProps> = ({
       width={size}
       height={size}
       viewBox="0 0 64 64"
-      fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn('', className)}
+      className={cn('block', className)}
     >
       {/* Solid blue background - avoids Android gradient ID conflict */}
       <rect width="64" height="64" rx="16" fill="#1D6FE0" />

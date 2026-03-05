@@ -117,14 +117,15 @@
 
   html {
     height: 100%;
-    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   body {
     @apply text-foreground antialiased;
     font-family: 'Inter', sans-serif;
-    height: 100%;
-    overflow: auto;
+    min-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: none;
     font-size: 16px;
   }
 

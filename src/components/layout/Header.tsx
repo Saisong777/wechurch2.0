@@ -181,7 +181,7 @@ export const Header: React.FC<HeaderProps> = ({
             {showLogo && (
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse-soft" />
-                <WeChurchLogo size={variant === 'default' ? 36 : 32} className="relative group-hover:scale-105 transition-transform sm:w-12 sm:h-12" />
+                <WeChurchLogo size={variant === 'default' ? 36 : 32} className="relative group-hover:scale-105 transition-transform" />
               </div>
             )}
             <div className="text-center">
