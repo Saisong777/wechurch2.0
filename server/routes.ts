@@ -652,7 +652,7 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/sessions/:sessionId/reports", async (req, res) => {
     try {
-      const { reportType, groupNumber, filledOnly } = req.body;
+      const { reportType, groupNumber, filledOnly, fastMode } = req.body;
 
       const INSIGHT_LABELS: Record<string, string> = {
         'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '對神的認識'
@@ -693,6 +693,10 @@ export async function registerRoutes(app: Express) {
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
+      const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
+      const groupMaxTokens = fastMode ? 2000 : 4000;
+      const overallMaxTokens = fastMode ? 3000 : 6000;
+
       let content: string;
       if (reportType === 'group' && groupNumber) {
         // Single group: use getGroupStudyResponses (INNER JOIN + DB-level filter by groupNumber)
@@ -714,9 +718,9 @@ export async function registerRoutes(app: Express) {
         const userContent = formatGroupNotesInput(members);
         try {
           const aiResponse = await openai.chat.completions.create({
-            model: "gemini-2.0-flash",
+            model: aiModel,
             messages: [{ role: "system", content: GROUP_SMALL_SYSTEM_PROMPT }, { role: "user", content: userContent }],
-            max_tokens: 4000,
+            max_tokens: groupMaxTokens,
           });
           content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
         } catch (err: any) {
@@ -747,9 +751,9 @@ export async function registerRoutes(app: Express) {
         const userContent = formatGroupNotesInput(members);
         try {
           const aiResponse = await openai.chat.completions.create({
-            model: "gemini-2.0-flash",
+            model: aiModel,
             messages: [{ role: "system", content: GROUP_LARGE_SYSTEM_PROMPT }, { role: "user", content: userContent }],
-            max_tokens: 6000,
+            max_tokens: overallMaxTokens,
           });
           content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
         } catch (err: any) {
