@@ -12,19 +12,7 @@ esbuild
         target: "node20",
         outfile: "dist/index.js",
         format: "esm",
-        external: [
-            "express",
-            "pg",
-            "drizzle-orm",
-            "dotenv",
-            "passport",
-            "passport-google-oauth20",
-            "express-session",
-            "connect-pg-simple",
-            "vite",
-            "multer",
-            "compression"
-        ],
+        packages: "external",
     })
     .then(() => {
         console.log("Server build complete.");
