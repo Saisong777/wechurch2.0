@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
+    "build": "vite build && node esbuild.config.js",
+    "start": "NODE_ENV=production node dist/index.js",
     "db:push": "drizzle-kit push",
     "lint": "eslint .",
     "test": "vitest run",
