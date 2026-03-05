@@ -686,7 +686,7 @@ export async function registerRoutes(app: Express) {
         return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員配置 AI_INTEGRATIONS_OPENAI_API_KEY" });
       }
 
-      const { GROUP_SMALL_SYSTEM_PROMPT, GROUP_LARGE_SYSTEM_PROMPT, formatGroupNotesInput } = await import("./prompts/devotional-analysis");
+      const { GROUP_SMALL_SYSTEM_PROMPT, GROUP_LARGE_SYSTEM_PROMPT, GROUP_FAST_SYSTEM_PROMPT, formatGroupNotesInput } = await import("./prompts/devotional-analysis");
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -694,8 +694,10 @@ export async function registerRoutes(app: Express) {
       });
 
       const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
-      const groupMaxTokens = fastMode ? 2000 : 4000;
-      const overallMaxTokens = fastMode ? 3000 : 6000;
+      const groupMaxTokens = fastMode ? 1500 : 4000;
+      const overallMaxTokens = fastMode ? 2500 : 6000;
+      // In fast mode, truncate each member's notes to 400 chars to reduce input tokens
+      const inputTruncate = fastMode ? 400 : undefined;
 
       let content: string;
       if (reportType === 'group' && groupNumber) {
@@ -715,11 +717,12 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholars_note, actionPlan: r.action_plan, coolDownNote: r.cool_down_note,
           }),
         }));
-        const userContent = formatGroupNotesInput(members);
+        const groupSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
+        const userContent = formatGroupNotesInput(members, undefined, inputTruncate);
         try {
           const aiResponse = await openai.chat.completions.create({
             model: aiModel,
-            messages: [{ role: "system", content: GROUP_SMALL_SYSTEM_PROMPT }, { role: "user", content: userContent }],
+            messages: [{ role: "system", content: groupSystemPrompt }, { role: "user", content: userContent }],
             max_tokens: groupMaxTokens,
           });
           content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
@@ -748,11 +751,12 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholarsNote, actionPlan: r.actionPlan, coolDownNote: r.coolDownNote,
           }),
         }));
-        const userContent = formatGroupNotesInput(members);
+        const userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        const overallSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
         try {
           const aiResponse = await openai.chat.completions.create({
             model: aiModel,
-            messages: [{ role: "system", content: GROUP_LARGE_SYSTEM_PROMPT }, { role: "user", content: userContent }],
+            messages: [{ role: "system", content: overallSystemPrompt }, { role: "user", content: userContent }],
             max_tokens: overallMaxTokens,
           });
           content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
