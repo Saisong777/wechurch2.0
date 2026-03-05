@@ -594,19 +594,26 @@ export const generateAIReport = async (
   sessionId: string,
   reportType: "group" | "overall",
   groupNumber?: number,
-  options?: AIReportOptions
+  options?: AIReportOptions,
+  _retryCount = 0
 ): Promise<{ success: boolean; report?: string; reportId?: string; error?: string }> => {
   try {
     const response = await fetch(`/api/sessions/${sessionId}/reports`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        reportType, 
+      body: JSON.stringify({
+        reportType,
         groupNumber,
         fastMode: options?.fastMode ?? false,
         filledOnly: options?.filledOnly ?? false,
       }),
     });
+    if (response.status === 429 && _retryCount < 4) {
+      const delay = Math.pow(2, _retryCount) * 3000; // 3s, 6s, 12s, 24s
+      console.warn(`[generateAIReport] 429 rate limit, retrying in ${delay}ms (attempt ${_retryCount + 1}/4)`);
+      await new Promise(r => setTimeout(r, delay));
+      return generateAIReport(sessionId, reportType, groupNumber, options, _retryCount + 1);
+    }
     if (!response.ok) {
       const errorData = await response.json();
       return { success: false, error: errorData.error || "Failed to generate report" };
