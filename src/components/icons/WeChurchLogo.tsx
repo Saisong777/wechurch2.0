@@ -28,16 +28,8 @@ export const WeChurchLogo: React.FC<WeChurchLogoProps> = ({
       xmlns="http://www.w3.org/2000/svg"
       className={cn('', className)}
     >
-      <defs>
-        {/* Sleek, premium gradient - slightly warmer blue for an inviting feel */}
-        <linearGradient id="weChurchPrimary" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0EA5E9" /> {/* sky-500 */}
-          <stop offset="100%" stopColor="#2563EB" /> {/* blue-600 */}
-        </linearGradient>
-      </defs>
-
-      {/* Modern Squircle Background */}
-      <rect width="64" height="64" rx="16" fill="url(#weChurchPrimary)" />
+      {/* Solid blue background - avoids Android gradient ID conflict */}
+      <rect width="64" height="64" rx="16" fill="#1D6FE0" />
 
       {/* 
         Minimalist Church/Person mark:

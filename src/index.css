@@ -125,6 +125,7 @@
     font-family: 'Inter', sans-serif;
     height: 100%;
     overflow: auto;
+    font-size: 16px;
   }
 
   #root {
@@ -376,14 +377,17 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Faster touch scroll on mobile */
+  /* Faster touch scroll - only on explicit scroll areas, NOT body */
   .scroll-container,
-  [data-radix-scroll-area-viewport],
-  main,
-  body {
+  [data-radix-scroll-area-viewport] {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
     touch-action: pan-y;
+  }
+
+  /* Prevent body-level overscroll bounce causing scroll-to-top */
+  body {
+    overscroll-behavior: none;
   }
 
   /* Disable hover card lift on touch devices (no hover state) */
