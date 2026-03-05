@@ -609,7 +609,7 @@ export const generateAIReport = async (
       }),
     });
     if (response.status === 429 && _retryCount < 4) {
-      const delay = Math.pow(2, _retryCount) * 3000; // 3s, 6s, 12s, 24s
+      const delay = [10000, 20000, 35000, 60000][_retryCount]; // 10s, 20s, 35s, 60s
       console.warn(`[generateAIReport] 429 rate limit, retrying in ${delay}ms (attempt ${_retryCount + 1}/4)`);
       await new Promise(r => setTimeout(r, delay));
       return generateAIReport(sessionId, reportType, groupNumber, options, _retryCount + 1);
