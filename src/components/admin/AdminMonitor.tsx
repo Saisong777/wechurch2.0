@@ -335,7 +335,9 @@ export const AdminMonitor: React.FC = () => {
     
     // Generate reports sequentially to avoid rate limiting
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
-    for (const group of groups) {
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i];
+      if (i > 0) await new Promise(r => setTimeout(r, 3000));
       const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
       setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
       results.push({ groupNumber: group.number, result });

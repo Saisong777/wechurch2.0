@@ -712,12 +712,29 @@ export async function registerRoutes(app: Express) {
           }),
         }));
         const userContent = formatGroupNotesInput(members);
-        const aiResponse = await openai.chat.completions.create({
-          model: "gemini-2.0-flash",
-          messages: [{ role: "system", content: GROUP_SMALL_SYSTEM_PROMPT }, { role: "user", content: userContent }],
-          max_tokens: 4000,
-        });
-        content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+        const callWithRetry = async (retries = 3, delayMs = 5000): Promise<string> => {
+          for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+              const aiResponse = await openai.chat.completions.create({
+                model: "gemini-2.0-flash",
+                messages: [{ role: "system", content: GROUP_SMALL_SYSTEM_PROMPT }, { role: "user", content: userContent }],
+                max_tokens: 4000,
+              });
+              return aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+            } catch (err: any) {
+              const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
+              if (is429 && attempt < retries) {
+                const wait = delayMs * Math.pow(2, attempt);
+                console.warn(`[report-generation] 429 rate limit, retrying in ${wait}ms (attempt ${attempt + 1}/${retries})`);
+                await new Promise(r => setTimeout(r, wait));
+              } else {
+                throw err;
+              }
+            }
+          }
+          throw new Error('Max retries exceeded');
+        };
+        content = await callWithRetry();
       } else {
         // Overall: use getStudyResponses (all participants, camelCase fields)
         const allRows = await storage.getStudyResponses(req.params.sessionId);
@@ -736,12 +753,29 @@ export async function registerRoutes(app: Express) {
           }),
         }));
         const userContent = formatGroupNotesInput(members);
-        const aiResponse = await openai.chat.completions.create({
-          model: "gemini-2.0-flash",
-          messages: [{ role: "system", content: GROUP_LARGE_SYSTEM_PROMPT }, { role: "user", content: userContent }],
-          max_tokens: 6000,
-        });
-        content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+        const callWithRetry = async (retries = 3, delayMs = 5000): Promise<string> => {
+          for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+              const aiResponse = await openai.chat.completions.create({
+                model: "gemini-2.0-flash",
+                messages: [{ role: "system", content: GROUP_LARGE_SYSTEM_PROMPT }, { role: "user", content: userContent }],
+                max_tokens: 6000,
+              });
+              return aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+            } catch (err: any) {
+              const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
+              if (is429 && attempt < retries) {
+                const wait = delayMs * Math.pow(2, attempt);
+                console.warn(`[report-generation] 429 rate limit, retrying in ${wait}ms (attempt ${attempt + 1}/${retries})`);
+                await new Promise(r => setTimeout(r, wait));
+              } else {
+                throw err;
+              }
+            }
+          }
+          throw new Error('Max retries exceeded');
+        };
+        content = await callWithRetry();
       }
 
       const report = await storage.createAiReport({
