@@ -872,11 +872,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateGroupingParticipants(activityId: string, updates: { id: string; groupNumber: number }[]): Promise<void> {
-    for (const update of updates) {
-      await db.update(groupingParticipants)
-        .set({ groupNumber: update.groupNumber })
-        .where(and(eq(groupingParticipants.id, update.id), eq(groupingParticipants.activityId, activityId)));
-    }
+    await Promise.all(
+      updates.map(update =>
+        db.update(groupingParticipants)
+          .set({ groupNumber: update.groupNumber })
+          .where(and(eq(groupingParticipants.id, update.id), eq(groupingParticipants.activityId, activityId)))
+      )
+    );
   }
 
   async deleteGroupingActivity(id: string): Promise<void> {

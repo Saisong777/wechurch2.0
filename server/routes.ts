@@ -524,11 +524,13 @@ export async function registerRoutes(app: Express) {
 
       const { assignments } = parsed.data;
 
+      const updatePromises: Promise<any>[] = [];
       for (const { participantIds, groupNumber } of assignments) {
         for (const participantId of participantIds) {
-          await storage.updateParticipant(participantId, { groupNumber, readyConfirmed: false });
+          updatePromises.push(storage.updateParticipant(participantId, { groupNumber, readyConfirmed: false }));
         }
       }
+      await Promise.all(updatePromises);
 
       sessionCache.clear();
       res.json({ success: true });
