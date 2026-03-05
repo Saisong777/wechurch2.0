@@ -50,7 +50,7 @@ export const BottomNav = () => {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white/98 border-t border-border/30 shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.05)] md:hidden pb-[env(safe-area-inset-bottom)]"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border/40 shadow-[0_-1px_0_0_rgba(0,0,0,0.08)] md:hidden pb-[env(safe-area-inset-bottom)]"
       style={{ WebkitTransform: 'translateZ(0)' }}
       data-testid="nav-bottom"
     >
