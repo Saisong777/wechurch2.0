@@ -197,12 +197,13 @@
 
   .card-elevated {
     box-shadow: var(--card-shadow);
-    transition: all 0.3s ease;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+    transform: translateZ(0);
   }
 
   .card-elevated:hover {
     box-shadow: var(--card-shadow-hover);
-    transform: translateY(-2px);
+    transform: translateY(-2px) translateZ(0);
   }
 
   .glow-sky {
@@ -375,21 +376,36 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Faster touch scroll on mobile */
   .scroll-container,
   [data-radix-scroll-area-viewport],
-  main {
+  main,
+  body {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
+    touch-action: pan-y;
   }
 
-  @media (prefers-reduced-motion: reduce) {
+  /* Disable hover card lift on touch devices (no hover state) */
+  .card-elevated:hover {
+    transform: translateZ(0);
+    box-shadow: var(--card-shadow);
+  }
 
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
+  /* Reduce float/bounce animations on mobile for perf */
+  .animate-float,
+  .animate-bounce-soft {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

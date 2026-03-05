@@ -50,7 +50,8 @@ export const BottomNav = () => {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-md border-t border-border/30 shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.05)] md:hidden pb-[env(safe-area-inset-bottom)]"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white/98 border-t border-border/30 shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.05)] md:hidden pb-[env(safe-area-inset-bottom)]"
+      style={{ WebkitTransform: 'translateZ(0)' }}
       data-testid="nav-bottom"
     >
       <div className="flex items-center justify-around h-14 max-w-xl mx-auto px-2">
