@@ -1,0 +1,13 @@
+node_modules
+.git
+.gitignore
+dist
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+.DS_Store
+*.swp
+*.swo
+start-test*.log
