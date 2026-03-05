@@ -652,47 +652,33 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/sessions/:sessionId/reports", async (req, res) => {
     try {
-      const { reportType, groupNumber, fastMode, filledOnly } = req.body;
-      const studyResponses = await storage.getStudyResponses(req.params.sessionId);
+      const { reportType, groupNumber, filledOnly } = req.body;
 
-      let filteredResponses = studyResponses;
-      if (groupNumber !== undefined && groupNumber !== null) {
-        filteredResponses = studyResponses.filter(r => r.groupNumber === groupNumber);
-      }
-      if (filledOnly) {
-        filteredResponses = filteredResponses.filter(r =>
-          r.observation || r.coreInsightNote || r.actionPlan
-        );
-      }
-
-      // Convert a study response to member content string for AI
       const INSIGHT_LABELS: Record<string, string> = {
         'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '對神的認識'
       };
-      const responseToContent = (r: typeof filteredResponses[0]): string => {
+      const buildContent = (fields: {
+        titlePhrase?: string | null; heartbeatVerse?: string | null;
+        observation?: string | null; coreInsightNote?: string | null;
+        scholarsNote?: string | null; actionPlan?: string | null; coolDownNote?: string | null;
+      }): string => {
         const parts: string[] = [];
-        if (r.titlePhrase) parts.push(`標題：${r.titlePhrase}`);
-        if (r.heartbeatVerse) parts.push(`最感動的經文：${r.heartbeatVerse}`);
-        if (r.observation) parts.push(`經文觀察：${r.observation}`);
-        if (r.coreInsightNote) {
+        if (fields.titlePhrase) parts.push(`標題：${fields.titlePhrase}`);
+        if (fields.heartbeatVerse) parts.push(`最感動的經文：${fields.heartbeatVerse}`);
+        if (fields.observation) parts.push(`經文觀察：${fields.observation}`);
+        if (fields.coreInsightNote) {
           try {
-            const obj = JSON.parse(r.coreInsightNote);
+            const obj = JSON.parse(fields.coreInsightNote);
             if (typeof obj === 'object' && !Array.isArray(obj)) {
               Object.entries(obj).forEach(([cat, text]) => {
-                if (text && String(text).trim()) {
-                  parts.push(`神學亮光【${INSIGHT_LABELS[cat] || cat}】：${text}`);
-                }
+                if (text && String(text).trim()) parts.push(`神學亮光【${INSIGHT_LABELS[cat] || cat}】：${text}`);
               });
-            } else {
-              parts.push(`神學亮光：${r.coreInsightNote}`);
-            }
-          } catch {
-            parts.push(`神學亮光：${r.coreInsightNote}`);
-          }
+            } else { parts.push(`神學亮光：${fields.coreInsightNote}`); }
+          } catch { parts.push(`神學亮光：${fields.coreInsightNote}`); }
         }
-        if (r.scholarsNote) parts.push(`學者筆記：${r.scholarsNote}`);
-        if (r.actionPlan) parts.push(`行動計畫：${r.actionPlan}`);
-        if (r.coolDownNote) parts.push(`冷靜筆記：${r.coolDownNote}`);
+        if (fields.scholarsNote) parts.push(`學者筆記：${fields.scholarsNote}`);
+        if (fields.actionPlan) parts.push(`行動計畫：${fields.actionPlan}`);
+        if (fields.coolDownNote) parts.push(`冷靜筆記：${fields.coolDownNote}`);
         return parts.join('\n');
       };
 
@@ -705,34 +691,50 @@ export async function registerRoutes(app: Express) {
 
       let content: string;
       if (reportType === 'group' && groupNumber) {
-        // Single group → small group prompt (with member names)
-        const members = filteredResponses.map(r => ({
-          name: r.participantName || '匿名',
-          content: responseToContent(r),
+        // Single group: use getGroupStudyResponses (INNER JOIN + DB-level filter by groupNumber)
+        const groupRows = await storage.getGroupStudyResponses(req.params.sessionId, groupNumber);
+        const filtered = filledOnly
+          ? groupRows.filter((r: any) => r.observation || r.core_insight_note || r.action_plan)
+          : groupRows;
+        if (filtered.length === 0) {
+          return res.status(400).json({ error: `第 ${groupNumber} 組尚無查經筆記資料` });
+        }
+        const members = filtered.map((r: any) => ({
+          name: r.participant_name || '匿名',
+          content: buildContent({
+            titlePhrase: r.title_phrase, heartbeatVerse: r.heartbeat_verse,
+            observation: r.observation, coreInsightNote: r.core_insight_note,
+            scholarsNote: r.scholars_note, actionPlan: r.action_plan, coolDownNote: r.cool_down_note,
+          }),
         }));
         const userContent = formatGroupNotesInput(members);
         const aiResponse = await openai.chat.completions.create({
           model: "gemini-2.0-flash",
-          messages: [
-            { role: "system", content: GROUP_SMALL_SYSTEM_PROMPT },
-            { role: "user", content: userContent }
-          ],
+          messages: [{ role: "system", content: GROUP_SMALL_SYSTEM_PROMPT }, { role: "user", content: userContent }],
           max_tokens: 4000,
         });
         content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
       } else {
-        // Overall (all participants) → large group prompt (anonymous)
-        const members = filteredResponses.map(r => ({
-          name: r.participantName || '匿名',
-          content: responseToContent(r),
+        // Overall: use getStudyResponses (all participants, camelCase fields)
+        const allRows = await storage.getStudyResponses(req.params.sessionId);
+        const filtered = filledOnly
+          ? allRows.filter(r => r.observation || r.coreInsightNote || r.actionPlan)
+          : allRows;
+        if (filtered.length === 0) {
+          return res.status(400).json({ error: "尚無查經筆記資料" });
+        }
+        const members = filtered.map(r => ({
+          name: (r as any).participantName || '匿名',
+          content: buildContent({
+            titlePhrase: r.titlePhrase, heartbeatVerse: r.heartbeatVerse,
+            observation: r.observation, coreInsightNote: r.coreInsightNote,
+            scholarsNote: r.scholarsNote, actionPlan: r.actionPlan, coolDownNote: r.coolDownNote,
+          }),
         }));
         const userContent = formatGroupNotesInput(members);
         const aiResponse = await openai.chat.completions.create({
           model: "gemini-2.0-flash",
-          messages: [
-            { role: "system", content: GROUP_LARGE_SYSTEM_PROMPT },
-            { role: "user", content: userContent }
-          ],
+          messages: [{ role: "system", content: GROUP_LARGE_SYSTEM_PROMPT }, { role: "user", content: userContent }],
           max_tokens: 6000,
         });
         content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
