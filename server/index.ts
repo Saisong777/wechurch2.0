@@ -3,15 +3,16 @@ import express from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { pool } from "./db";
 
 // Catch any uncaught errors so they show in Railway App Logs
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught Exception:", err);
   process.exit(1);
 });
+// Log unhandled rejections but don't crash — most are recoverable
 process.on("unhandledRejection", (reason) => {
-  console.error("[FATAL] Unhandled Rejection:", reason);
-  process.exit(1);
+  console.error("[WARN] Unhandled Rejection:", reason);
 });
 
 const app = express();
@@ -76,4 +77,23 @@ app.use((req, res, next) => {
   server.listen(port, "::", () => {
     log(`serving on port ${port}`);
   });
+
+  // Graceful shutdown — close connections cleanly during Railway deploys
+  const shutdown = async (signal: string) => {
+    log(`${signal} received, shutting down gracefully...`);
+    server.close(() => {
+      log('HTTP server closed');
+    });
+    try {
+      await pool.end();
+      log('DB pool closed');
+    } catch (e) {
+      console.error('[Shutdown] Error closing DB pool:', e);
+    }
+    // Force exit after 10s if something hangs
+    setTimeout(() => process.exit(0), 10000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 })();
+
