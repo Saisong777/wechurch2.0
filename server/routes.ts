@@ -682,6 +682,10 @@ export async function registerRoutes(app: Express) {
         return parts.join('\n');
       };
 
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員配置 AI_INTEGRATIONS_OPENAI_API_KEY" });
+      }
+
       const { GROUP_SMALL_SYSTEM_PROMPT, GROUP_LARGE_SYSTEM_PROMPT, formatGroupNotesInput } = await import("./prompts/devotional-analysis");
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
@@ -750,8 +754,9 @@ export async function registerRoutes(app: Express) {
 
       res.status(201).json(report);
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
       console.error("[report-generation] Failed for session", req.params.sessionId, ":", error);
-      res.status(500).json({ error: "Failed to generate report" });
+      res.status(500).json({ error: `AI 報告生成失敗：${errMsg}` });
     }
   });
 
@@ -1473,6 +1478,13 @@ export async function registerRoutes(app: Express) {
       const { name, gender } = req.body;
       if (!name || !gender) {
         return res.status(400).json({ error: "Name and gender are required" });
+      }
+
+      // Return existing record if same name already joined (handles page refresh / rejoin)
+      const existingParticipants = await storage.getGroupingParticipants(activity.id);
+      const existing = existingParticipants.find(p => p.name === name);
+      if (existing) {
+        return res.json(existing);
       }
 
       const participant = await storage.addGroupingParticipant({
@@ -3961,6 +3973,10 @@ export async function registerRoutes(app: Express) {
       }
       if (note.userId !== userId) {
         return res.status(403).json({ error: "Not authorized to analyze this note" });
+      }
+
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        return res.status(503).json({ error: "AI 功能尚未設定，請聯絡管理員" });
       }
 
       const { SINGLE_NOTE_SYSTEM_PROMPT, formatSingleNoteInput } = await import("./prompts/devotional-analysis");

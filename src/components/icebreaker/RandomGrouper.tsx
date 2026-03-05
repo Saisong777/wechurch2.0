@@ -123,10 +123,18 @@ export const RandomGrouper = () => {
   }, [activity, viewMode, activityError, activityDeleted]);
 
   useEffect(() => {
-    setHasJoined(false);
-    setJoinName('');
-    setJoinGender('');
-    setMyParticipantId(null);
+    if (currentActivityId) {
+      const stored = localStorage.getItem(`grouping_participant_${currentActivityId}`);
+      if (stored) {
+        setHasJoined(true);
+        setMyParticipantId(stored);
+      } else {
+        setHasJoined(false);
+        setJoinName('');
+        setJoinGender('');
+        setMyParticipantId(null);
+      }
+    }
   }, [currentActivityId]);
 
   const createMutation = useMutation({
@@ -177,6 +185,9 @@ export const RandomGrouper = () => {
       queryClient.invalidateQueries({ queryKey: [`/api/grouping/${currentActivityId}`] });
       setHasJoined(true);
       setMyParticipantId(data?.id || null);
+      if (data?.id && currentActivityId) {
+        localStorage.setItem(`grouping_participant_${currentActivityId}`, data.id);
+      }
       toast.success('加入成功！');
     },
     onError: (error: any) => {
