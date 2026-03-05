@@ -562,19 +562,17 @@ export const AdminMonitor: React.FC = () => {
               </span>
             </div>
             
-            {/* Latecomer Status */}
+            {/* Latecomer Toggle */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">遲到加入</span>
+                <Label htmlFor="allow-latecomers" className="text-sm cursor-pointer">遲到加入</Label>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                allowLatecomers 
-                  ? 'bg-accent/20 text-accent' 
-                  : 'bg-muted text-muted-foreground'
-              }`}>
-                {allowLatecomers ? '已啟用' : '未啟用'}
-              </span>
+              <Switch
+                id="allow-latecomers"
+                checked={allowLatecomers}
+                onCheckedChange={handleToggleLatecomers}
+              />
             </div>
             
             {/* End Study Session Button - only show during studying phase */}
@@ -662,7 +660,7 @@ export const AdminMonitor: React.FC = () => {
       </Card>
 
       {/* Admin Rescue Tools */}
-      {(isVerificationPhase || (!isStudyingPhase && groups.length > 0)) && (
+      {(isVerificationPhase || isStudyingPhase || groups.length > 0) && (
         <Card className="border-accent/50 bg-accent/5">
           <CardContent className="py-4 px-4 sm:px-6 space-y-4">
             {/* Header */}
