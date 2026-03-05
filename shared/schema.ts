@@ -19,7 +19,7 @@ export const userGenderEnum = pgEnum("user_gender", ["male", "female", "other"])
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
   displayName: text("display_name"),
   avatarUrl: text("avatar_url"),
   birthday: date("birthday"),
