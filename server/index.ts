@@ -63,7 +63,11 @@ app.use((req, res, next) => {
   }
 
   const port = Number(process.env.PORT) || 5001;
-  server.listen(port, () => {
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    console.error(`[Server] Failed to bind on port ${port}:`, err.message);
+    process.exit(1);
+  });
+  server.listen(port, "::", () => {
     log(`serving on port ${port}`);
   });
 })();
