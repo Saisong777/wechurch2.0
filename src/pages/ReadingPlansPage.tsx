@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -79,6 +80,7 @@ const ReadingPlansPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<string | null>(null);
   const [showBatchAnalysis, setShowBatchAnalysis] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<ReadingPlanTemplate | null>(null);
 
   const [planName, setPlanName] = useState('');
   const [planDescription, setPlanDescription] = useState('');
@@ -134,8 +136,9 @@ const ReadingPlansPage = () => {
         name: planName,
         description: planDescription || null,
         startDate,
-        bookSelections: selectedBooks,
-        chaptersPerDay,
+        bookSelections: selectedTemplate ? undefined : selectedBooks,
+        chaptersPerDay: selectedTemplate ? undefined : chaptersPerDay,
+        templateId: selectedTemplate?.id,
         reminderEnabled,
         reminderMorning: reminderEnabled ? reminderMorning : null,
         reminderNoon: reminderEnabled ? reminderNoon : null,
@@ -193,6 +196,7 @@ const ReadingPlansPage = () => {
     setReminderMorning('07:00');
     setReminderNoon('12:00');
     setReminderEvening('20:00');
+    setSelectedTemplate(null);
   };
 
   const addBook = (bookName: string) => {
@@ -216,9 +220,9 @@ const ReadingPlansPage = () => {
   };
 
   const totalSelectedChapters = selectedBooks.reduce((sum, s) => sum + (s.chapterEnd - s.chapterStart + 1), 0);
-  const estimatedDays = chaptersPerDay > 0 ? Math.ceil(totalSelectedChapters / chaptersPerDay) : 0;
+  const estimatedDays = selectedTemplate ? selectedTemplate.durationDays : (chaptersPerDay > 0 ? Math.ceil(totalSelectedChapters / chaptersPerDay) : 0);
 
-  const canSubmit = planName.trim() && selectedBooks.length > 0 && chaptersPerDay > 0;
+  const canSubmit = planName.trim() && (selectedTemplate || (selectedBooks.length > 0 && chaptersPerDay > 0));
 
   const handleCreateSubmit = () => {
     if (!canSubmit) return;
@@ -255,10 +259,12 @@ const ReadingPlansPage = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="讀經計劃" variant="compact" />
+        <Header title="讀經計劃" variant="compact" backTo="/learn" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6">
-          <div className="max-w-3xl lg:max-w-4xl mx-auto text-center text-muted-foreground py-12">
-            載入中...
+          <div className="max-w-3xl lg:max-w-4xl mx-auto space-y-4">
+            <Skeleton className="h-10 w-full rounded-lg bg-primary/10" />
+            <Skeleton className="h-32 w-full rounded-xl bg-primary/5" />
+            <Skeleton className="h-32 w-full rounded-xl bg-primary/5" />
           </div>
         </main>
       </div>
@@ -269,7 +275,7 @@ const ReadingPlansPage = () => {
     return (
       <FeatureGate featureKeys={["we_learn", "reading_plans"]} title="讀經計劃功能維護中" description="讀經計劃功能目前暫時關閉，請稍後再試">
         <div className="min-h-screen bg-background">
-          <Header title="讀經計劃" variant="compact" />
+          <Header title="讀經計劃" variant="compact" backTo="/learn" />
           <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6">
             <div className="max-w-3xl lg:max-w-4xl mx-auto">
               <Card>
@@ -292,7 +298,7 @@ const ReadingPlansPage = () => {
   return (
     <FeatureGate featureKeys={["we_learn", "reading_plans"]} title="讀經計劃功能維護中" description="讀經計劃功能目前暫時關閉，請稍後再試">
       <div className="min-h-screen bg-background">
-        <Header title="讀經計劃" variant="compact" />
+        <Header title="讀經計劃" variant="compact" backTo="/learn" />
 
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="max-w-3xl lg:max-w-4xl mx-auto">
@@ -307,7 +313,10 @@ const ReadingPlansPage = () => {
               </Button>
               <Button
                 variant={viewMode === 'create' ? 'default' : 'outline'}
-                onClick={() => setViewMode('create')}
+                onClick={() => {
+                  setSelectedTemplate(null);
+                  setViewMode('create');
+                }}
                 data-testid="button-view-create"
               >
                 <Plus className="w-4 h-4 mr-1.5" />
@@ -374,6 +383,8 @@ const ReadingPlansPage = () => {
                 isSupported={isSupported}
                 requestPermission={requestPermission}
                 toast={toast}
+                selectedTemplate={selectedTemplate}
+                onClearTemplate={() => setSelectedTemplate(null)}
               />
             )}
 
@@ -381,6 +392,12 @@ const ReadingPlansPage = () => {
               <BrowseTemplatesView
                 templates={templates}
                 loading={templatesLoading}
+                onSelectTemplate={(template) => {
+                  setPlanName(template.name);
+                  setPlanDescription(template.description || '');
+                  setSelectedTemplate(template);
+                  setViewMode('create');
+                }}
               />
             )}
           </div>
@@ -433,7 +450,21 @@ function MyPlansView({
   onCreateClick: () => void;
 }) {
   if (loading) {
-    return <div className="text-center py-12 text-muted-foreground">載入中...</div>;
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="bg-muted/30">
+            <CardHeader className="pb-2">
+              <Skeleton className="h-6 w-1/2 bg-primary/10 rounded" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-4 w-1/3 bg-primary/10 rounded" />
+              <Skeleton className="h-2 w-full bg-primary/5 rounded-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
   }
 
   if (plans.length === 0) {
@@ -555,6 +586,8 @@ function CreatePlanView({
   isSupported,
   requestPermission,
   toast,
+  selectedTemplate,
+  onClearTemplate,
 }: {
   bibleBooks: BibleBook[];
   booksLoading: boolean;
@@ -586,6 +619,8 @@ function CreatePlanView({
   isSupported: boolean;
   requestPermission: () => Promise<boolean>;
   toast: (options: { title: string; description?: string; variant?: 'default' | 'destructive' }) => void;
+  selectedTemplate?: ReadingPlanTemplate | null;
+  onClearTemplate?: () => void;
 }) {
   const availableBooks = bibleBooks.filter(b => !selectedBooks.some(s => s.bookName === b.bookName));
 
@@ -619,89 +654,121 @@ function CreatePlanView({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">選擇書卷</CardTitle>
-          <CardDescription>選擇要閱讀的聖經書卷和章節範圍</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {booksLoading ? (
-            <div className="text-center py-4 text-muted-foreground">載入書卷列表...</div>
-          ) : (
-            <div className="space-y-2">
-              <Label>新增書卷</Label>
-              <Select onValueChange={addBook} value="" data-testid="select-add-book">
-                <SelectTrigger data-testid="select-add-book-trigger">
-                  <SelectValue placeholder="選擇書卷..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableBooks.map((book) => (
-                    <SelectItem key={book.bookNumber} value={book.bookName}>
-                      {book.bookName}（{book.chapterCount} 章）
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {selectedTemplate ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              範本設定
+              <Badge variant="default" className="text-xs font-normal">已套用</Badge>
+            </CardTitle>
+            <CardDescription>
+              你選擇了「{selectedTemplate.name}」範本
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+              <div className="flex items-center gap-1.5 text-sm">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span>預計 {selectedTemplate.durationDays} 天完成</span>
+              </div>
+              {selectedTemplate.category && (
+                <div className="flex items-center gap-1.5 text-sm">
+                  <Library className="w-4 h-4 text-muted-foreground" />
+                  <span>分類: {selectedTemplate.category}</span>
+                </div>
+              )}
             </div>
-          )}
+            <Button variant="outline" size="sm" onClick={onClearTemplate} className="w-full sm:w-auto">
+              <X className="w-4 h-4 mr-1.5" />
+              清除範本改為自訂
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">選擇書卷</CardTitle>
+            <CardDescription>選擇要閱讀的聖經書卷和章節範圍</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {booksLoading ? (
+              <div className="text-center py-4 text-muted-foreground">載入書卷列表...</div>
+            ) : (
+              <div className="space-y-2">
+                <Label>新增書卷</Label>
+                <Select onValueChange={addBook} value="" data-testid="select-add-book">
+                  <SelectTrigger data-testid="select-add-book-trigger">
+                    <SelectValue placeholder="選擇書卷..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableBooks.map((book) => (
+                      <SelectItem key={book.bookNumber} value={book.bookName}>
+                        {book.bookName}（{book.chapterCount} 章）
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-          {selectedBooks.length > 0 && (
-            <div className="space-y-3">
-              <Label>已選書卷</Label>
-              {selectedBooks.map((sel) => {
-                const bookInfo = bibleBooks.find(b => b.bookName === sel.bookName);
-                const maxChapter = bookInfo?.chapterCount || sel.chapterEnd;
-                return (
-                  <Card key={sel.bookName} className="bg-muted/30">
-                    <CardContent className="py-3">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="font-medium text-sm">{sel.bookName}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeBook(sel.bookName)}
-                          data-testid={`button-remove-book-${sel.bookName}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">第</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={sel.chapterEnd}
-                          value={sel.chapterStart}
-                          onChange={(e) => updateBookRange(sel.bookName, 'chapterStart', Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-20"
-                          data-testid={`input-chapter-start-${sel.bookName}`}
-                        />
-                        <span className="text-muted-foreground">到</span>
-                        <Input
-                          type="number"
-                          min={sel.chapterStart}
-                          max={maxChapter}
-                          value={sel.chapterEnd}
-                          onChange={(e) => updateBookRange(sel.bookName, 'chapterEnd', Math.min(maxChapter, parseInt(e.target.value) || maxChapter))}
-                          className="w-20"
-                          data-testid={`input-chapter-end-${sel.bookName}`}
-                        />
-                        <span className="text-muted-foreground">章（共 {sel.chapterEnd - sel.chapterStart + 1} 章）</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+            {selectedBooks.length > 0 && (
+              <div className="space-y-3">
+                <Label>已選書卷</Label>
+                {selectedBooks.map((sel) => {
+                  const bookInfo = bibleBooks.find(b => b.bookName === sel.bookName);
+                  const maxChapter = bookInfo?.chapterCount || sel.chapterEnd;
+                  return (
+                    <Card key={sel.bookName} className="bg-muted/30">
+                      <CardContent className="py-3">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="font-medium text-sm">{sel.bookName}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeBook(sel.bookName)}
+                            data-testid={`button-remove-book-${sel.bookName}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">第</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={sel.chapterEnd}
+                            value={sel.chapterStart}
+                            onChange={(e) => updateBookRange(sel.bookName, 'chapterStart', Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-20"
+                            data-testid={`input-chapter-start-${sel.bookName}`}
+                          />
+                          <span className="text-muted-foreground">到</span>
+                          <Input
+                            type="number"
+                            min={sel.chapterStart}
+                            max={maxChapter}
+                            value={sel.chapterEnd}
+                            onChange={(e) => updateBookRange(sel.bookName, 'chapterEnd', Math.min(maxChapter, parseInt(e.target.value) || maxChapter))}
+                            className="w-20"
+                            data-testid={`input-chapter-end-${sel.bookName}`}
+                          />
+                          <span className="text-muted-foreground">章（共 {sel.chapterEnd - sel.chapterStart + 1} 章）</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
 
-          {selectedBooks.length === 0 && !booksLoading && (
-            <div className="text-center py-4 text-muted-foreground text-sm">
-              請選擇至少一卷書
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            {selectedBooks.length === 0 && !booksLoading && (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                請選擇至少一卷書
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -709,19 +776,21 @@ function CreatePlanView({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="chapters-per-day">每日章數</Label>
-              <Input
-                id="chapters-per-day"
-                type="number"
-                min={1}
-                max={50}
-                value={chaptersPerDay}
-                onChange={(e) => setChaptersPerDay(Math.max(1, parseInt(e.target.value) || 1))}
-                data-testid="input-chapters-per-day"
-              />
-            </div>
-            <div className="space-y-2">
+            {!selectedTemplate && (
+              <div className="space-y-2">
+                <Label htmlFor="chapters-per-day">每日章數</Label>
+                <Input
+                  id="chapters-per-day"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={chaptersPerDay}
+                  onChange={(e) => setChaptersPerDay(Math.max(1, parseInt(e.target.value) || 1))}
+                  data-testid="input-chapters-per-day"
+                />
+              </div>
+            )}
+            <div className={`space-y-2 ${selectedTemplate ? 'sm:col-span-2' : ''}`}>
               <Label htmlFor="start-date">開始日期</Label>
               <Input
                 id="start-date"
@@ -733,7 +802,7 @@ function CreatePlanView({
             </div>
           </div>
 
-          {totalSelectedChapters > 0 && (
+          {(!selectedTemplate && totalSelectedChapters > 0) && (
             <div className="flex flex-wrap gap-3 text-sm text-muted-foreground bg-muted/30 rounded-md p-3">
               <span>共 <strong className="text-foreground">{totalSelectedChapters}</strong> 章</span>
               <span>預計 <strong className="text-foreground">{estimatedDays}</strong> 天完成</span>
@@ -822,12 +891,29 @@ function CreatePlanView({
 function BrowseTemplatesView({
   templates,
   loading,
+  onSelectTemplate,
 }: {
   templates: ReadingPlanTemplate[];
   loading: boolean;
+  onSelectTemplate: (template: ReadingPlanTemplate) => void;
 }) {
   if (loading) {
-    return <div className="text-center py-12 text-muted-foreground">載入中...</div>;
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="bg-muted/30">
+            <CardContent className="py-5 space-y-3">
+              <Skeleton className="h-6 w-2/3 bg-primary/10 rounded" />
+              <Skeleton className="h-4 w-1/3 bg-primary/5 rounded" />
+              <Skeleton className="h-4 w-5/6 bg-primary/5 rounded mt-4" />
+              <div className="pt-2">
+                <Skeleton className="h-9 w-full rounded bg-primary/10" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
   }
 
   if (templates.length === 0) {
@@ -856,7 +942,8 @@ function BrowseTemplatesView({
         {templates.map((template) => (
           <Card
             key={template.id}
-            className="hover-elevate cursor-pointer transition-all"
+            className="hover-elevate cursor-pointer transition-all border-primary/10 hover:border-primary/30"
+            onClick={() => onSelectTemplate(template)}
             data-testid={`card-template-${template.id}`}
           >
             <CardHeader className="pb-2">

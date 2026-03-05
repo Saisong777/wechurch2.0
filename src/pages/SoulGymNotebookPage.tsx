@@ -479,7 +479,7 @@ export const SoulGymNotebookPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header variant="compact" title="Soul Gym 查經筆記本" />
+        <Header variant="compact" title="Soul Gym 查經筆記本" backTo="/user" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-8 sm:py-12">
           <div className="flex items-center justify-center min-h-[60vh]">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" data-testid="loading-spinner" />
@@ -496,7 +496,7 @@ export const SoulGymNotebookPage = () => {
       description="筆記本功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background" data-testid="soul-gym-notebook-page">
-        <Header variant="compact" title="Soul Gym 查經筆記本" />
+        <Header variant="compact" title="Soul Gym 查經筆記本" backTo="/user" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
           <div className="max-w-2xl md:max-w-3xl mx-auto">
             <Tabs defaultValue="personal" className="w-full">

@@ -75,16 +75,16 @@ export default {
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        xl: "12px",
-        "2xl": "16px",
-        "3xl": "24px",
+        md: "calc(var(--radius) - 4px)",
+        sm: "calc(var(--radius) - 8px)",
+        xl: "20px",
+        "2xl": "28px",
+        "3xl": "36px",
       },
       boxShadow: {
-        card: "0 2px 12px rgba(0,0,0,0.08)",
-        "card-hover": "0 4px 20px rgba(0,0,0,0.12)",
-        sheet: "0 8px 32px rgba(0,0,0,0.16)",
+        card: "0 8px 24px -6px rgba(0,0,0,0.06)",
+        "card-hover": "0 20px 40px -8px rgba(0,0,0,0.15)",
+        sheet: "0 16px 48px -12px rgba(0,0,0,0.20)",
       },
       keyframes: {
         "accordion-down": {

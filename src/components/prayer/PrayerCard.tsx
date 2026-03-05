@@ -7,7 +7,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { Prayer, useDeletePrayer, useToggleAmen, useTogglePinPrayer, useMarkPrayerAnswered, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { useUserRole } from '@/hooks/useUserRole';
-import { cn } from '@/lib/utils';
+import { cn, vibrate } from '@/lib/utils';
 import { PrayerComments } from './PrayerComments';
 import {
   Tooltip,
@@ -50,6 +50,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
   const canMarkAnswered = prayer.isOwner;
 
   const handleToggleAmen = () => {
+    vibrate(50);
     toggleAmenMutation.mutate({
       prayerId: prayer.id,
       hasAmened: prayer.hasAmened,
@@ -153,8 +154,8 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
                         size="icon"
                         className={cn(
                           "h-8 w-8",
-                          prayer.isAnswered 
-                            ? "text-emerald-500 hover:text-emerald-600" 
+                          prayer.isAnswered
+                            ? "text-emerald-500 hover:text-emerald-600"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                         onClick={handleMarkAnswered}
@@ -180,8 +181,8 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
                         size="icon"
                         className={cn(
                           "h-8 w-8",
-                          prayer.isPinned 
-                            ? "text-amber-500 hover:text-amber-600" 
+                          prayer.isPinned
+                            ? "text-amber-500 hover:text-amber-600"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                         onClick={handleTogglePin}
@@ -254,7 +255,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
               className={cn(
                 'gap-2 transition-all',
                 prayer.hasAmened &&
-                  'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
+                'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
               )}
             >
               <Heart

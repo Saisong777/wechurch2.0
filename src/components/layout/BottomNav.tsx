@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Dumbbell, BookOpen, Gamepad2, Share2, Home } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, vibrate } from '@/lib/utils';
 
 const navItems = [
   {
@@ -50,11 +50,10 @@ export const BottomNav = () => {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white shadow-sheet md:hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-md border-t border-border/30 shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.05)] md:hidden pb-[env(safe-area-inset-bottom)]"
       data-testid="nav-bottom"
     >
-      <div className="flex items-center justify-around h-14 max-w-xl mx-auto">
+      <div className="flex items-center justify-around h-14 max-w-xl mx-auto px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -64,6 +63,7 @@ export const BottomNav = () => {
               key={item.id}
               to={item.href}
               className="relative flex flex-col items-center justify-center flex-1 h-full"
+              onClick={() => vibrate(50)}
               data-testid={`nav-link-${item.id}`}
             >
               {active && (

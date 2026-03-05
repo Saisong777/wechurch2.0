@@ -8,10 +8,12 @@
   * {
     -webkit-font-smoothing: antialiased;
   }
+
   body {
     background-color: #FAFAF7;
     font-family: var(--font-sans);
   }
+
   :root {
     /* WeChurch - Joyful & Modern Palette (Sky Blue + Warm Accents) */
     --background: 210 40% 98%;
@@ -45,7 +47,7 @@
     --input: 210 25% 88%;
     --ring: 205 85% 50%;
 
-    --radius: 1rem;
+    --radius: 1.5rem;
 
     /* Custom tokens - WeChurch style */
     --sky-gradient: linear-gradient(135deg, hsl(200, 85%, 55%) 0%, hsl(210, 90%, 45%) 100%);
@@ -68,13 +70,15 @@
   }
 
   .dark {
-    --background: 220 25% 8%;
+    --background: 0 0% 0%;
+    /* OLED Black */
     --foreground: 210 40% 98%;
 
-    --card: 220 20% 12%;
+    --card: 240 5% 10%;
+    /* #18181B */
     --card-foreground: 210 40% 98%;
 
-    --popover: 220 20% 12%;
+    --popover: 240 5% 10%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 205 85% 55%;
@@ -83,8 +87,8 @@
     --secondary: 25 90% 55%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 15% 18%;
-    --muted-foreground: 210 15% 60%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 5% 65%;
 
     --accent: 200 90% 50%;
     --accent-foreground: 0 0% 100%;
@@ -92,8 +96,8 @@
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 15% 22%;
-    --input: 220 15% 22%;
+    --border: 240 5% 16%;
+    --input: 240 5% 16%;
     --ring: 205 85% 55%;
   }
 }
@@ -104,7 +108,8 @@
   }
 
   /* Prevent mobile overscroll bounce showing white background */
-  html, body {
+  html,
+  body {
     background-color: hsl(210, 40%, 98%);
     overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
@@ -128,12 +133,18 @@
   }
 
   /* Dark mode background color */
-  .dark html, .dark body {
-    background-color: hsl(220, 25%, 8%);
+  .dark html,
+  .dark body {
+    background-color: hsl(0, 0%, 0%);
   }
 
   /* Modern, friendly typography */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Nunito', sans-serif;
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -141,6 +152,7 @@
 }
 
 @layer components {
+
   /* New gradient utilities */
   .gradient-sky {
     background: var(--sky-gradient);
@@ -264,25 +276,61 @@
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 @keyframes pulse-soft {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.02); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
 }
 
 @keyframes bounce-soft {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 @keyframes scan {
-  0% { top: 0; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
+  0% {
+    top: 0;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
 }
 
 .animate-scan {
@@ -292,17 +340,21 @@
 .scripture-scroll-visible {
   scrollbar-gutter: stable;
 }
+
 .scripture-scroll-visible::-webkit-scrollbar {
   width: 6px;
 }
+
 .scripture-scroll-visible::-webkit-scrollbar-track {
   background: transparent;
   border-radius: 3px;
 }
+
 .scripture-scroll-visible::-webkit-scrollbar-thumb {
   background: hsl(var(--muted-foreground) / 0.3);
   border-radius: 3px;
 }
+
 .scripture-scroll-visible::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
@@ -312,7 +364,7 @@
   .hover-lift {
     @apply transition-all duration-300;
   }
-  
+
   .hover-lift:hover {
     @apply -translate-y-1 shadow-lg;
   }
@@ -322,7 +374,7 @@
   * {
     -webkit-tap-highlight-color: transparent;
   }
-  
+
   .scroll-container,
   [data-radix-scroll-area-viewport],
   main {
@@ -331,7 +383,10 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;

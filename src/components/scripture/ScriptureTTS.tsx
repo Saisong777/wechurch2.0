@@ -56,8 +56,13 @@ const FEMALE_VOICE_PATTERNS = [
   /Meijia/i,
 ];
 
-function detectGender(voice: SpeechSynthesisVoice): 'male' | 'female' | 'unknown' {
-  const nameAndLang = voice.name + ' ' + voice.voiceURI;
+function detectGender(voice: SpeechSynthesisVoice | { name: string, gender?: string }): 'male' | 'female' | 'unknown' {
+  if ('gender' in voice && voice.gender) {
+    return voice.gender.toLowerCase() === 'male' ? 'male' : 'female';
+  }
+  const nm = voice.name;
+  const uri = 'voiceURI' in voice ? voice.voiceURI : '';
+  const nameAndLang = nm + ' ' + uri;
   if (MALE_VOICE_PATTERNS.some(p => p.test(nameAndLang))) return 'male';
   if (FEMALE_VOICE_PATTERNS.some(p => p.test(nameAndLang))) return 'female';
   return 'unknown';
@@ -72,7 +77,7 @@ function shortenVoiceName(name: string): string {
     .trim();
 }
 
-function getVoiceLabel(voice: SpeechSynthesisVoice): string {
+function getVoiceLabel(voice: SpeechSynthesisVoice | { name: string, gender?: string }): string {
   const shortName = shortenVoiceName(voice.name);
   const gender = detectGender(voice);
   const genderTag = gender === 'male' ? ' [男聲]' : gender === 'female' ? ' [女聲]' : '';
@@ -92,19 +97,65 @@ function safeSpeechSynthesis() {
   return window.speechSynthesis;
 }
 
+const GCP_KEY_STORAGE = 'wechurch-gcp-tts-key';
+
+// Standard Google Cloud Chinese voices for quick access if we don't want to fetch the whole list
+const GCP_DEFAULT_VOICES = [
+  { name: 'cmn-TW-Wavenet-A', gender: 'female', lang: 'cmn-TW' },
+  { name: 'cmn-TW-Wavenet-B', gender: 'male', lang: 'cmn-TW' },
+  { name: 'cmn-TW-Wavenet-C', gender: 'male', lang: 'cmn-TW' },
+  { name: 'cmn-CN-Wavenet-A', gender: 'female', lang: 'cmn-CN' },
+  { name: 'cmn-CN-Wavenet-B', gender: 'male', lang: 'cmn-CN' },
+  { name: 'cmn-CN-Wavenet-C', gender: 'male', lang: 'cmn-CN' },
+  { name: 'cmn-CN-Wavenet-D', gender: 'female', lang: 'cmn-CN' },
+];
+
 export function ScriptureTTS({ text, className, compact = false, label }: ScriptureTTSProps) {
   const [ttsState, setTtsState] = useState<TtsState>('idle');
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voices, setVoices] = useState<Array<SpeechSynthesisVoice | { name: string, gender?: string, voiceURI?: string, lang?: string }>>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
   const [speed, setSpeed] = useState(1);
   const [panelOpen, setPanelOpen] = useState(false);
   const [supported, setSupported] = useState(true);
+  const [gcpKey, setGcpKey] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [isGcpActive, setIsGcpActive] = useState(false);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const storedKey = localStorage.getItem(GCP_KEY_STORAGE);
+      if (storedKey) {
+        setGcpKey(storedKey);
+        setIsGcpActive(true);
+      }
+    } catch { }
+  }, []);
 
   const loadVoices = useCallback(() => {
     try {
+      if (isGcpActive && gcpKey) {
+        // Use predefined GCP voices to avoid additional network calls purely for listing
+        const gcpOptions = GCP_DEFAULT_VOICES.map(v => ({
+          ...v,
+          voiceURI: v.name,
+        }));
+        setVoices(gcpOptions);
+
+        try {
+          const stored = localStorage.getItem(VOICE_STORAGE_KEY);
+          if (stored && gcpOptions.some(v => v.voiceURI === stored)) {
+            setSelectedVoiceURI(stored);
+          } else {
+            setSelectedVoiceURI(gcpOptions[0].voiceURI);
+          }
+        } catch { }
+        return;
+      }
+
       const synth = safeSpeechSynthesis();
       if (!synth) {
         setSupported(false);
@@ -135,13 +186,13 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
             setSelectedVoiceURI(defaultVoice.voiceURI);
             localStorage.setItem(VOICE_STORAGE_KEY, defaultVoice.voiceURI);
           }
-        } catch {}
+        } catch { }
       }
     } catch (e) {
       console.warn('[ScriptureTTS] loadVoices error:', e);
-      setSupported(false);
+      if (!isGcpActive) setSupported(false);
     }
-  }, []);
+  }, [isGcpActive, gcpKey]);
 
   useEffect(() => {
     try {
@@ -154,12 +205,12 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
       if (typeof synth.addEventListener === 'function') {
         synth.addEventListener('voiceschanged', loadVoices);
         return () => {
-          try { synth.removeEventListener('voiceschanged', loadVoices); } catch {}
+          try { synth.removeEventListener('voiceschanged', loadVoices); } catch { }
         };
       } else if ('onvoiceschanged' in synth) {
         synth.onvoiceschanged = loadVoices;
         return () => {
-          try { synth.onvoiceschanged = null; } catch {}
+          try { synth.onvoiceschanged = null; } catch { }
         };
       }
     } catch (e) {
@@ -173,7 +224,11 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
       try {
         const synth = safeSpeechSynthesis();
         if (synth) synth.cancel();
-      } catch {}
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+      } catch { }
     };
   }, []);
 
@@ -189,7 +244,48 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [panelOpen]);
 
-  const startSpeech = useCallback(() => {
+  const startSpeech = useCallback(async () => {
+    if (isGcpActive && gcpKey) {
+      setTtsState('playing');
+      try {
+        const voiceConfig = GCP_DEFAULT_VOICES.find(v => v.name === selectedVoiceURI) || GCP_DEFAULT_VOICES[0];
+        const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${gcpKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: { text },
+            voice: { languageCode: voiceConfig.lang, name: voiceConfig.name },
+            audioConfig: { audioEncoding: 'MP3', speakingRate: speed },
+          }),
+        });
+
+        if (!res.ok) {
+          console.error('[ScriptureTTS] GCP synthesis failed', await res.text());
+          throw new Error('GCP API Request failed');
+        }
+
+        const data = await res.json();
+        const audioStr = 'data:audio/mp3;base64,' + data.audioContent;
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        const audio = new Audio(audioStr);
+        audio.onended = () => setTtsState('idle');
+        audio.onerror = () => setTtsState('idle');
+        audioRef.current = audio;
+        audio.play().catch(e => {
+          console.warn('[ScriptureTTS] play gcp audio blocked:', e);
+          setTtsState('idle');
+        });
+      } catch (e) {
+        console.warn('[ScriptureTTS] startSpeech GCP error:', e);
+        setTtsState('idle');
+      }
+      return;
+    }
+
     try {
       const synth = safeSpeechSynthesis();
       if (!synth) return;
@@ -198,9 +294,9 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
       utterance.lang = 'zh-TW';
       utterance.rate = speed;
 
-      const voice = voices.find(v => v.voiceURI === selectedVoiceURI);
-      if (voice) {
-        utterance.voice = voice;
+      const voice = voices.find(v => ('voiceURI' in v ? v.voiceURI : v.name) === selectedVoiceURI);
+      if (voice && 'localService' in voice) { // Check if it's a native SpeechSynthesisVoice
+        utterance.voice = voice as SpeechSynthesisVoice;
       }
 
       utterance.onend = () => {
@@ -217,15 +313,31 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
       console.warn('[ScriptureTTS] startSpeech error:', e);
       setTtsState('idle');
     }
-  }, [text, speed, voices, selectedVoiceURI]);
+  }, [text, speed, voices, selectedVoiceURI, isGcpActive, gcpKey]);
 
   const handlePlayPause = useCallback(() => {
     try {
-      const synth = safeSpeechSynthesis();
-      if (!synth) return;
       if (ttsState === 'idle') {
         startSpeech();
-      } else if (ttsState === 'playing') {
+        return;
+      }
+
+      if (isGcpActive && gcpKey) {
+        if (audioRef.current) {
+          if (ttsState === 'playing') {
+            audioRef.current.pause();
+            setTtsState('paused');
+          } else {
+            audioRef.current.play();
+            setTtsState('playing');
+          }
+        }
+        return;
+      }
+
+      const synth = safeSpeechSynthesis();
+      if (!synth) return;
+      if (ttsState === 'playing') {
         synth.pause();
         setTtsState('paused');
       } else if (ttsState === 'paused') {
@@ -236,19 +348,24 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
       console.warn('[ScriptureTTS] playPause error:', e);
       setTtsState('idle');
     }
-  }, [ttsState, startSpeech]);
+  }, [ttsState, startSpeech, isGcpActive, gcpKey]);
 
   const handleStop = useCallback(() => {
     try {
-      const synth = safeSpeechSynthesis();
-      if (synth) synth.cancel();
-    } catch {}
+      if (isGcpActive && audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      } else {
+        const synth = safeSpeechSynthesis();
+        if (synth) synth.cancel();
+      }
+    } catch { }
     setTtsState('idle');
-  }, []);
+  }, [isGcpActive]);
 
   const handleVoiceChange = useCallback((voiceURI: string) => {
     setSelectedVoiceURI(voiceURI);
-    try { localStorage.setItem(VOICE_STORAGE_KEY, voiceURI); } catch {}
+    try { localStorage.setItem(VOICE_STORAGE_KEY, voiceURI); } catch { }
     if (ttsState !== 'idle') {
       try {
         const synth = safeSpeechSynthesis();
@@ -348,26 +465,74 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
         </Select>
       </div>
 
-      {voices.length > 0 ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">語音</span>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground shrink-0">語音</span>
+        {voices.length > 0 ? (
           <Select value={selectedVoiceURI} onValueChange={handleVoiceChange}>
             <SelectTrigger className="h-8 w-40 text-xs" data-testid="select-tts-voice">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {voices.map(v => (
-                <SelectItem key={v.voiceURI} value={v.voiceURI} data-testid={`option-voice-${v.voiceURI}`}>
-                  {getVoiceLabel(v)}
-                </SelectItem>
-              ))}
+              {voices.map(v => {
+                const uri = 'voiceURI' in v ? v.voiceURI : v.name;
+                return (
+                  <SelectItem key={uri} value={uri || ''} data-testid={`option-voice-${uri}`}>
+                    {getVoiceLabel(v)}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
+        ) : (
+          <span className="text-xs text-muted-foreground" data-testid="text-no-chinese-voices">
+            此設備不支援中文語音
+          </span>
+        )}
+      </div>
+
+      <div className="pt-2 border-t mt-1 flex justify-between items-center">
+        <span className="text-xs text-muted-foreground flex items-center gap-1">
+          {isGcpActive ? (
+            <span className="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse"></span>
+          ) : (
+            <span className="w-2 h-2 rounded-full bg-orange-400 inline-block"></span>
+          )}
+          {isGcpActive ? 'Google Cloud 高音質' : '免費設備語音'}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 text-xs px-2 gap-1"
+          onClick={() => setShowSettings(!showSettings)}
+        >
+          <Settings2 className="w-3 h-3" />
+          設定
+        </Button>
+      </div>
+
+      {showSettings && (
+        <div className="p-3 bg-muted/50 rounded-md border mt-1 space-y-2">
+          <label className="text-xs font-medium block">Google Cloud TTS 金鑰 (選填)</label>
+          <p className="text-[10px] text-muted-foreground">
+            填入有效金鑰以啟用高音質 AI 語音。金鑰僅安全儲存於您目前的瀏覽器中。
+          </p>
+          <input
+            type="password"
+            value={gcpKey}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              setGcpKey(val);
+              if (val) {
+                try { localStorage.setItem(GCP_KEY_STORAGE, val); setIsGcpActive(true); } catch { }
+              } else {
+                try { localStorage.removeItem(GCP_KEY_STORAGE); setIsGcpActive(false); } catch { }
+              }
+              setTtsState('idle'); // Stop playback on change
+            }}
+            placeholder="AIzaSy..."
+            className="w-full h-8 px-2 text-xs border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+          />
         </div>
-      ) : (
-        <p className="text-xs text-muted-foreground" data-testid="text-no-chinese-voices">
-          此設備不支援中文語音
-        </p>
       )}
     </div>
   );
@@ -452,11 +617,14 @@ export function ScriptureTTS({ text, className, compact = false, label }: Script
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {voices.map(v => (
-              <SelectItem key={v.voiceURI} value={v.voiceURI} data-testid={`option-voice-${v.voiceURI}`}>
-                {getVoiceLabel(v)}
-              </SelectItem>
-            ))}
+            {voices.map(v => {
+              const uri = 'voiceURI' in v ? v.voiceURI : v.name;
+              return (
+                <SelectItem key={uri} value={uri || ''} data-testid={`option-voice-${uri}`}>
+                  {getVoiceLabel(v)}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       ) : (

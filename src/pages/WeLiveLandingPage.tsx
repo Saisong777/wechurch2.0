@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dumbbell, BookMarked, ChevronRight } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { FeatureGate } from '@/components/ui/feature-gate';
@@ -49,23 +49,21 @@ export const WeLiveLandingPage = () => {
                 const Icon = feature.icon;
                 return (
                   <Link key={feature.id} to={feature.href} className="block" data-testid={`link-feature-${feature.id}`}>
-                    <Card className="hover-elevate active-elevate-2 cursor-pointer">
-                      <CardContent className="p-4 sm:p-5">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 rounded-xl ${feature.bgColor} flex items-center justify-center flex-shrink-0`}>
-                            <Icon className={`w-6 h-6 ${feature.iconColor}`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-semibold text-foreground" data-testid={`text-feature-title-${feature.id}`}>
-                              {feature.title}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mt-0.5" data-testid={`text-feature-subtitle-${feature.id}`}>
-                              {feature.subtitle}
-                            </p>
-                          </div>
-                          <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    <Card className="hover-elevate cursor-pointer transition-all">
+                      <CardHeader className="flex flex-row items-center gap-3 sm:gap-4 py-3 sm:py-4 px-3 sm:px-6">
+                        <div className={`p-2 sm:p-3 rounded-lg ${feature.bgColor} flex items-center justify-center flex-shrink-0`}>
+                          <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${feature.iconColor}`} />
                         </div>
-                      </CardContent>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base sm:text-lg" data-testid={`text-feature-title-${feature.id}`}>
+                            {feature.title}
+                          </CardTitle>
+                          <CardDescription className="mt-0.5 sm:mt-1 text-xs sm:text-sm line-clamp-2" data-testid={`text-feature-subtitle-${feature.id}`}>
+                            {feature.subtitle}
+                          </CardDescription>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                      </CardHeader>
                     </Card>
                   </Link>
                 );

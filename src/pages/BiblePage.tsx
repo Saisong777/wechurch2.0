@@ -14,6 +14,8 @@ import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialo
 import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { vibrate } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface BibleBook {
   bookName: string;
@@ -219,7 +221,7 @@ const BiblePage = () => {
   const changeFontSize = (delta: number) => {
     const next = Math.max(0, Math.min(3, fontSizeLevel + delta));
     setFontSizeLevel(next);
-    try { localStorage.setItem('wechurch-bible-font-size', String(next)); } catch {}
+    try { localStorage.setItem('wechurch-bible-font-size', String(next)); } catch { }
   };
 
   const getCurrentBookChapterCount = useCallback(() => {
@@ -307,12 +309,12 @@ const BiblePage = () => {
   const copySelectedVerses = async () => {
     const selectedVersesList = getSelectedVerses();
     if (selectedVersesList.length === 0) return;
-    
+
     const verseNums = selectedVersesList.map(v => v.verse);
     const rangeText = formatVerseRange(verseNums);
     const header = `${selectedBook} ${selectedChapter}:${rangeText}`;
     const text = selectedVersesList.map(v => `${v.verse} ${v.text}`).join('\n');
-    
+
     try {
       await navigator.clipboard.writeText(`${header}\n${text}`);
       toast({
@@ -330,12 +332,12 @@ const BiblePage = () => {
   const formatVerseRange = (nums: number[]) => {
     if (nums.length === 0) return '';
     if (nums.length === 1) return nums[0].toString();
-    
+
     const sorted = [...nums].sort((a, b) => a - b);
     const ranges: string[] = [];
     let start = sorted[0];
     let end = sorted[0];
-    
+
     for (let i = 1; i < sorted.length; i++) {
       if (sorted[i] === end + 1) {
         end = sorted[i];
@@ -370,12 +372,12 @@ const BiblePage = () => {
   const shareSelectedVerses = async () => {
     const selectedVersesList = getSelectedVerses();
     if (selectedVersesList.length === 0) return;
-    
+
     const verseNums = selectedVersesList.map(v => v.verse);
     const rangeText = formatVerseRange(verseNums);
     const header = `${selectedBook} ${selectedChapter}:${rangeText}`;
     const text = selectedVersesList.map(v => `${v.verse} ${v.text}`).join('\n');
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -417,19 +419,19 @@ const BiblePage = () => {
 
   const getAnchorRect = useCallback((): DOMRect | null => {
     if (selectedVerseNums.size === 0) return null;
-    
+
     const sortedNums = Array.from(selectedVerseNums).sort((a, b) => a - b);
     const firstNum = sortedNums[0];
     const lastNum = sortedNums[sortedNums.length - 1];
-    
+
     const firstEl = verseRefs.current.get(firstNum);
     const lastEl = verseRefs.current.get(lastNum);
-    
+
     if (!firstEl || !lastEl) return null;
-    
+
     const firstRect = firstEl.getBoundingClientRect();
     const lastRect = lastEl.getBoundingClientRect();
-    
+
     return {
       top: firstRect.top,
       left: Math.min(firstRect.left, lastRect.left),
@@ -446,7 +448,7 @@ const BiblePage = () => {
   const getCardVerseData = () => {
     const selectedVersesList = getSelectedVerses();
     if (selectedVersesList.length === 0) return { text: '', reference: '' };
-    
+
     const verseNums = selectedVersesList.map(v => v.verse);
     const rangeText = formatVerseRange(verseNums);
     const reference = `${selectedBook} ${selectedChapter}:${rangeText}`;
@@ -474,7 +476,7 @@ const BiblePage = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={(e) => { e.stopPropagation(); copyVerse(verse); }}
+          onClick={(e) => { e.stopPropagation(); vibrate(50); copyVerse(verse); }}
           title="複製經文"
           data-testid={`button-search-copy-${verse.id}`}
         >
@@ -483,7 +485,7 @@ const BiblePage = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={(e) => { e.stopPropagation(); shareVerse(verse); }}
+          onClick={(e) => { e.stopPropagation(); vibrate(50); shareVerse(verse); }}
           title="分享經文"
           data-testid={`button-search-share-${verse.id}`}
         >
@@ -494,6 +496,7 @@ const BiblePage = () => {
           size="icon"
           onClick={(e) => {
             e.stopPropagation();
+            vibrate(50);
             setSearchCardVerse({
               text: verse.text,
               reference: `${verse.bookName} ${verse.chapter}:${verse.verse}`,
@@ -518,6 +521,7 @@ const BiblePage = () => {
           size="icon"
           onClick={(e) => {
             e.stopPropagation();
+            vibrate(50);
             setSearchNoteVerse({
               reference: `${verse.bookName} ${verse.chapter}:${verse.verse}`,
               text: verse.text,
@@ -539,7 +543,7 @@ const BiblePage = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={(e) => { e.stopPropagation(); copyVerse(verse); }}
+          onClick={(e) => { e.stopPropagation(); vibrate(50); copyVerse(verse); }}
           data-testid={`button-copy-${verse.id}`}
         >
           <Copy className="w-4 h-4" />
@@ -547,7 +551,7 @@ const BiblePage = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={(e) => { e.stopPropagation(); shareVerse(verse); }}
+          onClick={(e) => { e.stopPropagation(); vibrate(50); shareVerse(verse); }}
           data-testid={`button-share-${verse.id}`}
         >
           <Share2 className="w-4 h-4" />
@@ -556,7 +560,7 @@ const BiblePage = () => {
           variant="ghost"
           size="icon"
           className={isSaved ? 'text-primary' : ''}
-          onClick={(e) => { e.stopPropagation(); toggleSaveVerse(verse); }}
+          onClick={(e) => { e.stopPropagation(); vibrate(50); toggleSaveVerse(verse); }}
           data-testid={`button-save-${verse.id}`}
         >
           {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
@@ -599,11 +603,10 @@ const BiblePage = () => {
             {categoryBooks.map((book) => (
               <button
                 key={book.bookNumber}
-                className={`h-11 rounded-lg text-sm flex flex-col items-center justify-center transition-colors ${
-                  selectedBook === book.bookName
-                    ? 'bg-brand-amber text-white font-bold'
-                    : 'bg-brand-soft text-gray-700 hover:bg-brand-sky/10'
-                }`}
+                className={`h-11 rounded-lg text-sm flex flex-col items-center justify-center transition-colors ${selectedBook === book.bookName
+                  ? 'bg-brand-amber text-white font-bold'
+                  : 'bg-brand-soft text-gray-700 hover:bg-brand-sky/10'
+                  }`}
                 onClick={() => setSelectedBook(book.bookName)}
                 data-testid={`button-book-${book.bookNumber}`}
               >
@@ -624,471 +627,490 @@ const BiblePage = () => {
       title="聖經閱讀功能維護中"
       description="聖經閱讀功能目前暫時關閉，請稍後再試"
     >
-    <div className="bg-brand-warm min-h-screen">
-      <div className="sticky top-0 z-40 bg-white border-b border-brand-border">
-        <div className="container mx-auto max-w-5xl flex items-center justify-between h-12 px-3 sm:px-4">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            {selectedBook ? (
-              <span className="font-semibold text-sm text-gray-800 truncate" data-testid="text-current-book">
-                {selectedBook}{selectedChapter ? ` ${selectedChapter}章` : ''}
-              </span>
-            ) : (
-              <span className="font-semibold text-sm text-gray-800">聖經閱讀</span>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="sm:hidden text-muted-foreground w-8 h-8"
-              onClick={() => setSearchExpanded(true)}
-              data-testid="button-expand-search"
-            >
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-0.5">
-            <button
-              className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100'}`}
-              onClick={() => changeFontSize(-1)}
-              disabled={fontSizeLevel === 0}
-              data-testid="button-font-decrease"
-            >A-</button>
-            <span className="text-xs text-gray-400 w-6 text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
-            <button
-              className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 3 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100'}`}
-              onClick={() => changeFontSize(1)}
-              disabled={fontSizeLevel === 3}
-              data-testid="button-font-increase"
-            >A+</button>
-          </div>
-        </div>
-      </div>
-      
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
-        <div className="max-w-5xl lg:max-w-6xl mx-auto w-full">
-          <div className="hidden sm:flex items-center gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="搜尋經文..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10 h-10 text-base md:text-sm"
-                data-testid="input-bible-search-desktop"
-              />
+      <div className="bg-brand-warm min-h-screen">
+        <Header
+          variant="compact"
+          title={selectedBook ? `${selectedBook}${selectedChapter ? ` ${selectedChapter}章` : ''}` : '聖經閱讀'}
+          backTo="/learn"
+          rightContent={
+            <div className="flex items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="sm:hidden text-muted-foreground w-8 h-8 mr-1"
+                onClick={() => setSearchExpanded(true)}
+                data-testid="button-expand-search"
+              >
+                <Search className="w-4 h-4" />
+              </Button>
+              <button
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-muted'}`}
+                onClick={() => changeFontSize(-1)}
+                disabled={fontSizeLevel === 0}
+                data-testid="button-font-decrease"
+              >A-</button>
+              <span className="text-xs text-gray-400 w-6 text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
+              <button
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 3 ? 'text-gray-300' : 'text-gray-500 hover:bg-muted'}`}
+                onClick={() => changeFontSize(1)}
+                disabled={fontSizeLevel === 3}
+                data-testid="button-font-increase"
+              >A+</button>
             </div>
-            <Button onClick={handleSearch} size="sm" className="h-10 px-3" data-testid="button-search-desktop">
-              搜尋
-            </Button>
-          </div>
-          {searchExpanded && (
-            <div className="fixed inset-x-0 top-0 z-[10001] bg-background border-b shadow-sm p-2 flex gap-1 items-center sm:hidden animate-in slide-in-from-top-2 duration-200">
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          }
+        />
+
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+          <div className="max-w-5xl lg:max-w-6xl mx-auto w-full">
+            <div className="hidden sm:flex items-center gap-2 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="搜尋經文..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSearch();
-                    if (e.key === 'Escape') { setSearchExpanded(false); if (!searchQuery) { setIsSearching(false); } }
-                  }}
-                  className="pl-7 pr-7 h-9 text-base"
-                  data-testid="input-bible-search"
-                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="pl-10 h-10 text-base md:text-sm"
+                  data-testid="input-bible-search-desktop"
                 />
-                {searchQuery && (
-                  <button
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground"
-                    onClick={clearSearch}
-                    data-testid="button-clear-search"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </div>
-              <Button onClick={handleSearch} size="sm" data-testid="button-search">
+              <Button onClick={handleSearch} size="sm" className="h-10 px-3" data-testid="button-search-desktop">
                 搜尋
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { setSearchExpanded(false); setIsSearching(false); setSearchQuery(''); }}
-                data-testid="button-close-search"
-              >
-                <X className="w-4 h-4" />
-              </Button>
             </div>
-          )}
-
-          {isSearching ? (
-            <Card>
-              <CardContent className="py-3 sm:py-6">
-                <div className="flex flex-wrap justify-between items-center gap-2 mb-3 sm:mb-6">
-                  <h3 className="font-semibold text-sm sm:text-lg" data-testid="text-search-title">
-                    搜尋: &ldquo;{searchQuery}&rdquo;
-                    {searchResults.length > 0 && (
-                      <span className="text-muted-foreground font-normal text-xs sm:text-sm ml-2">
-                        ({searchResults.length} 筆結果)
-                      </span>
-                    )}
-                  </h3>
-                  <Button variant="ghost" size="sm" onClick={clearSearch} className="h-7 sm:h-8 text-xs sm:text-sm" data-testid="button-back-from-search">
-                    返回書卷
-                  </Button>
-                </div>
-                {searchLoading ? (
-                  <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">搜尋中...</div>
-                ) : searchError ? (
-                  <div className="text-center py-8 sm:py-12 text-destructive flex flex-col items-center gap-2">
-                    <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                    <span className="text-sm">搜尋時發生錯誤</span>
-                  </div>
-                ) : searchResults.length === 0 ? (
-                  <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">找不到相關經文</div>
-                ) : (
-                  <div className="space-y-2 sm:space-y-3">
-                    {searchResults.map((v) => (
-                      <div key={v.id} className="p-3 sm:p-4 rounded-lg bg-muted/50" data-testid={`search-result-${v.id}`}>
-                        <div className="flex flex-wrap justify-between items-start gap-2 mb-1 sm:mb-2">
-                          <p className="text-sm sm:text-base text-primary font-medium">
-                            {v.bookName} {v.chapter}:{v.verse}
-                          </p>
-                        </div>
-                        <p className="text-sm sm:text-base leading-relaxed mb-2">{v.text}</p>
-                        <SearchVerseActions verse={v} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : selectedBook && selectedChapter ? (
-            <ErrorBoundary fallbackTitle="經文顯示發生錯誤">
-            <Card>
-              <CardContent className="py-2 sm:py-4">
-                <div className="flex flex-wrap justify-between items-center gap-2 mb-1 sm:mb-2">
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    {getChapterLabel(-1) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigateChapter(-1)}
-                        title={getChapterLabel(-1) || ''}
-                        data-testid="button-prev-chapter"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                    )}
-                    <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
-                    {getChapterLabel(1) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigateChapter(1)}
-                        title={getChapterLabel(1) || ''}
-                        data-testid="button-next-chapter"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-back-to-chapters">
-                    返回
-                  </Button>
-                </div>
-
-                <div className="flex items-center gap-1 sm:gap-2 mb-2">
-                  <div className="flex items-center gap-0.5">
-                    <Button
-                      variant={displayMode === 'list' ? 'default' : 'outline'}
-                      size="icon"
-                      className="w-8 h-8"
-                      onClick={() => {
-                        setDisplayMode('list');
-                        try { localStorage.setItem('wechurch-bible-display-mode', 'list'); } catch {}
-                      }}
-                      title="條列式"
-                      data-testid="button-display-list"
-                    >
-                      <List className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant={displayMode === 'paragraph' ? 'default' : 'outline'}
-                      size="icon"
-                      className="w-8 h-8"
-                      onClick={() => {
-                        setDisplayMode('paragraph');
-                        try { localStorage.setItem('wechurch-bible-display-mode', 'paragraph'); } catch {}
-                      }}
-                      title="段落式"
-                      data-testid="button-display-paragraph"
-                    >
-                      <AlignLeft className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <ScriptureTTS
-                    text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
-                    compact
-                    label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
+            {searchExpanded && (
+              <div className="fixed inset-x-0 top-0 z-[10001] bg-background border-b shadow-sm p-2 flex gap-1 items-center sm:hidden animate-in slide-in-from-top-2 duration-200">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="搜尋經文..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSearch();
+                      if (e.key === 'Escape') { setSearchExpanded(false); if (!searchQuery) { setIsSearching(false); } }
+                    }}
+                    className="pl-7 pr-7 h-9 text-base"
+                    data-testid="input-bible-search"
+                    autoFocus
                   />
-                  {selectedVerseNums.size > 0 && (
-                    <span className="text-xs text-muted-foreground ml-auto">已選 {selectedVerseNums.size} 節</span>
+                  {searchQuery && (
+                    <button
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground"
+                      onClick={clearSearch}
+                      data-testid="button-clear-search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   )}
                 </div>
+                <Button onClick={handleSearch} size="sm" data-testid="button-search">
+                  搜尋
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => { setSearchExpanded(false); setIsSearching(false); setSearchQuery(''); }}
+                  data-testid="button-close-search"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
 
-                {versesLoading ? (
-                  <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">載入中...</div>
-                ) : versesError ? (
-                  <div className="text-center py-8 sm:py-12 text-destructive flex flex-col items-center gap-2">
-                    <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                    <span className="text-sm">載入經文時發生錯誤</span>
+            {isSearching ? (
+              <Card>
+                <CardContent className="py-3 sm:py-6">
+                  <div className="flex flex-wrap justify-between items-center gap-2 mb-3 sm:mb-6">
+                    <h3 className="font-semibold text-sm sm:text-lg" data-testid="text-search-title">
+                      搜尋: &ldquo;{searchQuery}&rdquo;
+                      {searchResults.length > 0 && (
+                        <span className="text-muted-foreground font-normal text-xs sm:text-sm ml-2">
+                          ({searchResults.length} 筆結果)
+                        </span>
+                      )}
+                    </h3>
+                    <Button variant="ghost" size="sm" onClick={clearSearch} className="h-7 sm:h-8 text-xs sm:text-sm" data-testid="button-back-from-search">
+                      返回書卷
+                    </Button>
                   </div>
-                ) : (
-                  <div>
-                    {displayMode === 'paragraph' ? (
-                      <div className={`${currentFontConfig.paragraph} pr-2 sm:pr-4 py-2`}>
-                        {verses.map((v) => {
-                          const isContinuation = v.text.trim() === 'a';
-                          if (isContinuation) {
-                            return (
-                              <span
-                                key={v.verse}
-                                ref={(el) => {
-                                  if (el) verseRefs.current.set(v.verse, el);
-                                  else verseRefs.current.delete(v.verse);
-                                }}
-                                className="text-[10px] text-muted-foreground/50 align-super cursor-pointer"
-                                onClick={() => toggleVerseSelection(v.verse)}
-                                data-testid={`verse-${v.chapter}-${v.verse}`}
-                              >{v.verse}</span>
-                            );
-                          }
-                          return (
-                            <span key={v.verse}>
-                              <span
-                                ref={(el) => {
-                                  if (el) verseRefs.current.set(v.verse, el);
-                                  else verseRefs.current.delete(v.verse);
-                                }}
-                                className={`cursor-pointer transition-colors select-none rounded-sm ${
-                                  selectedVerseNums.has(v.verse)
-                                    ? 'bg-primary/10 ring-1 ring-primary/30'
-                                    : 'hover:bg-muted/50'
-                                }`}
-                                onClick={() => toggleVerseSelection(v.verse)}
-                                data-testid={`verse-${v.chapter}-${v.verse}`}
-                              >
-                                <sup className={`text-primary/60 font-medium ${currentFontConfig.sup} mr-0.5`}>{v.verse}</sup>
-                                {v.text}
-                              </span>
-                              {' '}
-                            </span>
-                          );
-                        })}
+                  {searchLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="p-3 sm:p-4 rounded-lg bg-muted/30">
+                          <Skeleton className="h-5 w-1/3 sm:w-1/4 rounded bg-primary/10 mb-2" />
+                          <Skeleton className="h-4 w-full rounded bg-primary/5" />
+                          <Skeleton className="h-4 w-4/5 rounded bg-primary/5 mt-1" />
+                          <div className="flex gap-1 mt-3">
+                            <Skeleton className="h-8 w-8 rounded-md bg-muted" />
+                            <Skeleton className="h-8 w-8 rounded-md bg-muted" />
+                            <Skeleton className="h-8 w-8 rounded-md bg-muted" />
+                            <Skeleton className="h-8 w-8 rounded-md bg-muted" />
+                            <Skeleton className="h-8 w-8 rounded-md bg-muted" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : searchError ? (
+                    <div className="text-center py-8 sm:py-12 text-destructive flex flex-col items-center gap-2">
+                      <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <span className="text-sm">搜尋時發生錯誤</span>
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="text-center py-8 sm:py-12 text-muted-foreground text-sm">找不到相關經文</div>
+                  ) : (
+                    <div className="space-y-2 sm:space-y-3">
+                      {searchResults.map((v) => (
+                        <div key={v.id} className="p-3 sm:p-4 rounded-lg bg-muted/50" data-testid={`search-result-${v.id}`}>
+                          <div className="flex flex-wrap justify-between items-start gap-2 mb-1 sm:mb-2">
+                            <p className="text-sm sm:text-base text-primary font-medium">
+                              {v.bookName} {v.chapter}:{v.verse}
+                            </p>
+                          </div>
+                          <p className="text-sm sm:text-base leading-relaxed mb-2">{v.text}</p>
+                          <SearchVerseActions verse={v} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : selectedBook && selectedChapter ? (
+              <ErrorBoundary fallbackTitle="經文顯示發生錯誤">
+                <Card>
+                  <CardContent className="py-2 sm:py-4">
+                    <div className="flex flex-wrap justify-between items-center gap-2 mb-1 sm:mb-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        {getChapterLabel(-1) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigateChapter(-1)}
+                            title={getChapterLabel(-1) || ''}
+                            data-testid="button-prev-chapter"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <h3 className="font-semibold text-base sm:text-xl">{selectedBook} {selectedChapter}章</h3>
+                        {getChapterLabel(1) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigateChapter(1)}
+                            title={getChapterLabel(1) || ''}
+                            data-testid="button-next-chapter"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => { setSelectedChapter(null); setSelectedVerseNums(new Set()); }} className="h-7 sm:h-8 px-2 text-xs sm:text-sm" data-testid="button-back-to-chapters">
+                        返回
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center gap-1 sm:gap-2 mb-2">
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant={displayMode === 'list' ? 'default' : 'outline'}
+                          size="icon"
+                          className="w-8 h-8"
+                          onClick={() => {
+                            setDisplayMode('list');
+                            try { localStorage.setItem('wechurch-bible-display-mode', 'list'); } catch { }
+                          }}
+                          title="條列式"
+                          data-testid="button-display-list"
+                        >
+                          <List className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant={displayMode === 'paragraph' ? 'default' : 'outline'}
+                          size="icon"
+                          className="w-8 h-8"
+                          onClick={() => {
+                            setDisplayMode('paragraph');
+                            try { localStorage.setItem('wechurch-bible-display-mode', 'paragraph'); } catch { }
+                          }}
+                          title="段落式"
+                          data-testid="button-display-paragraph"
+                        >
+                          <AlignLeft className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <ScriptureTTS
+                        text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
+                        compact
+                        label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
+                      />
+                      {selectedVerseNums.size > 0 && (
+                        <span className="text-xs text-muted-foreground ml-auto">已選 {selectedVerseNums.size} 節</span>
+                      )}
+                    </div>
+
+                    {versesLoading ? (
+                      <div className="space-y-4 py-4 px-2">
+                        <Skeleton className="h-6 w-3/4 sm:w-1/2 rounded bg-primary/10" />
+                        <Skeleton className="h-4 w-full rounded bg-primary/5" />
+                        <Skeleton className="h-4 w-5/6 rounded bg-primary/5" />
+
+                        <Skeleton className="h-6 w-2/3 sm:w-2/5 rounded bg-primary/10 mt-8" />
+                        <Skeleton className="h-4 w-full rounded bg-primary/5" />
+                        <Skeleton className="h-4 w-4/5 rounded bg-primary/5" />
+
+                        <Skeleton className="h-6 w-1/2 sm:w-1/3 rounded bg-primary/10 mt-8" />
+                        <Skeleton className="h-4 w-11/12 rounded bg-primary/5" />
+                        <Skeleton className="h-4 w-full rounded bg-primary/5" />
+                      </div>
+                    ) : versesError ? (
+                      <div className="text-center py-8 sm:py-12 text-destructive flex flex-col items-center gap-2">
+                        <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-sm">載入經文時發生錯誤</span>
                       </div>
                     ) : (
-                      <div className="space-y-1 sm:space-y-2 pr-2 sm:pr-4">
-                        {(() => {
-                          const groups: { main: typeof verses[0]; continuations: typeof verses }[] = [];
-                          for (const v of verses) {
-                            if (v.text.trim() === 'a' && groups.length > 0) {
-                              groups[groups.length - 1].continuations.push(v);
-                            } else {
-                              groups.push({ main: v, continuations: [] });
-                            }
-                          }
-                          return groups.map(({ main: v, continuations }) => (
-                            <div 
-                              key={v.verse} 
-                              ref={(el) => {
-                                if (el) verseRefs.current.set(v.verse, el);
-                                else verseRefs.current.delete(v.verse);
-                              }}
-                              className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${
-                                selectedVerseNums.has(v.verse) 
-                                  ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30' 
-                                  : 'hover:bg-muted/50'
-                              }`}
-                              onClick={() => toggleVerseSelection(v.verse)}
-                              data-testid={`verse-${v.chapter}-${v.verse}`}
-                            >
-                              <div className="flex items-start gap-1 sm:gap-2">
-                                {selectedVerseNums.has(v.verse) && (
-                                  <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
-                                )}
-                                <span className={`text-primary font-bold ${currentFontConfig.verseNum} min-w-[1.5rem] sm:min-w-[2rem] text-right`}>{v.verse}</span>
-                              </div>
-                              <span className={`${currentFontConfig.verse} leading-relaxed flex-1`}>
-                                {v.text}
-                                {continuations.map(c => (
+                      <div>
+                        {displayMode === 'paragraph' ? (
+                          <div className={`${currentFontConfig.paragraph} pr-2 sm:pr-4 py-2`}>
+                            {verses.map((v) => {
+                              const isContinuation = v.text.trim() === 'a';
+                              if (isContinuation) {
+                                return (
                                   <span
-                                    key={c.verse}
+                                    key={v.verse}
                                     ref={(el) => {
-                                      if (el) verseRefs.current.set(c.verse, el);
-                                      else verseRefs.current.delete(c.verse);
+                                      if (el) verseRefs.current.set(v.verse, el);
+                                      else verseRefs.current.delete(v.verse);
                                     }}
-                                    className="text-[10px] text-muted-foreground/50 align-super ml-0.5"
-                                    data-testid={`verse-${c.chapter}-${c.verse}`}
-                                  >{c.verse}</span>
-                                ))}
-                              </span>
-                            </div>
-                          ));
-                        })()}
+                                    className="text-[10px] text-muted-foreground/50 align-super cursor-pointer"
+                                    onClick={() => toggleVerseSelection(v.verse)}
+                                    data-testid={`verse-${v.chapter}-${v.verse}`}
+                                  >{v.verse}</span>
+                                );
+                              }
+                              return (
+                                <span key={v.verse}>
+                                  <span
+                                    ref={(el) => {
+                                      if (el) verseRefs.current.set(v.verse, el);
+                                      else verseRefs.current.delete(v.verse);
+                                    }}
+                                    className={`cursor-pointer transition-colors select-none rounded-sm ${selectedVerseNums.has(v.verse)
+                                      ? 'bg-primary/10 ring-1 ring-primary/30'
+                                      : 'hover:bg-muted/50'
+                                      }`}
+                                    onClick={() => toggleVerseSelection(v.verse)}
+                                    data-testid={`verse-${v.chapter}-${v.verse}`}
+                                  >
+                                    <sup className={`text-primary/60 font-medium ${currentFontConfig.sup} mr-0.5`}>{v.verse}</sup>
+                                    {v.text}
+                                  </span>
+                                  {' '}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="space-y-1 sm:space-y-2 pr-2 sm:pr-4">
+                            {(() => {
+                              const groups: { main: typeof verses[0]; continuations: typeof verses }[] = [];
+                              for (const v of verses) {
+                                if (v.text.trim() === 'a' && groups.length > 0) {
+                                  groups[groups.length - 1].continuations.push(v);
+                                } else {
+                                  groups.push({ main: v, continuations: [] });
+                                }
+                              }
+                              return groups.map(({ main: v, continuations }) => (
+                                <div
+                                  key={v.verse}
+                                  ref={(el) => {
+                                    if (el) verseRefs.current.set(v.verse, el);
+                                    else verseRefs.current.delete(v.verse);
+                                  }}
+                                  className={`flex gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg cursor-pointer group transition-colors ${selectedVerseNums.has(v.verse)
+                                    ? 'bg-primary/10 ring-1 sm:ring-2 ring-primary/30'
+                                    : 'hover:bg-muted/50'
+                                    }`}
+                                  onClick={() => toggleVerseSelection(v.verse)}
+                                  data-testid={`verse-${v.chapter}-${v.verse}`}
+                                >
+                                  <div className="flex items-start gap-1 sm:gap-2">
+                                    {selectedVerseNums.has(v.verse) && (
+                                      <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary mt-0.5 sm:mt-1 flex-shrink-0" />
+                                    )}
+                                    <span className={`text-primary font-bold ${currentFontConfig.verseNum} min-w-[1.5rem] sm:min-w-[2rem] text-right`}>{v.verse}</span>
+                                  </div>
+                                  <span className={`${currentFontConfig.verse} leading-relaxed flex-1`}>
+                                    {v.text}
+                                    {continuations.map(c => (
+                                      <span
+                                        key={c.verse}
+                                        ref={(el) => {
+                                          if (el) verseRefs.current.set(c.verse, el);
+                                          else verseRefs.current.delete(c.verse);
+                                        }}
+                                        className="text-[10px] text-muted-foreground/50 align-super ml-0.5"
+                                        data-testid={`verse-${c.chapter}-${c.verse}`}
+                                      >{c.verse}</span>
+                                    ))}
+                                  </span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center py-4 px-2 border-t mt-4">
+                          {getChapterLabel(-1) ? (
+                            <Button variant="outline" size="sm" onClick={() => navigateChapter(-1)} data-testid="button-prev-chapter-bottom">
+                              <ChevronLeft className="w-4 h-4 mr-1" />
+                              {getChapterLabel(-1)}
+                            </Button>
+                          ) : <div />}
+                          {getChapterLabel(1) ? (
+                            <Button variant="outline" size="sm" onClick={() => navigateChapter(1)} data-testid="button-next-chapter-bottom">
+                              {getChapterLabel(1)}
+                              <ChevronRight className="w-4 h-4 ml-1" />
+                            </Button>
+                          ) : <div />}
+                        </div>
                       </div>
                     )}
-
-                    <div className="flex justify-between items-center py-4 px-2 border-t mt-4">
-                      {getChapterLabel(-1) ? (
-                        <Button variant="outline" size="sm" onClick={() => navigateChapter(-1)} data-testid="button-prev-chapter-bottom">
-                          <ChevronLeft className="w-4 h-4 mr-1" />
-                          {getChapterLabel(-1)}
-                        </Button>
-                      ) : <div />}
-                      {getChapterLabel(1) ? (
-                        <Button variant="outline" size="sm" onClick={() => navigateChapter(1)} data-testid="button-next-chapter-bottom">
-                          {getChapterLabel(1)}
-                          <ChevronRight className="w-4 h-4 ml-1" />
-                        </Button>
-                      ) : <div />}
-                    </div>
+                  </CardContent>
+                </Card>
+              </ErrorBoundary>
+            ) : selectedBook ? (
+              <Card>
+                <CardContent className="py-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-semibold text-xl">{selectedBook}</h3>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedBook(null)}>
+                      返回書卷
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-            </ErrorBoundary>
-          ) : selectedBook ? (
-            <Card>
-              <CardContent className="py-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-semibold text-xl">{selectedBook}</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedBook(null)}>
-                    返回書卷
-                  </Button>
-                </div>
-                {chaptersError ? (
+                  {chaptersError ? (
+                    <div className="text-center py-12 text-destructive flex flex-col items-center gap-2">
+                      <AlertCircle className="w-6 h-6" />
+                      <span>載入章節時發生錯誤</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                      {chapters.map((c) => (
+                        <Button
+                          key={c.chapter}
+                          variant="outline"
+                          className="h-12 text-lg"
+                          onClick={() => setSelectedChapter(c.chapter)}
+                          data-testid={`button-chapter-${c.chapter}`}
+                        >
+                          {c.chapter}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div>
+                {booksError ? (
                   <div className="text-center py-12 text-destructive flex flex-col items-center gap-2">
                     <AlertCircle className="w-6 h-6" />
-                    <span>載入章節時發生錯誤</span>
+                    <span>載入書卷時發生錯誤</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
-                    {chapters.map((c) => (
-                      <Button
-                        key={c.chapter}
-                        variant="outline"
-                        className="h-12 text-lg"
-                        onClick={() => setSelectedChapter(c.chapter)}
-                        data-testid={`button-chapter-${c.chapter}`}
-                      >
-                        {c.chapter}
-                      </Button>
-                    ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardContent className="py-4 px-3 sm:px-4">
+                        <button
+                          className="w-full flex items-center justify-between gap-2 mb-2"
+                          onClick={() => setExpandedOT(!expandedOT)}
+                          data-testid="button-toggle-old-testament"
+                        >
+                          <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
+                            {expandedOT ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            <Book className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
+                            舊約聖經
+                            <span className="text-sm font-normal text-muted-foreground">{oldTestamentBooks.length}卷</span>
+                          </h3>
+                        </button>
+                        {expandedOT && (
+                          <div className="mt-2 space-y-2">
+                            {OLD_TESTAMENT_CATEGORIES.map(cat => renderCategorySection(cat, oldTestamentBooks))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="py-4 px-3 sm:px-4">
+                        <button
+                          className="w-full flex items-center justify-between gap-2 mb-2"
+                          onClick={() => setExpandedNT(!expandedNT)}
+                          data-testid="button-toggle-new-testament"
+                        >
+                          <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
+                            {expandedNT ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            <Book className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" />
+                            新約聖經
+                            <span className="text-sm font-normal text-muted-foreground">{newTestamentBooks.length}卷</span>
+                          </h3>
+                        </button>
+                        {expandedNT && (
+                          <div className="mt-2 space-y-2">
+                            {NEW_TESTAMENT_CATEGORIES.map(cat => renderCategorySection(cat, newTestamentBooks))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          ) : (
-            <div>
-              {booksError ? (
-                <div className="text-center py-12 text-destructive flex flex-col items-center gap-2">
-                  <AlertCircle className="w-6 h-6" />
-                  <span>載入書卷時發生錯誤</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardContent className="py-4 px-3 sm:px-4">
-                      <button
-                        className="w-full flex items-center justify-between gap-2 mb-2"
-                        onClick={() => setExpandedOT(!expandedOT)}
-                        data-testid="button-toggle-old-testament"
-                      >
-                        <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
-                          {expandedOT ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                          <Book className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
-                          舊約聖經
-                          <span className="text-sm font-normal text-muted-foreground">{oldTestamentBooks.length}卷</span>
-                        </h3>
-                      </button>
-                      {expandedOT && (
-                        <div className="mt-2 space-y-2">
-                          {OLD_TESTAMENT_CATEGORIES.map(cat => renderCategorySection(cat, oldTestamentBooks))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+              </div>
+            )}
+          </div>
+        </main>
 
-                  <Card>
-                    <CardContent className="py-4 px-3 sm:px-4">
-                      <button
-                        className="w-full flex items-center justify-between gap-2 mb-2"
-                        onClick={() => setExpandedNT(!expandedNT)}
-                        data-testid="button-toggle-new-testament"
-                      >
-                        <h3 className="font-semibold text-base sm:text-lg flex items-center gap-2">
-                          {expandedNT ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                          <Book className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" />
-                          新約聖經
-                          <span className="text-sm font-normal text-muted-foreground">{newTestamentBooks.length}卷</span>
-                        </h3>
-                      </button>
-                      {expandedNT && (
-                        <div className="mt-2 space-y-2">
-                          {NEW_TESTAMENT_CATEGORIES.map(cat => renderCategorySection(cat, newTestamentBooks))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </main>
+        {selectedBook && selectedChapter && (
+          <FloatingToolbar
+            visible={selectedVerseNums.size > 0 && !showCardModal && !searchCardVerse && !searchExpanded}
+            getAnchorRect={getAnchorRect}
+            selectedCount={selectedVerseNums.size}
+            onCopy={async () => {
+              await copySelectedVerses();
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            onShare={shareSelectedVerses}
+            onCreateCard={openCardCreator}
+            onClear={() => setSelectedVerseNums(new Set())}
+            copied={copied}
+            onNote={() => setShowNoteDialog(true)}
+          />
+        )}
 
-      {selectedBook && selectedChapter && (
-        <FloatingToolbar
-          visible={selectedVerseNums.size > 0 && !showCardModal && !searchCardVerse && !searchExpanded}
-          getAnchorRect={getAnchorRect}
-          selectedCount={selectedVerseNums.size}
-          onCopy={async () => {
-            await copySelectedVerses();
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+        <ScriptureCardCreator
+          open={showCardModal || !!searchCardVerse}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowCardModal(false);
+              setSearchCardVerse(null);
+            }
           }}
-          onShare={shareSelectedVerses}
-          onCreateCard={openCardCreator}
-          onClear={() => setSelectedVerseNums(new Set())}
-          copied={copied}
-          onNote={() => setShowNoteDialog(true)}
+          verse={searchCardVerse || getCardVerseData()}
         />
-      )}
 
-      <ScriptureCardCreator
-        open={showCardModal || !!searchCardVerse}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowCardModal(false);
-            setSearchCardVerse(null);
-          }
-        }}
-        verse={searchCardVerse || getCardVerseData()}
-      />
-
-      <DevotionalNoteDialog
-        open={showNoteDialog || !!searchNoteVerse}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowNoteDialog(false);
-            setSearchNoteVerse(null);
-          }
-        }}
-        verseReference={searchNoteVerse?.reference || getCardVerseData().reference}
-        verseText={searchNoteVerse?.text || getCardVerseData().text}
-      />
-    </div>
+        <DevotionalNoteDialog
+          open={showNoteDialog || !!searchNoteVerse}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowNoteDialog(false);
+              setSearchNoteVerse(null);
+            }
+          }}
+          verseReference={searchNoteVerse?.reference || getCardVerseData().reference}
+          verseText={searchNoteVerse?.text || getCardVerseData().text}
+        />
+      </div>
     </FeatureGate>
   );
 };

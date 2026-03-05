@@ -21,7 +21,7 @@ const NotebookPage = () => {
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+        <Header backTo="/" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-8 sm:py-12">
           <div className="flex items-center justify-center min-h-[60vh]">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -37,14 +37,14 @@ const NotebookPage = () => {
       title="筆記本功能維護中"
       description="筆記本功能目前暫時關閉，請稍後再試"
     >
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-        <div className="max-w-2xl md:max-w-3xl mx-auto">
-          <MyNotebook userEmail={userEmail} />
-        </div>
-      </main>
-    </div>
+      <div className="min-h-screen bg-background">
+        <Header backTo="/" />
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
+          <div className="max-w-2xl md:max-w-3xl mx-auto">
+            <MyNotebook userEmail={userEmail} />
+          </div>
+        </main>
+      </div>
     </FeatureGate>
   );
 };

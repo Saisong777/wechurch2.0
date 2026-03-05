@@ -22,6 +22,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Plus, Eye, EyeOff, Loader2, BookOpen } from 'lucide-react';
 import { useCreatePrayer, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
+import { vibrate } from '@/lib/utils';
 
 export const CreatePrayerDialog: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -33,6 +34,7 @@ export const CreatePrayerDialog: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!content.trim()) return;
+    vibrate(50);
 
     await createMutation.mutateAsync({
       content: content.trim(),

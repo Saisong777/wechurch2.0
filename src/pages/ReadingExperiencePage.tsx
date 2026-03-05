@@ -463,7 +463,7 @@ const ReadingExperiencePage = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header variant="compact" title="每日讀經" />
+        <Header variant="compact" title="每日讀經" backTo="/learn/reading-plans" />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-spinner" />
         </div>
@@ -474,7 +474,7 @@ const ReadingExperiencePage = () => {
   if (!plan) {
     return (
       <div className="min-h-screen bg-background">
-        <Header variant="compact" title="每日讀經" />
+        <Header variant="compact" title="每日讀經" backTo="/learn/reading-plans" />
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <p className="text-muted-foreground" data-testid="text-plan-not-found">找不到此讀經計劃</p>
           <Button variant="outline" onClick={() => navigate('/learn/reading-plans')} data-testid="button-back-to-plans">
@@ -499,7 +499,7 @@ const ReadingExperiencePage = () => {
 
   return (
     <div className="min-h-screen bg-background" data-testid="reading-experience-page">
-      <Header variant="compact" title="每日讀經" />
+      <Header variant="compact" title="每日讀經" backTo="/learn/reading-plans" />
 
       <div className="max-w-3xl lg:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 pb-24">
         <div className="flex items-center gap-2 py-3">

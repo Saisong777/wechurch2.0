@@ -54,7 +54,7 @@ export async function registerRoutes(app: Express) {
   const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
   const RATE_LIMIT_WINDOW_MS = 60000;
   const RATE_LIMIT_MAX_REQUESTS = 200;
-  
+
   setInterval(() => {
     const now = Date.now();
     for (const [key, value] of rateLimitMap.entries()) {
@@ -67,22 +67,22 @@ export async function registerRoutes(app: Express) {
   app.use('/api/', (req, res, next) => {
     const clientId = (req as any).user?.id || req.ip || 'unknown';
     const now = Date.now();
-    
+
     let entry = rateLimitMap.get(clientId);
     if (!entry || now > entry.resetTime) {
       entry = { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
       rateLimitMap.set(clientId, entry);
     }
-    
+
     entry.count++;
-    
+
     res.setHeader('X-RateLimit-Limit', RATE_LIMIT_MAX_REQUESTS.toString());
     res.setHeader('X-RateLimit-Remaining', Math.max(0, RATE_LIMIT_MAX_REQUESTS - entry.count).toString());
-    
+
     if (entry.count > RATE_LIMIT_MAX_REQUESTS) {
       return res.status(429).json({ error: 'Too many requests. Please try again later.' });
     }
-    
+
     next();
   });
 
@@ -91,17 +91,17 @@ export async function registerRoutes(app: Express) {
   async function resolveUserId(req: any): Promise<string | null> {
     const user = req.user;
     if (!user) return null;
-    
+
     const claims = user.claims || {};
     const authUserId = claims.sub;
     if (!authUserId) return null;
-    
+
     if (typeof authUserId === 'string' && authUserId.startsWith('local_')) {
       const localId = authUserId.replace('local_', '');
       const localUser = await storage.getUser(localId);
       if (localUser) return localId;
     }
-    
+
     try {
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
@@ -113,12 +113,12 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error('[resolveUserId] Error resolving user:', error);
     }
-    
+
     if (claims.email) {
       const legacyUser = await storage.getUserByEmail(claims.email);
       if (legacyUser) return legacyUser.id;
     }
-    
+
     return null;
   }
 
@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express) {
     }
 
     const poolStats = getPoolStats();
-    
+
     res.json({
       status: dbStatus === "ok" ? "healthy" : "degraded",
       timestamp: new Date().toISOString(),
@@ -203,7 +203,7 @@ export async function registerRoutes(app: Express) {
       const start = Date.now();
       await pool.query("SELECT 1");
       const latency = Date.now() - start;
-      
+
       res.json({
         status: "ok",
         latency,
@@ -224,7 +224,7 @@ export async function registerRoutes(app: Express) {
       const bibleCount = await pool.query("SELECT COUNT(*) as count FROM chinese_union_trad");
       const timelineCount = await pool.query("SELECT COUNT(*) as count FROM jesus_4seasons");
       const usersCount = await pool.query("SELECT COUNT(*) as count FROM users");
-      
+
       res.json({
         status: "ok",
         counts: {
@@ -235,9 +235,9 @@ export async function registerRoutes(app: Express) {
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to query database counts",
-        message: error.message 
+        message: error.message
       });
     }
   });
@@ -249,8 +249,8 @@ export async function registerRoutes(app: Express) {
       timelineCache.clear();
       apiCache.clear();
       console.log("[Cache] All caches cleared");
-      res.json({ 
-        status: "ok", 
+      res.json({
+        status: "ok",
         message: "All caches cleared successfully",
         timestamp: new Date().toISOString()
       });
@@ -471,29 +471,29 @@ export async function registerRoutes(app: Express) {
         email: z.string().email(),
         ready: z.boolean(),
       });
-      
+
       const parsed = setReadySchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid request data", success: false, details: parsed.error.errors });
       }
-      
+
       const { sessionId, email, ready } = parsed.data;
       const participantId = req.params.id;
-      
+
       const participant = await storage.getParticipant(participantId);
       if (!participant) {
         return res.status(404).json({ error: "Participant not found", success: false });
       }
-      
+
       if (participant.sessionId !== sessionId || participant.email !== email) {
         return res.status(403).json({ error: "Verification failed", success: false });
       }
-      
+
       const session = await storage.getSession(sessionId);
       if (!session || (session.status !== "grouping" && session.status !== "studying")) {
         return res.status(400).json({ error: "Session not in valid state", success: false });
       }
-      
+
       await storage.updateParticipant(participantId, { readyConfirmed: ready });
       sessionCache.invalidate(`poll:${sessionId}`);
       res.json({ success: true });
@@ -510,21 +510,21 @@ export async function registerRoutes(app: Express) {
           groupNumber: z.number().int().positive(),
         })),
       });
-      
+
       const parsed = batchAssignSchema.safeParse(req.body);
       if (!parsed.success) {
         console.error("[batch-assign-groups] Validation error:", parsed.error.errors);
         return res.status(400).json({ error: "Invalid request data", success: false, details: parsed.error.errors });
       }
-      
+
       const { assignments } = parsed.data;
-      
+
       for (const { participantIds, groupNumber } of assignments) {
         for (const participantId of participantIds) {
           await storage.updateParticipant(participantId, { groupNumber, readyConfirmed: false });
         }
       }
-      
+
       sessionCache.clear();
       res.json({ success: true });
     } catch (error) {
@@ -647,17 +647,17 @@ export async function registerRoutes(app: Express) {
     try {
       const { reportType, groupNumber, fastMode, filledOnly } = req.body;
       const studyResponses = await storage.getStudyResponses(req.params.sessionId);
-      
+
       let filteredResponses = studyResponses;
       if (groupNumber !== undefined && groupNumber !== null) {
         filteredResponses = studyResponses.filter(r => r.groupNumber === groupNumber);
       }
       if (filledOnly) {
-        filteredResponses = filteredResponses.filter(r => 
+        filteredResponses = filteredResponses.filter(r =>
           r.observation || r.coreInsightNote || r.actionPlan
         );
       }
-      
+
       // Generate markdown-formatted report content
       const generateMarkdownReport = (responses: typeof filteredResponses, grpNum?: number) => {
         const members = responses.map(r => r.participantName || '匿名').join('、');
@@ -671,7 +671,7 @@ export async function registerRoutes(app: Express) {
           if (!r.coreInsightNote) return;
           const name = r.participantName || '匿名';
           let noteObj: Record<string, string> | null = null;
-          try { noteObj = JSON.parse(r.coreInsightNote); } catch {}
+          try { noteObj = JSON.parse(r.coreInsightNote); } catch { }
           if (noteObj && typeof noteObj === 'object' && !Array.isArray(noteObj)) {
             Object.entries(noteObj).forEach(([cat, text]) => {
               if (text && text.trim()) {
@@ -684,7 +684,7 @@ export async function registerRoutes(app: Express) {
           }
         });
         const applications = responses.map(r => r.actionPlan).filter(Boolean);
-        
+
         let content = '';
         if (grpNum) {
           content += `**組別：** 第 ${grpNum} 組\n`;
@@ -692,49 +692,49 @@ export async function registerRoutes(app: Express) {
           content += `**📊 全會眾綜合分析**\n`;
         }
         content += `**組員：** ${members}\n\n`;
-        
+
         if (titlePhrases.length > 0) {
           content += `**📖 主題（Themes）：**\n`;
           titlePhrases.forEach(t => { content += `• ${t}\n`; });
           content += '\n';
         }
-        
+
         if (observations.length > 0) {
           content += `**🔍 事實發現（Observations）：**\n`;
           observations.slice(0, 5).forEach(o => { content += `• ${o}\n`; });
           content += '\n';
         }
-        
+
         if (insightsWithNames.length > 0) {
           content += `**💡 獨特亮光（Unique Insights）：**\n`;
           insightsWithNames.slice(0, 5).forEach(({ name, insight }) => { content += `• **${name}**：${insight}\n`; });
           content += '\n';
         }
-        
+
         if (applications.length > 0) {
           content += `**🎯 如何應用（Applications）：**\n`;
           applications.slice(0, 5).forEach(a => { content += `• ${a}\n`; });
           content += '\n';
         }
-        
+
         content += `**👤 個人貢獻摘要：**\n`;
         responses.forEach(r => {
           content += `• **${r.participantName || '匿名'}**：${r.titlePhrase || ''}${r.heartbeatVerse ? ' - ' + r.heartbeatVerse : ''}\n`;
         });
-        
+
         return content;
       };
-      
+
       let content: string;
       if (reportType === 'group' && groupNumber) {
         content = generateMarkdownReport(filteredResponses, groupNumber);
       } else {
         // Overall report - first add combined summary, then group-by-group sections
         const sections: string[] = [];
-        
+
         // Add overall combined summary (全會眾綜合分析) first
         sections.push(generateMarkdownReport(filteredResponses, undefined));
-        
+
         // Then add individual group sections
         const groupedResponses = new Map<number, typeof filteredResponses>();
         filteredResponses.forEach(r => {
@@ -744,7 +744,7 @@ export async function registerRoutes(app: Express) {
             groupedResponses.get(grp)!.push(r);
           }
         });
-        
+
         const sortedGroups = [...groupedResponses.keys()].sort((a, b) => a - b);
         sortedGroups.forEach(grp => {
           const grpResponses = groupedResponses.get(grp)!;
@@ -754,7 +754,7 @@ export async function registerRoutes(app: Express) {
         });
         content = sections.join('\n========================================\n\n');
       }
-      
+
       const report = await storage.createAiReport({
         sessionId: req.params.sessionId,
         reportType,
@@ -762,7 +762,7 @@ export async function registerRoutes(app: Express) {
         content,
         status: "COMPLETED"
       });
-      
+
       res.status(201).json(report);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate report" });
@@ -773,16 +773,16 @@ export async function registerRoutes(app: Express) {
     try {
       const { reportType, groupNumber } = req.body;
       const submissions = await storage.getSubmissions(req.params.sessionId);
-      
-      const groupSubmissions = groupNumber 
+
+      const groupSubmissions = groupNumber
         ? submissions.filter(s => s.groupNumber === groupNumber)
         : submissions;
-      
+
       const content = JSON.stringify({
         summary: `Generated ${reportType} report for ${groupSubmissions.length} submissions`,
         submissions: groupSubmissions.map(s => ({ name: s.name, theme: s.theme }))
       });
-      
+
       const report = await storage.createAiReport({
         sessionId: req.params.sessionId,
         reportType,
@@ -790,7 +790,7 @@ export async function registerRoutes(app: Express) {
         content,
         status: "COMPLETED"
       });
-      
+
       res.status(201).json(report);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate report" });
@@ -988,7 +988,7 @@ export async function registerRoutes(app: Express) {
         updateData.isAnswered = req.body.isAnswered;
         updateData.answeredAt = req.body.isAnswered ? new Date() : null;
       }
-      
+
       const prayer = await storage.updatePrayer(req.params.id, updateData);
       if (!prayer) {
         return res.status(404).json({ error: "Prayer not found" });
@@ -1194,7 +1194,7 @@ export async function registerRoutes(app: Express) {
           if (existingGame) {
             return res.status(200).json(existingGame);
           }
-        } catch {}
+        } catch { }
       }
       res.status(500).json({ error: "Failed to create game" });
     }
@@ -1262,7 +1262,7 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "sessionId and groupNumber required" });
       }
       const game = await storage.getSessionIcebreakerGame(
-        sessionId as string, 
+        sessionId as string,
         parseInt(groupNumber as string)
       );
       if (!game) {
@@ -1294,29 +1294,29 @@ export async function registerRoutes(app: Express) {
   });
 
   // ========== Grouping Activities (神的安排) ==========
-  
+
   // Get user's own active grouping activities
   app.get("/api/grouping/my-activities", async (req, res) => {
     try {
       if (!req.user) {
         return res.json({ activities: [] });
       }
-      
+
       const claims = (req.user as any).claims || {};
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       if (!userId) {
         return res.json({ activities: [] });
       }
-      
+
       const activities = await storage.getActiveGroupingActivitiesByOwner(userId);
       const activitiesWithParticipants = await Promise.all(
         activities.map(async (activity) => {
@@ -1364,18 +1364,18 @@ export async function registerRoutes(app: Express) {
       if (!req.user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      
+
       // Get user info from OIDC claims
       const claims = (req.user as any).claims || {};
       const authUserId = claims.sub;
-      
+
       // Look up the full user info from auth storage (which includes legacyUserId)
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       let role: string | undefined;
-      
+
       if (!userId && fullUser?.email) {
         // Fallback: look up legacy user by email
         const legacyUser = await storage.getUserByEmail(fullUser.email);
@@ -1383,20 +1383,20 @@ export async function registerRoutes(app: Express) {
           userId = legacyUser.id;
         }
       }
-      
+
       if (userId) {
         role = await storage.getUserRole(userId);
       }
-      
+
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
         return res.status(403).json({ error: "Only leaders and admins can create grouping activities" });
       }
 
       const { title, groupingMode, groupSize, groupCount, genderMode } = req.body;
-      
+
       // Generate unique short code for this activity
       const shortCode = await storage.generateUniqueShortCode();
-      
+
       const activity = await storage.createGroupingActivity({
         shortCode,
         title: title || '神的安排',
@@ -1458,13 +1458,13 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       if (activity.ownerId !== userId) {
         const role = userId ? await storage.getUserRole(userId) : undefined;
         if (role !== 'admin') {
@@ -1479,7 +1479,7 @@ export async function registerRoutes(app: Express) {
 
       // Shuffle participants
       const shuffled = [...participants].sort(() => Math.random() - 0.5);
-      
+
       let numGroups: number;
       if (activity.groupingMode === 'bySize') {
         numGroups = Math.ceil(shuffled.length / (activity.groupSize || 4));
@@ -1489,12 +1489,12 @@ export async function registerRoutes(app: Express) {
 
       // Assign groups based on gender mode
       let updates: { id: string; groupNumber: number }[] = [];
-      
+
       if (activity.genderMode === 'split') {
         // Split by gender
         const males = shuffled.filter(p => p.gender === 'M');
         const females = shuffled.filter(p => p.gender === 'F');
-        
+
         const assignGroups = (list: typeof participants, startGroup: number) => {
           const groupCount = Math.max(1, Math.ceil(list.length / (activity.groupSize || 4)));
           list.forEach((p, i) => {
@@ -1502,7 +1502,7 @@ export async function registerRoutes(app: Express) {
           });
           return groupCount;
         };
-        
+
         const maleGroups = assignGroups(males, 1);
         assignGroups(females, maleGroups + 1);
       } else {
@@ -1510,13 +1510,13 @@ export async function registerRoutes(app: Express) {
         const males = shuffled.filter(p => p.gender === 'M');
         const females = shuffled.filter(p => p.gender === 'F');
         const interleaved: typeof participants = [];
-        
+
         const maxLen = Math.max(males.length, females.length);
         for (let i = 0; i < maxLen; i++) {
           if (i < males.length) interleaved.push(males[i]);
           if (i < females.length) interleaved.push(females[i]);
         }
-        
+
         interleaved.forEach((p, i) => {
           updates.push({ id: p.id, groupNumber: (i % numGroups) + 1 });
         });
@@ -1550,13 +1550,13 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       if (activity.ownerId !== userId) {
         const role = userId ? await storage.getUserRole(userId) : undefined;
         if (role !== 'admin') {
@@ -1572,7 +1572,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // ==================== Prayer Meeting Routes ====================
-  
+
   // Get all prayer meetings
   app.get("/api/prayer-meetings", async (req, res) => {
     try {
@@ -1604,13 +1604,13 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       const role = userId ? await storage.getUserRole(userId) : undefined;
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
         return res.status(403).json({ error: "Only leaders can view history" });
@@ -1665,30 +1665,30 @@ export async function registerRoutes(app: Express) {
       if (!req.user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      
+
       const claims = (req.user as any).claims || {};
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       let role: string | undefined;
       if (userId) {
         role = await storage.getUserRole(userId);
       }
-      
+
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
         return res.status(403).json({ error: "Only leaders and admins can create prayer meetings" });
       }
 
       const { title, groupingMode, groupSize, groupCount, genderMode } = req.body;
       const shortCode = await storage.generateUniquePrayerMeetingCode();
-      
+
       const meeting = await storage.createPrayerMeeting({
         shortCode,
         title: title || '禱告會',
@@ -1750,13 +1750,13 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       if (meeting.ownerId !== userId) {
         const role = userId ? await storage.getUserRole(userId) : undefined;
         if (role !== 'admin') {
@@ -1783,13 +1783,13 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       const role = userId ? await storage.getUserRole(userId) : undefined;
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
         return res.status(403).json({ error: "Only leaders can delete prayer meetings" });
@@ -1802,7 +1802,7 @@ export async function registerRoutes(app: Express) {
 
       // Delete participants first
       await db.delete(prayerMeetingParticipants).where(eq(prayerMeetingParticipants.meetingId, req.params.id));
-      
+
       // Delete the meeting
       await db.delete(prayerMeetings).where(eq(prayerMeetings.id, req.params.id));
 
@@ -1829,18 +1829,18 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       // Allow meeting owner, or any leader/admin to execute grouping
       const role = userId ? await storage.getUserRole(userId) : undefined;
       const isOwner = meeting.ownerId === userId;
       const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
-      
+
       if (!isOwner && !isLeaderOrAdmin) {
         return res.status(403).json({ error: "Only leaders and admins can execute grouping" });
       }
@@ -1851,7 +1851,7 @@ export async function registerRoutes(app: Express) {
       }
 
       const shuffled = [...participants].sort(() => Math.random() - 0.5);
-      
+
       let numGroups: number;
       if (meeting.groupingMode === 'bySize') {
         numGroups = Math.ceil(shuffled.length / (meeting.groupSize || 4));
@@ -1860,14 +1860,14 @@ export async function registerRoutes(app: Express) {
       }
 
       let updates: { id: string; groupNumber: number }[] = [];
-      
+
       if (meeting.genderMode === 'separate') {
         const males = shuffled.filter(p => p.gender === 'M');
         const females = shuffled.filter(p => p.gender === 'F');
-        
+
         const maleGroups = Math.max(1, Math.ceil(males.length / (meeting.groupSize || 4)));
         const femaleGroups = Math.max(1, Math.ceil(females.length / (meeting.groupSize || 4)));
-        
+
         males.forEach((p, i) => {
           updates.push({ id: p.id, groupNumber: (i % maleGroups) + 1 });
         });
@@ -1917,27 +1917,27 @@ export async function registerRoutes(app: Express) {
       if (!meeting) {
         return res.status(404).json({ error: "Prayer meeting not found" });
       }
-      
+
       // Verify user is a leader/admin
       const claims = (req.user as any).claims || {};
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       const role = userId ? await storage.getUserRole(userId) : undefined;
       const isOwner = meeting.ownerId === userId;
       const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
-      
+
       if (!isOwner && !isLeaderOrAdmin) {
         return res.status(403).json({ error: "Only leaders and admins can start praying" });
       }
-      
+
       await storage.updatePrayerMeeting(meeting.id, { status: 'praying' });
       const updated = await storage.getPrayerMeeting(meeting.id);
       res.json(updated);
@@ -1957,14 +1957,14 @@ export async function registerRoutes(app: Express) {
         anonymousPrayer: z.string().max(2000).optional().default(''),
         meetingCode: z.string().optional(),
       });
-      
+
       const validation = prayersSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid prayer content", details: validation.error.errors });
       }
-      
+
       const { namedPrayer, urgentPrayer, anonymousPrayer, meetingCode } = validation.data;
-      
+
       const meeting = await storage.getPrayerMeeting(req.params.id);
       if (!meeting) {
         return res.status(404).json({ error: "Prayer meeting not found" });
@@ -1986,7 +1986,7 @@ export async function registerRoutes(app: Express) {
         const authUserId = claims.sub;
         const { authStorage } = await import("./replit_integrations/auth/storage");
         const fullUser = await authStorage.getUser(authUserId);
-        
+
         let userId = fullUser?.legacyUserId;
         if (!userId && fullUser?.email) {
           const legacyUser = await storage.getUserByEmail(fullUser.email);
@@ -1996,7 +1996,7 @@ export async function registerRoutes(app: Express) {
         const isOwner = participant.userId === userId;
         const role = userId ? await storage.getUserRole(userId) : undefined;
         const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
-        
+
         if (!isOwner && !isLeaderOrAdmin) {
           return res.status(403).json({ error: "You can only update your own prayer requests" });
         }
@@ -2043,7 +2043,7 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
@@ -2054,7 +2054,7 @@ export async function registerRoutes(app: Express) {
       const isOwner = participant.userId === userId;
       const role = userId ? await storage.getUserRole(userId) : undefined;
       const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
-      
+
       if (!isOwner && !isLeaderOrAdmin) {
         return res.status(403).json({ error: "You can only update your own prayer requests" });
       }
@@ -2063,7 +2063,7 @@ export async function registerRoutes(app: Express) {
       const updateData: { prayerRequest?: string; isAnonymous?: boolean } = {};
       if (prayerRequest !== undefined) updateData.prayerRequest = prayerRequest;
       if (isAnonymous !== undefined) updateData.isAnonymous = isAnonymous;
-      
+
       const updated = await storage.updatePrayerMeetingParticipant(req.params.participantId, updateData);
       res.json(updated);
     } catch (error) {
@@ -2082,14 +2082,14 @@ export async function registerRoutes(app: Express) {
       const anonymousPrayerSchema = z.object({
         anonymousPrayer: z.string().max(2000).nullable().optional(),
       });
-      
+
       const validation = anonymousPrayerSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid prayer content", details: validation.error.errors });
       }
-      
+
       const { anonymousPrayer } = validation.data;
-      
+
       const meeting = await storage.getPrayerMeeting(req.params.id);
       if (!meeting) {
         return res.status(404).json({ error: "Prayer meeting not found" });
@@ -2110,7 +2110,7 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
@@ -2121,7 +2121,7 @@ export async function registerRoutes(app: Express) {
       const isOwner = participant.userId === userId;
       const role = userId ? await storage.getUserRole(userId) : undefined;
       const isLeaderOrAdmin = role && ['leader', 'future_leader', 'admin'].includes(role);
-      
+
       if (!isOwner && !isLeaderOrAdmin) {
         return res.status(403).json({ error: "You can only update your own prayer requests" });
       }
@@ -2154,20 +2154,20 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       const role = userId ? await storage.getUserRole(userId) : undefined;
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
         return res.status(403).json({ error: "Only leaders and admins can classify prayers" });
       }
 
       const participants = await storage.getPrayerMeetingParticipants(meeting.id);
-      
+
       // Collect both named prayers and anonymous prayers for classification
       const namedPrayers = participants.filter(p => p.prayerRequest && p.prayerRequest.trim());
       const anonymousPrayers = participants.filter(p => p.anonymousPrayer && p.anonymousPrayer.trim());
@@ -2177,7 +2177,7 @@ export async function registerRoutes(app: Express) {
       }
 
       console.log("[PrayerMeeting] Starting AI classification for", namedPrayers.length, "named prayers and", anonymousPrayers.length, "anonymous prayers");
-      
+
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -2187,7 +2187,7 @@ export async function registerRoutes(app: Express) {
       // Build prayer data for classification with names and group info
       const prayerData: { index: number; name: string; gender: string; group: number | null; prayer: string; isAnonymous: boolean; participantId: string }[] = [];
       let prayerIndex = 1;
-      
+
       for (const p of namedPrayers) {
         prayerData.push({
           index: prayerIndex,
@@ -2222,9 +2222,9 @@ export async function registerRoutes(app: Express) {
           prayerInputText += `${p.index}. ${p.name}（${p.gender === 'male' ? '弟兄' : '姊妹'}，第${p.group || '?'}組）：${p.prayer}\n`;
         }
       }
-      
+
       console.log("[PrayerMeeting] Prayer input for AI:", prayerInputText.substring(0, 500) + "...");
-      
+
       // Use the enhanced "Church Prayer Secretary" prompt
       const systemPrompt = `# Role
 你是一位具備高度組織力與同理心的「教會代禱秘書」。你的專長是從大量的感性文字中，精準提取核心需求並進行系統化分類。
@@ -2299,7 +2299,7 @@ export async function registerRoutes(app: Express) {
       const result = JSON.parse(content);
       const classifications = result.classifications || [];
       const report = result.report || {};
-      
+
       console.log("[PrayerMeeting] Classifications:", classifications.length);
 
       // Update individual participant categories for quick filtering
@@ -2391,8 +2391,8 @@ export async function registerRoutes(app: Express) {
         .where(eq(prayerMeetings.id, meeting.id));
 
       console.log("[PrayerMeeting] Classification and report generation complete");
-      res.json({ 
-        message: "Prayers classified successfully", 
+      res.json({
+        message: "Prayers classified successfully",
         classified: classifiedCount,
         report: markdownReport,
         hasAlertContent: report.hasAlertContent || false
@@ -2414,11 +2414,11 @@ export async function registerRoutes(app: Express) {
 
       const participants = await storage.getPrayerMeetingParticipants(meeting.id);
       const groupNumber = req.query.group ? parseInt(req.query.group as string) : null;
-      
+
       // Support both old (includeAnonymous) and new (mode) parameters for backward compatibility
       const includeAnonymousLegacy = req.query.includeAnonymous === 'true';
       let mode = (req.query.mode as string) || (includeAnonymousLegacy ? 'all' : 'named');
-      
+
       const excludeParticipantId = req.query.excludeParticipant as string | undefined;
 
       type PrayerItem = {
@@ -2430,11 +2430,11 @@ export async function registerRoutes(app: Express) {
         prayerType: 'named' | 'anonymous' | 'urgent';
         gender?: string;
       };
-      
+
       const namedPrayers: PrayerItem[] = [];
       const urgentPrayers: PrayerItem[] = [];
       const anonymousPrayers: PrayerItem[] = [];
-      
+
       for (const p of participants) {
         if (p.urgentPrayer && p.urgentPrayer.trim()) {
           urgentPrayers.push({
@@ -2460,7 +2460,7 @@ export async function registerRoutes(app: Express) {
             });
           }
         }
-        
+
         if (p.anonymousPrayer && p.anonymousPrayer.trim()) {
           if (excludeParticipantId && p.id === excludeParticipantId) continue;
           anonymousPrayers.push({
@@ -2521,13 +2521,13 @@ export async function registerRoutes(app: Express) {
       const authUserId = claims.sub;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const fullUser = await authStorage.getUser(authUserId);
-      
+
       let userId = fullUser?.legacyUserId;
       if (!userId && fullUser?.email) {
         const legacyUser = await storage.getUserByEmail(fullUser.email);
         if (legacyUser) userId = legacyUser.id;
       }
-      
+
       if (meeting.ownerId !== userId) {
         const role = userId ? await storage.getUserRole(userId) : undefined;
         if (role !== 'admin') {
@@ -2633,14 +2633,14 @@ export async function registerRoutes(app: Express) {
   // Get message card image
   app.get("/api/message-cards/image/:filename", (req, res) => {
     const filename = req.params.filename;
-    
+
     // Check if filename is a full URL (to handle redirected requests or database entries with full URLs)
     if (filename.startsWith('http')) {
       return res.redirect(filename);
     }
-    
+
     const filePath = path.join(process.cwd(), 'public', 'message-cards', filename);
-    
+
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
     } else {
@@ -2782,33 +2782,33 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const multer = (await import("multer")).default;
-      const upload = multer({ 
+      const upload = multer({
         storage: multer.memoryStorage(),
         limits: { fileSize: 5 * 1024 * 1024 }
       });
-      
+
       upload.single('avatar')(req, res, async (err) => {
         if (err) {
           return res.status(400).json({ error: "Upload failed" });
         }
-        
+
         const file = (req as any).file;
         if (!file) {
           return res.status(400).json({ error: "No file provided" });
         }
-        
+
         const fsP = await import("fs/promises");
         const pathMod = await import("path");
         const uploadDir = pathMod.default.join(process.cwd(), "uploads", "avatars");
         await fsP.mkdir(uploadDir, { recursive: true });
-        
+
         const filename = `${req.params.id}-${Date.now()}.jpg`;
         const filepath = pathMod.default.join(uploadDir, filename);
         await fsP.writeFile(filepath, file.buffer);
-        
+
         const avatarUrl = `/uploads/avatars/${filename}`;
         await storage.updateUser(req.params.id, { avatarUrl });
-        
+
         res.json({ avatarUrl });
       });
     } catch (error) {
@@ -2894,12 +2894,12 @@ export async function registerRoutes(app: Express) {
   app.post("/api/send-profile-notification", async (req, res) => {
     try {
       const { email, name, type, redirectUrl } = req.body;
-      
+
       const { sendEmail } = await import('./resend');
-      
+
       let subject = '';
       let html = '';
-      
+
       switch (type) {
         case 'welcome':
           subject = '歡迎加入 WeChurch';
@@ -2926,13 +2926,13 @@ export async function registerRoutes(app: Express) {
             <a href="${redirectUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0ea5e9; color: white; text-decoration: none; border-radius: 8px;">查看</a>
           `;
       }
-      
+
       await sendEmail({
         to: email,
         subject,
         html
       });
-      
+
       res.json({ success: true, message: "郵件已發送" });
     } catch (error: any) {
       console.error('Error sending notification:', error);
@@ -3016,11 +3016,11 @@ export async function registerRoutes(app: Express) {
           }
         }
       }
-      
+
       const { sendBulkEmail } = await import('./resend');
-      
+
       const result = await sendBulkEmail(recipients, subject, body, isHtml !== false, attachments);
-      
+
       res.json(result);
     } catch (error: any) {
       console.error('Error sending bulk email:', error);
@@ -3242,7 +3242,7 @@ export async function registerRoutes(app: Express) {
   app.get("/api/jesus/timeline", async (req, res) => {
     try {
       const season = req.query.season as string | undefined;
-      const events = season 
+      const events = season
         ? await storage.getJesus4SeasonsBySeason(season)
         : await storage.getJesus4Seasons();
       res.json(events);
@@ -3259,7 +3259,7 @@ export async function registerRoutes(app: Express) {
       if (!ref) {
         return res.status(400).json({ error: "Missing ref parameter" });
       }
-      
+
       // Map gospel abbreviations to Chinese book names
       const bookMap: Record<string, string> = {
         'Mt': '馬太福音',
@@ -3267,26 +3267,26 @@ export async function registerRoutes(app: Express) {
         'Lk': '路加福音',
         'Jn': '約翰福音',
       };
-      
+
       // Parse reference like "Mt 1:1-17" or "Lk 3:23-38"
       const match = ref.match(/^(Mt|Mk|Lk|Jn)\s*(\d+):(\d+)(?:-(\d+))?$/);
       if (!match) {
         return res.json({ verses: [], error: "Invalid reference format" });
       }
-      
+
       const [, abbr, chapterStr, startStr, endStr] = match;
       const bookName = bookMap[abbr];
       const chapter = parseInt(chapterStr);
       const startVerse = parseInt(startStr);
       const endVerse = endStr ? parseInt(endStr) : startVerse;
-      
+
       const allVerses = await storage.getBibleVerses(bookName, chapter);
       const filteredVerses = allVerses.filter(v => v.verse >= startVerse && v.verse <= endVerse);
-      
-      res.json({ 
+
+      res.json({
         bookName,
         chapter,
-        verses: filteredVerses 
+        verses: filteredVerses
       });
     } catch (error) {
       console.error('Error fetching verses by reference:', error);
@@ -3524,65 +3524,90 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "User not found" });
       }
 
-      const { name, description, startDate, bookSelections, chaptersPerDay, reminderEnabled, reminderMorning, reminderNoon, reminderEvening } = req.body;
-      if (!name || !startDate || !bookSelections || !chaptersPerDay) {
-        return res.status(400).json({ error: "Missing required fields: name, startDate, bookSelections, chaptersPerDay" });
+      const { name, description, startDate, bookSelections, chaptersPerDay, reminderEnabled, reminderMorning, reminderNoon, reminderEvening, templateId } = req.body;
+      if (!name || !startDate) {
+        return res.status(400).json({ error: "Missing required fields: name, startDate" });
       }
 
-      const chapters: Array<{ bookName: string; chapter: number }> = [];
-      for (const sel of bookSelections) {
-        const start = sel.chapterStart || 1;
-        const end = sel.chapterEnd || start;
-        for (let ch = start; ch <= end; ch++) {
-          chapters.push({ bookName: sel.bookName, chapter: ch });
+      let finalTemplateId = templateId;
+      let totalDays = 0;
+      let templateItems: Array<{ templateId: string; dayNumber: number; bookName: string; chapterStart: number; chapterEnd: number; scriptureReference: string }> = [];
+
+      if (templateId) {
+        const template = await storage.getReadingPlanTemplate(templateId);
+        if (!template) {
+          return res.status(404).json({ error: "Reading plan template not found" });
         }
-      }
+        const existingItems = await storage.getReadingPlanItems(templateId);
+        templateItems = existingItems.map(item => ({
+          templateId: item.templateId,
+          dayNumber: item.dayNumber,
+          bookName: item.bookName || '',
+          chapterStart: item.chapterStart || 1,
+          chapterEnd: item.chapterEnd || 1,
+          scriptureReference: item.scriptureReference,
+        }));
+        totalDays = template.durationDays;
+      } else {
+        if (!bookSelections || !chaptersPerDay) {
+          return res.status(400).json({ error: "Missing required fields for custom plan: bookSelections, chaptersPerDay" });
+        }
 
-      const totalDays = Math.ceil(chapters.length / chaptersPerDay);
-
-      const template = await storage.createReadingPlanTemplate({
-        name: `${name} - Personal`,
-        description: description || null,
-        category: "personal",
-        durationDays: totalDays,
-        isPublic: false,
-        createdBy: userId,
-      });
-
-      const templateItems: Array<{ templateId: string; dayNumber: number; bookName: string; chapterStart: number; chapterEnd: number; scriptureReference: string }> = [];
-      for (let day = 0; day < totalDays; day++) {
-        const dayChapters = chapters.slice(day * chaptersPerDay, (day + 1) * chaptersPerDay);
-        if (dayChapters.length === 0) continue;
-        const firstChapter = dayChapters[0];
-        const lastChapter = dayChapters[dayChapters.length - 1];
-        let scriptureRef: string;
-        if (firstChapter.bookName === lastChapter.bookName) {
-          if (firstChapter.chapter === lastChapter.chapter) {
-            scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}`;
-          } else {
-            scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}-${lastChapter.chapter}`;
+        const chapters: Array<{ bookName: string; chapter: number }> = [];
+        for (const sel of bookSelections) {
+          const start = sel.chapterStart || 1;
+          const end = sel.chapterEnd || start;
+          for (let ch = start; ch <= end; ch++) {
+            chapters.push({ bookName: sel.bookName, chapter: ch });
           }
-        } else {
-          scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter} - ${lastChapter.bookName} ${lastChapter.chapter}`;
         }
-        templateItems.push({
-          templateId: template.id,
-          dayNumber: day + 1,
-          bookName: firstChapter.bookName,
-          chapterStart: firstChapter.chapter,
-          chapterEnd: lastChapter.chapter,
-          scriptureReference: scriptureRef,
-        });
-      }
 
-      await storage.createReadingPlanTemplateItems(templateItems);
+        totalDays = Math.ceil(chapters.length / chaptersPerDay);
+
+        const template = await storage.createReadingPlanTemplate({
+          name: `${name} - Personal`,
+          description: description || null,
+          category: "personal",
+          durationDays: totalDays,
+          isPublic: false,
+          createdBy: userId,
+        });
+        finalTemplateId = template.id;
+
+        for (let day = 0; day < totalDays; day++) {
+          const dayChapters = chapters.slice(day * chaptersPerDay, (day + 1) * chaptersPerDay);
+          if (dayChapters.length === 0) continue;
+          const firstChapter = dayChapters[0];
+          const lastChapter = dayChapters[dayChapters.length - 1];
+          let scriptureRef: string;
+          if (firstChapter.bookName === lastChapter.bookName) {
+            if (firstChapter.chapter === lastChapter.chapter) {
+              scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}`;
+            } else {
+              scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}-${lastChapter.chapter}`;
+            }
+          } else {
+            scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter} - ${lastChapter.bookName} ${lastChapter.chapter}`;
+          }
+          templateItems.push({
+            templateId: template.id,
+            dayNumber: day + 1,
+            bookName: firstChapter.bookName,
+            chapterStart: firstChapter.chapter,
+            chapterEnd: lastChapter.chapter,
+            scriptureReference: scriptureRef,
+          });
+        }
+
+        await storage.createReadingPlanTemplateItems(templateItems);
+      }
 
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + totalDays - 1);
 
       const plan = await storage.createUserReadingPlan({
         userId,
-        templateId: template.id,
+        templateId: finalTemplateId,
         name,
         description: description || null,
         startDate,

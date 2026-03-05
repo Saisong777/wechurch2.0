@@ -102,7 +102,7 @@ const LoginPage = () => {
             開發者快速登入
           </a>
         )}
-        <p className="mt-4 text-xs text-white/40">Powered by Replit</p>
+        <p className="mt-4 text-xs text-white/40">Powered by Christ</p>
       </main>
     </div>
   );
@@ -153,7 +153,7 @@ const LoginForm: React.FC = () => {
       toast.error('請輸入電子郵件');
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const response = await fetch('/api/auth/forgot-password', {
@@ -161,7 +161,7 @@ const LoginForm: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      
+
       if (response.ok) {
         setResetEmailSent(true);
         toast.success('密碼重設連結已發送至您的信箱！');

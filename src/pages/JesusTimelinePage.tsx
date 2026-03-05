@@ -194,9 +194,9 @@ const ScriptureDisplay = memo(({ reference, gospelName, fontSizeClass, paragraph
         <Book className="w-4 h-4" />
         {gospelName} {data.chapter} 章
       </h6>
-      <ScriptureViewer 
-        verses={formattedVerses} 
-        paragraphMode={paragraphMode} 
+      <ScriptureViewer
+        verses={formattedVerses}
+        paragraphMode={paragraphMode}
         fontSizeClass={fontSizeClass}
         onNoteForSelected={(ref, text) => onOpenNote(ref, text)}
       />
@@ -205,8 +205,11 @@ const ScriptureDisplay = memo(({ reference, gospelName, fontSizeClass, paragraph
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5"
-          onClick={() => onOpenNote(reference, allText)}
+          className="gap-1.5 hover-elevate transition-transform"
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+            onOpenNote(reference, allText);
+          }}
           data-testid="button-timeline-note"
         >
           <BookMarked className="w-3.5 h-3.5" />
@@ -297,130 +300,115 @@ const EventCard = memo(({
   const hasMultipleScriptures = gospelScriptures.length >= 2;
 
   return (
-    <Card
-      className="hover-elevate"
-      data-testid={`event-${event.id}`}
-    >
-      <CardContent className="p-3 sm:p-5">
-        <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-          <span
-            className={`text-xs font-bold ${cfg.textColor} opacity-70 tabular-nums`}
-            data-testid={`event-number-${event.id}`}
-          >
-            {String(event.displayOrder).padStart(3, '0')}
-          </span>
-          <Badge
-            variant="secondary"
-            className={`${cfg.badgeBg} border-0 text-[10px] sm:text-xs no-default-hover-elevate no-default-active-elevate`}
-            data-testid={`season-badge-${event.id}`}
-          >
-            {cfg.buttonLabel}
-          </Badge>
-          {exclusive && (
-            <Badge
-              variant="outline"
-              className="text-[10px] sm:text-xs border-amber-400 dark:border-amber-600 text-amber-600 dark:text-amber-400 no-default-hover-elevate no-default-active-elevate"
-              data-testid={`exclusive-${event.id}`}
-            >
-              {exclusive} 獨家
-            </Badge>
-          )}
-          {event.location && (
-            <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground" data-testid={`location-${event.id}`}>
-              <MapPin className="w-3 h-3" />
-              {event.location}
-            </span>
-          )}
-          {event.approximateDate && (
-            <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground" data-testid={`date-${event.id}`}>
-              <Calendar className="w-3 h-3" />
-              {event.approximateDate}
-            </span>
-          )}
-        </div>
-
-        <h4
-          className="font-semibold text-base sm:text-lg text-foreground mb-1.5 leading-snug"
-          data-testid={`event-title-${event.id}`}
-        >
-          {event.eventName}
-        </h4>
-
-        <div className="flex items-center gap-1 mb-2" data-testid={`gospel-indicators-${event.id}`}>
-          {gospelKeys.map(g => {
-            const hasScripture = !!event[g.field];
-            const colors = gospelIndicatorColors[g.abbr];
-            return (
-              <span
-                key={g.field}
-                className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-bold transition-colors ${
-                  hasScripture ? colors.active : colors.inactive
-                }`}
-                data-testid={`gospel-${g.abbr}-${event.id}`}
+    <div className="relative pl-8 sm:pl-10">
+      <div className="absolute left-2.5 sm:left-3 top-0 bottom-0 w-px border-l-2 border-dashed border-border" />
+      <div className="absolute left-[5px] sm:left-[7px] top-6 w-3 h-3 rounded-full bg-primary ring-4 ring-background z-10" />
+      <Card
+        className="hover-elevate transition-shadow duration-300 dark:bg-[#18181B]"
+        data-testid={`event-${event.id}`}
+      >
+        <CardContent className="p-3 sm:p-5">
+          <div className="flex justify-between items-start gap-2 mb-2">
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                <span
+                  className={`text-xs font-bold ${cfg.textColor} opacity-70 tabular-nums`}
+                  data-testid={`event-number-${event.id}`}
+                >
+                  {String(event.displayOrder).padStart(3, '0')}
+                </span>
+                <span className="text-xs text-muted-foreground mr-1" data-testid={`date-${event.id}`}>
+                  {event.location ? `${event.location} • ` : ''}{event.approximateDate || ''}
+                </span>
+              </div>
+              <h4
+                className="font-semibold text-base sm:text-lg text-foreground leading-snug"
+                data-testid={`event-title-${event.id}`}
               >
-                {g.abbr}
-              </span>
-            );
-          })}
-        </div>
+                {event.eventName}
+              </h4>
+            </div>
 
-        {isCollapsed && gospelScriptures.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleExpand(event.id);
-            }}
-            className="mt-1 gap-1 text-xs text-muted-foreground"
-            data-testid={`button-expand-${event.id}`}
-          >
-            <Book className="w-3.5 h-3.5" />
-            展開經文
-          </Button>
-        )}
-
-        {!isCollapsed && gospelScriptures.length > 0 && (
-          <div
-            className="mt-3 pt-3 border-t border-border space-y-3"
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-          >
-            {hasMultipleScriptures ? (
-              <SyncedScriptureDisplay scriptures={gospelScriptures} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} onOpenNote={onOpenNote} />
-            ) : (
-              gospelScriptures.map((g) => {
-                const singleBgColors: Record<string, string> = {
-                  'scriptureMt': 'bg-blue-50/60 dark:bg-blue-950/20',
-                  'scriptureMk': 'bg-green-50/60 dark:bg-green-950/20',
-                  'scriptureLk': 'bg-amber-50/60 dark:bg-amber-950/20',
-                  'scriptureJn': 'bg-purple-50/60 dark:bg-purple-950/20',
-                };
+            <div className="flex items-center gap-1 shrink-0" data-testid={`gospel-indicators-${event.id}`}>
+              {gospelKeys.map(g => {
+                const hasScripture = !!event[g.field];
+                if (!hasScripture) return null;
+                const colors = gospelIndicatorColors[g.abbr];
                 return (
-                  <div key={g.key} className={`rounded-lg p-3 ${singleBgColors[g.key] || 'bg-muted/30'}`}>
-                    <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} onOpenNote={onOpenNote} />
-                  </div>
+                  <span
+                    key={g.field}
+                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${colors.active}`}
+                    data-testid={`gospel-${g.abbr}-${event.id}`}
+                  >
+                    {g.abbr}
+                  </span>
                 );
-              })
-            )}
+              })}
+            </div>
+          </div>
+
+
+
+          {isCollapsed && gospelScriptures.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
+                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
                 onToggleExpand(event.id);
               }}
-              className="gap-1 text-xs text-muted-foreground"
-              data-testid={`button-collapse-${event.id}`}
+              className="mt-1 gap-1 text-xs text-muted-foreground hover-elevate"
+              data-testid={`button-expand-${event.id}`}
             >
-              <ChevronUp className="w-3.5 h-3.5" />
-              收起經文
+              <Book className="w-3.5 h-3.5" />
+              展開經文
             </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+
+          {!isCollapsed && gospelScriptures.length > 0 && (
+            <div
+              className="mt-3 pt-3 border-t border-border space-y-3"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              {hasMultipleScriptures ? (
+                <SyncedScriptureDisplay scriptures={gospelScriptures} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} onOpenNote={onOpenNote} />
+              ) : (
+                gospelScriptures.map((g) => {
+                  const singleBgColors: Record<string, string> = {
+                    'scriptureMt': 'bg-blue-50/60 dark:bg-blue-950/20',
+                    'scriptureMk': 'bg-green-50/60 dark:bg-green-950/20',
+                    'scriptureLk': 'bg-amber-50/60 dark:bg-amber-950/20',
+                    'scriptureJn': 'bg-purple-50/60 dark:bg-purple-950/20',
+                  };
+                  return (
+                    <div key={g.key} className={`rounded-lg p-3 ${singleBgColors[g.key] || 'bg-muted/30'}`}>
+                      <ScriptureDisplay reference={g.ref} gospelName={g.name} fontSizeClass={fontSizeClass} paragraphMode={paragraphMode} onOpenNote={onOpenNote} />
+                    </div>
+                  );
+                })
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+                  onToggleExpand(event.id);
+                }}
+                className="gap-1 text-xs text-muted-foreground hover-elevate"
+                data-testid={`button-collapse-${event.id}`}
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+                收起經文
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 });
 
@@ -468,7 +456,7 @@ const JesusTimelinePage = () => {
         const parsed = parseInt(saved, 10);
         if (parsed >= 0 && parsed < fontSizeOptions.length) return parsed;
       }
-    } catch {}
+    } catch { }
     return 1;
   });
 
@@ -484,7 +472,7 @@ const JesusTimelinePage = () => {
   const handleFontSizeChange = (delta: number) => {
     setFontSizeIdx(prev => {
       const next = Math.max(0, Math.min(fontSizeOptions.length - 1, prev + delta));
-      try { localStorage.setItem(FONT_SIZE_KEY, String(next)); } catch {}
+      try { localStorage.setItem(FONT_SIZE_KEY, String(next)); } catch { }
       return next;
     });
   };
@@ -563,163 +551,166 @@ const JesusTimelinePage = () => {
       description="耶穌四季功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background flex flex-col">
-        <Header variant="compact" title="耶穌四季" />
-        <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 overflow-y-auto">
-          <div className="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-4 pb-8">
-            <Card>
-              <CardContent className="py-2.5 sm:py-4">
-                <button
-                  onClick={() => setFilterOpen(!filterOpen)}
-                  className="flex items-center justify-between w-full gap-2"
-                  aria-expanded={filterOpen}
-                  data-testid="button-toggle-filter"
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Filter className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-sm font-medium text-foreground" data-testid="text-event-count">
-                      {filteredEvents.length} 個事件
-                    </span>
-                    {(selectedSeason || selectedGospel) && (
-                      <span className="text-xs text-muted-foreground">
-                        （共 {allEvents.length} 個）
+        <Header variant="compact" title="耶穌四季" backTo="/learn" />
+        <main className="flex-1 container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 pb-12 overflow-y-auto">
+          <div className="max-w-3xl lg:max-w-4xl mx-auto w-full space-y-4">
+            <div className="sticky top-14 md:top-[60px] z-40 transition-all duration-300 shadow-sm">
+              <Card className="bg-background/85 dark:bg-[#18181B]/85 backdrop-blur-md border-border/50">
+                <CardContent className="py-2.5 sm:py-3 px-3 sm:px-4">
+                  <button
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+                      setFilterOpen(!filterOpen);
+                    }}
+                    className="flex items-center justify-between w-full gap-2 transition-opacity hover:opacity-80"
+                    aria-expanded={filterOpen}
+                    data-testid="button-toggle-filter"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Filter className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-sm font-medium text-foreground" data-testid="text-event-count">
+                        {filteredEvents.length} 個事件
                       </span>
-                    )}
-                    {!filterOpen && (selectedSeason || selectedGospel) && (
-                      <div className="flex items-center gap-1">
-                        {selectedGospel && (
-                          <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
-                            {selectedGospel}
-                          </Badge>
-                        )}
-                        {selectedSeason && (
-                          <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
-                            {seasonConfig[selectedSeason]?.buttonLabel}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${filterOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {filterOpen && (
-                  <div className="mt-3 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-muted-foreground mr-1">福音書</span>
-                      {gospelKeys.map(g => {
-                        const isSelected = selectedGospel === g.abbr;
-                        return (
-                          <button
-                            key={g.abbr}
-                            onClick={() => handleGospelClick(g.abbr)}
-                            className={`inline-flex items-center justify-center rounded-md text-sm font-medium min-h-8 px-3 border transition-colors ${
-                              isSelected
-                                ? g.selectedBg
-                                : g.color
-                            }`}
-                            data-testid={`button-gospel-${g.abbr}`}
-                          >
-                            {g.abbr}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-muted-foreground mr-1">季節</span>
-                      {seasonOrder.map((season) => {
-                        const cfg = seasonConfig[season];
-                        const SeasonIcon = cfg.icon;
-                        const isSelected = selectedSeason === season;
-                        return (
-                          <button
-                            key={season}
-                            onClick={() => handleSeasonClick(season)}
-                            className={`inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium min-h-8 px-3 border transition-colors ${
-                              isSelected
-                                ? `${cfg.buttonSelectedBg} ${cfg.buttonSelectedText} border-transparent`
-                                : cfg.buttonOutlineColor
-                            }`}
-                            data-testid={`button-season-${season}`}
-                          >
-                            <SeasonIcon className="w-3.5 h-3.5" />
-                            {cfg.buttonLabel}
-                          </button>
-                        );
-                      })}
                       {(selectedSeason || selectedGospel) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedSeason(null);
-                            setSelectedGospel(null);
-                          }}
-                          data-testid="button-clear-filter"
-                        >
-                          清除篩選
-                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          （共 {allEvents.length} 個）
+                        </span>
+                      )}
+                      {!filterOpen && (selectedSeason || selectedGospel) && (
+                        <div className="flex items-center gap-1">
+                          {selectedGospel && (
+                            <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
+                              {selectedGospel}
+                            </Badge>
+                          )}
+                          {selectedSeason && (
+                            <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
+                              {seasonConfig[selectedSeason]?.buttonLabel}
+                            </Badge>
+                          )}
+                        </div>
                       )}
                     </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${filterOpen ? 'rotate-180' : ''}`} />
+                  </button>
 
-                    <div className="flex items-center gap-2 pt-1 border-t border-border mt-2">
-                      <Type className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                      <span className="text-xs text-muted-foreground">字體</span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleFontSizeChange(-1)}
-                          disabled={fontSizeIdx === 0}
-                          data-testid="button-font-decrease"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </Button>
-                        <span className="text-xs font-medium text-foreground min-w-[2rem] text-center" data-testid="text-font-size">
-                          {currentFontSize.label}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleFontSizeChange(1)}
-                          disabled={fontSizeIdx === fontSizeOptions.length - 1}
-                          data-testid="button-font-increase"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </Button>
+                  {filterOpen && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground mr-1">福音書</span>
+                        {gospelKeys.map(g => {
+                          const isSelected = selectedGospel === g.abbr;
+                          return (
+                            <button
+                              key={g.abbr}
+                              onClick={() => handleGospelClick(g.abbr)}
+                              className={`inline-flex items-center justify-center rounded-md text-sm font-medium min-h-8 px-3 border transition-colors ${isSelected
+                                ? g.selectedBg
+                                : g.color
+                                }`}
+                              data-testid={`button-gospel-${g.abbr}`}
+                            >
+                              {g.abbr}
+                            </button>
+                          );
+                        })}
                       </div>
 
-                      <div className="w-px h-4 bg-border mx-1" />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground mr-1">季節</span>
+                        {seasonOrder.map((season) => {
+                          const cfg = seasonConfig[season];
+                          const SeasonIcon = cfg.icon;
+                          const isSelected = selectedSeason === season;
+                          return (
+                            <button
+                              key={season}
+                              onClick={() => handleSeasonClick(season)}
+                              className={`inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium min-h-8 px-3 border transition-colors ${isSelected
+                                ? `${cfg.buttonSelectedBg} ${cfg.buttonSelectedText} border-transparent`
+                                : cfg.buttonOutlineColor
+                                }`}
+                              data-testid={`button-season-${season}`}
+                            >
+                              <SeasonIcon className="w-3.5 h-3.5" />
+                              {cfg.buttonLabel}
+                            </button>
+                          );
+                        })}
+                        {(selectedSeason || selectedGospel) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSeason(null);
+                              setSelectedGospel(null);
+                            }}
+                            data-testid="button-clear-filter"
+                          >
+                            清除篩選
+                          </Button>
+                        )}
+                      </div>
 
-                      <Button
-                        variant={displayMode === 'list' ? 'default' : 'outline'}
-                        size="icon"
-                        onClick={() => {
-                          setDisplayMode('list');
-                          try { localStorage.setItem('wechurch-scripture-display-mode', 'list'); } catch {}
-                        }}
-                        title="條列式"
-                        data-testid="button-display-list"
-                      >
-                        <List className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant={displayMode === 'paragraph' ? 'default' : 'outline'}
-                        size="icon"
-                        onClick={() => {
-                          setDisplayMode('paragraph');
-                          try { localStorage.setItem('wechurch-scripture-display-mode', 'paragraph'); } catch {}
-                        }}
-                        title="段落式"
-                        data-testid="button-display-paragraph"
-                      >
-                        <AlignLeft className="w-3.5 h-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-2 pt-1 border-t border-border mt-2">
+                        <Type className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs text-muted-foreground">字體</span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleFontSizeChange(-1)}
+                            disabled={fontSizeIdx === 0}
+                            data-testid="button-font-decrease"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                          <span className="text-xs font-medium text-foreground min-w-[2rem] text-center" data-testid="text-font-size">
+                            {currentFontSize.label}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleFontSizeChange(1)}
+                            disabled={fontSizeIdx === fontSizeOptions.length - 1}
+                            data-testid="button-font-increase"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
+
+                        <div className="w-px h-4 bg-border mx-1" />
+
+                        <Button
+                          variant={displayMode === 'list' ? 'default' : 'outline'}
+                          size="icon"
+                          onClick={() => {
+                            setDisplayMode('list');
+                            try { localStorage.setItem('wechurch-scripture-display-mode', 'list'); } catch { }
+                          }}
+                          title="條列式"
+                          data-testid="button-display-list"
+                        >
+                          <List className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant={displayMode === 'paragraph' ? 'default' : 'outline'}
+                          size="icon"
+                          onClick={() => {
+                            setDisplayMode('paragraph');
+                            try { localStorage.setItem('wechurch-scripture-display-mode', 'paragraph'); } catch { }
+                          }}
+                          title="段落式"
+                          data-testid="button-display-paragraph"
+                        >
+                          <AlignLeft className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">載入中...</div>
@@ -738,7 +729,7 @@ const JesusTimelinePage = () => {
                   return (
                     <section key={season} data-testid={`section-season-${season}`}>
                       <div
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-3 ${cfg.headerBg} border ${cfg.borderColor}`}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-4 ${cfg.headerBg} border ${cfg.borderColor} sticky top-[108px] md:top-[116px] z-30 shadow-sm backdrop-blur-sm opacity-95`}
                       >
                         <SeasonIcon className={`w-4 h-4 ${cfg.textColor}`} />
                         <h3 className={`text-sm sm:text-base font-semibold ${cfg.textColor}`}>
@@ -753,8 +744,8 @@ const JesusTimelinePage = () => {
                         </span>
                       </div>
 
-                      <div className="space-y-3">
-                        {events.map(event => (
+                      <div className="space-y-4 relative">
+                        {events.map((event, idx) => (
                           <LazyEventCard key={event.id}>
                             <EventCard
                               event={event}

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Gamepad2, Shuffle, BookOpen, ChevronRight } from "lucide-react";
+import { Header } from "@/components/layout/Header";
 
 const features = [
   {
@@ -39,6 +40,7 @@ const features = [
 export const WePlayPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
+      <Header variant="compact" />
       <div className="container mx-auto px-4 py-6 md:py-10">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-6 md:mb-8">

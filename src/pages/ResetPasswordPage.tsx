@@ -89,7 +89,7 @@ const ResetPasswordPage = () => {
   if (isVerifying) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-        <Header title="WeChurch" subtitle="" />
+        <Header title="WeChurch" subtitle="" backTo="/login" />
         <main className="container mx-auto px-4 py-12">
           <div className="max-w-md mx-auto text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
@@ -103,7 +103,7 @@ const ResetPasswordPage = () => {
   if (resetSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-        <Header title="WeChurch" subtitle="" />
+        <Header title="WeChurch" subtitle="" backTo="/login" />
         <main className="container mx-auto px-4 py-12">
           <div className="max-w-md mx-auto">
             <Card variant="highlight" className="border-2 shadow-lg">
@@ -135,7 +135,7 @@ const ResetPasswordPage = () => {
   if (!isValid) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-        <Header title="WeChurch" subtitle="" />
+        <Header title="WeChurch" subtitle="" backTo="/login" />
         <main className="container mx-auto px-4 py-12">
           <div className="max-w-md mx-auto">
             <Card variant="highlight" className="border-2 shadow-lg">
@@ -171,7 +171,7 @@ const ResetPasswordPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-      <Header title="WeChurch" subtitle="" />
+      <Header title="WeChurch" subtitle="" backTo="/login" />
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-md mx-auto">
           <Card variant="highlight" className="border-2 shadow-lg">

@@ -158,7 +158,7 @@ export const UserPage: React.FC = () => {
 
       // Determine the correct step based on session status and user state
       let restoredStep: UserStep = 'waiting';
-      
+
       if (sessionData.status === 'studying') {
         // Check if icebreaker is enabled and user hasn't completed it yet
         if (sessionData.icebreakerEnabled && participant.groupNumber) {
@@ -196,14 +196,14 @@ export const UserPage: React.FC = () => {
 
       setStep(restoredStep);
       setSessionId(storedSessionId);
-      
+
       console.log('[UserPage] Session restored successfully:', {
         sessionId: storedSessionId,
         participantId: participant.id,
         step: restoredStep,
         sessionStatus: sessionData.status,
       });
-      
+
       // Silent restoration - no toast to avoid notification spam during transitions
       console.log('[UserPage] Session restored successfully (silent)');
       setIsRestoring(false);
@@ -221,14 +221,14 @@ export const UserPage: React.FC = () => {
       // Support both ?session= (new short code) and ?session_id= (legacy UUID)
       const sessionFromUrl = searchParams.get('session') || searchParams.get('session_id');
       const stepFromUrl = searchParams.get('step');
-      
+
       // If URL has step=notebook, go directly to notebook
       if (stepFromUrl === 'notebook') {
         setStep('notebook');
         setIsRestoring(false);
         return;
       }
-      
+
       // If URL has a session code/ID, use that (new session join)
       if (sessionFromUrl) {
         setSessionId(sessionFromUrl);
@@ -269,9 +269,9 @@ export const UserPage: React.FC = () => {
 
   const loadSessionAndCheckAuth = async (idOrCode: string) => {
     setIsLoading(true);
-    
+
     const trimmedInput = idOrCode.trim().toUpperCase();
-    
+
     try {
       // Try short code first, then UUID
       let res;
@@ -394,7 +394,7 @@ export const UserPage: React.FC = () => {
                 <WeChurchIcon size={64} className="drop-shadow-lg" />
               </div>
             </div>
-            
+
             <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground text-center mb-4">
               WeChurch
             </h1>
@@ -427,7 +427,7 @@ export const UserPage: React.FC = () => {
                 返回首頁
               </Link>
             </Button>
-            
+
             <Card variant="highlight" className="border-2 border-primary/20">
               <CardHeader className="text-center px-4 sm:px-6 pt-8 sm:pt-8 pb-4">
                 <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-sky flex items-center justify-center mb-5 sm:mb-4 shadow-lg">
@@ -509,10 +509,10 @@ export const UserPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-            
-            <QRCodeScanner 
-              open={showScanner} 
-              onClose={() => setShowScanner(false)} 
+
+            <QRCodeScanner
+              open={showScanner}
+              onClose={() => setShowScanner(false)}
               onScan={handleQRScan}
             />
           </div>
@@ -553,8 +553,8 @@ export const UserPage: React.FC = () => {
       case 'waiting':
         return (
           <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <WaitingRoom 
-              onGroupingStarted={() => setStep('group-reveal')} 
+            <WaitingRoom
+              onGroupingStarted={() => setStep('group-reveal')}
               onSessionEnded={handleSessionEnded}
             />
           </div>
@@ -570,7 +570,7 @@ export const UserPage: React.FC = () => {
       case 'verification':
         return (
           <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <GroupVerification 
+            <GroupVerification
               onAllReady={() => {
                 // Check if icebreaker is enabled for this session
                 if (currentSession?.icebreakerEnabled && currentUser?.groupNumber) {
@@ -578,7 +578,7 @@ export const UserPage: React.FC = () => {
                 } else {
                   setStep('study');
                 }
-              }} 
+              }}
               onSessionEnded={handleSessionEnded}
             />
           </div>
@@ -591,7 +591,7 @@ export const UserPage: React.FC = () => {
         }
         return (
           <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <GroupIcebreaker 
+            <GroupIcebreaker
               sessionId={currentSession.id}
               groupNumber={currentUser.groupNumber}
               currentUserId={currentUser.id}
@@ -668,13 +668,13 @@ export const UserPage: React.FC = () => {
   }
 
   return (
-    <FeatureGate 
+    <FeatureGate
       featureKeys={["we_live", "bible_study"]}
       title="靈魂健身房維護中"
       description="Soul Gym 功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-background">
-        <Header variant={step === 'landing' ? 'default' : 'compact'} />
+        <Header variant={step === 'landing' ? 'default' : 'compact'} backTo="/user" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 pb-8">
           {renderStep()}
         </main>

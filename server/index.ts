@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
@@ -61,7 +62,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = 5000;
+  const port = Number(process.env.PORT) || 5001;
   server.listen({
     port,
     host: "0.0.0.0",

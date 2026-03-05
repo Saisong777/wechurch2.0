@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, BookMarked, User, Settings, Home, Dumbbell, BookOpen, Gamepad2, Share2, Shield } from 'lucide-react';
+import { LogOut, BookMarked, User, Settings, Home, Dumbbell, BookOpen, Gamepad2, Share2, Shield, ChevronLeft } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -33,6 +33,7 @@ interface HeaderProps {
   className?: string;
   variant?: 'default' | 'compact';
   rightContent?: React.ReactNode;
+  backTo?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
   className,
   variant = 'default',
   rightContent,
+  backTo,
 }) => {
   const { user, loading, signOut } = useAuth();
   const { profile } = useUserProfile();
@@ -128,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={handleSignOut}
               className="text-destructive focus:text-destructive cursor-pointer"
             >
@@ -138,9 +140,9 @@ export const Header: React.FC<HeaderProps> = ({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="rounded-full w-9 h-9"
           onClick={() => navigate('/login')}
         >
@@ -160,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between">
           {/* Mobile: Left spacer for balance (wider when rightContent is present) */}
           <div className={cn("md:hidden", rightContent ? "w-[5.25rem] sm:w-24" : "w-10 sm:w-12")} />
-          
+
           {/* Desktop: Logo on left */}
           <Link to="/" className="hidden md:flex items-center gap-2 hover:opacity-80 transition-opacity group shrink-0">
             {showLogo && (
@@ -222,15 +224,25 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           <div className="flex items-center gap-1">
+            {backTo && (
+              <button
+                onClick={() => navigate(backTo)}
+                className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-1 sm:mr-2 pr-1"
+                aria-label="返回上一頁"
+              >
+                <ChevronLeft className="w-5 h-5 mx-[-2px]" />
+                <span className="text-sm font-medium">返回</span>
+              </button>
+            )}
             {rightContent}
             {userMenu}
           </div>
         </div>
       </div>
-      
-      <ProfileSettingsDialog 
-        open={showProfileSettings} 
-        onOpenChange={setShowProfileSettings} 
+
+      <ProfileSettingsDialog
+        open={showProfileSettings}
+        onOpenChange={setShowProfileSettings}
       />
     </header>
   );
