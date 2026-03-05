@@ -333,14 +333,18 @@ export const AdminMonitor: React.FC = () => {
       description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
     });
     
-    // Generate reports sequentially to avoid rate limiting
+    // Generate reports in batches of 2 for speed (Gemini each call ~10-15s, natural throttle)
+    const CONCURRENCY = 2;
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
-    for (let i = 0; i < groups.length; i++) {
-      const group = groups[i];
-      if (i > 0) await new Promise(r => setTimeout(r, 6000));
-      const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
-      setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
-      results.push({ groupNumber: group.number, result });
+    for (let i = 0; i < groups.length; i += CONCURRENCY) {
+      const batch = groups.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(group => generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly }))
+      );
+      batchResults.forEach((result, j) => {
+        setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
+        results.push({ groupNumber: batch[j].number, result });
+      });
     }
     
     // Sort by group number and combine
