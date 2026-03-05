@@ -62,16 +62,20 @@ export async function setupAuth(app: Express) {
         const rc = await pool.query(`SELECT id FROM user_roles WHERE user_id=$1`, [userId]);
         if (rc.rows.length > 0) { await pool.query(`UPDATE user_roles SET role='admin',updated_at=NOW() WHERE user_id=$1`, [userId]); }
         else { await pool.query(`INSERT INTO user_roles (id,user_id,role,created_at,updated_at) VALUES (gen_random_uuid(),$1,'admin',NOW(),NOW())`, [userId]); }
-        req.login({ claims: { sub: devAuthId, email: devEmail, first_name: displayName, last_name: "" }, expires_at: Math.floor(Date.now()/1000)+86400*7 } as any, (err) => {
+        req.login({ claims: { sub: devAuthId, email: devEmail, first_name: displayName, last_name: "" }, expires_at: Math.floor(Date.now() / 1000) + 86400 * 7 } as any, (err) => {
           if (err) return res.status(500).json({ message: "Login failed" });
           req.session.save(() => res.redirect("/"));
         });
-      } catch(e) { console.error("[Dev Login]", e); return res.status(500).json({ message: "Dev login error" }); }
+      } catch (e) { console.error("[Dev Login]", e); return res.status(500).json({ message: "Dev login error" }); }
     });
   }
   app.get("/api/logout", (req, res) => { req.logout(() => res.redirect("/")); });
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    passport.use(new GoogleStrategy({ clientID: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, callbackURL: "/api/callback" },
+    passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.NODE_ENV === 'production' ? 'https://www.wechurch.online/api/callback' : '/api/callback'
+    },
       async (_at, _rt, profile, done) => {
         try {
           await upsertUser(profile);
@@ -92,6 +96,6 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (!req.isAuthenticated() || !user?.expires_at) return res.status(401).json({ message: "Unauthorized" });
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) { if (req.session) req.session.touch(); return next(); }
-  if (user.claims?.sub?.startsWith("local_") || user.claims?.sub?.startsWith("dev_")) { user.expires_at = Math.floor(Date.now()/1000)+86400*7; if (req.session) req.session.touch(); return next(); }
+  if (user.claims?.sub?.startsWith("local_") || user.claims?.sub?.startsWith("dev_")) { user.expires_at = Math.floor(Date.now() / 1000) + 86400 * 7; if (req.session) req.session.touch(); return next(); }
   res.status(401).json({ message: "Unauthorized" });
 };
