@@ -309,13 +309,21 @@ export async function registerRoutes(app: Express) {
         return res.json(cached);
       }
 
-      const session = await storage.getSession(sessionId);
+      // Fetch session and submissions in parallel (submissions don't depend on session)
+      const fetchSubmissions = (phase === 'studying' || phase === 'all')
+        ? storage.getSubmissions(sessionId)
+        : Promise.resolve(null);
+
+      const [session, submissions] = await Promise.all([
+        storage.getSession(sessionId),
+        fetchSubmissions,
+      ]);
+
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
       let participants: any[] | null = null;
-      let submissions: any[] | null = null;
 
       const effectivePhase = (phase === 'waiting' && session.status !== 'waiting') ? 'grouping' : phase;
 
@@ -323,16 +331,13 @@ export async function registerRoutes(app: Express) {
         participants = await storage.getParticipants(sessionId, groupNumber ? { groupNumber } : undefined);
       }
 
-      if (phase === 'studying' || phase === 'all') {
-        submissions = await storage.getSubmissions(sessionId);
-      }
-
       const participantCount = participants ? participants.length : 0;
       const submissionCount = submissions ? submissions.length : 0;
 
       let maxParticipantUpdate = '';
       if (participants && participants.length > 0) {
-        const fields = participants.map((p: any) => `${p.id}:${p.groupNumber}:${p.readyConfirmed}:${p.updatedAt || ''}`);
+        // Only include fields that affect client rendering (omit updatedAt to keep string compact)
+        const fields = participants.map((p: any) => `${p.id}:${p.groupNumber ?? ''}:${p.readyConfirmed ? 1 : 0}`);
         maxParticipantUpdate = fields.join(',');
       }
       let maxSubmissionUpdate = '';
@@ -910,9 +915,18 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "sessionId and userId/participantId are required" });
       }
 
-      // Verify the participant belongs to this session
-      const participant = await storage.getParticipant(resolvedUserId);
-      if (!participant || participant.sessionId !== sessionId) {
+      // Verify the participant belongs to this session (cached to reduce DB load during study phase)
+      const participantCacheKey = `participant-session:${resolvedUserId}`;
+      let participantSessionId = apiCache.get<string>(participantCacheKey);
+      if (!participantSessionId) {
+        const participant = await storage.getParticipant(resolvedUserId);
+        if (!participant) {
+          return res.status(403).json({ error: "Participant not found in this session" });
+        }
+        apiCache.set(participantCacheKey, participant.sessionId); // 5-min cache
+        participantSessionId = participant.sessionId;
+      }
+      if (participantSessionId !== sessionId) {
         return res.status(403).json({ error: "Participant not found in this session" });
       }
 
