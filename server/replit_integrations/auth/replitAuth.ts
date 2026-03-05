@@ -95,7 +95,16 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
   if (!req.isAuthenticated() || !user?.expires_at) return res.status(401).json({ message: "Unauthorized" });
   const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) { if (req.session) req.session.touch(); return next(); }
-  if (user.claims?.sub?.startsWith("local_") || user.claims?.sub?.startsWith("dev_")) { user.expires_at = Math.floor(Date.now() / 1000) + 86400 * 7; if (req.session) req.session.touch(); return next(); }
-  res.status(401).json({ message: "Unauthorized" });
+  if (now <= user.expires_at) {
+    // Proactively refresh expires_at when less than 1 day remaining
+    if (user.expires_at - now < 86400) {
+      user.expires_at = now + 86400 * 7;
+    }
+    if (req.session) req.session.touch();
+    return next();
+  }
+  // Session is still valid in DB (touch keeps it alive), so refresh expires_at for all user types
+  user.expires_at = Math.floor(Date.now() / 1000) + 86400 * 7;
+  if (req.session) req.session.touch();
+  return next();
 };

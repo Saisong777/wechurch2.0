@@ -28,7 +28,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const SESSION_REFRESH_INTERVAL = 5 * 60 * 1000;
-const AUTH_FAILURE_THRESHOLD = 3;
+const AUTH_FAILURE_THRESHOLD = 5; // 5 × 5min = 25min tolerance (handles deploys/network blips)
 
 function mapUserData(userData: any): AuthUser {
   return {
