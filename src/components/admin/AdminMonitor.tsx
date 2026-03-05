@@ -329,18 +329,17 @@ export const AdminMonitor: React.FC = () => {
     setGenerationProgress({ current: 0, total: groups.length });
     
     const modeLabel = fastMode ? '快速模式' : '高品質模式';
-    toast.info(`開始並行生成 ${groups.length} 個小組報告 (${modeLabel})...`, {
+    toast.info(`開始逐一生成 ${groups.length} 個小組報告 (${modeLabel})...`, {
       description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
     });
     
-    // Generate all reports in parallel for speed
-    const reportPromises = groups.map(async (group) => {
+    // Generate reports sequentially to avoid rate limiting
+    const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
+    for (const group of groups) {
       const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
       setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
-      return { groupNumber: group.number, result };
-    });
-    
-    const results = await Promise.all(reportPromises);
+      results.push({ groupNumber: group.number, result });
+    }
     
     // Sort by group number and combine
     results.sort((a, b) => a.groupNumber - b.groupNumber);
