@@ -19,28 +19,32 @@ export default defineConfig({
     target: "es2020",
     cssCodeSplit: true,
     sourcemap: false,
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
           if (id.includes("node_modules")) {
-            if (id.includes("react-dom") || id.includes("/react/")) {
+            // Core React - always loaded first
+            if (id.includes("react-dom") || id.includes("/react/") || id.includes("react-router-dom")) {
               return "vendor-react";
             }
-            if (id.includes("react-router-dom")) {
-              return "vendor-react";
+            // Animation library - separate chunk, only loaded where needed
+            if (id.includes("framer-motion")) {
+              return "vendor-motion";
             }
-            if (id.includes("@radix-ui")) {
+            // UI components
+            if (id.includes("@radix-ui") || id.includes("lucide-react")) {
               return "vendor-ui";
             }
-            if (id.includes("lucide-react")) {
-              return "vendor-ui";
-            }
+            // Data fetching
             if (id.includes("@tanstack/react-query")) {
               return "vendor-query";
             }
+            // Rich text editor - large, lazy loaded
             if (id.includes("@tiptap")) {
               return "vendor-editor";
             }
+            // Utility libraries
             if (
               id.includes("zod") ||
               id.includes("date-fns") ||
@@ -49,6 +53,7 @@ export default defineConfig({
             ) {
               return "vendor-utils";
             }
+            // Heavy one-off libraries
             if (id.includes("html2canvas")) {
               return "vendor-heavy";
             }

@@ -3231,6 +3231,8 @@ export async function registerRoutes(app: Express) {
   app.get("/api/bible/blessing/random", async (req, res) => {
     try {
       const verse = await storage.getRandomBlessingVerse();
+      // Cache for 10 minutes on client — blessing verse changes infrequently
+      res.setHeader('Cache-Control', 'private, max-age=600');
       res.json(verse || null);
     } catch (error) {
       console.error('Error fetching random blessing verse:', error);
@@ -3245,6 +3247,8 @@ export async function registerRoutes(app: Express) {
       const events = season
         ? await storage.getJesus4SeasonsBySeason(season)
         : await storage.getJesus4Seasons();
+      // Timeline is static content — cache for 1 hour
+      res.setHeader('Cache-Control', 'private, max-age=3600');
       res.json(events);
     } catch (error) {
       console.error('Error fetching Jesus timeline:', error);
