@@ -1063,10 +1063,13 @@ export async function registerRoutes(app: Express) {
     try {
       const cached = apiCache.get<any[]>(cacheKeys.featureToggles());
       if (cached) {
+        res.setHeader('Cache-Control', 'private, max-age=300');
         return res.json(cached);
       }
       const toggles = await storage.getFeatureToggles();
-      apiCache.set(cacheKeys.featureToggles(), toggles, 30);
+      // Cache for 5 minutes — feature toggles are rarely updated
+      apiCache.set(cacheKeys.featureToggles(), toggles, 300);
+      res.setHeader('Cache-Control', 'private, max-age=300');
       res.json(toggles);
     } catch (error) {
       res.status(500).json({ error: "Failed to get feature toggles" });

@@ -28,18 +28,18 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
-  
+
   getUserRoles(): Promise<{ userId: string; role: string }[]>;
   getUserRole(userId: string): Promise<string | undefined>;
   upsertUserRole(userId: string, role: string): Promise<void>;
-  
+
   getSession(id: string): Promise<Session | undefined>;
   getSessions(): Promise<Session[]>;
   getSessionByShortCode(shortCode: string): Promise<Session | undefined>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, data: Partial<Session>): Promise<Session | undefined>;
   deleteSession(id: string): Promise<void>;
-  
+
   getParticipants(sessionId: string, filters?: { groupNumber?: number }): Promise<Participant[]>;
   getParticipant(id: string): Promise<Participant | undefined>;
   createParticipant(participant: InsertParticipant): Promise<Participant>;
@@ -48,14 +48,14 @@ export interface IStorage {
   forceVerifyAllParticipants(sessionId: string): Promise<number>;
   resetAllReadyStatus(sessionId: string): Promise<number>;
   clearAllGroupAssignments(sessionId: string): Promise<number>;
-  
+
   getSubmissions(sessionId: string): Promise<Submission[]>;
   createSubmission(submission: InsertSubmission): Promise<Submission>;
   deleteSubmissionsBySession(sessionId: string): Promise<void>;
-  
+
   getAiReports(sessionId: string): Promise<AiReport[]>;
   createAiReport(report: { sessionId: string; reportType: string; groupNumber?: number; content: string; status?: string }): Promise<AiReport>;
-  
+
   getStudyResponse(sessionId: string, participantId: string): Promise<StudyResponse | undefined>;
   upsertStudyResponse(response: InsertStudyResponse & { sessionId: string; userId: string }): Promise<StudyResponse>;
   updateStudyResponseById(id: string, data: Partial<InsertStudyResponse>): Promise<StudyResponse | undefined>;
@@ -64,7 +64,7 @@ export interface IStorage {
   getNotebookEntries(email: string): Promise<any[]>;
   getNotebookSessions(email: string): Promise<any[]>;
   getGroupStudyResponses(sessionId: string, groupNumber: number): Promise<any[]>;
-  
+
   getPrayers(): Promise<Prayer[]>;
   createPrayer(prayer: InsertPrayer): Promise<Prayer>;
   updatePrayer(id: string, data: Partial<Prayer>): Promise<Prayer | undefined>;
@@ -73,44 +73,44 @@ export interface IStorage {
   getPrayerComments(prayerId: string, currentUserId?: string): Promise<{ id: string; prayerId: string; userId: string; content: string; createdAt: Date; authorName: string; authorAvatar: string | null; isOwner: boolean }[]>;
   createPrayerComment(prayerId: string, userId: string, content: string): Promise<{ id: string; prayerId: string; userId: string; content: string; createdAt: Date }>;
   deletePrayerComment(commentId: string): Promise<void>;
-  
+
   getFeatureToggles(): Promise<FeatureToggle[]>;
   getFeatureToggle(key: string): Promise<FeatureToggle | undefined>;
   updateFeatureToggle(id: string, data: Partial<FeatureToggle>): Promise<FeatureToggle | undefined>;
-  
+
   getPotentialMembers(): Promise<PotentialMember[]>;
   upsertPotentialMember(data: { email: string; name: string; gender?: string }): Promise<PotentialMember>;
   updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined>;
   deletePotentialMember(id: string): Promise<void>;
-  
+
   getStudyResponses(sessionId: string): Promise<StudyResponse[]>;
-  
+
   getIcebreakerGame(id: string): Promise<IcebreakerGame | undefined>;
   getIcebreakerGameByRoomCode(roomCode: string): Promise<IcebreakerGame | undefined>;
   createIcebreakerGame(game: Partial<IcebreakerGame>): Promise<IcebreakerGame>;
   updateIcebreakerGame(id: string, data: Partial<IcebreakerGame>): Promise<IcebreakerGame | undefined>;
-  
+
   getIcebreakerPlayers(gameId: string): Promise<IcebreakerPlayer[]>;
   createIcebreakerPlayer(player: { gameId: string; displayName: string; gender?: string; participantId?: string }): Promise<IcebreakerPlayer>;
-  
+
   getCardQuestions(level?: string): Promise<CardQuestion[]>;
   getAllCardQuestions(): Promise<CardQuestion[]>;
   getCardQuestionById(id: string): Promise<CardQuestion | undefined>;
   createCardQuestion(question: { contentText: string; contentTextEn?: string; level: string; isActive: boolean; sortOrder: number }): Promise<CardQuestion>;
   updateCardQuestion(id: string, updates: Partial<CardQuestion>): Promise<CardQuestion | undefined>;
   deleteCardQuestion(id: string): Promise<boolean>;
-  
+
   getSessionIcebreakerGame(sessionId: string, groupNumber: number): Promise<IcebreakerGame | undefined>;
   drawIcebreakerCard(gameId: string, level: string): Promise<{ cardId: string | null; cardContent: string | null; cardLevel: string; cardsRemaining: number }>;
   resetIcebreakerDeck(gameId: string): Promise<void>;
-  
+
   getMessageCards(): Promise<MessageCard[]>;
   getAllMessageCards(): Promise<MessageCard[]>;
   getMessageCard(shortCode: string): Promise<MessageCard | undefined>;
   getMessageCardById(id: string): Promise<MessageCard | undefined>;
   createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard>;
   updateMessageCard(id: string, data: Partial<{ title: string; imagePath: string; isActive: boolean }>): Promise<MessageCard | undefined>;
-  
+
   // Grouping Activities
   getGroupingActivities(): Promise<GroupingActivity[]>;
   getGroupingActivity(id: string): Promise<GroupingActivity | undefined>;
@@ -142,22 +142,22 @@ export interface IStorage {
   generateUniquePrayerMeetingCode(): Promise<string>;
 
   deleteAiReport(id: string): Promise<void>;
-  
+
   getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]>;
   getBibleChapters(bookName: string): Promise<{ chapter: number; verseCount: number }[]>;
   getBibleVerses(bookName: string, chapter: number): Promise<ChineseUnionTrad[]>;
   searchBibleVerses(query: string, limit?: number): Promise<ChineseUnionTrad[]>;
   getBlessingVerses(type?: string): Promise<BlessingVerse[]>;
   getRandomBlessingVerse(): Promise<BlessingVerse | undefined>;
-  
+
   getJesus4Seasons(): Promise<Jesus4Season[]>;
   getJesus4SeasonsBySeason(season: string): Promise<Jesus4Season[]>;
   getJesusDailyContent(season?: string): Promise<JesusDailyContent[]>;
-  
+
   getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]>;
   getReadingPlanTemplate(id: string): Promise<ReadingPlanTemplate | undefined>;
   getReadingPlanItems(templateId: string): Promise<ReadingPlanTemplateItem[]>;
-  
+
   getSavedVerses(userId: string): Promise<SavedVerse[]>;
   getSavedVerse(userId: string, bookName: string, chapter: number, verse: number): Promise<SavedVerse | undefined>;
   createSavedVerse(data: InsertSavedVerse): Promise<SavedVerse>;
@@ -182,7 +182,7 @@ export interface IStorage {
   getDevotionalNoteByVerseReference(userId: string, verseReference: string): Promise<DevotionalNote | undefined>;
 
   createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate>;
-  createReadingPlanTemplateItems(items: Array<{templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string}>): Promise<void>;
+  createReadingPlanTemplateItems(items: Array<{ templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string }>): Promise<void>;
 
   getInboxEmails(options?: { archived?: boolean; limit?: number; offset?: number }): Promise<InboxEmail[]>;
   getInboxEmail(id: number): Promise<InboxEmail | undefined>;
@@ -535,7 +535,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(prayerComments.userId, users.id))
       .where(eq(prayerComments.prayerId, prayerId))
       .orderBy(prayerComments.createdAt);
-    
+
     return comments.map(c => ({
       ...c,
       authorName: c.authorName || '匿名',
@@ -693,37 +693,42 @@ export class DatabaseStorage implements IStorage {
     // Get current game to check usedCardIds
     const [game] = await db.select().from(icebreakerGames).where(eq(icebreakerGames.id, gameId)).limit(1);
     const usedCardIds = (game?.usedCardIds as string[]) || [];
-    
-    // Get all active cards for this level
-    const allCards = await db.select().from(cardQuestions)
-      .where(and(eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
-    
+
+    // Get all active cards for this level — cached for 1 hour (static content)
+    const cardCacheKey = `cards:${level}`;
+    let allCards = bibleCache.get<typeof cardQuestions.$inferSelect[]>(cardCacheKey);
+    if (!allCards) {
+      allCards = await db.select().from(cardQuestions)
+        .where(and(eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
+      bibleCache.set(cardCacheKey, allCards, 3600);
+    }
+
     // Filter out already-drawn cards
     const availableCards = allCards.filter(card => !usedCardIds.includes(card.id));
-    
+
     if (availableCards.length === 0) {
       return { cardId: null, cardContent: null, cardLevel: level, cardsRemaining: 0 };
     }
-    
+
     // Pick a random card from available ones
     const randomCard = availableCards[Math.floor(Math.random() * availableCards.length)];
-    
+
     // Update game with new usedCardIds
     const newUsedCardIds = [...usedCardIds, randomCard.id];
     await db.update(icebreakerGames)
-      .set({ 
-        currentCardId: randomCard.id, 
-        currentLevel: level, 
+      .set({
+        currentCardId: randomCard.id,
+        currentLevel: level,
         usedCardIds: newUsedCardIds,
-        updatedAt: new Date() 
+        updatedAt: new Date()
       })
       .where(eq(icebreakerGames.id, gameId));
-    
-    return { 
-      cardId: randomCard.id, 
-      cardContent: randomCard.contentText, 
-      cardLevel: level, 
-      cardsRemaining: availableCards.length - 1 
+
+    return {
+      cardId: randomCard.id,
+      cardContent: randomCard.contentText,
+      cardLevel: level,
+      cardsRemaining: availableCards.length - 1
     };
   }
 
@@ -803,7 +808,7 @@ export class DatabaseStorage implements IStorage {
     let code: string = '';
     let attempts = 0;
     const maxAttempts = 100;
-    
+
     while (attempts < maxAttempts) {
       code = '';
       for (let i = 0; i < 4; i++) {
@@ -817,7 +822,7 @@ export class DatabaseStorage implements IStorage {
       }
       attempts++;
     }
-    
+
     throw new Error('Failed to generate unique short code after maximum attempts');
   }
 
@@ -942,7 +947,7 @@ export class DatabaseStorage implements IStorage {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code: string;
     let exists = true;
-    
+
     while (exists) {
       code = '';
       for (let i = 0; i < 4; i++) {
@@ -952,7 +957,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(prayerMeetings.shortCode, code)).limit(1);
       exists = existing.length > 0;
     }
-    
+
     return code!;
   }
 
@@ -970,7 +975,7 @@ export class DatabaseStorage implements IStorage {
       .from(chineseUnionTrad)
       .groupBy(chineseUnionTrad.bookName, chineseUnionTrad.bookNumber)
       .orderBy(asc(chineseUnionTrad.bookNumber));
-    
+
     // Only cache non-empty results
     if (result.length > 0) {
       bibleCache.set(cacheKey, result);
@@ -992,7 +997,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(chineseUnionTrad.bookName, bookName))
       .groupBy(chineseUnionTrad.chapter)
       .orderBy(asc(chineseUnionTrad.chapter));
-    
+
     bibleCache.set(cacheKey, result);
     return result;
   }
@@ -1007,7 +1012,7 @@ export class DatabaseStorage implements IStorage {
       .from(chineseUnionTrad)
       .where(and(eq(chineseUnionTrad.bookName, bookName), eq(chineseUnionTrad.chapter, chapter)))
       .orderBy(asc(chineseUnionTrad.verse));
-    
+
     bibleCache.set(cacheKey, result);
     return result;
   }
@@ -1029,8 +1034,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRandomBlessingVerse(): Promise<BlessingVerse | undefined> {
-    const [verse] = await db.select().from(blessingVerses).orderBy(sql`RANDOM()`).limit(1);
-    return verse;
+    // Cache a pool of blessing verses to avoid RANDOM() DB hit on every page load
+    const cacheKey = cacheKeys.blessingVerse();
+    let pool = bibleCache.get<BlessingVerse[]>(cacheKey);
+    if (!pool || pool.length === 0) {
+      pool = await db.select().from(blessingVerses).limit(50);
+      if (pool.length > 0) bibleCache.set(cacheKey, pool, 3600);
+    }
+    if (!pool || pool.length === 0) return undefined;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   async getJesus4Seasons(): Promise<Jesus4Season[]> {
@@ -1206,7 +1218,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async createReadingPlanTemplateItems(items: Array<{templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string}>): Promise<void> {
+  async createReadingPlanTemplateItems(items: Array<{ templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string }>): Promise<void> {
     if (items.length === 0) return;
     await db.insert(readingPlanTemplateItems).values(items);
   }
