@@ -333,15 +333,13 @@ export const AdminMonitor: React.FC = () => {
       description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
     });
     
-    // Generate all groups in parallel for speed
+    // Generate groups sequentially to avoid Gemini rate limits
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
-    await Promise.all(
-      groups.map(async (group) => {
-        const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
-        setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
-        results.push({ groupNumber: group.number, result });
-      })
-    );
+    for (const group of groups) {
+      const result = await generateAIReport(currentSession.id, 'group', group.number, { fastMode, filledOnly });
+      setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
+      results.push({ groupNumber: group.number, result });
+    }
     
     // Sort by group number and combine
     results.sort((a, b) => a.groupNumber - b.groupNumber);
