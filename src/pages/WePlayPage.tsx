@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Gamepad2, Shuffle, BookOpen, ChevronRight } from "lucide-react";
+import { Gamepad2, Shuffle, BookOpen, ChevronRight, Star } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 
 const features = [
@@ -34,6 +34,16 @@ const features = [
     bgColor: "bg-yellow-500/15",
     iconColor: "text-yellow-600",
     featureKeys: ["we_play", "bible_quiz"] as string[],
+  },
+  {
+    id: "pilgrim",
+    title: "天路歷程",
+    subtitle: "收集十字架，抵達教會！",
+    icon: Star,
+    href: "/play/pilgrim",
+    bgColor: "bg-blue-500/15",
+    iconColor: "text-blue-600",
+    featureKeys: [] as string[],
   },
 ];
 

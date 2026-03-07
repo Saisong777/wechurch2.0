@@ -52,6 +52,7 @@ const ResetPasswordPage = lazyPage(() => import("./pages/ResetPasswordPage"));
 const WePlayPage = lazyNamed(() => import("./pages/WePlayPage"), "WePlayPage");
 const IcebreakerPage = lazyNamed(() => import("./pages/IcebreakerPage"), "IcebreakerPage");
 const GrouperPage = lazyNamed(() => import("./pages/GrouperPage"), "GrouperPage");
+const PlatformerPage = lazyNamed(() => import("./pages/PlatformerPage"), "PlatformerPage");
 const PrayerWallPage = lazyPage(() => import("./pages/PrayerWallPage"));
 const MessageCardPage = lazyPage(() => import("./pages/MessageCardPage"));
 const SharePage = lazyPage(() => import("./pages/SharePage"));
@@ -97,6 +98,7 @@ const App = () => (
                     <Route path="/icebreaker" element={<IcebreakerPage />} />
                     <Route path="/grouper" element={<GrouperPage />} />
                     <Route path="/play/bible-quiz" element={<BibleQuizPage />} />
+                    <Route path="/play/pilgrim" element={<PlatformerPage />} />
                     <Route path="/prayer-wall" element={<PrayerWallPage />} />
                     <Route path="/card" element={<MessageCardPage />} />
                     <Route path="/share" element={<SharePage />} />
