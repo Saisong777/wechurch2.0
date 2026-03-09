@@ -588,6 +588,7 @@ export const fetchSubmissionsPublic = async (sessionId: string): Promise<StudySu
 export interface AIReportOptions {
   fastMode?: boolean;
   filledOnly?: boolean;
+  onChunk?: (chunk: string, fullContent: string) => void;
 }
 
 export const generateAIReport = async (
@@ -597,8 +598,14 @@ export const generateAIReport = async (
   options?: AIReportOptions,
   _retryCount = 0
 ): Promise<{ success: boolean; report?: string; reportId?: string; error?: string }> => {
+  const useStreaming = !!options?.onChunk;
+
   try {
-    const response = await fetch(`/api/sessions/${sessionId}/reports`, {
+    const endpoint = useStreaming
+      ? `/api/sessions/${sessionId}/reports/stream`
+      : `/api/sessions/${sessionId}/reports`;
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -618,6 +625,42 @@ export const generateAIReport = async (
       const errorData = await response.json();
       return { success: false, error: errorData.error || "Failed to generate report" };
     }
+
+    // Handle streaming response (SSE)
+    if (useStreaming && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let reportId: string | undefined;
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'chunk') {
+              fullContent += event.content;
+              options!.onChunk!(event.content, fullContent);
+            } else if (event.type === 'done') {
+              reportId = event.reportId;
+            } else if (event.type === 'error') {
+              return { success: false, error: event.error };
+            }
+          } catch { /* skip malformed SSE lines */ }
+        }
+      }
+      return { success: true, report: fullContent, reportId };
+    }
+
+    // Non-streaming response
     const data = await response.json();
     return { success: true, report: data.content, reportId: data.id };
   } catch (error) {

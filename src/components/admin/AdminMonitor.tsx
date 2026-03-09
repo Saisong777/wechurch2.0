@@ -333,8 +333,8 @@ export const AdminMonitor: React.FC = () => {
       description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
     });
     
-    // Generate groups in batches of 2 — ~2x faster than sequential, avoids full-parallel rate limit storm
-    const BATCH_SIZE = 2;
+    // Generate groups in batches of 3 — ~3x faster than sequential, avoids full-parallel rate limit storm
+    const BATCH_SIZE = 3;
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
     for (let i = 0; i < groups.length; i += BATCH_SIZE) {
       const batch = groups.slice(i, i + BATCH_SIZE);
@@ -385,18 +385,27 @@ export const AdminMonitor: React.FC = () => {
       description: filledOnly ? '僅分析有填寫內容的成員' : undefined,
     });
 
-    const result = await generateAIReport(currentSession.id, 'overall', undefined, { fastMode, filledOnly });
-    
+    // Use streaming for real-time text display
+    setReportContent('');
+    setShowReportDialog(true);
+
+    const result = await generateAIReport(currentSession.id, 'overall', undefined, {
+      fastMode,
+      filledOnly,
+      onChunk: (_chunk, fullContent) => {
+        setReportContent(fullContent);
+      },
+    });
+
     if (result.success && result.report) {
       setReportContent(result.report);
-      setShowReportDialog(true);
       toast.success('整體洞察報告已生成！');
-      // Refetch reports list
       refetchReports();
     } else {
+      if (!result.report) setShowReportDialog(false);
       toast.error(`生成失敗: ${result.error}`);
     }
-    
+
     setIsGeneratingOverall(false);
   };
 
