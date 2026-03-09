@@ -12,6 +12,29 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { pool, getPoolStats } from "./db";
 import { bibleCache, timelineCache, apiCache, sessionCache, prayerCache, cacheKeys } from "./cache";
 import compression from "compression";
+import OpenAI from "openai";
+import {
+  SINGLE_NOTE_SYSTEM_PROMPT,
+  MULTI_NOTE_SYSTEM_PROMPT,
+  GROUP_SMALL_SYSTEM_PROMPT,
+  GROUP_LARGE_SYSTEM_PROMPT,
+  GROUP_FAST_SYSTEM_PROMPT,
+  formatSingleNoteInput,
+  formatMultiNoteInput,
+  formatGroupNotesInput,
+} from "./prompts/devotional-analysis";
+
+// Singleton OpenAI client — reuses TCP connections across requests
+let _openaiClient: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!_openaiClient) {
+    _openaiClient = new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+  }
+  return _openaiClient;
+}
 
 const gameCreationLocks = new Map<string, Promise<any>>();
 
@@ -686,12 +709,7 @@ export async function registerRoutes(app: Express) {
         return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員配置 AI_INTEGRATIONS_OPENAI_API_KEY" });
       }
 
-      const { GROUP_SMALL_SYSTEM_PROMPT, GROUP_LARGE_SYSTEM_PROMPT, GROUP_FAST_SYSTEM_PROMPT, formatGroupNotesInput } = await import("./prompts/devotional-analysis");
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
+      const openai = getOpenAIClient();
 
       const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
       const groupMaxTokens = fastMode ? 1500 : 4000;
@@ -783,6 +801,154 @@ export async function registerRoutes(app: Express) {
       const errMsg = error instanceof Error ? error.message : String(error);
       console.error("[report-generation] Failed for session", req.params.sessionId, ":", error);
       res.status(500).json({ error: `AI 報告生成失敗：${errMsg}` });
+    }
+  });
+
+  // Streaming version — sends SSE chunks as AI generates, much faster perceived latency
+  app.post("/api/sessions/:sessionId/reports/stream", async (req, res) => {
+    try {
+      const { reportType, groupNumber, filledOnly, fastMode } = req.body;
+
+      const INSIGHT_LABELS: Record<string, string> = {
+        'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '對神的認識'
+      };
+      const buildContent = (fields: {
+        titlePhrase?: string | null; heartbeatVerse?: string | null;
+        observation?: string | null; coreInsightNote?: string | null;
+        scholarsNote?: string | null; actionPlan?: string | null; coolDownNote?: string | null;
+      }): string => {
+        const parts: string[] = [];
+        if (fields.titlePhrase) parts.push(`標題：${fields.titlePhrase}`);
+        if (fields.heartbeatVerse) parts.push(`最感動的經文：${fields.heartbeatVerse}`);
+        if (fields.observation) parts.push(`經文觀察：${fields.observation}`);
+        if (fields.coreInsightNote) {
+          try {
+            const obj = JSON.parse(fields.coreInsightNote);
+            if (typeof obj === 'object' && !Array.isArray(obj)) {
+              Object.entries(obj).forEach(([cat, text]) => {
+                if (text && String(text).trim()) parts.push(`神學亮光【${INSIGHT_LABELS[cat] || cat}】：${text}`);
+              });
+            } else { parts.push(`神學亮光：${fields.coreInsightNote}`); }
+          } catch { parts.push(`神學亮光：${fields.coreInsightNote}`); }
+        }
+        if (fields.scholarsNote) parts.push(`學者筆記：${fields.scholarsNote}`);
+        if (fields.actionPlan) parts.push(`行動計畫：${fields.actionPlan}`);
+        if (fields.coolDownNote) parts.push(`冷靜筆記：${fields.coolDownNote}`);
+        return parts.join('\n');
+      };
+
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員配置 AI_INTEGRATIONS_OPENAI_API_KEY" });
+      }
+
+      const openai = getOpenAIClient();
+      const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
+      const groupMaxTokens = fastMode ? 1500 : 4000;
+      const overallMaxTokens = fastMode ? 2500 : 6000;
+      const inputTruncate = fastMode ? 400 : undefined;
+
+      let systemPrompt: string;
+      let userContent: string;
+      let maxTokens: number;
+
+      if (reportType === 'group' && groupNumber) {
+        const groupRows = await storage.getGroupStudyResponses(req.params.sessionId, groupNumber);
+        const filtered = filledOnly
+          ? groupRows.filter((r: any) => r.observation || r.core_insight_note || r.action_plan)
+          : groupRows;
+        if (filtered.length === 0) {
+          return res.status(400).json({ error: `第 ${groupNumber} 組尚無查經筆記資料` });
+        }
+        const members = filtered.map((r: any) => ({
+          name: r.participant_name || '匿名',
+          content: buildContent({
+            titlePhrase: r.title_phrase, heartbeatVerse: r.heartbeat_verse,
+            observation: r.observation, coreInsightNote: r.core_insight_note,
+            scholarsNote: r.scholars_note, actionPlan: r.action_plan, coolDownNote: r.cool_down_note,
+          }),
+        }));
+        systemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
+        userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        maxTokens = groupMaxTokens;
+      } else {
+        const allRows = await storage.getStudyResponses(req.params.sessionId);
+        const filtered = filledOnly
+          ? allRows.filter(r => r.observation || r.coreInsightNote || r.actionPlan)
+          : allRows;
+        if (filtered.length === 0) {
+          return res.status(400).json({ error: "尚無查經筆記資料" });
+        }
+        const members = filtered.map(r => ({
+          name: (r as any).participantName || '匿名',
+          content: buildContent({
+            titlePhrase: r.titlePhrase, heartbeatVerse: r.heartbeatVerse,
+            observation: r.observation, coreInsightNote: r.coreInsightNote,
+            scholarsNote: r.scholarsNote, actionPlan: r.actionPlan, coolDownNote: r.coolDownNote,
+          }),
+        }));
+        systemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
+        userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        maxTokens = overallMaxTokens;
+      }
+
+      // Set up SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      let fullContent = '';
+      try {
+        const stream = await openai.chat.completions.create({
+          model: aiModel,
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }],
+          max_tokens: maxTokens,
+          stream: true,
+        });
+
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta?.content;
+          if (delta) {
+            fullContent += delta;
+            res.write(`data: ${JSON.stringify({ type: 'chunk', content: delta })}\n\n`);
+          }
+        }
+      } catch (err: any) {
+        const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
+        if (is429) {
+          res.write(`data: ${JSON.stringify({ type: 'error', error: '請求過多，請稍後再試（Gemini rate limit）' })}\n\n`);
+          res.end();
+          return;
+        }
+        throw err;
+      }
+
+      if (!fullContent) fullContent = '（AI 未回應）';
+
+      // Save completed report to DB
+      const report = await storage.createAiReport({
+        sessionId: req.params.sessionId,
+        reportType,
+        groupNumber,
+        content: fullContent,
+        status: "COMPLETED"
+      });
+
+      res.write(`data: ${JSON.stringify({ type: 'done', reportId: report.id })}\n\n`);
+      res.end();
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error("[report-stream] Failed for session", req.params.sessionId, ":", error);
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'error', error: `AI 報告生成失敗：${errMsg}` })}\n\n`);
+        res.end();
+      } catch {
+        // Headers may have already been sent as JSON error
+        if (!res.headersSent) {
+          res.status(500).json({ error: `AI 報告生成失敗：${errMsg}` });
+        }
+      }
     }
   });
 
@@ -2261,11 +2427,7 @@ export async function registerRoutes(app: Express) {
 
       console.log("[PrayerMeeting] Starting AI classification for", namedPrayers.length, "named prayers and", anonymousPrayers.length, "anonymous prayers");
 
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
+      const openai = getOpenAIClient();
 
       // Build prayer data for classification with names and group info
       const prayerData: { index: number; name: string; gender: string; group: number | null; prayer: string; isAnonymous: boolean; participantId: string }[] = [];
@@ -4005,14 +4167,8 @@ export async function registerRoutes(app: Express) {
         return res.status(503).json({ error: "AI 功能尚未設定，請聯絡管理員" });
       }
 
-      const { SINGLE_NOTE_SYSTEM_PROMPT, formatSingleNoteInput } = await import("./prompts/devotional-analysis");
       const userContent = formatSingleNoteInput(note);
-
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
+      const openai = getOpenAIClient();
 
       const response = await openai.chat.completions.create({
         model: "gemini-2.0-flash",
@@ -4069,14 +4225,8 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "No devotional notes found for the given criteria" });
       }
       if (notes.length === 1) {
-        const { SINGLE_NOTE_SYSTEM_PROMPT, formatSingleNoteInput } = await import("./prompts/devotional-analysis");
         const userContent = formatSingleNoteInput(notes[0]);
-
-        const OpenAI = (await import("openai")).default;
-        const openai = new OpenAI({
-          apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-        });
+        const openai = getOpenAIClient();
 
         const response = await openai.chat.completions.create({
           model: "gemini-2.0-flash",
@@ -4091,14 +4241,8 @@ export async function registerRoutes(app: Express) {
         return res.json({ analysis: result || '', noteCount: 1 });
       }
 
-      const { MULTI_NOTE_SYSTEM_PROMPT, formatMultiNoteInput } = await import("./prompts/devotional-analysis");
       const userContent = formatMultiNoteInput(notes);
-
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
+      const openai = getOpenAIClient();
 
       const response = await openai.chat.completions.create({
         model: "gemini-2.0-flash",
@@ -4134,15 +4278,9 @@ export async function registerRoutes(app: Express) {
         }
       }
 
-      const { GROUP_SMALL_SYSTEM_PROMPT, GROUP_LARGE_SYSTEM_PROMPT, formatGroupNotesInput } = await import("./prompts/devotional-analysis");
       const systemPrompt = mode === 'large' ? GROUP_LARGE_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
       const userContent = formatGroupNotesInput(members, verseRange);
-
-      const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
+      const openai = getOpenAIClient();
 
       const response = await openai.chat.completions.create({
         model: "gemini-2.0-flash",
