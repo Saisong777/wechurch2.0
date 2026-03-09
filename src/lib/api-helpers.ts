@@ -615,8 +615,8 @@ export const generateAIReport = async (
         filledOnly: options?.filledOnly ?? false,
       }),
     });
-    if (response.status === 429 && _retryCount < 4) {
-      const delay = [3000, 8000, 20000, 40000][_retryCount]; // 3s, 8s, 20s, 40s
+    if (response.status === 429 && _retryCount < 3) {
+      const delay = [15000, 35000, 65000][_retryCount]; // 15s, 35s, 65s (Gemini needs ~60s to reset)
       console.warn(`[generateAIReport] 429 rate limit, retrying in ${delay}ms (attempt ${_retryCount + 1}/4)`);
       await new Promise(r => setTimeout(r, delay));
       return generateAIReport(sessionId, reportType, groupNumber, options, _retryCount + 1);
