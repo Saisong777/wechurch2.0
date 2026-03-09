@@ -676,6 +676,7 @@ export async function registerRoutes(app: Express) {
   app.post("/api/sessions/:sessionId/reports", async (req, res) => {
     try {
       const { reportType, groupNumber, filledOnly, fastMode } = req.body;
+      console.log(`[report-gen] START type=${reportType} group=${groupNumber} fast=${fastMode} filled=${filledOnly} session=${req.params.sessionId}`);
 
       const INSIGHT_LABELS: Record<string, string> = {
         'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '對神的認識'
@@ -706,8 +707,10 @@ export async function registerRoutes(app: Express) {
       };
 
       if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+        console.error('[report-gen] MISSING AI_INTEGRATIONS_OPENAI_API_KEY');
         return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員配置 AI_INTEGRATIONS_OPENAI_API_KEY" });
       }
+      console.log(`[report-gen] API key: ${process.env.AI_INTEGRATIONS_OPENAI_API_KEY?.slice(0, 8)}... baseURL: ${process.env.AI_INTEGRATIONS_OPENAI_BASE_URL}`);
 
       const openai = getOpenAIClient();
 
@@ -721,10 +724,12 @@ export async function registerRoutes(app: Express) {
       if (reportType === 'group' && groupNumber) {
         // Single group: use getGroupStudyResponses (INNER JOIN + DB-level filter by groupNumber)
         const groupRows = await storage.getGroupStudyResponses(req.params.sessionId, groupNumber);
+        console.log(`[report-gen] group ${groupNumber}: ${groupRows.length} DB rows`);
         const filtered = filledOnly
           ? groupRows.filter((r: any) => r.observation || r.core_insight_note || r.action_plan)
           : groupRows;
         if (filtered.length === 0) {
+          console.warn(`[report-gen] group ${groupNumber}: 0 rows after filter`);
           return res.status(400).json({ error: `第 ${groupNumber} 組尚無查經筆記資料` });
         }
         const members = filtered.map((r: any) => ({
@@ -737,6 +742,7 @@ export async function registerRoutes(app: Express) {
         }));
         const groupSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
         const userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        console.log(`[report-gen] group ${groupNumber}: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
           const aiResponse = await openai.chat.completions.create({
             model: aiModel,
@@ -744,7 +750,9 @@ export async function registerRoutes(app: Express) {
             max_tokens: groupMaxTokens,
           });
           content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+          console.log(`[report-gen] group ${groupNumber}: AI OK, contentLen=${content.length}`);
         } catch (err: any) {
+          console.error(`[report-gen] group ${groupNumber}: AI ERROR`, err?.status, err?.message?.slice(0, 200));
           const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
           if (is429) {
             console.warn(`[report-generation] 429 rate limit for group ${groupNumber}`);
@@ -755,10 +763,12 @@ export async function registerRoutes(app: Express) {
       } else {
         // Overall: use getStudyResponses (all participants, camelCase fields)
         const allRows = await storage.getStudyResponses(req.params.sessionId);
+        console.log(`[report-gen] overall: ${allRows.length} DB rows`);
         const filtered = filledOnly
           ? allRows.filter(r => r.observation || r.coreInsightNote || r.actionPlan)
           : allRows;
         if (filtered.length === 0) {
+          console.warn(`[report-gen] overall: 0 rows after filter`);
           return res.status(400).json({ error: "尚無查經筆記資料" });
         }
         const members = filtered.map(r => ({
@@ -771,6 +781,7 @@ export async function registerRoutes(app: Express) {
         }));
         const userContent = formatGroupNotesInput(members, undefined, inputTruncate);
         const overallSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
+        console.log(`[report-gen] overall: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
           const aiResponse = await openai.chat.completions.create({
             model: aiModel,
@@ -778,16 +789,18 @@ export async function registerRoutes(app: Express) {
             max_tokens: overallMaxTokens,
           });
           content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+          console.log(`[report-gen] overall: AI OK, contentLen=${content.length}`);
         } catch (err: any) {
+          console.error(`[report-gen] overall: AI ERROR`, err?.status, err?.message?.slice(0, 200));
           const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
           if (is429) {
-            console.warn(`[report-generation] 429 rate limit for overall report`);
             return res.status(429).json({ error: '請求過多，請稍後再試（Gemini rate limit）' });
           }
           throw err;
         }
       }
 
+      console.log(`[report-gen] Saving report contentLen=${content.length}`);
       const report = await storage.createAiReport({
         sessionId: req.params.sessionId,
         reportType,
@@ -795,11 +808,12 @@ export async function registerRoutes(app: Express) {
         content,
         status: "COMPLETED"
       });
+      console.log(`[report-gen] DONE id=${report.id}`);
 
       res.status(201).json(report);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      console.error("[report-generation] Failed for session", req.params.sessionId, ":", error);
+      console.error("[report-gen] FATAL:", errMsg);
       res.status(500).json({ error: `AI 報告生成失敗：${errMsg}` });
     }
   });
@@ -808,6 +822,7 @@ export async function registerRoutes(app: Express) {
   app.post("/api/sessions/:sessionId/reports/stream", async (req, res) => {
     try {
       const { reportType, groupNumber, filledOnly, fastMode } = req.body;
+      console.log(`[report-stream] START type=${reportType} group=${groupNumber} fast=${fastMode}`);
 
       const INSIGHT_LABELS: Record<string, string> = {
         'PROMISE': '應許', 'COMMAND': '命令', 'WARNING': '警戒', 'GOD_ATTRIBUTE': '對神的認識'

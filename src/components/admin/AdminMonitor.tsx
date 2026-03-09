@@ -333,8 +333,8 @@ export const AdminMonitor: React.FC = () => {
       description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
     });
     
-    // Generate groups in batches of 3 — ~3x faster than sequential, avoids full-parallel rate limit storm
-    const BATCH_SIZE = 3;
+    // Generate groups in batches of 2 — avoids Gemini rate limit (15 RPM free tier)
+    const BATCH_SIZE = 2;
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
     for (let i = 0; i < groups.length; i += BATCH_SIZE) {
       const batch = groups.slice(i, i + BATCH_SIZE);
