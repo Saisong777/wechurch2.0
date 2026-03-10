@@ -933,7 +933,7 @@ export async function registerRoutes(app: Express) {
         const genAI = getGeminiClient();
         const model = genAI.getGenerativeModel({ model: aiModel });
 
-        const resultStream = await model.generateContentStream({
+        const result = await model.generateContentStream({
           contents: [{
             role: 'user',
             parts: [{ text: `System: ${systemPrompt}\n\nUser: ${userContent}` }]
@@ -941,7 +941,7 @@ export async function registerRoutes(app: Express) {
           generationConfig: { maxOutputTokens: maxTokens }
         });
 
-        for await (const chunk of resultStream) {
+        for await (const chunk of result.stream) {
           const delta = chunk.text();
           if (delta) {
             fullContent += delta;
