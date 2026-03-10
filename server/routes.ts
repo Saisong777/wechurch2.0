@@ -13,6 +13,7 @@ import { pool, getPoolStats } from "./db";
 import { bibleCache, timelineCache, apiCache, sessionCache, prayerCache, cacheKeys } from "./cache";
 import compression from "compression";
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   SINGLE_NOTE_SYSTEM_PROMPT,
   MULTI_NOTE_SYSTEM_PROMPT,
@@ -24,7 +25,7 @@ import {
   formatGroupNotesInput,
 } from "./prompts/devotional-analysis";
 
-// Singleton OpenAI client — reuses TCP connections across requests
+// Legacy proxy client (keep for unchanged endpoints until fully migrated)
 let _openaiClient: OpenAI | null = null;
 function getOpenAIClient(): OpenAI {
   if (!_openaiClient) {
@@ -34,6 +35,17 @@ function getOpenAIClient(): OpenAI {
     });
   }
   return _openaiClient;
+}
+
+// Native Google Gemini client (bypasses proxy, uses direct billing)
+let _geminiClient: GoogleGenerativeAI | null = null;
+function getGeminiClient(): GoogleGenerativeAI {
+  if (!_geminiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not set in environment variables");
+    _geminiClient = new GoogleGenerativeAI(apiKey);
+  }
+  return _geminiClient;
 }
 
 const gameCreationLocks = new Map<string, Promise<any>>();
@@ -706,15 +718,14 @@ export async function registerRoutes(app: Express) {
         return parts.join('\n');
       };
 
-      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-        console.error('[report-gen] MISSING AI_INTEGRATIONS_OPENAI_API_KEY');
-        return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員配置 AI_INTEGRATIONS_OPENAI_API_KEY" });
+      if (!process.env.GEMINI_API_KEY) {
+        console.error('[report-gen] MISSING GEMINI_API_KEY');
+        return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員設定 GEMINI_API_KEY" });
       }
-      console.log(`[report-gen] API key: ${process.env.AI_INTEGRATIONS_OPENAI_API_KEY?.slice(0, 8)}... baseURL: ${process.env.AI_INTEGRATIONS_OPENAI_BASE_URL}`);
 
-      const openai = getOpenAIClient();
-
-      const aiModel = "gemini-2.0-flash";
+      const genAI = getGeminiClient();
+      const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
+      const model = genAI.getGenerativeModel({ model: aiModel });
       const groupMaxTokens = fastMode ? 1500 : 4000;
       const overallMaxTokens = fastMode ? 2500 : 6000;
       // In fast mode, truncate each member's notes to 400 chars to reduce input tokens
@@ -783,12 +794,14 @@ export async function registerRoutes(app: Express) {
         const overallSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
         console.log(`[report-gen] overall: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
-          const aiResponse = await openai.chat.completions.create({
-            model: aiModel,
-            messages: [{ role: "system", content: overallSystemPrompt }, { role: "user", content: userContent }],
-            max_tokens: overallMaxTokens,
+          const resultObj = await model.generateContent({
+            contents: [{
+              role: 'user',
+              parts: [{ text: `System: ${overallSystemPrompt}\n\nUser: ${userContent}` }]
+            }],
+            generationConfig: { maxOutputTokens: overallMaxTokens }
           });
-          content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+          content = resultObj.response.text() || '（AI 未回應）';
           console.log(`[report-gen] overall: AI OK, contentLen=${content.length}`);
         } catch (err: any) {
           console.error(`[report-gen] overall: AI ERROR`, err?.status, err?.message?.slice(0, 200));
@@ -852,12 +865,13 @@ export async function registerRoutes(app: Express) {
         return parts.join('\n');
       };
 
-      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-        return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員配置 AI_INTEGRATIONS_OPENAI_API_KEY" });
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員設定 GEMINI_API_KEY" });
       }
 
-      const openai = getOpenAIClient();
-      const aiModel = "gemini-2.0-flash";
+      const genAI = getGeminiClient();
+      const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
+      const model = genAI.getGenerativeModel({ model: aiModel });
       const groupMaxTokens = fastMode ? 1500 : 4000;
       const overallMaxTokens = fastMode ? 2500 : 6000;
       const inputTruncate = fastMode ? 400 : undefined;
@@ -915,15 +929,19 @@ export async function registerRoutes(app: Express) {
 
       let fullContent = '';
       try {
-        const stream = await openai.chat.completions.create({
-          model: aiModel,
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }],
-          max_tokens: maxTokens,
-          stream: true,
+        const genAI = getGeminiClient();
+        const model = genAI.getGenerativeModel({ model: aiModel });
+
+        const resultStream = await model.generateContentStream({
+          contents: [{
+            role: 'user',
+            parts: [{ text: `System: ${systemPrompt}\n\nUser: ${userContent}` }]
+          }],
+          generationConfig: { maxOutputTokens: maxTokens }
         });
 
-        for await (const chunk of stream) {
-          const delta = chunk.choices[0]?.delta?.content;
+        for await (const chunk of resultStream) {
+          const delta = chunk.text();
           if (delta) {
             fullContent += delta;
             res.write(`data: ${JSON.stringify({ type: 'chunk', content: delta })}\n\n`);
@@ -2538,18 +2556,22 @@ export async function registerRoutes(app: Express) {
 - 必須使用繁體中文。
 - 只回覆JSON，不要其他文字。`;
 
-      const response = await openai.chat.completions.create({
-        model: "gemini-2.0-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: prayerInputText }
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 8000,
+      const genAI = getGeminiClient();
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+      const resultObj = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [{ text: `System: ${systemPrompt}\n\nUser: ${prayerInputText}` }]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 8000
+        }
       });
 
       console.log("[PrayerMeeting] AI response received");
-      const content = response.choices[0]?.message?.content;
+      const content = resultObj.response.text();
       if (!content) {
         console.error("[PrayerMeeting] AI response empty");
         return res.status(500).json({ error: "AI response empty" });
@@ -4183,18 +4205,18 @@ export async function registerRoutes(app: Express) {
       }
 
       const userContent = formatSingleNoteInput(note);
-      const openai = getOpenAIClient();
+      const genAI = getGeminiClient();
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-      const response = await openai.chat.completions.create({
-        model: "gemini-2.0-flash",
-        messages: [
-          { role: "system", content: SINGLE_NOTE_SYSTEM_PROMPT },
-          { role: "user", content: `請整理以下靈修筆記：\n\n${userContent}` }
-        ],
-        max_tokens: 4000,
+      const resultObj = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [{ text: `System: ${SINGLE_NOTE_SYSTEM_PROMPT}\n\nUser: 請整理以下靈修筆記：\n\n${userContent}` }]
+        }],
+        generationConfig: { maxOutputTokens: 4000 }
       });
 
-      const result = response.choices[0]?.message?.content;
+      const result = resultObj.response.text();
       if (!result) {
         return res.status(500).json({ error: "AI response empty" });
       }
@@ -4241,34 +4263,34 @@ export async function registerRoutes(app: Express) {
       }
       if (notes.length === 1) {
         const userContent = formatSingleNoteInput(notes[0]);
-        const openai = getOpenAIClient();
+        const genAI = getGeminiClient();
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-        const response = await openai.chat.completions.create({
-          model: "gemini-2.0-flash",
-          messages: [
-            { role: "system", content: SINGLE_NOTE_SYSTEM_PROMPT },
-            { role: "user", content: `請整理以下靈修筆記：\n\n${userContent}` }
-          ],
-          max_tokens: 4000,
+        const resultObj = await model.generateContent({
+          contents: [{
+            role: 'user',
+            parts: [{ text: `System: ${SINGLE_NOTE_SYSTEM_PROMPT}\n\nUser: 請整理以下靈修筆記：\n\n${userContent}` }]
+          }],
+          generationConfig: { maxOutputTokens: 4000 }
         });
 
-        const result = response.choices[0]?.message?.content;
+        const result = resultObj.response.text();
         return res.json({ analysis: result || '', noteCount: 1 });
       }
 
       const userContent = formatMultiNoteInput(notes);
-      const openai = getOpenAIClient();
+      const genAI = getGeminiClient();
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-      const response = await openai.chat.completions.create({
-        model: "gemini-2.0-flash",
-        messages: [
-          { role: "system", content: MULTI_NOTE_SYSTEM_PROMPT },
-          { role: "user", content: `請整合分析以下 ${notes.length} 篇靈修筆記：\n\n${userContent}` }
-        ],
-        max_tokens: 8000,
+      const resultObj = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [{ text: `System: ${MULTI_NOTE_SYSTEM_PROMPT}\n\nUser: 請整合分析以下 ${notes.length} 篇靈修筆記：\n\n${userContent}` }]
+        }],
+        generationConfig: { maxOutputTokens: 8000 }
       });
 
-      const result = response.choices[0]?.message?.content;
+      const result = resultObj.response.text();
       if (!result) {
         return res.status(500).json({ error: "AI response empty" });
       }
@@ -4295,18 +4317,18 @@ export async function registerRoutes(app: Express) {
 
       const systemPrompt = mode === 'large' ? GROUP_LARGE_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
       const userContent = formatGroupNotesInput(members, verseRange);
-      const openai = getOpenAIClient();
+      const genAI = getGeminiClient();
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-      const response = await openai.chat.completions.create({
-        model: "gemini-2.0-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent }
-        ],
-        max_tokens: mode === 'large' ? 6000 : 4000,
+      const resultObj = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [{ text: `System: ${systemPrompt}\n\nUser: ${userContent}` }]
+        }],
+        generationConfig: { maxOutputTokens: mode === 'large' ? 6000 : 4000 }
       });
 
-      const result = response.choices[0]?.message?.content;
+      const result = resultObj.response.text();
       if (!result) {
         return res.status(500).json({ error: "AI response empty" });
       }
