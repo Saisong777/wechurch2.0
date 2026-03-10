@@ -26,6 +26,12 @@ interface ParsedOverallReport {
   observations?: string;
   insights?: string;
   applications?: string;
+  topic?: string;
+  theology?: string;
+  highlights?: string;
+  divergence?: string;
+  soulGym?: string;
+  summary?: string;
   raw: string;
 }
 
@@ -45,6 +51,12 @@ function parseOverallReport(content: string): ParsedOverallReport {
     observations: section.observations,
     insights: section.insights,
     applications: section.applications,
+    topic: section.topic,
+    theology: section.theology,
+    highlights: section.highlights,
+    divergence: section.divergence,
+    soulGym: section.soulGym,
+    summary: section.summary,
     raw: section.raw,
   };
 }
@@ -92,6 +104,12 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
       observations: parsed.observations,
       insights: parsed.insights,
       applications: parsed.applications,
+      topic: parsed.topic,
+      theology: parsed.theology,
+      highlights: parsed.highlights,
+      divergence: parsed.divergence,
+      soulGym: parsed.soulGym,
+      summary: parsed.summary,
       raw: parsed.raw,
     };
     const markdown = generateSectionMarkdown(section, verseReference);
@@ -149,7 +167,9 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
   }
 
   const parsed = parseOverallReport(report);
-  const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications;
+  const isNewFormat = !!(parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary);
+  const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications
+    || parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary;
 
   return (
     <Card>
@@ -195,32 +215,35 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
 
         {hasStructuredContent ? (
           <div className="space-y-4 sm:space-y-5">
-            {parsed.themes && (
-              <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
-            )}
-
-            {parsed.observations && (
-              <EnhancedSection type="observations" content={parsed.observations} showKeywords={false} />
-            )}
-
-            {parsed.insights && (
-              <EnhancedSection type="insights" content={parsed.insights} showQuotes={true} showKeywords={false} />
-            )}
-
-            {parsed.applications && (
-              <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
-            )}
-
-            {parsed.contributions && (
-              <div className="p-3 sm:p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-primary/10 to-primary/5 border-primary shadow-sm">
-                <h3 className="flex items-center gap-2 font-bold text-sm sm:text-base mb-3 sm:mb-4 text-primary">
-                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                  共同領受 Collective Insights
-                </h3>
-                <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                  {parsed.contributions}
-                </div>
-              </div>
+            {isNewFormat ? (
+              <>
+                {parsed.topic && <EnhancedSection type="topic" content={parsed.topic} showKeywords={false} />}
+                {parsed.observations && <EnhancedSection type="observations" content={parsed.observations} showKeywords={false} />}
+                {parsed.theology && <EnhancedSection type="theology" content={parsed.theology} showKeywords={false} />}
+                {parsed.applications && <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />}
+                {parsed.highlights && <EnhancedSection type="highlights" content={parsed.highlights} showQuotes={true} showKeywords={false} />}
+                {parsed.divergence && <EnhancedSection type="divergence" content={parsed.divergence} showKeywords={false} />}
+                {parsed.soulGym && <EnhancedSection type="soulGym" content={parsed.soulGym} showKeywords={false} />}
+                {parsed.summary && <EnhancedSection type="summary" content={parsed.summary} showKeywords={false} />}
+              </>
+            ) : (
+              <>
+                {parsed.themes && <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />}
+                {parsed.observations && <EnhancedSection type="observations" content={parsed.observations} showKeywords={false} />}
+                {parsed.insights && <EnhancedSection type="insights" content={parsed.insights} showQuotes={true} showKeywords={false} />}
+                {parsed.applications && <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />}
+                {parsed.contributions && (
+                  <div className="p-3 sm:p-5 border-l-4 rounded-r-lg bg-gradient-to-r from-primary/10 to-primary/5 border-primary shadow-sm">
+                    <h3 className="flex items-center gap-2 font-bold text-sm sm:text-base mb-3 sm:mb-4 text-primary">
+                      <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                      共同領受 Collective Insights
+                    </h3>
+                    <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                      {parsed.contributions}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : (

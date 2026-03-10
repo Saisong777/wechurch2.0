@@ -19,14 +19,20 @@ interface ReportComparisonProps {
   onClose?: () => void;
 }
 
-const sectionTypes = [
+const ALL_SECTION_TYPES = [
+  { key: 'topic', label: '主題', icon: '📖' },
   { key: 'themes', label: '主題', icon: '🎯' },
   { key: 'observations', label: '觀察', icon: '👀' },
+  { key: 'theology', label: '神學亮光', icon: '💡' },
   { key: 'insights', label: '亮光', icon: '💡' },
   { key: 'applications', label: '應用', icon: '✍️' },
+  { key: 'highlights', label: '亮光語錄', icon: '⭐' },
+  { key: 'divergence', label: '觀點分歧', icon: '🔀' },
+  { key: 'soulGym', label: 'SoulGym', icon: '🏋️' },
+  { key: 'summary', label: '總結', icon: '📝' },
 ] as const;
 
-type SectionKey = typeof sectionTypes[number]['key'];
+type SectionKey = typeof ALL_SECTION_TYPES[number]['key'];
 
 // Extract keywords from content for comparison
 function extractKeywords(content: string): Set<string> {
@@ -218,7 +224,21 @@ export const ReportComparison: React.FC<ReportComparisonProps> = ({
   const [rightGroup, setRightGroup] = useState<number | 'overall'>(
     groupReports[1]?.groupNumber || groupReports[0]?.groupNumber || 'overall'
   );
-  const [activeSection, setActiveSection] = useState<SectionKey>('themes');
+  // Filter to only sections that exist in at least one report
+  const availableSections = useMemo(() => {
+    return ALL_SECTION_TYPES.filter(s => {
+      const key = s.key as keyof GroupReport;
+      return groupReports.some(r => r[key]) || overallReport?.[key];
+    });
+  }, [groupReports, overallReport]);
+
+  const [activeSection, setActiveSection] = useState<SectionKey>(() => {
+    const first = ALL_SECTION_TYPES.find(s => {
+      const key = s.key as keyof GroupReport;
+      return groupReports.some(r => r[key]) || overallReport?.[key];
+    });
+    return (first?.key || 'themes') as SectionKey;
+  });
   const [showDiff, setShowDiff] = useState(true);
 
   const getReport = (selection: number | 'overall'): GroupReport | undefined => {
@@ -322,7 +342,7 @@ export const ReportComparison: React.FC<ReportComparisonProps> = ({
               />
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm">此組沒有「{sectionTypes.find(s => s.key === activeSection)?.label}」內容</p>
+                <p className="text-sm">此組沒有「{ALL_SECTION_TYPES.find(s => s.key === activeSection)?.label}」內容</p>
               </div>
             )}
           </div>
@@ -406,7 +426,7 @@ export const ReportComparison: React.FC<ReportComparisonProps> = ({
 
         {/* Section Tabs */}
         <div className="flex gap-1.5 mt-3 overflow-x-auto pb-1">
-          {sectionTypes.map(section => (
+          {availableSections.map(section => (
             <Button
               key={section.key}
               variant={activeSection === section.key ? 'default' : 'outline'}

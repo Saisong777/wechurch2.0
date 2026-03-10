@@ -5,11 +5,19 @@ export interface GroupReport {
   groupInfo?: string;
   members?: string;
   verse?: string;
-  contributions?: string;  // Personal contributions summary
+  // Old format fields (backward compatibility)
+  contributions?: string;
   themes?: string;
   observations?: string;
   insights?: string;
   applications?: string;
+  // New format fields
+  topic?: string;        // 本次查經主題
+  theology?: string;     // 神學亮光交集 / 共識 / 交集
+  highlights?: string;   // 亮光語錄 / 獨到亮光 / 少數亮光
+  divergence?: string;   // 觀點分歧
+  soulGym?: string;      // SoulGym 微操練
+  summary?: string;      // 一句話總結
   raw: string;
 }
 
@@ -38,6 +46,62 @@ function parseChineseNumeral(str: string): number | null {
   return null;
 }
 
+// Map Chinese section titles to GroupReport field keys (new format)
+const SECTION_TITLE_MAP: Record<string, keyof GroupReport> = {
+  '本次查經主題': 'topic',
+  '共同觀察': 'observations',
+  '全體觀察共識': 'observations',
+  '神學亮光交集': 'theology',
+  '神學亮光共識': 'theology',
+  '神學交集': 'theology',
+  '共同應用': 'applications',
+  '群體應用方向': 'applications',
+  '亮光語錄': 'highlights',
+  '獨到亮光': 'highlights',
+  '少數亮光': 'highlights',
+  '觀點分歧': 'divergence',
+  'SoulGym 微操練': 'soulGym',
+  'SoulGym微操練': 'soulGym',
+  '一句話總結': 'summary',
+};
+
+// Detect if content uses the new prompt format
+function isNewFormat(text: string): boolean {
+  return /\*\*\d+｜/.test(text) ||
+    /\*\*共同觀察\*\*/.test(text) ||
+    /\*\*本次查經主題\*\*/.test(text) ||
+    /\*\*神學交集\*\*/.test(text) ||
+    /\*\*一句話總結\*\*/.test(text);
+}
+
+// Parse new format sections: **N｜title** or **title** with --- separators
+function parseNewFormatSections(text: string, section: Partial<GroupReport>): void {
+  // Split by --- separators on their own line
+  const blocks = text.split(/\n---\n|\n---$/);
+
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+
+    // Match: **1｜本次查經主題** or **共同觀察** (FAST mode, no number)
+    const headerMatch = trimmed.match(/\*\*(?:\d+[｜|])?\s*(.+?)\*\*/);
+    if (!headerMatch) continue;
+
+    // Strip star emoji and whitespace from title
+    const title = headerMatch[1].replace(/^[⭐★☆]\s*/, '').trim();
+    const fieldKey = SECTION_TITLE_MAP[title];
+
+    if (fieldKey) {
+      // Content is everything after the header line
+      const contentStart = trimmed.indexOf('\n');
+      const content = contentStart >= 0 ? trimmed.slice(contentStart).trim() : '';
+      if (content) {
+        (section as any)[fieldKey] = cleanMarkdown(content);
+      }
+    }
+  }
+}
+
 // Clean markdown formatting - remove ** and handle list items
 export function cleanMarkdown(text: string): string {
   if (!text) return '';
@@ -62,6 +126,12 @@ function getScore(s: Partial<GroupReport>): number {
     len(s.observations) * 2 +
     len(s.insights) * 2 +
     len(s.applications) * 2 +
+    len(s.topic) * 2 +
+    len(s.theology) * 2 +
+    len(s.highlights) * 2 +
+    len(s.divergence) * 2 +
+    len(s.soulGym) * 2 +
+    len(s.summary) * 2 +
     rawScore +
     (s.members ? 100 : 0) +
     (s.verse ? 50 : 0)
@@ -126,112 +196,88 @@ export function parseReportContent(content: string): GroupReport[] {
     if (membersMatch) {
       section.members = cleanMarkdown(membersMatch[1]);
     }
-    
+
     // Extract verse - handle bold syntax in value
     const verseMatch = groupReport.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*(?:\*\*)?\s*([^\n]+)/);
     if (verseMatch) {
       section.verse = cleanMarkdown(verseMatch[1]);
     }
-    
-    // Helper function to extract section content by looking for next section header
-    const extractSectionContent = (
-      text: string, 
-      startPattern: RegExp, 
-      endMarkers: string[]
-    ): string | null => {
-      const startMatch = text.match(startPattern);
-      if (!startMatch) return null;
-      
-      const startIdx = startMatch.index! + startMatch[0].length;
-      let endIdx = text.length;
-      
-      // Find the earliest next section marker
-      // Section headers must start at the beginning of a line (after newline)
-      // and be formatted as **emoji** or emoji at line start
-      for (const marker of endMarkers) {
-        // Create patterns for section headers that:
-        // 1. Start at beginning of line (after \n)
-        // 2. Have the marker at line start, not as part of list content
-        const emojiChar = marker.replace(/\*\*/g, '');
-        // Match: newline followed by optional ** and the emoji
-        const headerPattern = new RegExp(`\\n\\*{0,2}${emojiChar}[^\\n]*[：:]`, 'i');
-        const markerMatch = text.slice(startIdx).match(headerPattern);
-        if (markerMatch && markerMatch.index !== undefined) {
-          // +1 to not include the newline in the content
-          const absoluteIdx = startIdx + markerMatch.index + 1;
-          if (absoluteIdx < endIdx) {
-            endIdx = absoluteIdx;
+
+    // Branch based on format detection
+    if (isNewFormat(groupReport)) {
+      // NEW FORMAT: **N｜title** with --- separators
+      parseNewFormatSections(groupReport, section);
+    } else {
+      // OLD FORMAT: emoji-based headers
+      // Helper function to extract section content by looking for next section header
+      const extractSectionContent = (
+        text: string,
+        startPattern: RegExp,
+        endMarkers: string[]
+      ): string | null => {
+        const startMatch = text.match(startPattern);
+        if (!startMatch) return null;
+
+        const startIdx = startMatch.index! + startMatch[0].length;
+        let endIdx = text.length;
+
+        for (const marker of endMarkers) {
+          const emojiChar = marker.replace(/\*\*/g, '');
+          const headerPattern = new RegExp(`\\n\\*{0,2}${emojiChar}[^\\n]*[：:]`, 'i');
+          const markerMatch = text.slice(startIdx).match(headerPattern);
+          if (markerMatch && markerMatch.index !== undefined) {
+            const absoluteIdx = startIdx + markerMatch.index + 1;
+            if (absoluteIdx < endIdx) {
+              endIdx = absoluteIdx;
+            }
           }
         }
-      }
-      
-      // Also look for "---" separator on its own line
-      const dashMatch = text.slice(startIdx).match(/\n---(?:\n|$)/);
-      if (dashMatch && dashMatch.index !== undefined) {
-        const absoluteDashIdx = startIdx + dashMatch.index;
-        if (absoluteDashIdx < endIdx) {
-          endIdx = absoluteDashIdx;
+
+        const dashMatch = text.slice(startIdx).match(/\n---(?:\n|$)/);
+        if (dashMatch && dashMatch.index !== undefined) {
+          const absoluteDashIdx = startIdx + dashMatch.index;
+          if (absoluteDashIdx < endIdx) {
+            endIdx = absoluteDashIdx;
+          }
         }
-      }
-      
-      return text.slice(startIdx, endIdx).trim();
-    };
-    
-    // Section markers to look for (order matters for proper boundary detection)
-    const SECTION_MARKERS = ['**📖', '📖', '**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤'];
-    
-    // Extract themes - handle various formats:
-    // **📖 主題（Themes）：** or **📖 主題：** or 📖 主題： or 主題（Themes）：
-    const themesContent = extractSectionContent(
-      groupReport,
-      /\*{0,2}📖?\s*主題(?:（Themes）)?[：:\s]*\*{0,2}\s*/i,
-      ['**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤']
-    );
-    if (themesContent) {
-      section.themes = cleanMarkdown(themesContent);
-    }
-    
-    // Extract observations - handle various formats:
-    // **🔍 事實發現（Observations）：** or **🔍 事實發現：** or 事實發現：
-    const obsContent = extractSectionContent(
-      groupReport,
-      /\*{0,2}🔍?\s*事實發現(?:（Observations）)?[：:\s]*\*{0,2}\s*/i,
-      ['**💡', '💡', '**🎯', '🎯', '**👤', '👤']
-    );
-    if (obsContent) {
-      section.observations = cleanMarkdown(obsContent);
-    }
-    
-    // Extract insights (獨特亮光) - handle various formats:
-    // **💡 獨特亮光（Unique Insights）：** or **💡 獨特亮光：** or 獨特亮光：
-    const insightsContent = extractSectionContent(
-      groupReport,
-      /\*{0,2}💡\s*獨特亮光[^*\n]*\*{0,2}\s*/i,
-      ['**🎯', '🎯', '**👤', '👤']
-    );
-    if (insightsContent) {
-      section.insights = cleanMarkdown(insightsContent);
-    }
-    
-    // Extract applications - handle various formats:
-    // **🎯 如何應用（Applications）：** or **🎯 應用：** or 如何應用：
-    const appContent = extractSectionContent(
-      groupReport,
-      /\*{0,2}🎯?\s*(?:如何)?應用(?:（Applications）)?[：:\s]*\*{0,2}\s*/i,
-      ['**👤', '👤']
-    );
-    if (appContent) {
-      section.applications = cleanMarkdown(appContent);
-    }
-    
-    // Extract personal contributions (at the end) - handle **👤 個人貢獻摘要：** format
-    const contribContent = extractSectionContent(
-      groupReport,
-      /\*{0,2}👤\s*個人貢獻[^：:\n]*[：:\s]*\*{0,2}\s*/i,
-      [] // Last section, no end markers
-    );
-    if (contribContent) {
-      section.contributions = cleanMarkdown(contribContent);
+
+        return text.slice(startIdx, endIdx).trim();
+      };
+
+      const themesContent = extractSectionContent(
+        groupReport,
+        /\*{0,2}📖?\s*主題(?:（Themes）)?[：:\s]*\*{0,2}\s*/i,
+        ['**🔍', '🔍', '**💡', '💡', '**🎯', '🎯', '**👤', '👤']
+      );
+      if (themesContent) section.themes = cleanMarkdown(themesContent);
+
+      const obsContent = extractSectionContent(
+        groupReport,
+        /\*{0,2}🔍?\s*事實發現(?:（Observations）)?[：:\s]*\*{0,2}\s*/i,
+        ['**💡', '💡', '**🎯', '🎯', '**👤', '👤']
+      );
+      if (obsContent) section.observations = cleanMarkdown(obsContent);
+
+      const insightsContent = extractSectionContent(
+        groupReport,
+        /\*{0,2}💡\s*獨特亮光[^*\n]*\*{0,2}\s*/i,
+        ['**🎯', '🎯', '**👤', '👤']
+      );
+      if (insightsContent) section.insights = cleanMarkdown(insightsContent);
+
+      const appContent = extractSectionContent(
+        groupReport,
+        /\*{0,2}🎯?\s*(?:如何)?應用(?:（Applications）)?[：:\s]*\*{0,2}\s*/i,
+        ['**👤', '👤']
+      );
+      if (appContent) section.applications = cleanMarkdown(appContent);
+
+      const contribContent = extractSectionContent(
+        groupReport,
+        /\*{0,2}👤\s*個人貢獻[^：:\n]*[：:\s]*\*{0,2}\s*/i,
+        []
+      );
+      if (contribContent) section.contributions = cleanMarkdown(contribContent);
     }
     
     // Store raw content as fallback - also cleaned

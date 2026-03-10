@@ -33,7 +33,9 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
   onDownloadPDF,
   onPrint,
 }) => {
-  const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications;
+  const isNewFormat = !!(section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary);
+  const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications
+    || section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary;
   const isOverall = variant === 'overall' || section.groupNumber === 0;
   
   return (
@@ -145,25 +147,25 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
       {/* Structured Sections with Enhanced Visual Elements */}
       {hasStructuredContent ? (
         <div className="space-y-4 sm:space-y-5">
-          {section.themes && (
-            <EnhancedSection type="themes" content={section.themes} showKeywords={false} />
-          )}
-          
-          {section.observations && (
-            <EnhancedSection type="observations" content={section.observations} showKeywords={false} />
-          )}
-          
-          {section.insights && (
-            <EnhancedSection type="insights" content={section.insights} showQuotes={true} showKeywords={false} />
-          )}
-          
-          {section.applications && (
-            <EnhancedSection type="applications" content={section.applications} showKeywords={false} />
-          )}
-          
-          {/* Personal Contributions Section - at the bottom */}
-          {section.contributions && (
-            <ContributionsSection contributions={section.contributions} />
+          {isNewFormat ? (
+            <>
+              {section.topic && <EnhancedSection type="topic" content={section.topic} showKeywords={false} />}
+              {section.observations && <EnhancedSection type="observations" content={section.observations} showKeywords={false} />}
+              {section.theology && <EnhancedSection type="theology" content={section.theology} showKeywords={false} />}
+              {section.applications && <EnhancedSection type="applications" content={section.applications} showKeywords={false} />}
+              {section.highlights && <EnhancedSection type="highlights" content={section.highlights} showQuotes={true} showKeywords={false} />}
+              {section.divergence && <EnhancedSection type="divergence" content={section.divergence} showKeywords={false} />}
+              {section.soulGym && <EnhancedSection type="soulGym" content={section.soulGym} showKeywords={false} />}
+              {section.summary && <EnhancedSection type="summary" content={section.summary} showKeywords={false} />}
+            </>
+          ) : (
+            <>
+              {section.themes && <EnhancedSection type="themes" content={section.themes} showKeywords={false} />}
+              {section.observations && <EnhancedSection type="observations" content={section.observations} showKeywords={false} />}
+              {section.insights && <EnhancedSection type="insights" content={section.insights} showQuotes={true} showKeywords={false} />}
+              {section.applications && <EnhancedSection type="applications" content={section.applications} showKeywords={false} />}
+              {section.contributions && <ContributionsSection contributions={section.contributions} />}
+            </>
           )}
         </div>
       ) : (

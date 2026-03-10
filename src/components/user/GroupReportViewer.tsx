@@ -28,6 +28,12 @@ interface ParsedReport {
   observations?: string;
   insights?: string;
   applications?: string;
+  topic?: string;
+  theology?: string;
+  highlights?: string;
+  divergence?: string;
+  soulGym?: string;
+  summary?: string;
   raw: string;
 }
 
@@ -35,11 +41,11 @@ interface ParsedReport {
 function parseReportContent(content: string): ParsedReport {
   const sections = parseReportContentFull(content);
   const section = sections[0];
-  
+
   if (!section) {
     return { raw: content };
   }
-  
+
   return {
     members: section.members,
     verse: section.verse,
@@ -48,6 +54,12 @@ function parseReportContent(content: string): ParsedReport {
     observations: section.observations,
     insights: section.insights,
     applications: section.applications,
+    topic: section.topic,
+    theology: section.theology,
+    highlights: section.highlights,
+    divergence: section.divergence,
+    soulGym: section.soulGym,
+    summary: section.summary,
     raw: section.raw,
   };
 }
@@ -65,6 +77,12 @@ function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verse
     observations: parsed.observations,
     insights: parsed.insights,
     applications: parsed.applications,
+    topic: parsed.topic,
+    theology: parsed.theology,
+    highlights: parsed.highlights,
+    divergence: parsed.divergence,
+    soulGym: parsed.soulGym,
+    summary: parsed.summary,
     raw: parsed.raw,
   };
   
@@ -167,7 +185,9 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   }
 
   const parsed = parseReportContent(report);
-  const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications;
+  const isNewFormat = !!(parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary);
+  const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications
+    || parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary;
 
 
   return (
@@ -229,25 +249,25 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
         {/* Structured Sections */}
         {hasStructuredContent ? (
           <div className="space-y-4 sm:space-y-5">
-            {parsed.themes && (
-              <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />
-            )}
-            
-            {parsed.observations && (
-              <EnhancedSection type="observations" content={parsed.observations} showKeywords={false} />
-            )}
-            
-            {parsed.insights && (
-              <EnhancedSection type="insights" content={parsed.insights} showQuotes={true} showKeywords={false} />
-            )}
-            
-            {parsed.applications && (
-              <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />
-            )}
-            
-            {/* Personal Contributions Section - at the bottom */}
-            {parsed.contributions && (
-              <ContributionsSectionUser contributions={parsed.contributions} />
+            {isNewFormat ? (
+              <>
+                {parsed.topic && <EnhancedSection type="topic" content={parsed.topic} showKeywords={false} />}
+                {parsed.observations && <EnhancedSection type="observations" content={parsed.observations} showKeywords={false} />}
+                {parsed.theology && <EnhancedSection type="theology" content={parsed.theology} showKeywords={false} />}
+                {parsed.applications && <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />}
+                {parsed.highlights && <EnhancedSection type="highlights" content={parsed.highlights} showQuotes={true} showKeywords={false} />}
+                {parsed.divergence && <EnhancedSection type="divergence" content={parsed.divergence} showKeywords={false} />}
+                {parsed.soulGym && <EnhancedSection type="soulGym" content={parsed.soulGym} showKeywords={false} />}
+                {parsed.summary && <EnhancedSection type="summary" content={parsed.summary} showKeywords={false} />}
+              </>
+            ) : (
+              <>
+                {parsed.themes && <EnhancedSection type="themes" content={parsed.themes} showKeywords={false} />}
+                {parsed.observations && <EnhancedSection type="observations" content={parsed.observations} showKeywords={false} />}
+                {parsed.insights && <EnhancedSection type="insights" content={parsed.insights} showQuotes={true} showKeywords={false} />}
+                {parsed.applications && <EnhancedSection type="applications" content={parsed.applications} showKeywords={false} />}
+                {parsed.contributions && <ContributionsSectionUser contributions={parsed.contributions} />}
+              </>
             )}
           </div>
         ) : (

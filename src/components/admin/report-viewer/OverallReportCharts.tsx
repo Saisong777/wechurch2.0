@@ -89,14 +89,19 @@ function extractParticipationStats(groups: GroupReport[]) {
     
     // Estimate content richness from raw length
     const contentLength = g.raw?.length || 0;
-    const hasThemes = !!g.themes;
-    const hasObservations = !!g.observations;
-    const hasInsights = !!g.insights;
-    const hasApplications = !!g.applications;
-    const hasContributions = !!g.contributions;
-    
-    const sectionScore = [hasThemes, hasObservations, hasInsights, hasApplications, hasContributions]
-      .filter(Boolean).length;
+    const isNewFmt = !!(g.topic || g.theology || g.highlights || g.divergence || g.soulGym || g.summary);
+
+    let sectionScore: number;
+    let totalPossible: number;
+    if (isNewFmt) {
+      sectionScore = [g.topic, g.observations, g.theology, g.applications, g.highlights, g.divergence, g.soulGym, g.summary]
+        .filter(Boolean).length;
+      totalPossible = 8;
+    } else {
+      sectionScore = [g.themes, g.observations, g.insights, g.applications, g.contributions]
+        .filter(Boolean).length;
+      totalPossible = 5;
+    }
     
     return {
       name: `第${g.groupNumber}組`,
@@ -104,7 +109,7 @@ function extractParticipationStats(groups: GroupReport[]) {
       memberCount,
       contentLength: Math.min(contentLength / 100, 100), // Normalize for chart
       sectionScore,
-      completeness: Math.round((sectionScore / 5) * 100),
+      completeness: Math.round((sectionScore / totalPossible) * 100),
     };
   }).sort((a, b) => a.groupNumber - b.groupNumber);
 }
@@ -133,7 +138,8 @@ function extractKeywordFrequency(groups: GroupReport[]) {
   ];
   
   for (const group of groups) {
-    const text = [group.themes, group.observations, group.insights, group.applications, group.raw]
+    const text = [group.themes, group.observations, group.insights, group.applications,
+      group.topic, group.theology, group.highlights, group.divergence, group.soulGym, group.summary, group.raw]
       .filter(Boolean)
       .join(' ');
     
@@ -156,9 +162,15 @@ function extractKeywordFrequency(groups: GroupReport[]) {
 
 // Extract section completeness data
 function extractSectionStats(groups: GroupReport[]) {
-  const sectionNames = ['主題', '觀察', '亮光', '應用', '個人貢獻'];
-  const sectionKeys: (keyof GroupReport)[] = ['themes', 'observations', 'insights', 'applications', 'contributions'];
-  
+  const hasNewFormat = groups.some(g => g.topic || g.theology || g.highlights);
+
+  const sectionNames = hasNewFormat
+    ? ['主題', '觀察', '神學亮光', '應用', '亮光語錄', '分歧', 'SoulGym', '總結']
+    : ['主題', '觀察', '亮光', '應用', '個人貢獻'];
+  const sectionKeys: (keyof GroupReport)[] = hasNewFormat
+    ? ['topic', 'observations', 'theology', 'applications', 'highlights', 'divergence', 'soulGym', 'summary']
+    : ['themes', 'observations', 'insights', 'applications', 'contributions'];
+
   return sectionNames.map((name, idx) => {
     const key = sectionKeys[idx];
     const groupsWithSection = groups.filter(g => g[key] && String(g[key]).trim().length > 10).length;

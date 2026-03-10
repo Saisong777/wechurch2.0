@@ -243,38 +243,44 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {slide.section.themes && (
-                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-green-400">
-                    <h3 className="text-green-300 font-semibold text-sm mb-2">主題</h3>
-                    <div className="text-white/90">{formatSlideContent(slide.section.themes)}</div>
-                  </div>
-                )}
-                {slide.section.observations && (
-                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-teal-400">
-                    <h3 className="text-teal-300 font-semibold text-sm mb-2">事實發現</h3>
-                    <div className="text-white/90">{formatSlideContent(slide.section.observations)}</div>
-                  </div>
-                )}
-                {slide.section.insights && (
-                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-amber-400">
-                    <h3 className="text-amber-300 font-semibold text-sm mb-2">獨特亮光</h3>
-                    <div className="text-white/90">{formatSlideContent(slide.section.insights)}</div>
-                  </div>
-                )}
-                {slide.section.applications && (
-                  <div className="bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-blue-400">
-                    <h3 className="text-blue-300 font-semibold text-sm mb-2">如何應用</h3>
-                    <div className="text-white/90">{formatSlideContent(slide.section.applications)}</div>
-                  </div>
-                )}
-              </div>
-              {slide.section.contributions && (
-                <div className="mt-3 sm:mt-4 bg-white/5 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-purple-400">
-                  <h3 className="text-purple-300 font-semibold text-sm mb-2">個人貢獻摘要</h3>
-                  <div className="text-white/80 text-sm">{formatSlideContent(slide.section.contributions)}</div>
-                </div>
-              )}
+              {(() => {
+                const s = slide.section!;
+                const isNewFmt = !!(s.topic || s.theology || s.highlights || s.divergence || s.soulGym || s.summary);
+                const cards: Array<{ field: keyof GroupReport; label: string; border: string; text: string }> = isNewFmt ? [
+                  { field: 'topic', label: '主題', border: 'border-green-400', text: 'text-green-300' },
+                  { field: 'observations', label: '共同觀察', border: 'border-teal-400', text: 'text-teal-300' },
+                  { field: 'theology', label: '神學亮光', border: 'border-amber-400', text: 'text-amber-300' },
+                  { field: 'applications', label: '共同應用', border: 'border-blue-400', text: 'text-blue-300' },
+                  { field: 'highlights', label: '亮光語錄', border: 'border-yellow-400', text: 'text-yellow-300' },
+                  { field: 'divergence', label: '觀點分歧', border: 'border-orange-400', text: 'text-orange-300' },
+                  { field: 'soulGym', label: 'SoulGym', border: 'border-purple-400', text: 'text-purple-300' },
+                  { field: 'summary', label: '一句話總結', border: 'border-indigo-400', text: 'text-indigo-300' },
+                ] : [
+                  { field: 'themes', label: '主題', border: 'border-green-400', text: 'text-green-300' },
+                  { field: 'observations', label: '事實發現', border: 'border-teal-400', text: 'text-teal-300' },
+                  { field: 'insights', label: '獨特亮光', border: 'border-amber-400', text: 'text-amber-300' },
+                  { field: 'applications', label: '如何應用', border: 'border-blue-400', text: 'text-blue-300' },
+                ];
+                const activeCards = cards.filter(c => s[c.field]);
+                return (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      {activeCards.map(c => (
+                        <div key={c.field} className={`bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 ${c.border}`}>
+                          <h3 className={`${c.text} font-semibold text-sm mb-2`}>{c.label}</h3>
+                          <div className="text-white/90">{formatSlideContent(s[c.field] as string)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {!isNewFmt && s.contributions && (
+                      <div className="mt-3 sm:mt-4 bg-white/5 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-purple-400">
+                        <h3 className="text-purple-300 font-semibold text-sm mb-2">個人貢獻摘要</h3>
+                        <div className="text-white/80 text-sm">{formatSlideContent(s.contributions)}</div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ) : null}
         </div>

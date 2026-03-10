@@ -42,9 +42,30 @@ export function generateSectionMarkdown(section: GroupReport, verseReference?: s
   if (section.contributions) {
     lines.push(`**👤 個人貢獻摘要（Personal Contributions）：**\n${section.contributions}\n`);
   }
-  
+
+  // New format fields
+  if (section.topic) {
+    lines.push(`**📖 本次查經主題：**\n${section.topic}\n`);
+  }
+  if (section.theology) {
+    lines.push(`**💡 神學亮光：**\n${section.theology}\n`);
+  }
+  if (section.highlights) {
+    lines.push(`**⭐ 亮光語錄：**\n${section.highlights}\n`);
+  }
+  if (section.divergence) {
+    lines.push(`**🔀 觀點分歧：**\n${section.divergence}\n`);
+  }
+  if (section.soulGym) {
+    lines.push(`**🏋️ SoulGym 微操練：**\n${section.soulGym}\n`);
+  }
+  if (section.summary) {
+    lines.push(`**📝 一句話總結：**\n${section.summary}\n`);
+  }
+
   // If no structured content, fall back to raw
-  const hasStructured = section.contributions || section.themes || section.observations || section.insights || section.applications;
+  const hasStructured = section.contributions || section.themes || section.observations || section.insights || section.applications
+    || section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary;
   if (!hasStructured && section.raw) {
     lines.push(section.raw);
   }
@@ -175,6 +196,39 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
         border-left-color: #a855f7;
       }
       .section.contributions h3 { color: #9333ea; }
+
+      .section.topic { border-left-color: #22c55e; }
+      .section.topic h3 { color: #16a34a; }
+
+      .section.theology {
+        background: #fffbeb;
+        border-left-color: #eab308;
+      }
+      .section.theology h3 { color: #ca8a04; }
+
+      .section.highlights {
+        background: #fffbeb;
+        border-left-color: #f59e0b;
+      }
+      .section.highlights h3 { color: #d97706; }
+
+      .section.divergence {
+        background: #fff7ed;
+        border-left-color: #f97316;
+      }
+      .section.divergence h3 { color: #ea580c; }
+
+      .section.soulGym {
+        background: #faf5ff;
+        border-left-color: #a855f7;
+      }
+      .section.soulGym h3 { color: #9333ea; }
+
+      .section.summary {
+        background: #eef2ff;
+        border-left-color: #6366f1;
+      }
+      .section.summary h3 { color: #4f46e5; }
       
       .footer {
         margin-top: 48px;
@@ -194,63 +248,38 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
   `;
   
   const groupsHTML = filteredSections.map(section => {
-    const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications;
-    
+    const isNewFmt = !!(section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary);
+    const hasStructuredContent = section.contributions || section.themes || section.observations || section.insights || section.applications
+      || section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary;
+
+    const renderSection = (cls: string, title: string, content?: string) =>
+      content ? `<div class="section ${cls}"><h3>${title}</h3><div class="section-content">${content}</div></div>` : '';
+
     return `
       <div class="group-section">
-        ${section.groupInfo ? `
-          <div class="group-header">
-            <h2>📚 ${section.groupInfo}</h2>
-          </div>
-        ` : ''}
-        
+        ${section.groupInfo ? `<div class="group-header"><h2>📚 ${section.groupInfo}</h2></div>` : ''}
         ${(section.members || section.verse) ? `
           <div class="group-meta">
             ${section.members ? `<p><strong>👥 組員：</strong>${section.members}</p>` : ''}
             ${section.verse ? `<p><strong>📖 經文：</strong>${section.verse}</p>` : ''}
           </div>
         ` : ''}
-        
-        ${hasStructuredContent ? `
-          ${section.themes ? `
-            <div class="section themes">
-              <h3>📖 主題 Themes</h3>
-              <div class="section-content">${section.themes}</div>
-            </div>
-          ` : ''}
-          
-          ${section.observations ? `
-            <div class="section observations">
-              <h3>🔍 事實發現 Observations</h3>
-              <div class="section-content">${section.observations}</div>
-            </div>
-          ` : ''}
-          
-          ${section.insights ? `
-            <div class="section insights">
-              <h3>💡 獨特亮光 Unique Insights</h3>
-              <div class="section-content">${section.insights}</div>
-            </div>
-          ` : ''}
-          
-          ${section.applications ? `
-            <div class="section applications">
-              <h3>🎯 如何應用 Applications</h3>
-              <div class="section-content">${section.applications}</div>
-            </div>
-          ` : ''}
-          
-          ${section.contributions ? `
-            <div class="section contributions">
-              <h3>👤 個人貢獻摘要 Personal Contributions</h3>
-              <div class="section-content">${section.contributions}</div>
-            </div>
-          ` : ''}
+        ${hasStructuredContent ? (isNewFmt ? `
+          ${renderSection('topic', '📖 本次查經主題', section.topic)}
+          ${renderSection('observations', '🔍 共同觀察', section.observations)}
+          ${renderSection('theology', '💡 神學亮光', section.theology)}
+          ${renderSection('applications', '🎯 共同應用', section.applications)}
+          ${renderSection('highlights', '⭐ 亮光語錄', section.highlights)}
+          ${renderSection('divergence', '🔀 觀點分歧', section.divergence)}
+          ${renderSection('soulGym', '🏋️ SoulGym 微操練', section.soulGym)}
+          ${renderSection('summary', '📝 一句話總結', section.summary)}
         ` : `
-          <div class="section">
-            <div class="section-content">${section.raw}</div>
-          </div>
-        `}
+          ${renderSection('themes', '📖 主題 Themes', section.themes)}
+          ${renderSection('observations', '🔍 事實發現 Observations', section.observations)}
+          ${renderSection('insights', '💡 獨特亮光 Unique Insights', section.insights)}
+          ${renderSection('applications', '🎯 如何應用 Applications', section.applications)}
+          ${renderSection('contributions', '👤 個人貢獻摘要', section.contributions)}
+        `) : `<div class="section"><div class="section-content">${section.raw}</div></div>`}
       </div>
     `;
   }).join('');
@@ -328,7 +357,38 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
     </div>
   `);
 
-  // Overall report slide (全部人) - one slide with all content
+  // Helper to generate content boxes for a section
+  function generateSlideBoxes(s: GroupReport): string {
+    const isNewFmt = !!(s.topic || s.theology || s.highlights || s.divergence || s.soulGym || s.summary);
+    const box = (cls: string, emoji: string, label: string, content?: string) =>
+      content ? `<div class="content-box ${cls}"><h3 class="box-title">${emoji} ${label}</h3><div class="box-content">${formatForSlide(content, 5)}</div></div>` : '';
+
+    if (isNewFmt) {
+      return `
+        <div class="content-grid">
+          ${box('themes-box', '📖', '主題', s.topic)}
+          ${box('observations-box', '🔍', '共同觀察', s.observations)}
+          ${box('insights-box', '💡', '神學亮光', s.theology)}
+          ${box('applications-box', '🎯', '共同應用', s.applications)}
+        </div>
+        <div class="content-grid" style="margin-top:0.5rem">
+          ${box('insights-box', '⭐', '亮光語錄', s.highlights)}
+          ${box('applications-box', '🔀', '觀點分歧', s.divergence)}
+          ${box('themes-box', '🏋️', 'SoulGym', s.soulGym)}
+          ${box('observations-box', '📝', '總結', s.summary)}
+        </div>`;
+    }
+    return `
+      <div class="content-grid">
+        ${box('themes-box', '📖', '主題', s.themes)}
+        ${box('observations-box', '🔍', '事實發現', s.observations)}
+        ${box('insights-box', '💡', '獨特亮光', s.insights)}
+        ${box('applications-box', '🎯', '如何應用', s.applications)}
+      </div>
+      ${s.contributions ? `<div class="contributions-section"><h3 class="contributions-title">👤 個人貢獻摘要</h3><div class="contributions-content">${formatForSlide(s.contributions, 4)}</div></div>` : ''}`;
+  }
+
+  // Overall report slide
   if (overallReport) {
     slides.push(`
       <div class="slide content-slide overall-slide">
@@ -336,44 +396,13 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
           <div class="slide-header">
             <h2 class="slide-title overall-title">📊 全會眾綜合分析</h2>
           </div>
-          <div class="content-grid">
-            ${overallReport.themes ? `
-              <div class="content-box themes-box">
-                <h3 class="box-title">📖 主題</h3>
-                <div class="box-content">${formatForSlide(overallReport.themes, 6)}</div>
-              </div>
-            ` : ''}
-            ${overallReport.observations ? `
-              <div class="content-box observations-box">
-                <h3 class="box-title">🔍 事實發現</h3>
-                <div class="box-content">${formatForSlide(overallReport.observations, 6)}</div>
-              </div>
-            ` : ''}
-            ${overallReport.insights ? `
-              <div class="content-box insights-box">
-                <h3 class="box-title">💡 獨特亮光</h3>
-                <div class="box-content">${formatForSlide(overallReport.insights, 6)}</div>
-              </div>
-            ` : ''}
-            ${overallReport.applications ? `
-              <div class="content-box applications-box">
-                <h3 class="box-title">🎯 如何應用</h3>
-                <div class="box-content">${formatForSlide(overallReport.applications, 6)}</div>
-              </div>
-            ` : ''}
-          </div>
-          ${overallReport.contributions ? `
-            <div class="contributions-section">
-              <h3 class="contributions-title">👤 個人貢獻摘要</h3>
-              <div class="contributions-content">${formatForSlide(overallReport.contributions, 4)}</div>
-            </div>
-          ` : ''}
+          ${generateSlideBoxes(overallReport)}
         </div>
       </div>
     `);
   }
 
-  // Individual group slides - one slide per group with all sections
+  // Individual group slides
   for (const section of groupReports) {
     slides.push(`
       <div class="slide content-slide group-slide">
@@ -382,38 +411,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
             <h2 class="slide-title">第 ${section.groupNumber} 組</h2>
             ${section.members ? `<span class="members-badge">${section.members}</span>` : ''}
           </div>
-          <div class="content-grid">
-            ${section.themes ? `
-              <div class="content-box themes-box">
-                <h3 class="box-title">📖 主題</h3>
-                <div class="box-content">${formatForSlide(section.themes, 6)}</div>
-              </div>
-            ` : ''}
-            ${section.observations ? `
-              <div class="content-box observations-box">
-                <h3 class="box-title">🔍 事實發現</h3>
-                <div class="box-content">${formatForSlide(section.observations, 6)}</div>
-              </div>
-            ` : ''}
-            ${section.insights ? `
-              <div class="content-box insights-box">
-                <h3 class="box-title">💡 獨特亮光</h3>
-                <div class="box-content">${formatForSlide(section.insights, 6)}</div>
-              </div>
-            ` : ''}
-            ${section.applications ? `
-              <div class="content-box applications-box">
-                <h3 class="box-title">🎯 如何應用</h3>
-                <div class="box-content">${formatForSlide(section.applications, 6)}</div>
-              </div>
-            ` : ''}
-          </div>
-          ${section.contributions ? `
-            <div class="contributions-section">
-              <h3 class="contributions-title">👤 個人貢獻摘要</h3>
-              <div class="contributions-content">${formatForSlide(section.contributions, 4)}</div>
-            </div>
-          ` : ''}
+          ${generateSlideBoxes(section)}
         </div>
       </div>
     `);
@@ -729,7 +727,8 @@ export async function generatePPTX(sections: GroupReport[], verseReference?: str
   // One slide per group - all content on one page
   for (const section of groupReports) {
     const slide = pptx.addSlide();
-    
+    const isNewFmt = !!(section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary);
+
     // Group header
     slide.addText(`第 ${section.groupNumber} 組`, {
       x: 0.3, y: 0.2, w: 3, h: 0.5,
@@ -737,7 +736,6 @@ export async function generatePPTX(sections: GroupReport[], verseReference?: str
       fontFace: 'Microsoft JhengHei'
     });
 
-    // Members
     if (section.members) {
       slide.addText(`組員：${section.members}`, {
         x: 0.3, y: 0.7, w: 9.4, h: 0.35,
@@ -746,60 +744,60 @@ export async function generatePPTX(sections: GroupReport[], verseReference?: str
       });
     }
 
-    let yPos = 1.15;
     const leftX = 0.3;
     const rightX = 5.1;
     const boxW = 4.5;
-    const boxH = 1.8;
 
     // Helper to add content box
-    const addContentBox = (x: number, y: number, title: string, content: string, color: string) => {
+    const addBox = (x: number, y: number, h: number, title: string, content: string, color: string) => {
       slide.addText(title, {
-        x, y, w: boxW, h: 0.35,
-        fontSize: 13, bold: true, color,
+        x, y, w: boxW, h: 0.3,
+        fontSize: 12, bold: true, color,
         fontFace: 'Microsoft JhengHei'
       });
-      slide.addText(cleanContent(content, 120), {
-        x, y: y + 0.35, w: boxW, h: boxH - 0.4,
-        fontSize: 10, color: '333333', valign: 'top',
+      slide.addText(cleanContent(content, 100), {
+        x, y: y + 0.3, w: boxW, h: h - 0.35,
+        fontSize: 9, color: '333333', valign: 'top',
         fontFace: 'Microsoft JhengHei'
       });
     };
 
-    // Themes - top left
-    if (section.themes) {
-      addContentBox(leftX, yPos, '📖 主題', section.themes, '16A34A');
-    }
-
-    // Observations - top right
-    if (section.observations) {
-      addContentBox(rightX, yPos, '🔍 事實發現', section.observations, '0D9488');
-    }
-
-    yPos += boxH + 0.15;
-
-    // Insights - bottom left
-    if (section.insights) {
-      addContentBox(leftX, yPos, '💡 獨特亮光', section.insights, 'D97706');
-    }
-
-    // Applications - bottom right
-    if (section.applications) {
-      addContentBox(rightX, yPos, '🎯 如何應用', section.applications, '2563EB');
-    }
-
-    // Personal contributions at the bottom
-    if (section.contributions) {
-      slide.addText('👤 個人貢獻摘要', {
-        x: 0.3, y: 4.65, w: 9.4, h: 0.3,
-        fontSize: 11, bold: true, color: '9333EA',
-        fontFace: 'Microsoft JhengHei'
-      });
-      slide.addText(cleanContent(section.contributions, 200), {
-        x: 0.3, y: 4.95, w: 9.4, h: 0.5,
-        fontSize: 9, color: '555555', valign: 'top',
-        fontFace: 'Microsoft JhengHei'
-      });
+    if (isNewFmt) {
+      // New format: 4 rows x 2 columns, smaller boxes
+      const boxH = 1.05;
+      let yPos = 1.15;
+      if (section.topic) addBox(leftX, yPos, boxH, '📖 主題', section.topic, '16A34A');
+      if (section.observations) addBox(rightX, yPos, boxH, '🔍 共同觀察', section.observations, '0D9488');
+      yPos += boxH + 0.1;
+      if (section.theology) addBox(leftX, yPos, boxH, '💡 神學亮光', section.theology, 'CA8A04');
+      if (section.applications) addBox(rightX, yPos, boxH, '🎯 共同應用', section.applications, '2563EB');
+      yPos += boxH + 0.1;
+      if (section.highlights) addBox(leftX, yPos, boxH, '⭐ 亮光語錄', section.highlights, 'D97706');
+      if (section.divergence) addBox(rightX, yPos, boxH, '🔀 觀點分歧', section.divergence, 'EA580C');
+      yPos += boxH + 0.1;
+      if (section.soulGym) addBox(leftX, yPos, boxH, '🏋️ SoulGym', section.soulGym, '9333EA');
+      if (section.summary) addBox(rightX, yPos, boxH, '📝 總結', section.summary, '4F46E5');
+    } else {
+      // Old format: 2x2 grid
+      const boxH = 1.8;
+      let yPos = 1.15;
+      if (section.themes) addBox(leftX, yPos, boxH, '📖 主題', section.themes, '16A34A');
+      if (section.observations) addBox(rightX, yPos, boxH, '🔍 事實發現', section.observations, '0D9488');
+      yPos += boxH + 0.15;
+      if (section.insights) addBox(leftX, yPos, boxH, '💡 獨特亮光', section.insights, 'D97706');
+      if (section.applications) addBox(rightX, yPos, boxH, '🎯 如何應用', section.applications, '2563EB');
+      if (section.contributions) {
+        slide.addText('👤 個人貢獻摘要', {
+          x: 0.3, y: 4.65, w: 9.4, h: 0.3,
+          fontSize: 11, bold: true, color: '9333EA',
+          fontFace: 'Microsoft JhengHei'
+        });
+        slide.addText(cleanContent(section.contributions, 200), {
+          x: 0.3, y: 4.95, w: 9.4, h: 0.5,
+          fontSize: 9, color: '555555', valign: 'top',
+          fontFace: 'Microsoft JhengHei'
+        });
+      }
     }
   }
 
