@@ -755,18 +755,19 @@ export async function registerRoutes(app: Express) {
         const userContent = formatGroupNotesInput(members, undefined, inputTruncate);
         console.log(`[report-gen] group ${groupNumber}: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
-          const aiResponse = await openai.chat.completions.create({
-            model: aiModel,
-            messages: [{ role: "system", content: groupSystemPrompt }, { role: "user", content: userContent }],
-            max_tokens: groupMaxTokens,
+          const resultObj = await model.generateContent({
+            contents: [{
+              role: 'user',
+              parts: [{ text: `System: ${groupSystemPrompt}\n\nUser: ${userContent}` }]
+            }],
+            generationConfig: { maxOutputTokens: groupMaxTokens }
           });
-          content = aiResponse.choices[0]?.message?.content || '（AI 未回應）';
+          content = resultObj.response.text() || '（AI 未回應）';
           console.log(`[report-gen] group ${groupNumber}: AI OK, contentLen=${content.length}`);
         } catch (err: any) {
           console.error(`[report-gen] group ${groupNumber}: AI ERROR`, err?.status, err?.message?.slice(0, 200));
           const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
           if (is429) {
-            console.warn(`[report-generation] 429 rate limit for group ${groupNumber}`);
             return res.status(429).json({ error: '請求過多，請稍後再試（Gemini rate limit）' });
           }
           throw err;
