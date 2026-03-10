@@ -724,7 +724,7 @@ export async function registerRoutes(app: Express) {
       }
 
       const genAI = getGeminiClient();
-      const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
+      const aiModel = "gemini-2.0-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
       const groupMaxTokens = fastMode ? 1500 : 4000;
       const overallMaxTokens = fastMode ? 2500 : 6000;
@@ -870,7 +870,7 @@ export async function registerRoutes(app: Express) {
       }
 
       const genAI = getGeminiClient();
-      const aiModel = fastMode ? "gemini-2.0-flash-lite" : "gemini-2.0-flash";
+      const aiModel = "gemini-2.0-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
       const groupMaxTokens = fastMode ? 1500 : 4000;
       const overallMaxTokens = fastMode ? 2500 : 6000;
