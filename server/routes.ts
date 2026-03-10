@@ -724,7 +724,7 @@ export async function registerRoutes(app: Express) {
       }
 
       const genAI = getGeminiClient();
-      const aiModel = "gemini-2.0-flash";
+      const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
       const groupMaxTokens = fastMode ? 1500 : 4000;
       const overallMaxTokens = fastMode ? 2500 : 6000;
@@ -871,7 +871,7 @@ export async function registerRoutes(app: Express) {
       }
 
       const genAI = getGeminiClient();
-      const aiModel = "gemini-2.0-flash";
+      const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
       const groupMaxTokens = fastMode ? 1500 : 4000;
       const overallMaxTokens = fastMode ? 2500 : 6000;
@@ -2558,7 +2558,7 @@ export async function registerRoutes(app: Express) {
 - 只回覆JSON，不要其他文字。`;
 
       const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const resultObj = await model.generateContent({
         contents: [{
@@ -4207,7 +4207,7 @@ export async function registerRoutes(app: Express) {
 
       const userContent = formatSingleNoteInput(note);
       const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const resultObj = await model.generateContent({
         contents: [{
@@ -4265,7 +4265,7 @@ export async function registerRoutes(app: Express) {
       if (notes.length === 1) {
         const userContent = formatSingleNoteInput(notes[0]);
         const genAI = getGeminiClient();
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const resultObj = await model.generateContent({
           contents: [{
@@ -4281,7 +4281,7 @@ export async function registerRoutes(app: Express) {
 
       const userContent = formatMultiNoteInput(notes);
       const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const resultObj = await model.generateContent({
         contents: [{
@@ -4319,7 +4319,7 @@ export async function registerRoutes(app: Express) {
       const systemPrompt = mode === 'large' ? GROUP_LARGE_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
       const userContent = formatGroupNotesInput(members, verseRange);
       const genAI = getGeminiClient();
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const resultObj = await model.generateContent({
         contents: [{
