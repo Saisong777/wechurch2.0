@@ -41,6 +41,7 @@ function lazyNamed<T extends Record<string, ComponentType<any>>>(
 // Lazy load all pages with error recovery
 const Index = lazyPage(() => import("./pages/Index"));
 const BibleQuizPage = lazyNamed(() => import("./pages/BibleQuizPage"), "BibleQuizPage");
+const DiscipleQuizPage = lazyNamed(() => import("./pages/DiscipleQuizPage"), "DiscipleQuizPage");
 const WeLiveLandingPage = lazyNamed(() => import("./pages/WeLiveLandingPage"), "WeLiveLandingPage");
 const UserPage = lazyNamed(() => import("./pages/UserPage"), "UserPage");
 const SoulGymNotebookPage = lazyNamed(() => import("./pages/SoulGymNotebookPage"), "SoulGymNotebookPage");
@@ -97,6 +98,7 @@ const App = () => (
                     <Route path="/icebreaker" element={<IcebreakerPage />} />
                     <Route path="/grouper" element={<GrouperPage />} />
                     <Route path="/play/bible-quiz" element={<BibleQuizPage />} />
+                    <Route path="/play/disciple-quiz" element={<DiscipleQuizPage />} />
                     <Route path="/prayer-wall" element={<PrayerWallPage />} />
                     <Route path="/card" element={<MessageCardPage />} />
                     <Route path="/share" element={<SharePage />} />

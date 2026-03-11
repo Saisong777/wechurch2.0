@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Gamepad2, Shuffle, BookOpen, ChevronRight } from "lucide-react";
+import { Gamepad2, Shuffle, BookOpen, ScrollText, ChevronRight } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 
 const features = [
@@ -34,6 +34,16 @@ const features = [
     bgColor: "bg-yellow-500/15",
     iconColor: "text-yellow-600",
     featureKeys: ["we_play", "bible_quiz"] as string[],
+  },
+  {
+    id: "disciple-quiz",
+    title: "你像哪個門徒？",
+    subtitle: "10 題測出你的門徒人格",
+    icon: ScrollText,
+    href: "/play/disciple-quiz",
+    bgColor: "bg-orange-500/15",
+    iconColor: "text-orange-600",
+    featureKeys: ["we_play", "disciple_quiz"] as string[],
   },
 ];
 
