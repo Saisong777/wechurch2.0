@@ -165,18 +165,79 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     setPresentationMode(true);
   };
 
+  // Section card definitions for slides
+  const newFormatCards: Array<{ field: keyof GroupReport; label: string; color: string }> = [
+    { field: 'topic', label: '📖 本次查經主題', color: 'from-emerald-500/20 to-emerald-500/5 border-emerald-400' },
+    { field: 'observations', label: '🔍 共同觀察', color: 'from-teal-500/20 to-teal-500/5 border-teal-400' },
+    { field: 'theology', label: '💡 神學亮光', color: 'from-amber-500/20 to-amber-500/5 border-amber-400' },
+    { field: 'applications', label: '🎯 共同應用', color: 'from-blue-500/20 to-blue-500/5 border-blue-400' },
+    { field: 'highlights', label: '⭐ 亮光語錄', color: 'from-yellow-500/20 to-yellow-500/5 border-yellow-400' },
+    { field: 'divergence', label: '🔀 觀點分歧', color: 'from-orange-500/20 to-orange-500/5 border-orange-400' },
+    { field: 'soulGym', label: '🏋️ SoulGym 微操練', color: 'from-purple-500/20 to-purple-500/5 border-purple-400' },
+    { field: 'summary', label: '✨ 一句話總結', color: 'from-indigo-500/20 to-indigo-500/5 border-indigo-400' },
+  ];
+  const oldFormatCards: Array<{ field: keyof GroupReport; label: string; color: string }> = [
+    { field: 'themes', label: '📖 主題', color: 'from-emerald-500/20 to-emerald-500/5 border-emerald-400' },
+    { field: 'observations', label: '🔍 事實發現', color: 'from-teal-500/20 to-teal-500/5 border-teal-400' },
+    { field: 'insights', label: '💡 獨特亮光', color: 'from-amber-500/20 to-amber-500/5 border-amber-400' },
+    { field: 'applications', label: '🎯 如何應用', color: 'from-blue-500/20 to-blue-500/5 border-blue-400' },
+    { field: 'contributions', label: '👤 個人貢獻', color: 'from-purple-500/20 to-purple-500/5 border-purple-400' },
+  ];
+
+  type PresentationSlide = {
+    type: 'title' | 'section-header' | 'content' | 'end';
+    title?: string;
+    subtitle?: string;
+    members?: string;
+    verse?: string;
+    cards?: Array<{ field: keyof GroupReport; label: string; color: string; content: string }>;
+    groupNumber?: number;
+  };
+
   const presentationSlides = React.useMemo(() => {
-    if (!parsedSections.length) return [];
+    if (!parsedSections.length) return [] as PresentationSlide[];
     const groupReportsSorted = parsedSections.filter(s => s.groupNumber > 0).sort((a, b) => a.groupNumber - b.groupNumber);
     const overallReport = parsedSections.find(s => s.groupNumber === 0);
-    const slides: { type: 'title' | 'content' | 'end'; title?: string; subtitle?: string; section?: GroupReport }[] = [];
+    const slides: PresentationSlide[] = [];
+
+    // Title slide
     slides.push({ type: 'title', title: '查經分析報告', subtitle: verseReference || '靈魂健身房' });
-    if (overallReport) {
-      slides.push({ type: 'content', title: '全會眾綜合分析', section: overallReport });
-    }
+
+    // Helper: split a section's content into paginated slides (max 2 cards per slide)
+    const addSectionSlides = (section: GroupReport, label: string) => {
+      const isNewFmt = !!(section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary);
+      const cardDefs = isNewFmt ? newFormatCards : oldFormatCards;
+      const activeCards = cardDefs
+        .filter(c => section[c.field])
+        .map(c => ({ ...c, content: section[c.field] as string }));
+
+      if (activeCards.length === 0) return;
+
+      // Section header slide
+      slides.push({
+        type: 'section-header',
+        title: label,
+        members: section.members,
+        verse: section.verse,
+        groupNumber: section.groupNumber,
+      });
+
+      // Content slides: max 2 cards per slide for readability
+      for (let i = 0; i < activeCards.length; i += 2) {
+        slides.push({
+          type: 'content',
+          title: label,
+          cards: activeCards.slice(i, i + 2),
+          groupNumber: section.groupNumber,
+        });
+      }
+    };
+
+    if (overallReport) addSectionSlides(overallReport, '📊 全會眾綜合分析');
     for (const section of groupReportsSorted) {
-      slides.push({ type: 'content', title: `第 ${section.groupNumber} 組`, section });
+      addSectionSlides(section, `第 ${section.groupNumber} 組`);
     }
+
     slides.push({ type: 'end', title: '感謝參與', subtitle: '願神的話語常存在我們心中' });
     return slides;
   }, [parsedSections, verseReference]);
@@ -216,137 +277,164 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
 
   if (presentationMode) {
     const slide = presentationSlides[currentSlide];
-    const formatSlideContent = (text?: string) => {
+    const formatSlideContent = (text?: string, maxLines = 12) => {
       if (!text) return null;
-      return text.replace(/\*\*/g, '').replace(/^[-•]\s*/gm, '').split('\n').filter(l => l.trim()).map((line, i) => (
-        <div key={i} className="py-0.5 text-sm sm:text-base leading-relaxed">{line.trim()}</div>
+      const lines = text.replace(/\*\*/g, '').replace(/^[-•]\s*/gm, '• ').split('\n').filter(l => l.trim());
+      const display = lines.slice(0, maxLines);
+      return display.map((line, i) => (
+        <div key={i} className="py-0.5 leading-relaxed">{line.trim()}</div>
       ));
     };
-    return (
-      <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
-        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-          <span className="text-white/60 text-xs sm:text-sm">
-            {currentSlide + 1} / {presentationSlides.length}
-          </span>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setPresentationMode(false)}
-            className="text-white/70 hover:text-white"
-            data-testid="button-close-presentation"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
 
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-auto">
-          {slide?.type === 'title' || slide?.type === 'end' ? (
-            <div className="text-center">
-              <h1 className="text-3xl sm:text-5xl font-bold text-white mb-4" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.3)' }}>
-                {slide.title}
-              </h1>
-              {slide.subtitle && (
-                <p className="text-xl sm:text-2xl text-white/80">{slide.subtitle}</p>
-              )}
-              {slide.type === 'title' && (
-                <p className="mt-6 text-white/50 text-sm">
-                  {new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
-              )}
+    const isOverall = slide?.groupNumber === 0;
+
+    return (
+      <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center">
+        {/* 16:9 slide container */}
+        <div
+          className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-2xl overflow-hidden"
+          style={{
+            width: 'min(100vw, calc(100vh * 16 / 9))',
+            height: 'min(100vh, calc(100vw * 9 / 16))',
+          }}
+        >
+          {/* Top bar: slide counter + close */}
+          <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-3">
+            <span className="text-white/40 text-xs font-medium tracking-wider">
+              {slide?.title && slide.type === 'content' ? slide.title : ''}
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-white/40 text-xs">
+                {currentSlide + 1} / {presentationSlides.length}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setPresentationMode(false)}
+                className="text-white/50 hover:text-white h-7 w-7"
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
-          ) : slide?.section ? (
-            <div className="w-full max-w-5xl">
-              <div className="flex items-center gap-3 mb-4 flex-wrap">
-                <h2 className={cn(
-                  "text-2xl sm:text-3xl font-bold",
-                  slide.section.groupNumber === 0 ? "text-purple-300" : "text-teal-300"
-                )}>
+          </div>
+
+          {/* Slide content area */}
+          <div className="absolute inset-0 flex items-center justify-center p-10 pt-14 pb-16">
+            {/* Title / End slide */}
+            {(slide?.type === 'title' || slide?.type === 'end') && (
+              <div className="text-center max-w-[80%]">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6" style={{ textShadow: '2px 2px 12px rgba(0,0,0,0.4)' }}>
                   {slide.title}
-                </h2>
-                {slide.section.members && (
-                  <span className="text-sm text-white/50 bg-white/10 px-3 py-1 rounded-full">
-                    {slide.section.members}
-                  </span>
+                </h1>
+                {slide.subtitle && (
+                  <p className="text-xl sm:text-2xl lg:text-3xl text-white/70 font-light">{slide.subtitle}</p>
+                )}
+                {slide.type === 'title' && (
+                  <div className="mt-10 flex items-center justify-center gap-3 text-white/40 text-sm">
+                    <span>{new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <span>·</span>
+                    <span>WeChurch</span>
+                  </div>
+                )}
+                {slide.type === 'end' && (
+                  <div className="mt-10 text-white/30 text-sm">🙏</div>
                 )}
               </div>
-              {(() => {
-                const s = slide.section!;
-                const isNewFmt = !!(s.topic || s.theology || s.highlights || s.divergence || s.soulGym || s.summary);
-                const cards: Array<{ field: keyof GroupReport; label: string; border: string; text: string }> = isNewFmt ? [
-                  { field: 'topic', label: '主題', border: 'border-green-400', text: 'text-green-300' },
-                  { field: 'observations', label: '共同觀察', border: 'border-teal-400', text: 'text-teal-300' },
-                  { field: 'theology', label: '神學亮光', border: 'border-amber-400', text: 'text-amber-300' },
-                  { field: 'applications', label: '共同應用', border: 'border-blue-400', text: 'text-blue-300' },
-                  { field: 'highlights', label: '亮光語錄', border: 'border-yellow-400', text: 'text-yellow-300' },
-                  { field: 'divergence', label: '觀點分歧', border: 'border-orange-400', text: 'text-orange-300' },
-                  { field: 'soulGym', label: 'SoulGym', border: 'border-purple-400', text: 'text-purple-300' },
-                  { field: 'summary', label: '一句話總結', border: 'border-indigo-400', text: 'text-indigo-300' },
-                ] : [
-                  { field: 'themes', label: '主題', border: 'border-green-400', text: 'text-green-300' },
-                  { field: 'observations', label: '事實發現', border: 'border-teal-400', text: 'text-teal-300' },
-                  { field: 'insights', label: '獨特亮光', border: 'border-amber-400', text: 'text-amber-300' },
-                  { field: 'applications', label: '如何應用', border: 'border-blue-400', text: 'text-blue-300' },
-                ];
-                const activeCards = cards.filter(c => s[c.field]);
-                return (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      {activeCards.map(c => (
-                        <div key={c.field} className={`bg-white/10 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 ${c.border}`}>
-                          <h3 className={`${c.text} font-semibold text-sm mb-2`}>{c.label}</h3>
-                          <div className="text-white/90">{formatSlideContent(s[c.field] as string)}</div>
-                        </div>
-                      ))}
-                    </div>
-                    {!isNewFmt && s.contributions && (
-                      <div className="mt-3 sm:mt-4 bg-white/5 backdrop-blur rounded-lg p-3 sm:p-4 border-l-4 border-purple-400">
-                        <h3 className="text-purple-300 font-semibold text-sm mb-2">個人貢獻摘要</h3>
-                        <div className="text-white/80 text-sm">{formatSlideContent(s.contributions)}</div>
+            )}
+
+            {/* Section header slide */}
+            {slide?.type === 'section-header' && (
+              <div className="text-center max-w-[80%]">
+                <div className={cn(
+                  "inline-block px-5 py-2 rounded-full text-sm font-medium mb-6",
+                  isOverall ? "bg-purple-500/20 text-purple-300" : "bg-teal-500/20 text-teal-300"
+                )}>
+                  {isOverall ? '全會眾報告' : '小組報告'}
+                </div>
+                <h1 className={cn(
+                  "text-4xl sm:text-5xl lg:text-6xl font-bold mb-6",
+                  isOverall ? "text-purple-200" : "text-teal-200"
+                )} style={{ textShadow: '2px 2px 12px rgba(0,0,0,0.4)' }}>
+                  {slide.title}
+                </h1>
+                {slide.members && (
+                  <p className="text-lg text-white/60 mb-3">
+                    <span className="text-white/40">👥 組員：</span>{slide.members}
+                  </p>
+                )}
+                {slide.verse && (
+                  <p className="text-lg text-white/50 italic">
+                    <span className="text-white/40">📖 經文：</span>{slide.verse}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Content slide: 1-2 section cards */}
+            {slide?.type === 'content' && slide.cards && (
+              <div className="w-full h-full flex flex-col justify-center gap-5 max-w-[92%]">
+                <div className={cn(
+                  "grid gap-5 flex-1 min-h-0",
+                  slide.cards.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                )}>
+                  {slide.cards.map((card) => (
+                    <div
+                      key={card.field}
+                      className={cn(
+                        "bg-gradient-to-br border-l-4 rounded-xl p-6 flex flex-col overflow-hidden",
+                        card.color
+                      )}
+                    >
+                      <h3 className="text-lg font-bold text-white/90 mb-4 shrink-0">
+                        {card.label}
+                      </h3>
+                      <div className="text-white/80 text-sm sm:text-base overflow-auto flex-1 leading-relaxed">
+                        {formatSlideContent(card.content, slide.cards!.length === 1 ? 16 : 10)}
                       </div>
-                    )}
-                  </>
-                );
-              })()}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom navigation bar */}
+          <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center gap-4 py-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setCurrentSlide(prev => Math.max(prev - 1, 0))}
+              disabled={currentSlide === 0}
+              className="text-white/50 hover:text-white disabled:opacity-20 h-8 w-8"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex gap-1">
+              {presentationSlides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentSlide(i)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    i === currentSlide ? "bg-white w-6" : "bg-white/20 w-1.5"
+                  )}
+                />
+              ))}
             </div>
-          ) : null}
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setCurrentSlide(prev => Math.min(prev + 1, presentationSlides.length - 1))}
+              disabled={currentSlide === presentationSlides.length - 1}
+              className="text-white/50 hover:text-white disabled:opacity-20 h-8 w-8"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center justify-center gap-4 pb-4">
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setCurrentSlide(prev => Math.max(prev - 1, 0))}
-            disabled={currentSlide === 0}
-            className="text-white/70 hover:text-white disabled:opacity-30"
-            data-testid="button-prev-slide"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </Button>
-          <div className="flex gap-1.5">
-            {presentationSlides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentSlide(i)}
-                className={cn(
-                  "w-2 h-2 rounded-full transition-all",
-                  i === currentSlide ? "bg-white w-6" : "bg-white/30"
-                )}
-                data-testid={`button-slide-dot-${i}`}
-              />
-            ))}
-          </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setCurrentSlide(prev => Math.min(prev + 1, presentationSlides.length - 1))}
-            disabled={currentSlide === presentationSlides.length - 1}
-            className="text-white/70 hover:text-white disabled:opacity-30"
-            data-testid="button-next-slide"
-          >
-            <ChevronRight className="w-6 h-6" />
-          </Button>
-        </div>
-        <p className="text-center text-white/30 text-xs pb-3">使用方向鍵或點擊導航 · ESC 退出</p>
+        {/* Hint below slide */}
+        <p className="text-white/20 text-xs mt-3">方向鍵 / 空白鍵導航 · ESC 退出</p>
       </div>
     );
   }
