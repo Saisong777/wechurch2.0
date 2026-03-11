@@ -723,6 +723,10 @@ export async function registerRoutes(app: Express) {
         return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員設定 GEMINI_API_KEY" });
       }
 
+      // Fetch session to get verseReference
+      const session = await storage.getSession(req.params.sessionId);
+      const verseRange = session?.verseReference || undefined;
+
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
@@ -752,7 +756,7 @@ export async function registerRoutes(app: Express) {
           }),
         }));
         const groupSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
-        const userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        const userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         console.log(`[report-gen] group ${groupNumber}: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
           const resultObj = await model.generateContent({
@@ -791,7 +795,7 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholarsNote, actionPlan: r.actionPlan, coolDownNote: r.coolDownNote,
           }),
         }));
-        const userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        const userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         const overallSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
         console.log(`[report-gen] overall: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
@@ -870,6 +874,10 @@ export async function registerRoutes(app: Express) {
         return res.status(503).json({ error: "AI 功能尚未設定：請聯絡管理員設定 GEMINI_API_KEY" });
       }
 
+      // Fetch session to get verseReference
+      const session = await storage.getSession(req.params.sessionId);
+      const verseRange = session?.verseReference || undefined;
+
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
@@ -898,7 +906,7 @@ export async function registerRoutes(app: Express) {
           }),
         }));
         systemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
-        userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         maxTokens = groupMaxTokens;
       } else {
         const allRows = await storage.getStudyResponses(req.params.sessionId);
@@ -917,7 +925,7 @@ export async function registerRoutes(app: Express) {
           }),
         }));
         systemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
-        userContent = formatGroupNotesInput(members, undefined, inputTruncate);
+        userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         maxTokens = overallMaxTokens;
       }
 
