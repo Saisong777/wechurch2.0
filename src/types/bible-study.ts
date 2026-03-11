@@ -19,6 +19,7 @@ export interface Session {
   groups: Group[];
   allowLatecomers?: boolean;
   icebreakerEnabled?: boolean;
+  icebreakerLevel?: 'L1' | 'L2' | 'L3';
 }
 
 export interface Group {

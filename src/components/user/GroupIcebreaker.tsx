@@ -7,6 +7,7 @@ interface GroupIcebreakerProps {
   sessionId: string;
   groupNumber: number;
   currentUserId?: string;
+  initialLevel?: 'L1' | 'L2' | 'L3';
   onComplete: () => void;
   onSkip?: () => void;
 }
@@ -15,6 +16,7 @@ export const GroupIcebreaker: React.FC<GroupIcebreakerProps> = ({
   sessionId,
   groupNumber,
   currentUserId,
+  initialLevel = 'L1',
   onComplete,
   onSkip,
 }) => {
@@ -46,6 +48,7 @@ export const GroupIcebreaker: React.FC<GroupIcebreakerProps> = ({
         sessionId={sessionId}
         groupNumber={groupNumber}
         currentUserId={currentUserId}
+        initialLevel={initialLevel}
         onComplete={onComplete}
       />
 

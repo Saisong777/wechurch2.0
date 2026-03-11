@@ -60,6 +60,7 @@ export const fetchSessionPublic = async (sessionId: string): Promise<{
   createdAt: Date;
   allowLatecomers: boolean;
   icebreakerEnabled: boolean;
+  icebreakerLevel: string;
 } | null> => {
   try {
     const response = await fetch(`/api/sessions/${sessionId}`);
@@ -75,6 +76,7 @@ export const fetchSessionPublic = async (sessionId: string): Promise<{
       createdAt: new Date(data.createdAt),
       allowLatecomers: data.allowLatecomers || false,
       icebreakerEnabled: data.icebreakerEnabled || false,
+      icebreakerLevel: data.icebreakerLevel || 'L1',
     };
   } catch (error) {
     console.error("Fetch session public error:", error);

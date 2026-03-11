@@ -22,6 +22,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
   const [churchUnit, setChurchUnit] = useState('');
   const [verseReference, setVerseReference] = useState('');
   const [icebreakerEnabled, setIcebreakerEnabled] = useState(true);
+  const [icebreakerLevel, setIcebreakerLevel] = useState<'L1' | 'L2' | 'L3'>('L1');
   const [allowLatecomers, setAllowLatecomers] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -50,6 +51,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
           status: 'waiting',
           ownerId: user.id,
           icebreakerEnabled,
+          icebreakerLevel: icebreakerEnabled ? icebreakerLevel : 'L1',
           allowLatecomers
         })
       });
@@ -180,9 +182,35 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
               />
             </div>
             {icebreakerEnabled && (
-              <p className="text-xs text-muted-foreground ml-6">
-                分組後會先進行真心話不用冒險環節
-              </p>
+              <div className="ml-6 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  分組後會先進行真心話不用冒險環節
+                </p>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">起始難度</Label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'L1' as const, label: '真心話', desc: 'Warm-Up', color: 'bg-emerald-500 border-emerald-400 text-white' },
+                      { value: 'L2' as const, label: '連結', desc: 'Connection', color: 'bg-amber-500 border-amber-400 text-white' },
+                      { value: 'L3' as const, label: '深度', desc: 'Deep', color: 'bg-rose-500 border-rose-400 text-white' },
+                    ]).map((level) => (
+                      <button
+                        key={level.value}
+                        type="button"
+                        onClick={() => setIcebreakerLevel(level.value)}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border-2 transition-all ${
+                          icebreakerLevel === level.value
+                            ? `${level.color} ring-2 ring-offset-1 ring-offset-background scale-[1.02]`
+                            : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        <div>{level.label}</div>
+                        <div className="text-[10px] opacity-80">{level.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Allow Latecomers Toggle */}

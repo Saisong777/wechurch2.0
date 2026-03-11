@@ -142,6 +142,7 @@ export const UserPage: React.FC = () => {
         groups: [],
         allowLatecomers: sessionData.allowLatecomers || false,
         icebreakerEnabled: sessionData.icebreakerEnabled || false,
+        icebreakerLevel: (sessionData.icebreakerLevel as 'L1' | 'L2' | 'L3') || 'L1',
       });
 
       // Restore user state
@@ -301,6 +302,7 @@ export const UserPage: React.FC = () => {
         createdAt: new Date(sessionData.createdAt),
         groups: [],
         icebreakerEnabled: sessionData.icebreakerEnabled || false,
+        icebreakerLevel: (sessionData.icebreakerLevel as 'L1' | 'L2' | 'L3') || 'L1',
       });
 
       setIsLoading(false);
@@ -595,6 +597,7 @@ export const UserPage: React.FC = () => {
               sessionId={currentSession.id}
               groupNumber={currentUser.groupNumber}
               currentUserId={currentUser.id}
+              initialLevel={currentSession.icebreakerLevel || 'L1'}
               onComplete={() => {
                 // Mark icebreaker as completed in localStorage
                 localStorage.setItem(`icebreaker_completed_${currentSession.id}_${currentUser.id}`, 'true');

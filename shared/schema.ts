@@ -58,6 +58,7 @@ export const sessions = pgTable("sessions", {
   shortCode: text("short_code").unique(),
   allowLatecomers: boolean("allow_latecomers").default(false).notNull(),
   icebreakerEnabled: boolean("icebreaker_enabled").default(false).notNull(),
+  icebreakerLevel: text("icebreaker_level").default("L1").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

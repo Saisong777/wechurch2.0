@@ -28,6 +28,7 @@ interface TurnBasedCardGameProps {
   sessionId: string;
   groupNumber: number;
   currentUserId: string;
+  initialLevel?: CardLevel;
   onComplete: () => void;
 }
 
@@ -46,6 +47,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
   sessionId,
   groupNumber,
   currentUserId,
+  initialLevel = 'L1',
   onComplete,
 }) => {
   const [members, setMembers] = useState<User[]>([]);
@@ -55,7 +57,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
     currentDrawerCardId: null,
     drawerOrder: [],
     sharedMemberIds: [],
-    currentLevel: 'L1',
+    currentLevel: initialLevel,
     currentCardContent: null,
     currentCardContentEn: null,
   });
