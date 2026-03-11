@@ -350,7 +350,7 @@ export const AdminMonitor: React.FC = () => {
 
     for (const { groupNumber, result } of results) {
       if (result.success && result.report) {
-        allReports += `\n\n${'='.repeat(50)}\n第 ${groupNumber} 組報告\n${'='.repeat(50)}\n\n${result.report}`;
+        allReports += `\n\n${'='.repeat(50)}\n第 ${groupNumber} 組報告\n\n${result.report}`;
         successCount++;
       } else {
         toast.error(`第 ${groupNumber} 組生成失敗: ${result.error}`);
@@ -369,7 +369,7 @@ export const AdminMonitor: React.FC = () => {
 
       if (overallResult.success && overallResult.report) {
         // Add overall report at the beginning
-        allReports = `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n${'='.repeat(50)}\n\n${overallResult.report}` + allReports;
+        allReports = `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n\n${overallResult.report}` + allReports;
         successCount++;
       } else {
         toast.error(`全體報告生成失敗: ${overallResult.error}`);
@@ -407,7 +407,7 @@ export const AdminMonitor: React.FC = () => {
     // Add overall reports FIRST (so they appear at the top of the viewer)
     for (const report of overallReports) {
       // Use a recognizable format that parse.ts can handle: "第 0 組" pattern for overall
-      combinedContent += `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n${'='.repeat(50)}\n\n${report.content}`;
+      combinedContent += `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n\n${report.content}`;
     }
     
     // Add group reports (sorted by group number)
@@ -416,7 +416,7 @@ export const AdminMonitor: React.FC = () => {
     );
     
     for (const report of sortedGroupReports) {
-      combinedContent += `\n\n${'='.repeat(50)}\n第 ${report.groupNumber} 組報告\n${'='.repeat(50)}\n\n${report.content}`;
+      combinedContent += `\n\n${'='.repeat(50)}\n第 ${report.groupNumber} 組報告\n\n${report.content}`;
     }
     
     if (combinedContent) {
