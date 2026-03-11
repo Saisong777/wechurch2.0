@@ -8,7 +8,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/api-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants, endStudySession } from '@/lib/admin-helpers';
-import { Users, FileText, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye, Trash2 } from 'lucide-react';
+import { Users, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -322,32 +322,32 @@ export const AdminMonitor: React.FC = () => {
     }
   };
 
-  const handleGenerateGroupSummary = async () => {
+  const handleGenerateAllReports = async () => {
     if (!currentSession?.id || groups.length === 0) return;
-    
+
+    const totalSteps = groups.length + 1; // groups + overall
     setIsGeneratingGroup(true);
-    setGenerationProgress({ current: 0, total: groups.length });
-    
+    setGenerationProgress({ current: 0, total: totalSteps });
+
     const modeLabel = fastMode ? '快速模式' : '高品質模式';
-    toast.info(`開始逐一生成 ${groups.length} 個小組報告 (${modeLabel})...`, {
-      description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析每組的讀經筆記...',
+    toast.info(`開始生成 ${groups.length} 個小組 + 全體報告 (${modeLabel})...`, {
+      description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析讀經筆記...',
     });
-    
-    // Generate groups one at a time with delay to respect Gemini rate limits
+
+    // Phase 1: Generate group reports one at a time
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
     for (let i = 0; i < groups.length; i++) {
-      if (i > 0) await new Promise(r => setTimeout(r, 4000)); // 4s gap between groups
+      if (i > 0) await new Promise(r => setTimeout(r, 4000)); // 4s gap for rate limit
       const result = await generateAIReport(currentSession.id, 'group', groups[i].number, { fastMode, filledOnly });
       setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
       results.push({ groupNumber: groups[i].number, result });
     }
-    
-    // Sort by group number and combine
+
+    // Combine group reports
     results.sort((a, b) => a.groupNumber - b.groupNumber);
-    
     let allReports = '';
     let successCount = 0;
-    
+
     for (const { groupNumber, result } of results) {
       if (result.success && result.report) {
         allReports += `\n\n${'='.repeat(50)}\n第 ${groupNumber} 組報告\n${'='.repeat(50)}\n\n${result.report}`;
@@ -356,52 +356,39 @@ export const AdminMonitor: React.FC = () => {
         toast.error(`第 ${groupNumber} 組生成失敗: ${result.error}`);
       }
     }
-    
+
+    setIsGeneratingGroup(false);
+
+    // Phase 2: Generate overall report
+    if (successCount > 0) {
+      await new Promise(r => setTimeout(r, 4000)); // Gap before overall
+      setIsGeneratingOverall(true);
+
+      const overallResult = await generateAIReport(currentSession.id, 'overall', undefined, { fastMode, filledOnly });
+      setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
+
+      if (overallResult.success && overallResult.report) {
+        // Add overall report at the beginning
+        allReports = `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n${'='.repeat(50)}\n\n${overallResult.report}` + allReports;
+        successCount++;
+      } else {
+        toast.error(`全體報告生成失敗: ${overallResult.error}`);
+      }
+
+      setIsGeneratingOverall(false);
+    }
+
+    // Show combined results
     if (allReports) {
       setReportContent(allReports);
       setShowReportDialog(true);
-      toast.success(`成功生成 ${successCount}/${groups.length} 個小組報告！`, {
-        description: '每位參與者現在可以在自己的頁面查看小組報告',
+      toast.success(`完成！小組 ${results.filter(r => r.result.success).length}/${groups.length} + 全體報告`, {
+        description: '參與者現在可以在自己的頁面查看報告',
       });
-      // Refetch reports list
       refetchReports();
     }
-    
+
     setGenerationProgress({ current: 0, total: 0 });
-    setIsGeneratingGroup(false);
-  };
-
-  const handleGenerateOverallInsight = async () => {
-    if (!currentSession?.id) return;
-    
-    setIsGeneratingOverall(true);
-    const overallModeLabel = fastMode ? '快速模式' : '高品質模式';
-    toast.info(`正在生成整體洞察報告 (${overallModeLabel})...`, {
-      description: filledOnly ? '僅分析有填寫內容的成員' : undefined,
-    });
-
-    // Use streaming for real-time text display
-    setReportContent('');
-    setShowReportDialog(true);
-
-    const result = await generateAIReport(currentSession.id, 'overall', undefined, {
-      fastMode,
-      filledOnly,
-      onChunk: (_chunk, fullContent) => {
-        setReportContent(fullContent);
-      },
-    });
-
-    if (result.success && result.report) {
-      setReportContent(result.report);
-      toast.success('整體洞察報告已生成！');
-      refetchReports();
-    } else {
-      if (!result.report) setShowReportDialog(false);
-      toast.error(`生成失敗: ${result.error}`);
-    }
-
-    setIsGeneratingOverall(false);
   };
 
   // Handler to view existing reports
@@ -1039,42 +1026,31 @@ export const AdminMonitor: React.FC = () => {
             )}
             
             {/* Action buttons - stack on mobile */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
               <Button
                 variant="navy"
                 size="lg"
-                className="w-full h-12 sm:h-11 text-xs sm:text-sm"
-                onClick={handleGenerateGroupSummary}
-                disabled={isGeneratingGroup || !hasDataForAnalysis}
+                className="w-full h-12 sm:h-11 text-xs sm:text-sm col-span-2 sm:col-span-1"
+                onClick={handleGenerateAllReports}
+                disabled={isGeneratingGroup || isGeneratingOverall || !hasDataForAnalysis}
               >
-                {isGeneratingGroup ? (
+                {isGeneratingGroup || isGeneratingOverall ? (
                   <>
                     <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                    <span className="hidden sm:inline">生成中 ({generationProgress.current}/{generationProgress.total})</span>
-                    <span className="sm:hidden">{generationProgress.current}/{generationProgress.total}</span>
+                    <span className="hidden sm:inline">
+                      {isGeneratingOverall ? '全體報告...' : `小組 ${generationProgress.current}/${groups.length}`}
+                    </span>
+                    <span className="sm:hidden">
+                      {isGeneratingOverall ? '全體...' : `${generationProgress.current}/${groups.length}`}
+                    </span>
                   </>
                 ) : (
                   <>
-                    <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="hidden sm:inline">生成小組摘要</span>
-                    <span className="sm:hidden">小組報告</span>
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline">生成 AI 報告</span>
+                    <span className="sm:hidden">AI 報告</span>
                   </>
                 )}
-              </Button>
-              <Button
-                variant="gold"
-                size="lg"
-                className="w-full h-12 sm:h-11 text-xs sm:text-sm"
-                onClick={handleGenerateOverallInsight}
-                disabled={isGeneratingOverall || !hasDataForAnalysis}
-              >
-                {isGeneratingOverall ? (
-                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                )}
-                <span className="hidden sm:inline">生成整體洞察</span>
-                <span className="sm:hidden">整體報告</span>
               </Button>
               <Button
                 variant="secondary"

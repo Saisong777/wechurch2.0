@@ -145,26 +145,43 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
 
       // Insert each study response via Express API
       let insertedCount = 0;
+      let failedCount = 0;
+      let lastError = '';
       for (const response of mockResponses) {
-        const res = await fetch(`/api/study-responses`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(response),
-        });
-        if (res.ok) {
-          insertedCount++;
-        } else {
-          const errorData = await res.json();
-          console.error('Study response creation failed:', errorData);
+        try {
+          const res = await fetch(`/api/study-responses`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(response),
+          });
+          if (res.ok) {
+            insertedCount++;
+            setGeneratedCount(insertedCount);
+          } else {
+            failedCount++;
+            const errorData = await res.json().catch(() => ({ error: res.statusText }));
+            lastError = errorData.error || `HTTP ${res.status}`;
+            console.error('Study response creation failed:', errorData);
+          }
+        } catch (err: any) {
+          failedCount++;
+          lastError = err.message;
+          console.error('Study response insert error:', err);
         }
       }
 
       setGeneratedCount(insertedCount);
-      toast.success(`成功生成 ${insertedCount} 筆模擬資料！`);
-    } catch (error) {
+      if (insertedCount > 0 && failedCount === 0) {
+        toast.success(`成功生成 ${insertedCount} 筆模擬資料！`);
+      } else if (insertedCount > 0) {
+        toast.warning(`成功 ${insertedCount} 筆，失敗 ${failedCount} 筆: ${lastError}`);
+      } else {
+        toast.error(`全部失敗 (${failedCount} 筆): ${lastError}`);
+      }
+    } catch (error: any) {
       console.error('Error generating mock data:', error);
-      toast.error('生成失敗 Generation failed');
+      toast.error(`生成失敗: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }

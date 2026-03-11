@@ -138,47 +138,44 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
   const [isGeneratingSubmissions, setIsGeneratingSubmissions] = useState(false);
   const [autoGenerateSubmissions, setAutoGenerateSubmissions] = useState(true);
 
-  const generateMockSubmissions = async (participants: Array<{ id: string; name: string; email: string; groupNumber: number | null }>, verseReference: string) => {
-    const submissions = participants
-      .filter(p => p.groupNumber !== null)
-      .map(p => ({
-        sessionId: currentSession!.id,
-        userId: p.id,
-        groupNumber: p.groupNumber!,
-        name: p.name,
-        email: p.email,
-        bibleVerse: verseReference,
-        theme: getRandomItem(MOCK_THEMES),
-        movingVerse: getRandomItem(MOCK_MOVING_VERSES),
-        factsDiscovered: getRandomItem(MOCK_FACTS),
-        traditionalExegesis: getRandomItem(MOCK_EXEGESIS),
-        inspirationFromGod: getRandomItem(MOCK_INSPIRATIONS),
-        applicationInLife: getRandomItem(MOCK_APPLICATIONS),
-        others: getRandomItem(MOCK_OTHERS) || "",
-      }));
+  const INSIGHT_CATEGORIES = ['PROMISE', 'COMMAND', 'WARNING', 'GOD_ATTRIBUTE'] as const;
 
-    if (submissions.length === 0) {
+  const generateMockStudyResponses = async (participants: Array<{ id: string; name: string; email: string; groupNumber: number | null }>) => {
+    const grouped = participants.filter(p => p.groupNumber !== null);
+
+    if (grouped.length === 0) {
       return 0;
     }
 
-    // Insert via Express API
+    // Insert study responses via Express API (study_responses table, used by AI report)
     let insertedCount = 0;
-    for (const submission of submissions) {
+    for (const p of grouped) {
       try {
-        const response = await fetch(`/api/sessions/${currentSession!.id}/submissions`, {
+        const response = await fetch(`/api/study-responses`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify(submission),
+          body: JSON.stringify({
+            sessionId: currentSession!.id,
+            userId: p.id,
+            titlePhrase: getRandomItem(MOCK_THEMES),
+            heartbeatVerse: getRandomItem(MOCK_MOVING_VERSES),
+            observation: getRandomItem(MOCK_FACTS),
+            coreInsightCategory: getRandomItem([...INSIGHT_CATEGORIES]),
+            coreInsightNote: getRandomItem(MOCK_INSPIRATIONS),
+            scholarsNote: getRandomItem(MOCK_EXEGESIS),
+            actionPlan: getRandomItem(MOCK_APPLICATIONS),
+            coolDownNote: getRandomItem(MOCK_OTHERS) || '感謝神的帶領',
+          }),
         });
         if (response.ok) {
           insertedCount++;
         } else {
-          const errorData = await response.json();
-          console.error('Submission failed:', errorData);
+          const errorData = await response.json().catch(() => ({ error: response.statusText }));
+          console.error('Study response failed:', errorData);
         }
       } catch (error) {
-        console.error('Submission insert error:', error);
+        console.error('Study response insert error:', error);
       }
     }
 
@@ -219,9 +216,8 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
         return;
       }
 
-      const count = await generateMockSubmissions(
-        participants as Array<{ id: string; name: string; email: string; groupNumber: number | null }>,
-        currentSession.verseReference || '約翰福音 3:16'
+      const count = await generateMockStudyResponses(
+        participants as Array<{ id: string; name: string; email: string; groupNumber: number | null }>
       );
 
       toast.success(`已生成 ${count} 筆模擬查經資料！`);
