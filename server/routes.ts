@@ -729,9 +729,10 @@ export async function registerRoutes(app: Express) {
 
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
-      const model = genAI.getGenerativeModel({ model: aiModel });
-      const groupMaxTokens = fastMode ? 4000 : 6000;
-      const overallMaxTokens = fastMode ? 6000 : 10000;
+      // Gemini 2.5 Flash uses thinking tokens that count toward maxOutputTokens.
+      // Must set generous limits so thinking + actual output both fit.
+      const groupMaxTokens = fastMode ? 10000 : 16000;
+      const overallMaxTokens = fastMode ? 12000 : 20000;
       // In fast mode, truncate each member's notes to 400 chars to reduce input tokens
       const inputTruncate = fastMode ? 400 : undefined;
 
@@ -759,15 +760,21 @@ export async function registerRoutes(app: Express) {
         const userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         console.log(`[report-gen] group ${groupNumber}: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
+          // Use systemInstruction instead of stuffing prompt into user message
+          const model = genAI.getGenerativeModel({
+            model: aiModel,
+            systemInstruction: groupSystemPrompt,
+          });
           const resultObj = await model.generateContent({
-            contents: [{
-              role: 'user',
-              parts: [{ text: `System: ${groupSystemPrompt}\n\nUser: ${userContent}` }]
-            }],
+            contents: [{ role: 'user', parts: [{ text: userContent }] }],
             generationConfig: { maxOutputTokens: groupMaxTokens }
           });
+          const finishReason = resultObj.response.candidates?.[0]?.finishReason;
           content = resultObj.response.text() || '（AI 未回應）';
-          console.log(`[report-gen] group ${groupNumber}: AI OK, contentLen=${content.length}`);
+          console.log(`[report-gen] group ${groupNumber}: AI OK, contentLen=${content.length}, finishReason=${finishReason}`);
+          if (finishReason === 'MAX_TOKENS') {
+            console.warn(`[report-gen] group ${groupNumber}: ⚠️ TRUNCATED by MAX_TOKENS (limit=${groupMaxTokens})`);
+          }
         } catch (err: any) {
           console.error(`[report-gen] group ${groupNumber}: AI ERROR`, err?.status, err?.message?.slice(0, 200));
           const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
@@ -799,15 +806,21 @@ export async function registerRoutes(app: Express) {
         const overallSystemPrompt = GROUP_OVERALL_SYSTEM_PROMPT;
         console.log(`[report-gen] overall: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
+          // Use systemInstruction instead of stuffing prompt into user message
+          const model = genAI.getGenerativeModel({
+            model: aiModel,
+            systemInstruction: overallSystemPrompt,
+          });
           const resultObj = await model.generateContent({
-            contents: [{
-              role: 'user',
-              parts: [{ text: `System: ${overallSystemPrompt}\n\nUser: ${userContent}` }]
-            }],
+            contents: [{ role: 'user', parts: [{ text: userContent }] }],
             generationConfig: { maxOutputTokens: overallMaxTokens }
           });
+          const finishReason = resultObj.response.candidates?.[0]?.finishReason;
           content = resultObj.response.text() || '（AI 未回應）';
-          console.log(`[report-gen] overall: AI OK, contentLen=${content.length}`);
+          console.log(`[report-gen] overall: AI OK, contentLen=${content.length}, finishReason=${finishReason}`);
+          if (finishReason === 'MAX_TOKENS') {
+            console.warn(`[report-gen] overall: ⚠️ TRUNCATED by MAX_TOKENS (limit=${overallMaxTokens})`);
+          }
         } catch (err: any) {
           console.error(`[report-gen] overall: AI ERROR`, err?.status, err?.message?.slice(0, 200));
           const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
@@ -880,9 +893,9 @@ export async function registerRoutes(app: Express) {
 
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
-      const model = genAI.getGenerativeModel({ model: aiModel });
-      const groupMaxTokens = fastMode ? 4000 : 6000;
-      const overallMaxTokens = fastMode ? 6000 : 10000;
+      // Gemini 2.5 Flash thinking tokens count toward maxOutputTokens
+      const groupMaxTokens = fastMode ? 10000 : 16000;
+      const overallMaxTokens = fastMode ? 12000 : 20000;
       const inputTruncate = fastMode ? 400 : undefined;
 
       let systemPrompt: string;
@@ -938,14 +951,14 @@ export async function registerRoutes(app: Express) {
 
       let fullContent = '';
       try {
-        const genAI = getGeminiClient();
-        const model = genAI.getGenerativeModel({ model: aiModel });
+        // Use systemInstruction instead of stuffing prompt into user message
+        const model = genAI.getGenerativeModel({
+          model: aiModel,
+          systemInstruction: systemPrompt,
+        });
 
         const result = await model.generateContentStream({
-          contents: [{
-            role: 'user',
-            parts: [{ text: `System: ${systemPrompt}\n\nUser: ${userContent}` }]
-          }],
+          contents: [{ role: 'user', parts: [{ text: userContent }] }],
           generationConfig: { maxOutputTokens: maxTokens }
         });
 
