@@ -1,6 +1,6 @@
 // Report viewer module exports
 
-export { parseReportContent, cleanMarkdown } from './parse';
+export { parseReportContent, parseSingleReport, cleanMarkdown } from './parse';
 export type { GroupReport } from './parse';
 
 export { 

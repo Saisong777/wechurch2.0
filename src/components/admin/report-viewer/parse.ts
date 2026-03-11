@@ -140,7 +140,30 @@ function getScore(s: Partial<GroupReport>): number {
   );
 }
 
-// Parse report content into structured sections
+// Parse a single report's content into a GroupReport (no group detection needed)
+// Used when the caller already knows reportType and groupNumber from DB.
+export function parseSingleReport(content: string): GroupReport {
+  const section: Partial<GroupReport> = { groupNumber: 0 };
+
+  // Extract members
+  const membersMatch = content.match(/(?:\*\*)?組員(?:\*\*)?[：:]\s*(?:\*\*)?\s*([^\n]+)/);
+  if (membersMatch) section.members = cleanMarkdown(membersMatch[1]);
+
+  // Extract verse
+  const verseMatch = content.match(/(?:\*\*)?查經經文(?:\*\*)?[：:]\s*(?:\*\*)?\s*([^\n]+)/);
+  if (verseMatch) section.verse = cleanMarkdown(verseMatch[1]);
+
+  // Extract structured sections
+  if (isNewFormat(content)) {
+    parseNewFormatSections(content, section);
+  }
+
+  // Always store raw as fallback
+  section.raw = cleanMarkdown(content);
+  return section as GroupReport;
+}
+
+// Parse report content into structured sections (for combined multi-group strings)
 export function parseReportContent(content: string): GroupReport[] {
   const sections: GroupReport[] = [];
   const groupIndex = new Map<number, number>();

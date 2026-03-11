@@ -21,8 +21,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 import {
-  parseReportContent,
-  cleanMarkdown,
+  parseSingleReport,
   generateSectionMarkdown,
   generatePrintHTML,
   downloadBlob,
@@ -67,11 +66,10 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   const parsedSections = React.useMemo(() => {
     if (!reports || reports.length === 0) return [];
     return reports.map(r => {
-      const parsed = parseReportContent(r.content);
-      const section = parsed[0] || { raw: cleanMarkdown(r.content), groupNumber: 0 } as GroupReport;
-      // Override group identification from DB data (reliable) instead of text parsing (fragile)
-      const gn = r.reportType === 'overall' ? 0 : (r.groupNumber || 0);
-      section.groupNumber = gn;
+      // Parse each report individually — no score thresholds, no group detection needed
+      const section = parseSingleReport(r.content);
+      // Set group identification from DB data (reliable)
+      section.groupNumber = r.reportType === 'overall' ? 0 : (r.groupNumber || 0);
       section.groupInfo = r.reportType === 'overall'
         ? '📊 全會眾綜合分析'
         : `第 ${r.groupNumber} 組`;
