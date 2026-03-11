@@ -19,7 +19,7 @@ import {
   MULTI_NOTE_SYSTEM_PROMPT,
   GROUP_SMALL_SYSTEM_PROMPT,
   GROUP_LARGE_SYSTEM_PROMPT,
-  GROUP_FAST_SYSTEM_PROMPT,
+  GROUP_OVERALL_SYSTEM_PROMPT,
   formatSingleNoteInput,
   formatMultiNoteInput,
   formatGroupNotesInput,
@@ -730,8 +730,8 @@ export async function registerRoutes(app: Express) {
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
-      const groupMaxTokens = fastMode ? 1500 : 4000;
-      const overallMaxTokens = fastMode ? 2500 : 6000;
+      const groupMaxTokens = fastMode ? 3000 : 4000;
+      const overallMaxTokens = fastMode ? 5000 : 8000;
       // In fast mode, truncate each member's notes to 400 chars to reduce input tokens
       const inputTruncate = fastMode ? 400 : undefined;
 
@@ -755,7 +755,7 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholars_note, actionPlan: r.action_plan, coolDownNote: r.cool_down_note,
           }),
         }));
-        const groupSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
+        const groupSystemPrompt = GROUP_SMALL_SYSTEM_PROMPT;
         const userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         console.log(`[report-gen] group ${groupNumber}: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
@@ -796,7 +796,7 @@ export async function registerRoutes(app: Express) {
           }),
         }));
         const userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
-        const overallSystemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
+        const overallSystemPrompt = GROUP_OVERALL_SYSTEM_PROMPT;
         console.log(`[report-gen] overall: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
           const resultObj = await model.generateContent({
@@ -881,8 +881,8 @@ export async function registerRoutes(app: Express) {
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
-      const groupMaxTokens = fastMode ? 1500 : 4000;
-      const overallMaxTokens = fastMode ? 2500 : 6000;
+      const groupMaxTokens = fastMode ? 3000 : 4000;
+      const overallMaxTokens = fastMode ? 5000 : 8000;
       const inputTruncate = fastMode ? 400 : undefined;
 
       let systemPrompt: string;
@@ -905,7 +905,7 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholars_note, actionPlan: r.action_plan, coolDownNote: r.cool_down_note,
           }),
         }));
-        systemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_SMALL_SYSTEM_PROMPT;
+        systemPrompt = GROUP_SMALL_SYSTEM_PROMPT;
         userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         maxTokens = groupMaxTokens;
       } else {
@@ -924,7 +924,7 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholarsNote, actionPlan: r.actionPlan, coolDownNote: r.coolDownNote,
           }),
         }));
-        systemPrompt = fastMode ? GROUP_FAST_SYSTEM_PROMPT : GROUP_LARGE_SYSTEM_PROMPT;
+        systemPrompt = GROUP_OVERALL_SYSTEM_PROMPT;
         userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
         maxTokens = overallMaxTokens;
       }
