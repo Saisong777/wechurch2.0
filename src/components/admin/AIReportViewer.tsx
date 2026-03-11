@@ -203,13 +203,16 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     // Title slide
     slides.push({ type: 'title', title: '查經分析報告', subtitle: verseReference || '靈魂健身房' });
 
-    // Helper: split a section's content into paginated slides (max 2 cards per slide)
+    // Helper: smart pagination — short cards paired, long cards solo
+    const countLines = (text: string) => text.replace(/\*\*/g, '').split('\n').filter(l => l.trim()).length;
+    const SHORT_THRESHOLD = 5; // ≤5 lines = short card
+
     const addSectionSlides = (section: GroupReport, label: string) => {
       const isNewFmt = !!(section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary);
       const cardDefs = isNewFmt ? newFormatCards : oldFormatCards;
       const activeCards = cardDefs
         .filter(c => section[c.field])
-        .map(c => ({ ...c, content: section[c.field] as string }));
+        .map(c => ({ ...c, content: section[c.field] as string, lines: countLines(section[c.field] as string) }));
 
       if (activeCards.length === 0) return;
 
@@ -222,14 +225,21 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         groupNumber: section.groupNumber,
       });
 
-      // Content slides: 1 card per slide for large readable text
-      for (const card of activeCards) {
-        slides.push({
-          type: 'content',
-          title: label,
-          cards: [card],
-          groupNumber: section.groupNumber,
-        });
+      // Group cards into slides: pair short cards, give long cards their own slide
+      let i = 0;
+      while (i < activeCards.length) {
+        const current = activeCards[i];
+        const next = i + 1 < activeCards.length ? activeCards[i + 1] : null;
+
+        // Both short → pair them
+        if (current.lines <= SHORT_THRESHOLD && next && next.lines <= SHORT_THRESHOLD) {
+          slides.push({ type: 'content', title: label, cards: [current, next], groupNumber: section.groupNumber });
+          i += 2;
+        } else {
+          // Long card or last remaining card → solo slide
+          slides.push({ type: 'content', title: label, cards: [current], groupNumber: section.groupNumber });
+          i += 1;
+        }
       }
     };
 
@@ -370,25 +380,48 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               </div>
             )}
 
-            {/* Content slide: 1 section card, full width */}
+            {/* Content slide: 1 or 2 section cards */}
             {slide?.type === 'content' && slide.cards && (
-              <div className="w-full h-full flex flex-col justify-center max-w-[90%]">
-                {slide.cards.map((card) => (
+              <div className={cn(
+                "w-full h-full flex flex-col justify-center max-w-[90%]",
+                slide.cards.length === 2 ? "gap-5" : ""
+              )}>
+                {slide.cards.length === 1 ? (
+                  /* Solo card: full height, large text */
                   <div
-                    key={card.field}
                     className={cn(
                       "bg-gradient-to-br border-l-[6px] rounded-2xl p-8 lg:p-10 flex flex-col overflow-hidden flex-1 min-h-0",
-                      card.color
+                      slide.cards[0].color
                     )}
                   >
                     <h3 className="text-2xl lg:text-3xl font-bold text-white/90 mb-6 shrink-0">
-                      {card.label}
+                      {slide.cards[0].label}
                     </h3>
                     <div className="text-white/85 overflow-auto flex-1 leading-loose">
-                      {formatSlideContent(card.content, 10)}
+                      {formatSlideContent(slide.cards[0].content, 12)}
                     </div>
                   </div>
-                ))}
+                ) : (
+                  /* Two cards side by side */
+                  <div className="grid grid-cols-2 gap-5 flex-1 min-h-0">
+                    {slide.cards.map((card) => (
+                      <div
+                        key={card.field}
+                        className={cn(
+                          "bg-gradient-to-br border-l-[5px] rounded-2xl p-7 lg:p-8 flex flex-col overflow-hidden",
+                          card.color
+                        )}
+                      >
+                        <h3 className="text-xl lg:text-2xl font-bold text-white/90 mb-4 shrink-0">
+                          {card.label}
+                        </h3>
+                        <div className="text-white/85 overflow-auto flex-1 text-lg lg:text-xl leading-relaxed">
+                          {formatSlideContent(card.content, 7)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
