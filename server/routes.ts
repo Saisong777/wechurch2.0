@@ -730,8 +730,8 @@ export async function registerRoutes(app: Express) {
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
-      const groupMaxTokens = fastMode ? 3000 : 4000;
-      const overallMaxTokens = fastMode ? 5000 : 8000;
+      const groupMaxTokens = fastMode ? 4000 : 6000;
+      const overallMaxTokens = fastMode ? 6000 : 10000;
       // In fast mode, truncate each member's notes to 400 chars to reduce input tokens
       const inputTruncate = fastMode ? 400 : undefined;
 
@@ -881,8 +881,8 @@ export async function registerRoutes(app: Express) {
       const genAI = getGeminiClient();
       const aiModel = "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({ model: aiModel });
-      const groupMaxTokens = fastMode ? 3000 : 4000;
-      const overallMaxTokens = fastMode ? 5000 : 8000;
+      const groupMaxTokens = fastMode ? 4000 : 6000;
+      const overallMaxTokens = fastMode ? 6000 : 10000;
       const inputTruncate = fastMode ? 400 : undefined;
 
       let systemPrompt: string;

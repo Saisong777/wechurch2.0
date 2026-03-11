@@ -74,30 +74,32 @@ function isNewFormat(text: string): boolean {
     /\*\*一句話總結\*\*/.test(text);
 }
 
-// Parse new format sections: **N｜title** or **title** with --- separators
+// Parse new format sections: **N｜title** or **title**
+// Finds ALL section headers and extracts content between them,
+// regardless of whether --- separators exist.
 function parseNewFormatSections(text: string, section: Partial<GroupReport>): void {
-  // Split by --- separators on their own line
-  const blocks = text.split(/\n---\n|\n---$/);
+  // Find all recognized section headers in the text
+  const headerRegex = /\*\*(?:\d+[｜|])?\s*(.+?)\*\*/g;
+  const headers: { fieldKey: keyof GroupReport; index: number; endIndex: number }[] = [];
+  let match;
 
-  for (const block of blocks) {
-    const trimmed = block.trim();
-    if (!trimmed) continue;
-
-    // Match: **1｜本次查經主題** or **共同觀察** (FAST mode, no number)
-    const headerMatch = trimmed.match(/\*\*(?:\d+[｜|])?\s*(.+?)\*\*/);
-    if (!headerMatch) continue;
-
-    // Strip star emoji and whitespace from title
-    const title = headerMatch[1].replace(/^[⭐★☆]\s*/, '').trim();
+  while ((match = headerRegex.exec(text)) !== null) {
+    const title = match[1].replace(/^[⭐★☆]\s*/, '').trim();
     const fieldKey = SECTION_TITLE_MAP[title];
-
     if (fieldKey) {
-      // Content is everything after the header line
-      const contentStart = trimmed.indexOf('\n');
-      const content = contentStart >= 0 ? trimmed.slice(contentStart).trim() : '';
-      if (content) {
-        (section as any)[fieldKey] = cleanMarkdown(content);
-      }
+      headers.push({ fieldKey, index: match.index, endIndex: match.index + match[0].length });
+    }
+  }
+
+  // Extract content between consecutive headers
+  for (let i = 0; i < headers.length; i++) {
+    const { fieldKey, endIndex } = headers[i];
+    const nextStart = i + 1 < headers.length ? headers[i + 1].index : text.length;
+    let content = text.slice(endIndex, nextStart).trim();
+    // Remove --- separators and source annotations like （來源：...）
+    content = content.replace(/^---\s*$/gm, '').replace(/^（來源：[^）]*）\s*/gm, '').trim();
+    if (content) {
+      (section as any)[fieldKey] = cleanMarkdown(content);
     }
   }
 }
