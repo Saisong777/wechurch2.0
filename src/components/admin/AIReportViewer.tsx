@@ -222,12 +222,12 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
         groupNumber: section.groupNumber,
       });
 
-      // Content slides: max 2 cards per slide for readability
-      for (let i = 0; i < activeCards.length; i += 2) {
+      // Content slides: 1 card per slide for large readable text
+      for (const card of activeCards) {
         slides.push({
           type: 'content',
           title: label,
-          cards: activeCards.slice(i, i + 2),
+          cards: [card],
           groupNumber: section.groupNumber,
         });
       }
@@ -277,12 +277,12 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
 
   if (presentationMode) {
     const slide = presentationSlides[currentSlide];
-    const formatSlideContent = (text?: string, maxLines = 12) => {
+    const formatSlideContent = (text?: string, maxLines = 10) => {
       if (!text) return null;
       const lines = text.replace(/\*\*/g, '').replace(/^[-•]\s*/gm, '• ').split('\n').filter(l => l.trim());
       const display = lines.slice(0, maxLines);
       return display.map((line, i) => (
-        <div key={i} className="py-0.5 leading-relaxed">{line.trim()}</div>
+        <div key={i} className="py-1 leading-loose text-xl lg:text-2xl">{line.trim()}</div>
       ));
     };
 
@@ -299,12 +299,12 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
           }}
         >
           {/* Top bar: slide counter + close */}
-          <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-3">
-            <span className="text-white/40 text-xs font-medium tracking-wider">
+          <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-4">
+            <span className="text-white/40 text-sm lg:text-base font-medium tracking-wider">
               {slide?.title && slide.type === 'content' ? slide.title : ''}
             </span>
             <div className="flex items-center gap-3">
-              <span className="text-white/40 text-xs">
+              <span className="text-white/40 text-sm lg:text-base">
                 {currentSlide + 1} / {presentationSlides.length}
               </span>
               <Button
@@ -319,25 +319,25 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
           </div>
 
           {/* Slide content area */}
-          <div className="absolute inset-0 flex items-center justify-center p-10 pt-14 pb-16">
+          <div className="absolute inset-0 flex items-center justify-center p-12 pt-16 pb-20">
             {/* Title / End slide */}
             {(slide?.type === 'title' || slide?.type === 'end') && (
               <div className="text-center max-w-[80%]">
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6" style={{ textShadow: '2px 2px 12px rgba(0,0,0,0.4)' }}>
+                <h1 className="text-5xl lg:text-7xl font-bold text-white mb-8" style={{ textShadow: '2px 2px 12px rgba(0,0,0,0.4)' }}>
                   {slide.title}
                 </h1>
                 {slide.subtitle && (
-                  <p className="text-xl sm:text-2xl lg:text-3xl text-white/70 font-light">{slide.subtitle}</p>
+                  <p className="text-2xl lg:text-4xl text-white/70 font-light">{slide.subtitle}</p>
                 )}
                 {slide.type === 'title' && (
-                  <div className="mt-10 flex items-center justify-center gap-3 text-white/40 text-sm">
+                  <div className="mt-12 flex items-center justify-center gap-3 text-white/40 text-lg">
                     <span>{new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     <span>·</span>
                     <span>WeChurch</span>
                   </div>
                 )}
                 {slide.type === 'end' && (
-                  <div className="mt-10 text-white/30 text-sm">🙏</div>
+                  <div className="mt-12 text-white/30 text-2xl">🙏</div>
                 )}
               </div>
             )}
@@ -346,54 +346,49 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             {slide?.type === 'section-header' && (
               <div className="text-center max-w-[80%]">
                 <div className={cn(
-                  "inline-block px-5 py-2 rounded-full text-sm font-medium mb-6",
+                  "inline-block px-6 py-2.5 rounded-full text-lg lg:text-xl font-medium mb-8",
                   isOverall ? "bg-purple-500/20 text-purple-300" : "bg-teal-500/20 text-teal-300"
                 )}>
                   {isOverall ? '全會眾報告' : '小組報告'}
                 </div>
                 <h1 className={cn(
-                  "text-4xl sm:text-5xl lg:text-6xl font-bold mb-6",
+                  "text-5xl lg:text-7xl font-bold mb-8",
                   isOverall ? "text-purple-200" : "text-teal-200"
                 )} style={{ textShadow: '2px 2px 12px rgba(0,0,0,0.4)' }}>
                   {slide.title}
                 </h1>
                 {slide.members && (
-                  <p className="text-lg text-white/60 mb-3">
+                  <p className="text-xl lg:text-2xl text-white/60 mb-4">
                     <span className="text-white/40">👥 組員：</span>{slide.members}
                   </p>
                 )}
                 {slide.verse && (
-                  <p className="text-lg text-white/50 italic">
+                  <p className="text-xl lg:text-2xl text-white/50 italic">
                     <span className="text-white/40">📖 經文：</span>{slide.verse}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Content slide: 1-2 section cards */}
+            {/* Content slide: 1 section card, full width */}
             {slide?.type === 'content' && slide.cards && (
-              <div className="w-full h-full flex flex-col justify-center gap-5 max-w-[92%]">
-                <div className={cn(
-                  "grid gap-5 flex-1 min-h-0",
-                  slide.cards.length === 1 ? "grid-cols-1" : "grid-cols-2"
-                )}>
-                  {slide.cards.map((card) => (
-                    <div
-                      key={card.field}
-                      className={cn(
-                        "bg-gradient-to-br border-l-4 rounded-xl p-6 flex flex-col overflow-hidden",
-                        card.color
-                      )}
-                    >
-                      <h3 className="text-lg font-bold text-white/90 mb-4 shrink-0">
-                        {card.label}
-                      </h3>
-                      <div className="text-white/80 text-sm sm:text-base overflow-auto flex-1 leading-relaxed">
-                        {formatSlideContent(card.content, slide.cards!.length === 1 ? 16 : 10)}
-                      </div>
+              <div className="w-full h-full flex flex-col justify-center max-w-[90%]">
+                {slide.cards.map((card) => (
+                  <div
+                    key={card.field}
+                    className={cn(
+                      "bg-gradient-to-br border-l-[6px] rounded-2xl p-8 lg:p-10 flex flex-col overflow-hidden flex-1 min-h-0",
+                      card.color
+                    )}
+                  >
+                    <h3 className="text-2xl lg:text-3xl font-bold text-white/90 mb-6 shrink-0">
+                      {card.label}
+                    </h3>
+                    <div className="text-white/85 overflow-auto flex-1 leading-loose">
+                      {formatSlideContent(card.content, 10)}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
