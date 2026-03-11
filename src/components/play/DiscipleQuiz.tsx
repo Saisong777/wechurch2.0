@@ -170,6 +170,7 @@ const DISCIPLES: Record<string, {
 };
 
 const QUESTIONS = [
+  // ===== 第一輪：社交與人際 (Q1-Q4) =====
   {
     q: "朋友聚會時，你通常是...",
     qEn: "At a gathering, you're usually...",
@@ -181,6 +182,38 @@ const QUESTIONS = [
     ],
   },
   {
+    q: "朋友跟你說心事時，你通常...",
+    qEn: "When a friend confides in you...",
+    options: [
+      { text: "馬上給建議，幫他想解決方法", scores: { peter: 2, philip: 3, simonZ: 1 } },
+      { text: "安靜聽完，給一個很深的擁抱", scores: { john: 3, thaddaeus: 2, jamesA: 1 } },
+      { text: "問清楚所有細節再回應", scores: { thomas: 3, matthew: 2, nathanael: 1 } },
+      { text: "幫他牽線，介紹能幫忙的人", scores: { andrew: 3, matthias: 2, philip: 1 } },
+    ],
+  },
+  {
+    q: "你跟陌生人在一起時...",
+    qEn: "When surrounded by strangers...",
+    options: [
+      { text: "自然就開始聊起來了，完全不怕生", scores: { peter: 3, andrew: 2, philip: 1 } },
+      { text: "會等對方先開口，但一開口就能深聊", scores: { john: 2, nathanael: 3, thaddaeus: 1 } },
+      { text: "觀察環境和人，心裡做各種分析", scores: { thomas: 2, matthew: 3, jamesA: 1 } },
+      { text: "安安靜靜待在旁邊，不太需要社交", scores: { jamesA: 3, matthias: 2, thomas: 1 } },
+    ],
+  },
+  {
+    q: "經營友情，你覺得最重要的是...",
+    qEn: "In maintaining friendships, the most important thing is...",
+    options: [
+      { text: "可以一起冒險、一起衝", scores: { peter: 2, james: 3, simonZ: 1 } },
+      { text: "彼此真實，不需要戴面具", scores: { nathanael: 3, john: 2, thomas: 1 } },
+      { text: "長期穩定，不用常聯繫也不會變", scores: { jamesA: 3, matthias: 2, matthew: 1 } },
+      { text: "互相幫助、互相成全", scores: { andrew: 3, thaddaeus: 2, philip: 1 } },
+    ],
+  },
+
+  // ===== 第二輪：決策與思考 (Q5-Q8) =====
+  {
     q: "面對一個你不確定的決定，你會...",
     qEn: "Facing an uncertain decision, you would...",
     options: [
@@ -191,23 +224,23 @@ const QUESTIONS = [
     ],
   },
   {
-    q: "看到社會上不公義的事，你的第一反應是...",
-    qEn: "Seeing injustice in society, your first reaction is...",
+    q: "團隊在討論一件事，你覺得大家方向錯了，你會...",
+    qEn: "The team is heading in the wrong direction. You would...",
     options: [
-      { text: "馬上行動！發文、連署、上街", scores: { simonZ: 3, james: 2, peter: 1 } },
-      { text: "深入研究問題的根源", scores: { thomas: 3, philip: 2, matthew: 1 } },
-      { text: "先關心受害者的感受", scores: { john: 2, thaddaeus: 3, andrew: 1 } },
-      { text: "在自己的崗位上默默做該做的事", scores: { jamesA: 3, matthias: 2, nathanael: 1 } },
+      { text: "直接說出來：「我覺得不對！」", scores: { peter: 3, nathanael: 2, simonZ: 1 } },
+      { text: "用提問的方式引導大家發現問題", scores: { philip: 3, thomas: 2, john: 1 } },
+      { text: "私下找關鍵的人溝通", scores: { andrew: 3, thaddaeus: 2, matthew: 1 } },
+      { text: "先配合，但持續觀察和準備", scores: { jamesA: 2, matthias: 3, james: 1 } },
     ],
   },
   {
-    q: "你最享受的工作模式是...",
-    qEn: "Your favorite work mode is...",
+    q: "學新東西的時候，你傾向...",
+    qEn: "When learning something new, you prefer...",
     options: [
-      { text: "帶領團隊衝刺目標", scores: { peter: 3, james: 2, simonZ: 1 } },
-      { text: "獨自深度研究和創作", scores: { john: 3, thomas: 2, matthew: 1 } },
-      { text: "跟不同的人合作交流", scores: { andrew: 2, philip: 3, thaddaeus: 1 } },
-      { text: "把混亂的東西整理成有條理的系統", scores: { matthew: 3, jamesA: 1, matthias: 2 } },
+      { text: "直接動手做，邊做邊學", scores: { peter: 3, james: 2, simonZ: 1 } },
+      { text: "先把理論和原理搞清楚", scores: { thomas: 3, philip: 2, john: 1 } },
+      { text: "找有經驗的人帶著學", scores: { andrew: 2, matthias: 3, thaddaeus: 1 } },
+      { text: "做筆記、畫架構圖，系統性學習", scores: { matthew: 3, jamesA: 2, nathanael: 1 } },
     ],
   },
   {
@@ -218,6 +251,18 @@ const QUESTIONS = [
       { text: "嗯...讓我先查證一下", scores: { thomas: 3, philip: 2, matthew: 1 } },
       { text: "觀察對方的表情和動機", scores: { john: 2, nathanael: 3, jamesA: 1 } },
       { text: "不管真假，先關心分享這消息的人", scores: { thaddaeus: 3, andrew: 1, matthias: 2 } },
+    ],
+  },
+
+  // ===== 第三輪：工作與角色 (Q9-Q12) =====
+  {
+    q: "你最享受的工作模式是...",
+    qEn: "Your favorite work mode is...",
+    options: [
+      { text: "帶領團隊衝刺目標", scores: { peter: 3, james: 2, simonZ: 1 } },
+      { text: "獨自深度研究和創作", scores: { john: 3, thomas: 2, matthew: 1 } },
+      { text: "跟不同的人合作交流", scores: { andrew: 2, philip: 3, thaddaeus: 1 } },
+      { text: "把混亂的東西整理成有條理的系統", scores: { matthew: 3, jamesA: 1, matthias: 2 } },
     ],
   },
   {
@@ -231,6 +276,38 @@ const QUESTIONS = [
     ],
   },
   {
+    q: "如果你是專案負責人，你的風格會是...",
+    qEn: "As a project lead, your style would be...",
+    options: [
+      { text: "走在最前面，衝鋒陷陣型", scores: { peter: 3, james: 2, simonZ: 1 } },
+      { text: "確保每個人都在對的位置上", scores: { andrew: 3, matthew: 2, philip: 1 } },
+      { text: "提出深刻的願景和方向", scores: { john: 3, thomas: 1, thaddaeus: 2 } },
+      { text: "默默補位，哪裡需要就去哪裡", scores: { jamesA: 3, matthias: 2, nathanael: 1 } },
+    ],
+  },
+  {
+    q: "完成一個大案子後，你最想...",
+    qEn: "After finishing a big project, you most want to...",
+    options: [
+      { text: "馬上慶祝！然後找下一個挑戰", scores: { peter: 2, james: 3, simonZ: 1 } },
+      { text: "寫一份完整的複盤報告", scores: { matthew: 3, philip: 2, thomas: 1 } },
+      { text: "好好休息，回到日常的節奏", scores: { jamesA: 3, matthias: 2, nathanael: 1 } },
+      { text: "感謝每一個參與的人", scores: { andrew: 2, thaddaeus: 3, john: 1 } },
+    ],
+  },
+
+  // ===== 第四輪：逆境與價值觀 (Q13-Q16) =====
+  {
+    q: "看到社會上不公義的事，你的第一反應是...",
+    qEn: "Seeing injustice in society, your first reaction is...",
+    options: [
+      { text: "馬上行動！發文、連署、上街", scores: { simonZ: 3, james: 2, peter: 1 } },
+      { text: "深入研究問題的根源", scores: { thomas: 3, philip: 2, matthew: 1 } },
+      { text: "先關心受害者的感受", scores: { john: 2, thaddaeus: 3, andrew: 1 } },
+      { text: "在自己的崗位上默默做該做的事", scores: { jamesA: 3, matthias: 2, nathanael: 1 } },
+    ],
+  },
+  {
     q: "壓力很大的時候，你會...",
     qEn: "When under heavy pressure, you...",
     options: [
@@ -240,6 +317,70 @@ const QUESTIONS = [
       { text: "開始列清單，把事情拆解成小步驟", scores: { matthew: 3, philip: 2, nathanael: 1 } },
     ],
   },
+  {
+    q: "你犯了一個嚴重的錯誤，你的反應是...",
+    qEn: "You've made a serious mistake. Your reaction is...",
+    options: [
+      { text: "痛哭一場，但很快站起來重新出發", scores: { peter: 3, james: 1, thaddaeus: 2 } },
+      { text: "反覆分析哪裡出了問題，避免再犯", scores: { thomas: 3, matthew: 2, philip: 1 } },
+      { text: "覺得很慚愧，需要一段時間才能面對自己", scores: { john: 2, jamesA: 2, matthias: 2 } },
+      { text: "坦然承認，不找藉口", scores: { nathanael: 3, simonZ: 1, andrew: 2 } },
+    ],
+  },
+  {
+    q: "你最怕別人說你...",
+    qEn: "You're most afraid of being called...",
+    options: [
+      { text: "膽小、不敢冒險", scores: { peter: 3, james: 2, simonZ: 1 } },
+      { text: "虛偽、表裡不一", scores: { nathanael: 3, john: 2, thomas: 1 } },
+      { text: "無用、沒有貢獻", scores: { matthew: 2, jamesA: 3, matthias: 1 } },
+      { text: "冷漠、不關心別人", scores: { thaddaeus: 3, andrew: 2, philip: 1 } },
+    ],
+  },
+
+  // ===== 第五輪：信仰與內在 (Q17-Q20) =====
+  {
+    q: "讀聖經的時候，你最常有的感受是...",
+    qEn: "When reading the Bible, you most often feel...",
+    options: [
+      { text: "被激勵！想馬上去行動", scores: { peter: 3, simonZ: 2, james: 1 } },
+      { text: "好感動，心裡有很深的觸動", scores: { john: 3, thaddaeus: 2, nathanael: 1 } },
+      { text: "有很多問題想研究和探討", scores: { thomas: 3, philip: 2, matthew: 1 } },
+      { text: "安靜領受，感覺被穩固", scores: { jamesA: 3, matthias: 2, andrew: 1 } },
+    ],
+  },
+  {
+    q: "禱告的時候，你最自然的方式是...",
+    qEn: "Your most natural way to pray is...",
+    options: [
+      { text: "大聲、火熱、充滿感情", scores: { peter: 2, james: 3, simonZ: 1 } },
+      { text: "安安靜靜，像跟好朋友說話", scores: { john: 3, jamesA: 2, matthias: 1 } },
+      { text: "很具體——列出每一件事來禱告", scores: { matthew: 3, philip: 2, thomas: 1 } },
+      { text: "為別人代禱比為自己禱告更多", scores: { andrew: 2, thaddaeus: 3, nathanael: 1 } },
+    ],
+  },
+  {
+    q: "你覺得信仰最核心的是...",
+    qEn: "The core of faith for you is...",
+    options: [
+      { text: "行動！信仰沒有行動是死的", scores: { james: 3, peter: 2, simonZ: 1 } },
+      { text: "關係——跟神之間真實的連結", scores: { john: 3, nathanael: 2, thaddaeus: 1 } },
+      { text: "真理——搞清楚什麼是對的", scores: { thomas: 3, philip: 2, matthew: 1 } },
+      { text: "忠心——每天持續地走這條路", scores: { jamesA: 3, matthias: 2, andrew: 1 } },
+    ],
+  },
+  {
+    q: "如果你活在耶穌的時代，你最可能...",
+    qEn: "If you lived in Jesus' time, you'd most likely...",
+    options: [
+      { text: "第一個跳下船，走向耶穌", scores: { peter: 3, james: 2, simonZ: 1 } },
+      { text: "坐在耶穌旁邊，安靜聽他講道", scores: { john: 3, jamesA: 2, matthias: 1 } },
+      { text: "到處帶人來見耶穌", scores: { andrew: 3, philip: 2, thaddaeus: 1 } },
+      { text: "把耶穌說的每句話都記下來", scores: { matthew: 3, thomas: 2, nathanael: 1 } },
+    ],
+  },
+
+  // ===== 第六輪：深層性格 (Q21-Q24) =====
   {
     q: "你最認同的一句話是...",
     qEn: "The quote you resonate with most...",
@@ -261,6 +402,16 @@ const QUESTIONS = [
     ],
   },
   {
+    q: "十年後回頭看，你最希望別人記得你是...",
+    qEn: "In 10 years, you hope people remember you as...",
+    options: [
+      { text: "那個敢帶頭改變局面的人", scores: { peter: 2, simonZ: 3, james: 1 } },
+      { text: "那個永遠說真話、活得真實的人", scores: { nathanael: 3, thomas: 2, john: 1 } },
+      { text: "那個默默付出、從不缺席的人", scores: { jamesA: 3, matthias: 2, matthew: 1 } },
+      { text: "那個總在關鍵時刻牽線搭橋的人", scores: { andrew: 3, philip: 1, thaddaeus: 2 } },
+    ],
+  },
+  {
     q: "你覺得最重要的品格是...",
     qEn: "The most important virtue to you is...",
     options: [
@@ -270,6 +421,15 @@ const QUESTIONS = [
       { text: "愛心——讓每個人感受到被在乎", scores: { john: 2, andrew: 2, thaddaeus: 3 } },
     ],
   },
+];
+
+const SECTIONS = [
+  { start: 0, end: 3, label: "社交與人際", labelEn: "SOCIAL & RELATIONSHIPS" },
+  { start: 4, end: 7, label: "決策與思考", labelEn: "DECISIONS & THINKING" },
+  { start: 8, end: 11, label: "工作與角色", labelEn: "WORK & ROLE" },
+  { start: 12, end: 15, label: "逆境與價值觀", labelEn: "ADVERSITY & VALUES" },
+  { start: 16, end: 19, label: "信仰與內在", labelEn: "FAITH & INNER LIFE" },
+  { start: 20, end: 23, label: "深層性格", labelEn: "DEEP CHARACTER" },
 ];
 
 interface QuizResults {
@@ -339,6 +499,10 @@ export default function DiscipleQuiz() {
     return Math.round((score / results.maxScore) * 100);
   };
 
+  const getCurrentSection = () => {
+    return SECTIONS.find(s => currentQ >= s.start && currentQ <= s.end);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -354,7 +518,7 @@ export default function DiscipleQuiz() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&family=Cinzel:wght@400;600;700&display=swap');
 
-        .gold-text {
+        .dq-gold-text {
           background: linear-gradient(135deg, #d4a44a 0%, #f5d98a 40%, #d4a44a 60%, #a67c2e 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
@@ -446,7 +610,7 @@ export default function DiscipleQuiz() {
           background: rgba(212, 164, 74, 0.1);
           border-radius: 3px;
           overflow: hidden;
-          margin-bottom: 40px;
+          margin-bottom: 24px;
         }
 
         .dq-progress-fill {
@@ -539,7 +703,7 @@ export default function DiscipleQuiz() {
             </div>
             <div style={{ fontSize: 64, marginBottom: 16 }}>📜</div>
             <h1
-              className="gold-text"
+              className="dq-gold-text"
               style={{
                 fontFamily: "'Cinzel', serif",
                 fontSize: "clamp(28px, 5vw, 40px)",
@@ -582,7 +746,7 @@ export default function DiscipleQuiz() {
                 marginRight: "auto",
               }}
             >
-              透過 10 道情境題，
+              透過 24 道情境題，
               <br />
               發現你的人格特質最像耶穌的哪一位門徒。
               <br />
@@ -623,6 +787,43 @@ export default function DiscipleQuiz() {
                 style={{ width: `${((currentQ + 1) / QUESTIONS.length) * 100}%` }}
               />
             </div>
+
+            {/* Section Label */}
+            {(() => {
+              const sec = getCurrentSection();
+              const isNewSection = sec && currentQ === sec.start;
+              return sec ? (
+                <div
+                  key={sec.labelEn}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 20,
+                    animation: isNewSection ? "dqFadeSlideIn 0.5s ease" : "none",
+                  }}
+                >
+                  <div style={{
+                    padding: "4px 12px",
+                    background: "rgba(212, 164, 74, 0.1)",
+                    borderRadius: 20,
+                    border: "1px solid rgba(212, 164, 74, 0.15)",
+                  }}>
+                    <span style={{ fontSize: 12, color: "#d4a44a", fontWeight: 600 }}>
+                      {sec.label}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: 11,
+                    color: "rgba(245,230,200,0.25)",
+                    fontFamily: "'Cinzel', serif",
+                    letterSpacing: 1,
+                  }}>
+                    {sec.labelEn}
+                  </span>
+                </div>
+              ) : null;
+            })()}
 
             <div className={fadeIn ? "dq-fade-in" : "dq-fade-out"} key={currentQ}>
               <h2
@@ -692,7 +893,7 @@ export default function DiscipleQuiz() {
                       YOU ARE MOST LIKE
                     </p>
                     <h2
-                      className="gold-text"
+                      className="dq-gold-text"
                       style={{
                         fontFamily: "'Cinzel', serif",
                         fontSize: "clamp(22px, 5vw, 32px)",

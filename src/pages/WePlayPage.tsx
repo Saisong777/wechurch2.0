@@ -38,7 +38,7 @@ const features = [
   {
     id: "disciple-quiz",
     title: "你像哪個門徒？",
-    subtitle: "10 題測出你的門徒人格",
+    subtitle: "24 題測出你的門徒人格",
     icon: ScrollText,
     href: "/play/disciple-quiz",
     bgColor: "bg-orange-500/15",
