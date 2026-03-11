@@ -334,13 +334,18 @@ export const AdminMonitor: React.FC = () => {
       description: filledOnly ? '僅分析有填寫內容的成員' : 'AI 正在分析讀經筆記...',
     });
 
-    // Phase 1: Generate group reports one at a time
+    // Phase 1: Generate group reports one at a time with error isolation
     const results: { groupNumber: number; result: { success: boolean; report?: string; error?: string } }[] = [];
     for (let i = 0; i < groups.length; i++) {
-      if (i > 0) await new Promise(r => setTimeout(r, 4000)); // 4s gap for rate limit
-      const result = await generateAIReport(currentSession.id, 'group', groups[i].number, { fastMode, filledOnly });
+      if (i > 0) await new Promise(r => setTimeout(r, 6000)); // 6s gap for Gemini rate limit
+      try {
+        const result = await generateAIReport(currentSession.id, 'group', groups[i].number, { fastMode, filledOnly });
+        results.push({ groupNumber: groups[i].number, result });
+      } catch (err: any) {
+        console.error(`[generateAllReports] group ${groups[i].number} threw:`, err);
+        results.push({ groupNumber: groups[i].number, result: { success: false, error: err?.message || '未知錯誤' } });
+      }
       setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
-      results.push({ groupNumber: groups[i].number, result });
     }
 
     // Collect successful group reports
@@ -361,17 +366,22 @@ export const AdminMonitor: React.FC = () => {
 
     // Phase 2: Generate overall report
     if (successCount > 0) {
-      await new Promise(r => setTimeout(r, 4000)); // Gap before overall
+      await new Promise(r => setTimeout(r, 6000)); // Gap before overall
       setIsGeneratingOverall(true);
 
-      const overallResult = await generateAIReport(currentSession.id, 'overall', undefined, { fastMode, filledOnly });
-      setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
+      try {
+        const overallResult = await generateAIReport(currentSession.id, 'overall', undefined, { fastMode, filledOnly });
+        setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
 
-      if (overallResult.success && overallResult.report) {
-        reportsList.unshift({ reportType: 'overall', groupNumber: 0, content: overallResult.report });
-        successCount++;
-      } else {
-        toast.error(`全體報告生成失敗: ${overallResult.error}`);
+        if (overallResult.success && overallResult.report) {
+          reportsList.unshift({ reportType: 'overall', groupNumber: 0, content: overallResult.report });
+          successCount++;
+        } else {
+          toast.error(`全體報告生成失敗: ${overallResult.error}`);
+        }
+      } catch (err: any) {
+        console.error('[generateAllReports] overall threw:', err);
+        toast.error(`全體報告生成失敗: ${err?.message || '未知錯誤'}`);
       }
 
       setIsGeneratingOverall(false);

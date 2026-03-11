@@ -605,16 +605,26 @@ export const generateAIReport = async (
       ? `/api/sessions/${sessionId}/reports/stream`
       : `/api/sessions/${sessionId}/reports`;
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reportType,
-        groupNumber,
-        fastMode: options?.fastMode ?? false,
-        filledOnly: options?.filledOnly ?? false,
-      }),
-    });
+    // Gemini 2.5 Flash with thinking can take 60-90s; set generous timeout (3 min)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportType,
+          groupNumber,
+          fastMode: options?.fastMode ?? false,
+          filledOnly: options?.filledOnly ?? false,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (response.status === 429 && _retryCount < 3) {
       const delay = [15000, 35000, 65000][_retryCount]; // 15s, 35s, 65s (Gemini needs ~60s to reset)
       console.warn(`[generateAIReport] 429 rate limit, retrying in ${delay}ms (attempt ${_retryCount + 1}/4)`);
