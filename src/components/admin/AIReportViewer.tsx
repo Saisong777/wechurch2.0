@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 
 import {
   parseReportContent,
+  cleanMarkdown,
   generateSectionMarkdown,
   generatePrintHTML,
   downloadBlob,
@@ -32,17 +33,24 @@ import {
   ReportComparison,
 } from './report-viewer';
 
+// Structured report from DB or generation
+export interface ReportItem {
+  reportType: string;
+  groupNumber: number | null;
+  content: string;
+}
+
 interface AIReportViewerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  reportContent: string | null;
+  reports: ReportItem[] | null;
   verseReference?: string;
 }
 
 export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   open,
   onOpenChange,
-  reportContent,
+  reports,
   verseReference,
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
@@ -54,9 +62,23 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   React.useEffect(() => {
     if (!open) setPresentationMode(false);
   }, [open]);
-  
-  const parsedSections = reportContent ? parseReportContent(reportContent) : [];
-  
+
+  // Parse each report individually and assign groupNumber from DB data
+  const parsedSections = React.useMemo(() => {
+    if (!reports || reports.length === 0) return [];
+    return reports.map(r => {
+      const parsed = parseReportContent(r.content);
+      const section = parsed[0] || { raw: cleanMarkdown(r.content), groupNumber: 0 } as GroupReport;
+      // Override group identification from DB data (reliable) instead of text parsing (fragile)
+      const gn = r.reportType === 'overall' ? 0 : (r.groupNumber || 0);
+      section.groupNumber = gn;
+      section.groupInfo = r.reportType === 'overall'
+        ? '📊 全會眾綜合分析'
+        : `第 ${r.groupNumber} 組`;
+      return section;
+    });
+  }, [reports]);
+
   // Filter sections based on search query
   const filteredSections = parsedSections.filter(section => {
     if (!searchQuery) return true;
@@ -72,11 +94,17 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   const groupReports = filteredSections.filter(s => s.groupNumber > 0);
   const overallReports = filteredSections.filter(s => s.groupNumber === 0);
   const hasMultipleGroups = groupReports.length > 1 || (groupReports.length >= 1 && overallReports.length >= 1);
-  
+
+  // Reconstruct full text for copy
+  const allContentText = React.useMemo(() => {
+    if (!reports) return '';
+    return reports.map(r => r.content).join('\n\n');
+  }, [reports]);
+
   // --- Copy handlers ---
   const handleCopyAll = () => {
-    if (reportContent) {
-      navigator.clipboard.writeText(reportContent);
+    if (allContentText) {
+      navigator.clipboard.writeText(allContentText);
       toast.success('報告已複製到剪貼簿！');
     }
   };
@@ -88,7 +116,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
       toast.success(groupNumber === 0 ? '全組總結已複製！' : `第 ${groupNumber} 組報告已複製！`);
     }
   };
-  
+
   // --- Print handlers ---
   const handlePrint = (groupNumber?: number) => {
     const html = generatePrintHTML(parsedSections, verseReference, groupNumber);
@@ -99,37 +127,37 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   const handleDownloadPDF = (groupNumber?: number) => {
     const html = generatePrintHTML(parsedSections, verseReference, groupNumber);
     openPrintWindow(html, true);
-    
+
     toast.info(`正在開啟 PDF 預覽...`, {
       description: '請使用瀏覽器的「列印」→「另存為 PDF」功能',
     });
   };
-  
+
   const handleDownloadMarkdownAll = () => {
     if (!parsedSections.length) return;
-    
+
     const allMarkdown = parsedSections
       .map(section => generateSectionMarkdown(section, verseReference))
       .join('\n\n' + '='.repeat(50) + '\n\n');
-    
+
     const blob = new Blob([allMarkdown], { type: 'text/markdown;charset=utf-8;' });
     const filename = `查經報告-${verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.md`;
     downloadBlob(blob, filename);
-    
+
     toast.success('Markdown 已下載！');
   };
 
   const handleDownloadMarkdownGroup = (groupNumber: number) => {
     const section = parsedSections.find(s => s.groupNumber === groupNumber);
     if (!section) return;
-    
+
     const markdown = generateSectionMarkdown(section, verseReference);
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
-    const filename = groupNumber === 0 
+    const filename = groupNumber === 0
       ? `全組總結-${verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.md`
       : `第${groupNumber}組報告-${verseReference || 'export'}-${new Date().toISOString().split('T')[0]}.md`;
     downloadBlob(blob, filename);
-    
+
     toast.success(groupNumber === 0 ? '全組總結 Markdown 已下載！' : `第 ${groupNumber} 組 Markdown 已下載！`);
   };
 
@@ -187,7 +215,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
   };
 
   const { overallReports: visibleOverall, groupReports: visibleGroups, showAll, showCompare } = getCurrentContent();
-  
+
   if (presentationMode) {
     const slide = presentationSlides[currentSlide];
     const formatSlideContent = (text?: string) => {
@@ -349,7 +377,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             </p>
           )}
         </DialogHeader>
-        
+
         {/* Quick Navigation Bar - Only show when multiple groups */}
         {hasMultipleGroups && (
           <div className="px-3 sm:px-6 py-2 sm:py-3 border-b bg-muted/20">
@@ -429,7 +457,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             </div>
           </div>
         )}
-        
+
         {/* Toolbar */}
         <div className="px-3 sm:px-6 py-2 border-b bg-background/50 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -452,7 +480,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               列印
             </Button>
           </div>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="default" size="sm" className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm">
@@ -480,7 +508,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                 <Printer className="w-4 h-4 mr-2" />
                 列印全部
               </DropdownMenuItem>
-              
+
               {hasMultipleGroups && (
                 <>
                   <DropdownMenuSeparator />
@@ -494,7 +522,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
                     </DropdownMenuItem>
                   )}
                   {groupReports.map(section => (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       key={section.groupNumber}
                       onClick={() => handleDownloadMarkdownGroup(section.groupNumber)}
                     >
@@ -507,13 +535,13 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        
+
         {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6" ref={printRef}>
           <div className="space-y-6 sm:space-y-8">
             {/* Comparison View */}
             {showCompare && groupReports.length >= 2 && (
-              <ReportComparison 
+              <ReportComparison
                 groupReports={groupReports}
                 overallReport={overallReports[0]}
                 onClose={() => setActiveTab('all')}
@@ -522,8 +550,8 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
 
             {/* Visualization Charts for Overall View */}
             {!showCompare && (activeTab === 'all' || activeTab === 'overall') && groupReports.length > 1 && (
-              <OverallReportCharts 
-                groupReports={groupReports} 
+              <OverallReportCharts
+                groupReports={groupReports}
                 overallReport={overallReports[0]}
                 className="mb-6"
               />
@@ -600,7 +628,7 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             )}
           </div>
         </div>
-        
+
         {/* Footer */}
         <div className="px-3 sm:px-6 py-3 sm:py-4 border-t bg-muted/30 flex items-center justify-between gap-2">
           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">

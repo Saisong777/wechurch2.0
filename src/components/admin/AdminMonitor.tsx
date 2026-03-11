@@ -27,7 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StudyProgressMonitor } from './StudyProgressMonitor';
 import { MockDataGenerator } from './MockDataGenerator';
-import { AIReportViewer } from './AIReportViewer';
+import { AIReportViewer, ReportItem } from './AIReportViewer';
 import { useAdminStudyResponses } from '@/hooks/useAdminStudyResponses';
 import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
 
@@ -36,7 +36,7 @@ export const AdminMonitor: React.FC = () => {
   const { currentSession, users, setUsers, submissions, setSubmissions, addSubmission, setCurrentSession } = useSession();
   const [isGeneratingGroup, setIsGeneratingGroup] = useState(false);
   const [isGeneratingOverall, setIsGeneratingOverall] = useState(false);
-  const [reportContent, setReportContent] = useState<string | null>(null);
+  const [reportData, setReportData] = useState<ReportItem[] | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [isForceVerifying, setIsForceVerifying] = useState(false);
@@ -343,14 +343,14 @@ export const AdminMonitor: React.FC = () => {
       results.push({ groupNumber: groups[i].number, result });
     }
 
-    // Combine group reports
+    // Collect successful group reports
     results.sort((a, b) => a.groupNumber - b.groupNumber);
-    let allReports = '';
+    const reportsList: ReportItem[] = [];
     let successCount = 0;
 
     for (const { groupNumber, result } of results) {
       if (result.success && result.report) {
-        allReports += `\n\n${'='.repeat(50)}\n第 ${groupNumber} 組報告\n\n${result.report}`;
+        reportsList.push({ reportType: 'group', groupNumber, content: result.report });
         successCount++;
       } else {
         toast.error(`第 ${groupNumber} 組生成失敗: ${result.error}`);
@@ -368,8 +368,7 @@ export const AdminMonitor: React.FC = () => {
       setGenerationProgress(prev => ({ ...prev, current: prev.current + 1 }));
 
       if (overallResult.success && overallResult.report) {
-        // Add overall report at the beginning
-        allReports = `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n\n${overallResult.report}` + allReports;
+        reportsList.unshift({ reportType: 'overall', groupNumber: 0, content: overallResult.report });
         successCount++;
       } else {
         toast.error(`全體報告生成失敗: ${overallResult.error}`);
@@ -379,8 +378,8 @@ export const AdminMonitor: React.FC = () => {
     }
 
     // Show combined results
-    if (allReports) {
-      setReportContent(allReports);
+    if (reportsList.length > 0) {
+      setReportData(reportsList);
       setShowReportDialog(true);
       toast.success(`完成！小組 ${results.filter(r => r.result.success).length}/${groups.length} + 全體報告`, {
         description: '參與者現在可以在自己的頁面查看報告',
@@ -397,30 +396,20 @@ export const AdminMonitor: React.FC = () => {
       toast.info('目前沒有已生成的報告');
       return;
     }
-    
-    // Combine all group reports for viewing
-    const groupReports = existingReports.filter(r => r.reportType === 'group');
+
+    // Pass structured data directly — no string concatenation needed
     const overallReports = existingReports.filter(r => r.reportType === 'overall');
-    
-    let combinedContent = '';
-    
-    // Add overall reports FIRST (so they appear at the top of the viewer)
-    for (const report of overallReports) {
-      // Use a recognizable format that parse.ts can handle: "第 0 組" pattern for overall
-      combinedContent += `\n\n${'='.repeat(50)}\n📊 全會眾綜合分析報告\n組別：第 0 組（全體）\n\n${report.content}`;
-    }
-    
-    // Add group reports (sorted by group number)
-    const sortedGroupReports = [...groupReports].sort((a, b) => 
-      (a.groupNumber || 0) - (b.groupNumber || 0)
-    );
-    
-    for (const report of sortedGroupReports) {
-      combinedContent += `\n\n${'='.repeat(50)}\n第 ${report.groupNumber} 組報告\n\n${report.content}`;
-    }
-    
-    if (combinedContent) {
-      setReportContent(combinedContent);
+    const groupReports = existingReports
+      .filter(r => r.reportType === 'group')
+      .sort((a, b) => (a.groupNumber || 0) - (b.groupNumber || 0));
+
+    const reportsList: ReportItem[] = [
+      ...overallReports.map(r => ({ reportType: r.reportType, groupNumber: r.groupNumber, content: r.content })),
+      ...groupReports.map(r => ({ reportType: r.reportType, groupNumber: r.groupNumber, content: r.content })),
+    ];
+
+    if (reportsList.length > 0) {
+      setReportData(reportsList);
       setShowReportDialog(true);
     }
   };
@@ -458,8 +447,8 @@ export const AdminMonitor: React.FC = () => {
   };
 
   const handleCopyReport = () => {
-    if (reportContent) {
-      navigator.clipboard.writeText(reportContent);
+    if (reportData) {
+      navigator.clipboard.writeText(reportData.map(r => r.content).join('\n\n'));
       toast.success('報告已複製到剪貼簿！');
     }
   };
@@ -1110,7 +1099,7 @@ export const AdminMonitor: React.FC = () => {
       <AIReportViewer
         open={showReportDialog}
         onOpenChange={setShowReportDialog}
-        reportContent={reportContent}
+        reports={reportData}
         verseReference={currentSession?.verseReference}
       />
     </div>
