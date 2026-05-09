@@ -14,6 +14,12 @@ import { apiRequest } from '@/lib/queryClient';
 
 type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'mail' | 'inbox' | 'create' | 'waiting' | 'monitor';
 
+const hostFlowSteps: Array<{ step: AdminStep; label: string; hint: string }> = [
+  { step: 'create', label: '建立聚會', hint: '設定經文' },
+  { step: 'waiting', label: '邀請與分組', hint: 'QR、成員、分組' },
+  { step: 'monitor', label: '主持查經', hint: '進度、AI、結束' },
+];
+
 function lazyAdminComponent<T extends Record<string, unknown>>(
   factory: () => Promise<T>,
   name: keyof T
@@ -362,31 +368,33 @@ export const AdminPage: React.FC = () => {
       <main className="container mx-auto max-w-7xl">
         {/* Progress indicator - only show during session flow */}
         {(step === 'create' || step === 'waiting' || step === 'monitor') && (
-          <div className="flex items-center justify-center gap-2 py-4 sm:py-6">
-            {(['create', 'waiting', 'monitor'] as AdminStep[]).map((s, index) => (
+          <div className="px-3 sm:px-4 py-4 sm:py-6">
+            <div className="mx-auto max-w-3xl rounded-2xl border bg-card/80 p-3 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-primary">一頁式主持台</p>
+                  <p className="text-xs text-muted-foreground">照著目前階段操作即可</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+            {hostFlowSteps.map(({ step: s, label, hint }, index) => (
               <React.Fragment key={s}>
                 <div
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium transition-all ${
+                  className={`rounded-xl px-2 py-2 text-center transition-all ${
                     step === s
                       ? 'gradient-coral text-white shadow-lg'
-                      : ['create', 'waiting', 'monitor'].indexOf(step) > index
-                      ? 'bg-primary text-primary-foreground'
+                      : hostFlowSteps.findIndex(item => item.step === step) > index
+                      ? 'bg-primary/10 text-primary'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >
-                  {index + 1}
+                  <p className="text-xs font-bold sm:text-sm">{index + 1}. {label}</p>
+                  <p className="mt-0.5 hidden text-[11px] opacity-80 sm:block">{hint}</p>
                 </div>
-                {index < 2 && (
-                  <div
-                    className={`w-8 sm:w-12 h-1 rounded ${
-                      ['create', 'waiting', 'monitor'].indexOf(step) > index
-                        ? 'bg-primary'
-                        : 'bg-muted'
-                    }`}
-                  />
-                )}
               </React.Fragment>
             ))}
+              </div>
+            </div>
           </div>
         )}
 

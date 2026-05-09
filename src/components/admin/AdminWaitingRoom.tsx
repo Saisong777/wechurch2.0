@@ -137,6 +137,8 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
   }, {} as Record<string, typeof users>);
   
   const locationCount = Object.keys(locationGroups).length;
+  const estimatedGroupCount = users.length > 0 ? Math.ceil(users.length / maxSize) : 0;
+  const canStartGrouping = users.length >= 2 && !isGrouping;
 
   const handleCopySessionId = () => {
     const codeToCopy = currentSession?.shortCode || currentSession?.id;
@@ -273,6 +275,56 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
         currentStep="join"
         icebreakerEnabled={currentSession?.icebreakerEnabled ?? true}
       />
+
+      <Card className="border-primary/20 bg-primary/5 shadow-sm">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-primary">主持人下一步</p>
+              <h2 className="mt-1 text-xl font-bold text-foreground">
+                {users.length < 2 ? '先讓大家加入' : '人到齊就可以分組'}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {users.length < 2
+                  ? '把 QR Code 投到螢幕，或把活動代碼貼到群組。'
+                  : `目前 ${users.length} 人，依照 ${minSize}-${maxSize} 人設定，預計分成 ${estimatedGroupCount} 組。`}
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 lg:min-w-[360px]">
+              <div className="rounded-xl bg-background px-3 py-2 text-center">
+                <p className="text-xl font-bold text-foreground">{users.length}</p>
+                <p className="text-xs text-muted-foreground">已加入</p>
+              </div>
+              <div className="rounded-xl bg-background px-3 py-2 text-center">
+                <p className="text-xl font-bold text-foreground">{estimatedGroupCount}</p>
+                <p className="text-xs text-muted-foreground">預估組數</p>
+              </div>
+              <div className="rounded-xl bg-background px-3 py-2 text-center">
+                <p className="text-sm font-bold text-foreground">
+                  {currentSession?.icebreakerEnabled ? '抽卡' : '手動'}
+                </p>
+                <p className="text-xs text-muted-foreground">分組後</p>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="gold"
+            size="xl"
+            className="mt-4 w-full h-14 sm:h-12 text-base sm:text-lg"
+            onClick={handleStartGrouping}
+            disabled={!canStartGrouping}
+          >
+            {isGrouping ? (
+              '分組中...'
+            ) : (
+              <>
+                <UserCheck className="w-5 h-5 sm:w-6 sm:h-6" />
+                人到齊，開始分組 ({users.length} 人)
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Participants */}
       <Card>
@@ -467,22 +519,6 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
       <StressTestSimulator 
         onParticipantsGenerated={loadParticipants}
       />
-      <Button
-        variant="gold"
-        size="xl"
-        className="w-full h-14 sm:h-12 text-base sm:text-lg"
-        onClick={handleStartGrouping}
-        disabled={users.length < 2 || isGrouping}
-      >
-        {isGrouping ? (
-          '分組中...'
-        ) : (
-          <>
-            <UserCheck className="w-5 h-5 sm:w-6 sm:h-6" />
-            人到齊，開始分組 ({users.length} 人)
-          </>
-        )}
-      </Button>
     </div>
   );
 };
