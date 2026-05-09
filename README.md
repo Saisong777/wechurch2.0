@@ -134,7 +134,10 @@ export CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 npm run local:db
 npm run local:db:wait
 npm run db:push:local
+npm run local:prod
 ```
+
+開啟網站：`http://localhost:5099`
 
 如果要一次跑「資料庫 + schema + build + test + audit + 瀏覽器白屏檢查」：
 

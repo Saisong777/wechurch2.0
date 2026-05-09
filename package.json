@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "local:prod": "NODE_ENV=production PORT=5099 tsx server/index.ts",
+    "local:prod": "NODE_ENV=production PORT=${PORT:-5099} SESSION_SECRET=${SESSION_SECRET:-local-prod-session-secret} DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev} tsx server/index.ts",
     "local:verify": "node scripts/local-verify.cjs",
     "safe:check": "npm run build && npm test && npm audit && npm run local:verify",
     "local:db": "cat compose.yml | docker compose -f - up -d db",
