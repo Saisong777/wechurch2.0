@@ -93,7 +93,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
         localStorage.removeItem('pending_session_id');
         localStorage.setItem('bible_study_participant_id', joinedUser.id);
         localStorage.setItem('user_email', email);
-        toast.success('成功加入健身課程！');
+        toast.success('成功加入查經活動！');
         onJoined(isLatecomer && !!joinedUser.groupNumber);
       } else {
         toast.error('加入失敗，請重試');

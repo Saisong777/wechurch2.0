@@ -46,7 +46,7 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5" />
-            靈命健身進度監控 Study Progress Monitor
+            三步驟查經進度
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -58,15 +58,15 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
             </div>
             <div className="rounded-lg p-3 text-center border bg-green-50/50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">{statusCounts.warming_up}</p>
-              <p className="text-xs text-green-600 dark:text-green-400">暖身中</p>
+              <p className="text-xs text-green-600 dark:text-green-400">看見</p>
             </div>
             <div className="rounded-lg p-3 text-center border bg-yellow-50/50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800">
               <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{statusCounts.heavy_lifting}</p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400">重訓中</p>
+              <p className="text-xs text-yellow-600 dark:text-yellow-400">領受</p>
             </div>
             <div className="rounded-lg p-3 text-center border bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{statusCounts.stretching}</p>
-              <p className="text-xs text-blue-600 dark:text-blue-400">收操中</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400">完成</p>
             </div>
           </div>
 
@@ -111,7 +111,7 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
                           disabled={p.progressStatus === 'not_started'}
                         >
                           <Eye className="w-4 h-4 mr-1" />
-                          Peek
+                          查看
                         </Button>
                       </td>
                     </tr>
@@ -123,38 +123,34 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
         </CardContent>
       </Card>
 
-      {/* Peek Modal */}
+      {/* Note Modal */}
       <Dialog open={!!selectedParticipant} onOpenChange={() => setSelectedParticipant(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              {selectedParticipant?.participantName} 的健身筆記
+              {selectedParticipant?.participantName} 的查經筆記
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
             {selectedParticipant?.response && (
               <div className="space-y-4">
-                {/* Phase 1 */}
                 <div className="border-l-4 border-l-green-500 pl-4 space-y-2">
                   <h4 className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
-                    <Eye className="w-4 h-4" /> Phase 1: 暖身
+                    <Eye className="w-4 h-4" /> 1. 看見
                   </h4>
                   <div className="text-sm space-y-1">
-                    <p><span className="text-muted-foreground">標題分段:</span> {selectedParticipant.response.titlePhrase || selectedParticipant.response.title_phrase || '-'}</p>
-                    <p><span className="text-muted-foreground">最感動的經文:</span> {selectedParticipant.response.heartbeatVerse || selectedParticipant.response.heartbeat_verse || '-'}</p>
-                    <p><span className="text-muted-foreground">經文上的資訊:</span> {selectedParticipant.response.observation || '-'}</p>
+                    <p><span className="text-muted-foreground">觀察:</span> {selectedParticipant.response.observation || '-'}</p>
                   </div>
                 </div>
 
-                {/* Phase 2 */}
                 <div className="border-l-4 border-l-yellow-500 pl-4 space-y-2">
                   <h4 className="font-medium text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
-                    <Dumbbell className="w-4 h-4" /> Phase 2: 重訓
+                    <Dumbbell className="w-4 h-4" /> 2. 領受
                   </h4>
                   <div className="text-sm space-y-1">
                     <p>
-                      <span className="text-muted-foreground">思想神的話:</span>{' '}
+                      <span className="text-muted-foreground">領受:</span>{' '}
                       {(() => {
                         const cats = parseCategories(selectedParticipant.response?.coreInsightCategory || selectedParticipant.response?.core_insight_category || null);
                         const nts = parseNotes(selectedParticipant.response?.coreInsightNote || selectedParticipant.response?.core_insight_note || null, cats);
@@ -178,18 +174,15 @@ export const StudyProgressMonitor: React.FC<StudyProgressMonitorProps> = ({ sess
                         );
                       })()}
                     </p>
-                    <p><span className="text-muted-foreground">注釋書或其他的參考資料:</span> {selectedParticipant.response.scholarsNote || selectedParticipant.response.scholars_note || '-'}</p>
                   </div>
                 </div>
 
-                {/* Phase 3 */}
                 <div className="border-l-4 border-l-blue-500 pl-4 space-y-2">
                   <h4 className="font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" /> Phase 3: 伸展
+                    <Sparkles className="w-4 h-4" /> 3. 回應
                   </h4>
                   <div className="text-sm space-y-1">
-                    <p><span className="text-muted-foreground">與神同行的行動:</span> {selectedParticipant.response.actionPlan || selectedParticipant.response.action_plan || '-'}</p>
-                    <p><span className="text-muted-foreground">其他:</span> {selectedParticipant.response.coolDownNote || selectedParticipant.response.cool_down_note || '-'}</p>
+                    <p><span className="text-muted-foreground">行動:</span> {selectedParticipant.response.actionPlan || selectedParticipant.response.action_plan || '-'}</p>
                   </div>
                 </div>
               </div>

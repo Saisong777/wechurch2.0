@@ -159,13 +159,29 @@ export const AdminPage: React.FC = () => {
                 data-testid="button-create-session"
               >
                 <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
-                開始新課程
+                建立查經活動
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div>
+              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                今日 SoulGym
+              </h3>
+              <SessionHistory
+                onCreateNew={() => setStep('create')}
+                onSelectSession={handleSelectSession}
+              />
+            </div>
+
+            <div className="pt-2">
+              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                後台管理
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {([
-                { icon: History, label: '歷史資料', desc: '查看過往課程', action: () => setStep('history'), testId: 'button-history' },
+                { icon: History, label: '歷史資料', desc: '查看過往活動', action: () => setStep('history'), testId: 'button-history' },
                 { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
                 { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
                 { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
@@ -194,17 +210,7 @@ export const AdminPage: React.FC = () => {
                   </div>
                 </button>
               ))}
-            </div>
-
-            <div>
-              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                <BookOpen className="w-4 h-4" />
-                進行中的課程
-              </h3>
-              <SessionHistory 
-                onCreateNew={() => setStep('create')} 
-                onSelectSession={handleSelectSession}
-              />
+              </div>
             </div>
           </div>
         );

@@ -159,7 +159,7 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
             全體報告尚未生成
           </p>
           <p className="text-sm text-muted-foreground mt-1">
-            請等待教練生成 AI 全體分析報告
+            請等待帶領者生成 AI 全體分析報告
           </p>
         </CardContent>
       </Card>

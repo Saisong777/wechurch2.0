@@ -177,7 +177,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
             小組報告尚未生成
           </p>
           <p className="text-sm text-muted-foreground mt-1">
-            請等待教練生成 AI 分析報告
+            請等待帶領者生成 AI 分析報告
           </p>
         </CardContent>
       </Card>

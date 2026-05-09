@@ -67,7 +67,7 @@ export const SessionQRCode: React.FC<SessionQRCodeProps> = ({ sessionId, shortCo
         {shortCode && (
           <div className="text-center">
             <p className="text-2xl font-mono font-bold tracking-[0.3em]">{shortCode}</p>
-            <p className="text-xs text-muted-foreground mt-1">課程代碼</p>
+            <p className="text-xs text-muted-foreground mt-1">活動代碼</p>
           </div>
         )}
         

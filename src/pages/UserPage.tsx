@@ -373,7 +373,7 @@ export const UserPage: React.FC = () => {
 
   const handleEnterSession = async () => {
     if (!sessionId.trim()) {
-      toast.error('請輸入課程代碼');
+      toast.error('請輸入活動代碼');
       return;
     }
     await loadSessionAndCheckAuth(sessionId);
@@ -435,15 +435,15 @@ export const UserPage: React.FC = () => {
                 <div className="mx-auto w-20 h-20 sm:w-16 sm:h-16 rounded-full gradient-sky flex items-center justify-center mb-5 sm:mb-4 shadow-lg">
                   <WeChurchIcon size={40} className="drop-shadow-md" />
                 </div>
-                <CardTitle className="text-2xl sm:text-2xl font-display">輸入課程代碼</CardTitle>
+                <CardTitle className="text-2xl sm:text-2xl font-display">輸入活動代碼</CardTitle>
                 <CardDescription className="text-base sm:text-base mt-2">
-                  Enter 4-digit code from your coach
+                  輸入帶領者提供的 4 碼代碼
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6 pb-8 sm:pb-8">
                 <div className="space-y-3">
                   <Label htmlFor="sessionId" className="text-base sm:text-sm font-medium">
-                    課程代碼 Session Code
+                    活動代碼 Session Code
                   </Label>
                   <Input
                     id="sessionId"
@@ -454,7 +454,7 @@ export const UserPage: React.FC = () => {
                     maxLength={4}
                   />
                   <p className="text-sm text-muted-foreground text-center">
-                    輸入教練提供的 4 碼代碼
+                    輸入帶領者提供的 4 碼代碼
                   </p>
                 </div>
 
@@ -640,13 +640,13 @@ export const UserPage: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  請點擊下方按鈕重置後重新輸入課程代碼。
+                  請點擊下方按鈕重置後重新輸入活動代碼。
                 </p>
                 <Button variant="gold" size="xl" className="w-full" onClick={resetLocalState}>
                   重置並重新加入
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => setStep('enter-session')}>
-                  返回輸入課程代碼
+                  返回輸入活動代碼
                 </Button>
               </CardContent>
             </Card>

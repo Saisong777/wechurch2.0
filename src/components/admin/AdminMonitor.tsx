@@ -8,7 +8,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/api-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants, endStudySession } from '@/lib/admin-helpers';
-import { Users, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye, Trash2 } from 'lucide-react';
+import { Users, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye, Trash2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -25,6 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { StudyProgressMonitor } from './StudyProgressMonitor';
 import { MockDataGenerator } from './MockDataGenerator';
 import { AIReportViewer, ReportItem } from './AIReportViewer';
@@ -47,6 +48,7 @@ export const AdminMonitor: React.FC = () => {
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
   const [allowLatecomers, setAllowLatecomers] = useState(currentSession?.allowLatecomers || false);
   const [icebreakerEnabled, setIcebreakerEnabled] = useState(currentSession?.icebreakerEnabled || false);
+  const [isRescueOpen, setIsRescueOpen] = useState(false);
   
   // AI generation options
   const [fastMode, setFastMode] = useState(true);  // Default to fast mode
@@ -93,8 +95,8 @@ export const AdminMonitor: React.FC = () => {
       !allSubmittedNotified
     ) {
       setAllSubmittedNotified(true);
-      toast.success('🎉 全員交卷完成！', {
-        description: `所有 ${studyProgressStats.total} 位參與者都已完成健身筆記`,
+      toast.success('全員查經筆記已完成！', {
+        description: `所有 ${studyProgressStats.total} 位參與者都已完成三步驟查經`,
         duration: 10000,
       });
     }
@@ -149,7 +151,7 @@ export const AdminMonitor: React.FC = () => {
     if (allReady && isVerificationPhase) {
       await updateSessionStatus(currentSession.id, 'studying');
       setCurrentSession({ ...currentSession, status: 'studying' });
-      toast.success('所有組員已確認，開始健身！', {
+      toast.success('所有組員已確認，開始查經！', {
         description: 'All members verified! Study phase started.',
       });
     }
@@ -519,6 +521,76 @@ export const AdminMonitor: React.FC = () => {
     ? (studyProgressStats.completed / studyProgressStats.total) * 100 
     : 0;
 
+  const currentFlowStep = flowSteps[activeFlowIndex] || flowSteps[0];
+  const CurrentFlowIcon = currentFlowStep.icon;
+  type FlowGuidance = {
+    title: string;
+    description: string;
+    actionLabel: string;
+    disabled: boolean;
+    onClick?: () => void | Promise<void>;
+  };
+  const flowGuidance: FlowGuidance = (() => {
+    if (activeFlowStep === 'join') {
+      return {
+        title: '現在：等待大家加入',
+        description: '把 QR Code 或活動代碼投影出來，等人數差不多後再開始分組。',
+        actionLabel: '等待加入中',
+        disabled: true,
+      };
+    }
+    if (activeFlowStep === 'intro') {
+      return {
+        title: '現在：分組與自我介紹',
+        description: '請各組確認成員都在同一組，完成自我介紹後再進入查經。',
+        actionLabel: '強制進入查經',
+        onClick: handleForceVerifyAll,
+        disabled: isForceVerifying || totalMemberCount === 0,
+      };
+    }
+    if (activeFlowStep === 'icebreaker') {
+      return {
+        title: '現在：抽卡分享',
+        description: '請大家先完成抽卡分享。分享結束後，帶領者口頭宣布進入三步驟查經即可。',
+        actionLabel: '等待分享完成',
+        disabled: true,
+      };
+    }
+    if (activeFlowStep === 'study') {
+      return {
+        title: '現在：三步驟查經',
+        description: `目前 ${studyProgressStats.completed}/${studyProgressStats.total || totalCount} 位完成。等大家完成後，下一步會進入 AI 整理。`,
+        actionLabel: '等待大家完成',
+        disabled: true,
+      };
+    }
+    if (activeFlowStep === 'group-report') {
+      return {
+        title: '下一步：產生 AI 整理',
+        description: '先整理每一小組的綜合查經，再彙整成今天的大組總成果。',
+        actionLabel: '產生小組與大組 AI 整理',
+        onClick: handleGenerateAllReports,
+        disabled: isGeneratingGroup || isGeneratingOverall || !hasDataForAnalysis,
+      };
+    }
+    if (activeFlowStep === 'overall-report') {
+      return {
+        title: '下一步：完成大組總整理',
+        description: '小組整理已完成，接著補上全體查經的總成果。',
+        actionLabel: '產生 AI 總整理',
+        onClick: handleGenerateAllReports,
+        disabled: isGeneratingGroup || isGeneratingOverall || !hasDataForAnalysis,
+      };
+    }
+    return {
+      title: '今天的查經已完成',
+      description: '可以查閱報告、匯出資料，或回到歷史資料查看封存內容。',
+      actionLabel: '查閱報告',
+      onClick: handleViewExistingReports,
+      disabled: existingReports.length === 0,
+    };
+  })();
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       {/* Session Header */}
@@ -533,7 +605,7 @@ export const AdminMonitor: React.FC = () => {
             </div>
             <div className="flex items-center gap-3 sm:gap-4">
               <Badge variant={isVerificationPhase ? 'secondary' : isStudyingPhase ? 'default' : 'outline'} className="text-xs sm:text-sm">
-                {isVerificationPhase ? '驗證中' : isStudyingPhase ? '健身中' : currentSession?.status}
+                {isVerificationPhase ? '分組確認中' : isStudyingPhase ? '查經中' : currentSession?.status}
               </Badge>
               <div className="text-center">
                 <p className="text-xl sm:text-2xl font-bold text-primary">
@@ -545,7 +617,7 @@ export const AdminMonitor: React.FC = () => {
                   }
                 </p>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  {isVerificationPhase ? '已確認' : isStudyingPhase ? '已交卷' : '參與者'}
+                  {isVerificationPhase ? '已確認' : isStudyingPhase ? '已完成' : '參與者'}
                 </p>
               </div>
             </div>
@@ -570,15 +642,15 @@ export const AdminMonitor: React.FC = () => {
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>
-                  🔴 尚未開始: {studyProgressStats.notStarted} | 
-                  🟡 進行中: {studyProgressStats.inProgress} | 
-                  🟢 已完成: {studyProgressStats.completed}
+                  尚未開始: {studyProgressStats.notStarted} |
+                  進行中: {studyProgressStats.inProgress} |
+                  已完成: {studyProgressStats.completed}
                 </span>
                 <span>{studySubmissionPercentage.toFixed(0)}%</span>
               </div>
               {studyProgressStats.completed === studyProgressStats.total && (
                 <div className="text-center py-2 px-4 bg-accent/10 rounded-lg border border-accent/30">
-                  <p className="text-sm font-medium text-accent">🎉 全員交卷完成！</p>
+                  <p className="text-sm font-medium text-accent">全員查經筆記已完成</p>
                 </div>
               )}
             </div>
@@ -586,7 +658,7 @@ export const AdminMonitor: React.FC = () => {
 
           {/* Session Settings Status - Read-only indicators */}
           <div className="mt-4 pt-4 border-t border-border space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">課程設定</p>
+            <p className="text-xs font-medium text-muted-foreground">活動設定</p>
             
             {/* Icebreaker Status */}
             <div className="flex items-center justify-between">
@@ -702,16 +774,39 @@ export const AdminMonitor: React.FC = () => {
 
       <Card>
         <CardContent className="py-4 px-4 sm:px-6">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">SoulGym 現場流程</p>
-              <p className="text-base sm:text-lg font-semibold text-foreground">
-                {flowSteps[activeFlowIndex]?.label || '進行中'}
-              </p>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <CurrentFlowIcon className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">SoulGym 主持台</p>
+                <p className="text-lg sm:text-xl font-semibold text-foreground">
+                  {flowGuidance.title}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+                  {flowGuidance.description}
+                </p>
+              </div>
             </div>
-            <Badge variant="outline" className="shrink-0">
-              {activeFlowIndex + 1}/{flowSteps.length}
-            </Badge>
+            <div className="flex items-center gap-2 lg:shrink-0">
+              <Badge variant="outline" className="hidden sm:inline-flex">
+                {activeFlowIndex + 1}/{flowSteps.length}
+              </Badge>
+              <Button
+                variant={flowGuidance.onClick ? 'default' : 'outline'}
+                className="w-full sm:w-auto h-11"
+                onClick={flowGuidance.onClick}
+                disabled={flowGuidance.disabled || !flowGuidance.onClick}
+              >
+                {(isForceVerifying || isGeneratingGroup || isGeneratingOverall) && flowGuidance.onClick ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {flowGuidance.actionLabel}
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -748,17 +843,30 @@ export const AdminMonitor: React.FC = () => {
 
       {/* Admin Rescue Tools */}
       {(isVerificationPhase || isStudyingPhase || groups.length > 0) && (
-        <Card className="border-accent/50 bg-accent/5">
-          <CardContent className="py-4 px-4 sm:px-6 space-y-4">
+        <Collapsible open={isRescueOpen} onOpenChange={setIsRescueOpen}>
+          <Card className="border-accent/50 bg-accent/5">
+            <CardContent className="py-4 px-4 sm:px-6 space-y-4">
             {/* Header */}
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-foreground text-sm sm:text-base">管理員救援工具</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  現場出狀況時可快速救援
-                </p>
-              </div>
+            <CollapsibleTrigger asChild>
+              <button className="w-full flex items-start justify-between gap-3 text-left">
+                <span className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+                  <span>
+                    <span className="block font-medium text-foreground text-sm sm:text-base">現場救援工具</span>
+                    <span className="block text-xs sm:text-sm text-muted-foreground">
+                      遇到分組、確認或重來問題時再展開使用
+                    </span>
+                  </span>
+                </span>
+                <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${isRescueOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="space-y-4">
+            <div className="h-px bg-border" />
+            <div className="flex items-start gap-2 rounded-lg bg-background/60 border border-border px-3 py-2 text-xs sm:text-sm text-muted-foreground">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-accent" />
+              <p>這些按鈕會改變現場狀態，平常流程請優先使用上方主持台。</p>
             </div>
 
             {/* Action Buttons - horizontal scroll on mobile */}
@@ -899,8 +1007,10 @@ export const AdminMonitor: React.FC = () => {
                 </AlertDialogContent>
               </AlertDialog>
             </div>
-          </CardContent>
-        </Card>
+            </CollapsibleContent>
+            </CardContent>
+          </Card>
+        </Collapsible>
       )}
 
       {/* Groups Overview by Location */}
@@ -1065,7 +1175,7 @@ export const AdminMonitor: React.FC = () => {
           <CardHeader className="px-4 sm:px-6">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Sparkles className="w-5 h-5 text-secondary" />
-              AI 分析
+              AI 整理
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 px-4 sm:px-6">
@@ -1138,8 +1248,8 @@ export const AdminMonitor: React.FC = () => {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="hidden sm:inline">生成 AI 報告</span>
-                    <span className="sm:hidden">AI 報告</span>
+                    <span className="hidden sm:inline">產生 AI 整理</span>
+                    <span className="sm:hidden">AI 整理</span>
                   </>
                 )}
               </Button>
@@ -1151,7 +1261,7 @@ export const AdminMonitor: React.FC = () => {
                 disabled={existingReports.length === 0}
               >
                 <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">查閱報告</span>
+                <span className="hidden sm:inline">查閱整理</span>
                 <span className="sm:hidden">查閱</span>
                 {existingReports.length > 0 && (
                   <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 h-4">

@@ -85,7 +85,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(createdShortCode);
-    toast.success('課程代碼已複製！');
+    toast.success('活動代碼已複製！');
   };
 
   const handleDownloadQR = () => {
@@ -123,9 +123,9 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
           <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full gradient-orange flex items-center justify-center mb-4 glow-orange">
             <Dumbbell className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
           </div>
-          <CardTitle className="text-xl sm:text-2xl">開始新的健身課程</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl">建立新的查經活動</CardTitle>
           <CardDescription className="text-base sm:text-sm">
-            Start a new Soul Gym training session
+            建立今天的 SoulGym，讓大家掃描 QR Code 加入
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6">

@@ -112,7 +112,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
     if (!selectedSession) return;
     const codeToCopy = selectedSession.shortCode || selectedSession.id;
     navigator.clipboard.writeText(codeToCopy);
-    toast.success('課程代碼已複製！');
+    toast.success('活動代碼已複製！');
   };
 
   const handleDownloadQR = () => {
@@ -142,12 +142,14 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       waiting: 'bg-secondary/20 text-secondary-foreground',
+      grouping: 'bg-primary/15 text-primary',
       studying: 'bg-accent/20 text-accent',
       completed: 'bg-muted text-muted-foreground',
     };
     const labels: Record<string, string> = {
       waiting: '等待中',
-      studying: '進行中',
+      grouping: '分組中',
+      studying: '查經中',
       completed: '已完成',
     };
     return (
@@ -162,11 +164,11 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
       <div className="w-full max-w-3xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <h2 className="font-serif text-xl sm:text-2xl font-bold text-foreground">
-            我的健身課程
+            進行中的查經活動
           </h2>
           <Button variant="gold" onClick={onCreateNew} className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm">
             <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
-            建立新課程
+            建立查經活動
           </Button>
         </div>
 
@@ -181,14 +183,14 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                 <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground" />
               </div>
               <h3 className="font-serif text-lg sm:text-xl font-semibold mb-2">
-                還沒有健身課程
+                還沒有進行中的查經活動
               </h3>
               <p className="text-muted-foreground text-base sm:text-sm mb-6">
-                建立您的第一個健身課程
+                建立今天的 SoulGym，讓大家掃描 QR Code 加入
               </p>
               <Button variant="gold" onClick={onCreateNew} className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm">
                 <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
-                建立新課程
+                建立查經活動
               </Button>
             </CardContent>
           </Card>
@@ -225,7 +227,18 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="hidden sm:inline-flex h-9"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectSession(session.id);
+                        }}
+                      >
+                        進入主持台
+                      </Button>
                       {/* QR Code Button */}
                       <Button
                         variant="ghost"
@@ -305,7 +318,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
               {selectedSession.shortCode && (
                 <div className="text-center">
                   <p className="text-3xl font-mono font-bold tracking-[0.3em]">{selectedSession.shortCode}</p>
-                  <p className="text-xs text-muted-foreground mt-1">課程代碼</p>
+                  <p className="text-xs text-muted-foreground mt-1">活動代碼</p>
                 </div>
               )}
               

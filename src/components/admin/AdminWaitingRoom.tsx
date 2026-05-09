@@ -87,7 +87,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
     const codeToCopy = currentSession?.shortCode || currentSession?.id;
     if (codeToCopy) {
       navigator.clipboard.writeText(codeToCopy);
-      toast.success('課程代碼已複製！');
+    toast.success('活動代碼已複製！');
     }
   };
 

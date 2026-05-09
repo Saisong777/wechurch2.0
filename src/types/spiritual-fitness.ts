@@ -66,11 +66,11 @@ export const INSIGHT_CATEGORIES: { value: InsightCategory; label: string; emoji:
 export const getProgressStatusLabel = (status: ProgressStatus): { label: string; labelEn: string; color: string } => {
   switch (status) {
     case 'warming_up':
-      return { label: '暖身中', labelEn: 'Warming Up', color: 'text-green-600' };
+      return { label: '看見', labelEn: 'Observing', color: 'text-green-600' };
     case 'heavy_lifting':
-      return { label: '重訓中', labelEn: 'Heavy Lifting', color: 'text-yellow-600' };
+      return { label: '領受', labelEn: 'Receiving', color: 'text-yellow-600' };
     case 'stretching':
-      return { label: '收操中', labelEn: 'Cooling Down', color: 'text-blue-600' };
+      return { label: '完成', labelEn: 'Completed', color: 'text-blue-600' };
     default:
       return { label: '尚未開始', labelEn: 'Not Started', color: 'text-muted-foreground' };
   }

@@ -254,7 +254,7 @@ export const ParticipantAuth: React.FC<ParticipantAuthProps> = ({ onSuccess, onG
         </div>
         <div>
           <CardTitle className="text-2xl font-serif">
-            {mode === 'login' ? '登入開始健身' : '註冊新帳號'}
+            {mode === 'login' ? '登入開始查經' : '註冊新帳號'}
           </CardTitle>
           <CardDescription className="text-base mt-2">
             {mode === 'login' ? 'Sign in to join Soul Gym' : 'Create account to join'}
