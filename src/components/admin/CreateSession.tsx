@@ -11,6 +11,7 @@ import { Dumbbell, Download, CheckCircle, Copy, Flame, Gamepad2, Clock, Church }
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import { getSessionJoinUrl } from '@/lib/url-helpers';
+import { MeetingFlowGuide } from './MeetingFlowGuide';
 
 interface CreateSessionProps {
   onCreated: () => void;
@@ -132,6 +133,8 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6">
+          <MeetingFlowGuide currentStep="setup" icebreakerEnabled={icebreakerEnabled} />
+
           <div className="space-y-2">
             <Label htmlFor="church-unit" className="text-base font-semibold flex items-center gap-2">
               <Church className="w-4 h-4 text-primary" />
@@ -162,7 +165,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
               className="h-12 sm:h-14 text-base sm:text-lg"
             />
             <p className="text-sm text-muted-foreground">
-              輸入今天訓練使用的經文章節
+              例：約翰福音 3:1-21。建立後大家會先加入等候室。
             </p>
           </div>
 
@@ -187,7 +190,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
             {icebreakerEnabled && (
               <div className="ml-6 space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  組員確認後會先進入系統抽卡分享，再進三步驟查經。
+                  分組確認後會先進入系統抽卡分享，再進三步驟查經。
                 </p>
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground">起始難度</Label>
@@ -217,7 +220,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
             )}
             {!icebreakerEnabled && (
               <p className="text-xs text-muted-foreground ml-6">
-                關閉後，組員確認完成會等待帶領者按「開始三步驟查經」。你可以在中間安排現場遊戲或未來模組。
+                關閉後，分組確認完會停在中場。你可以安排現場遊戲，再手動開始三步驟查經。
               </p>
             )}
 
@@ -254,7 +257,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
             ) : (
               <>
                 <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
-                開始訓練 Start Training
+                建立聚會，顯示 QR
               </>
             )}
           </Button>
@@ -301,6 +304,15 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
             <p className="text-sm text-muted-foreground text-center">
               掃描 QR Code 或輸入 4 碼代碼加入課程
             </p>
+
+            <div className="w-full rounded-xl bg-muted/50 p-3 text-sm">
+              <p className="font-semibold text-foreground">接下來這樣帶：</p>
+              <ol className="mt-2 space-y-1 text-muted-foreground">
+                <li>1. 把 QR 投到螢幕，請大家加入</li>
+                <li>2. 人到齊後進等候室，按「人到齊，開始分組」</li>
+                <li>3. 分組確認完，再進分享與三步驟查經</li>
+              </ol>
+            </div>
             
             {/* Action buttons */}
             <div className="flex gap-2 w-full">

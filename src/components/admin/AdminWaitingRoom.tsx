@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { SessionQRCode } from './SessionQRCode';
 import { StressTestSimulator } from './StressTestSimulator';
 import { getSessionJoinUrl } from '@/lib/url-helpers';
+import { MeetingFlowGuide } from './MeetingFlowGuide';
 
 // Fetch participants from Express API
 const fetchParticipantsFromAPI = async (sessionId: string): Promise<User[]> => {
@@ -268,6 +269,11 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
         )}
       </div>
 
+      <MeetingFlowGuide
+        currentStep="join"
+        icebreakerEnabled={currentSession?.icebreakerEnabled ?? true}
+      />
+
       {/* Participants */}
       <Card>
         <CardHeader className="px-4 sm:px-6">
@@ -297,6 +303,9 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
               <Users className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
               <p className="text-base sm:text-lg">等待成員加入...</p>
               <p className="text-sm mt-1">Waiting for participants to join...</p>
+              <p className="text-sm mt-3 text-primary">
+                把 QR Code 投到螢幕，或直接分享代碼給大家。
+              </p>
             </div>
           ) : (
             <div className="space-y-5 sm:space-y-6">
@@ -470,7 +479,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
         ) : (
           <>
             <UserCheck className="w-5 h-5 sm:w-6 sm:h-6" />
-            開始分組 Start Grouping ({users.length} 人)
+            人到齊，開始分組 ({users.length} 人)
           </>
         )}
       </Button>
