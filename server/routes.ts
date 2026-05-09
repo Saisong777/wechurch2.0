@@ -3132,8 +3132,14 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", isAuthenticated, async (req, res) => {
     try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const role = await storage.getUserRole(userId);
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       const users = await storage.getUsers();
       res.json(users);
     } catch (error) {
@@ -3141,8 +3147,14 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/user-roles", async (req, res) => {
+  app.get("/api/user-roles", isAuthenticated, async (req, res) => {
     try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const role = await storage.getUserRole(userId);
+      if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       const roles = await storage.getUserRoles();
       res.json(roles);
     } catch (error) {
@@ -3150,9 +3162,18 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/user-roles/:userId", async (req, res) => {
+  app.put("/api/user-roles/:userId", isAuthenticated, async (req, res) => {
     try {
+      const actorId = await resolveUserId(req);
+      if (!actorId) return res.status(401).json({ error: "Unauthorized" });
+      const actorRole = await storage.getUserRole(actorId);
+      if (actorRole !== 'admin') {
+        return res.status(403).json({ error: "Only admins can change user roles" });
+      }
       const { role } = req.body;
+      if (!['member', 'leader', 'future_leader', 'admin'].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
       await storage.upsertUserRole(req.params.userId, role);
       res.json({ success: true });
     } catch (error) {
