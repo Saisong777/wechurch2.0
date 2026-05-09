@@ -99,6 +99,36 @@ npm run build        # 建置生產版本
 npm run lint         # ESLint 檢查
 npm test             # 執行測試
 npm run db:push      # 推送 Drizzle schema
+npm run local:verify # 本機 production build 瀏覽器白屏檢查
+npm run safe:check   # push 前完整檢查：build + test + audit + browser smoke
+```
+
+## Push 前本機驗證流程
+
+正式站更新前，請先在本機跑完整檢查：
+
+```bash
+npm run safe:check
+```
+
+這個指令會：
+
+1. 產生 production build。
+2. 跑 Vitest。
+3. 跑 `npm audit`。
+4. 用本機 production server 啟動網站。
+5. 用 headless Chrome 打開 `http://127.0.0.1:5099`，確認 React 已渲染、沒有白屏 runtime exception、沒有 CSP 擋住模組。
+
+驗證截圖會輸出到 `artifacts/local-verify.png`。如果本機沒有 Chrome，請設定：
+
+```bash
+export CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+```
+
+本機資料庫可參考 `.env.local.example`。如果尚未建立本機 PostgreSQL，首頁 smoke test 仍可檢查前端是否白屏；但要完整測 API 流程，請先準備本機 DB 並執行：
+
+```bash
+npm run db:push
 ```
 
 ---

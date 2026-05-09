@@ -36,6 +36,7 @@ out/
 # ── 測試 & 覆蓋率
 coverage/
 .nyc_output/
+artifacts/
 
 # ── 日誌
 logs/
