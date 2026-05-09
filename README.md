@@ -100,7 +100,10 @@ npm run lint         # ESLint 檢查
 npm test             # 執行測試
 npm run db:push      # 推送 Drizzle schema
 npm run local:verify # 本機 production build 瀏覽器白屏檢查
+npm run local:db     # 用 Docker 啟動本機 PostgreSQL
+npm run db:push:local # 將 schema 推到本機 PostgreSQL
 npm run safe:check   # push 前完整檢查：build + test + audit + browser smoke
+npm run safe:check:full # 含 Docker PostgreSQL 的完整本機檢查
 ```
 
 ## Push 前本機驗證流程
@@ -125,10 +128,18 @@ npm run safe:check
 export CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 ```
 
-本機資料庫可參考 `.env.local.example`。如果尚未建立本機 PostgreSQL，首頁 smoke test 仍可檢查前端是否白屏；但要完整測 API 流程，請先準備本機 DB 並執行：
+本機資料庫可用 Docker 啟動：
 
 ```bash
-npm run db:push
+npm run local:db
+npm run local:db:wait
+npm run db:push:local
+```
+
+如果要一次跑「資料庫 + schema + build + test + audit + 瀏覽器白屏檢查」：
+
+```bash
+npm run safe:check:full
 ```
 
 ---

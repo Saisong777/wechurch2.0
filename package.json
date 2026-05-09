@@ -13,7 +13,13 @@
     "test:watch": "vitest",
     "local:prod": "NODE_ENV=production PORT=5099 tsx server/index.ts",
     "local:verify": "node scripts/local-verify.cjs",
-    "safe:check": "npm run build && npm test && npm audit && npm run local:verify"
+    "safe:check": "npm run build && npm test && npm audit && npm run local:verify",
+    "local:db": "cat compose.yml | docker compose -f - up -d db",
+    "local:db:wait": "until cat compose.yml | docker compose -f - exec -T db pg_isready -U postgres -d wechurch_dev; do sleep 1; done",
+    "local:db:down": "cat compose.yml | docker compose -f - down",
+    "local:db:reset": "cat compose.yml | docker compose -f - down -v && cat compose.yml | docker compose -f - up -d db && npm run local:db:wait && DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:push",
+    "db:push:local": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:push",
+    "safe:check:full": "npm run local:db && npm run local:db:wait && npm run db:push:local && DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run safe:check"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
