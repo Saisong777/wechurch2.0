@@ -1,8 +1,7 @@
-import React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dumbbell,
   BookOpen,
@@ -10,9 +9,13 @@ import {
   Share2,
   Heart,
   Sparkles,
-  Users,
   ChevronRight,
-  Home
+  Home,
+  LogOut,
+  BookMarked,
+  Settings,
+  User,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,14 +26,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, BookMarked, Settings, User } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { useQuery } from '@tanstack/react-query';
 import { ClickableVerse } from '@/components/scripture/ClickableVerse';
-import { CheckCircle2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -148,6 +149,10 @@ const Index = () => {
   };
 
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+  const currentHour = useMemo(() => new Date().getHours(), []);
+  const greeting = currentHour < 12 ? '早安' : currentHour < 18 ? '午安' : '晚安';
+  const displayName = getDisplayName();
+  const greetingName = user ? displayName : '朋友';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
@@ -267,20 +272,22 @@ const Index = () => {
       <main className="container mx-auto px-4 py-4 md:py-8">
         <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto space-y-6">
 
-          {/* Hero Banner Section */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent p-6 sm:p-8 animate-fade-in border border-primary/10 shadow-sm">
-            <div className="absolute top-0 right-0 p-8 opacity-10">
-              <WeChurchLogo size={120} />
+          <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-background to-secondary/10 p-6 sm:p-8 animate-fade-in border border-primary/10 shadow-sm">
+            <div className="hidden sm:block absolute top-5 right-5 opacity-10 pointer-events-none">
+              <WeChurchLogo size={132} />
             </div>
 
             <div className="relative z-10 mb-6 sm:mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-                {new Date().getHours() < 12 ? '早安' : new Date().getHours() < 18 ? '午安' : '晚安'}，
-                <span className="text-primary">{getDisplayName()}</span>！
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-primary shadow-sm ring-1 ring-primary/10 mb-4">
+                <Sparkles className="w-3.5 h-3.5 text-secondary" />
+                WeChurch 我們就是教會
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2 leading-tight">
+                {greeting}，
+                <span className="text-primary">{greetingName}</span>
               </h2>
-              <p className="text-sm sm:text-base text-muted-foreground flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-secondary" />
-                這是充實心靈的美好一天
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-xl">
+                一起，活出耶穌的豐盛生命。今天從讀經、禱告，或一段真誠的小組分享開始。
               </p>
             </div>
             {(isVerseLoading || isSummaryLoading) ? (
@@ -383,16 +390,28 @@ const Index = () => {
                 </CardContent>
               </Card>
             ) : null}
-          </div> {/* Close Hero Section Div */}
+          </section>
 
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5 animate-fade-in" style={{ animationDelay: '100ms' }}>
-            {featureConfig.map((feature) => {
+            {featuresLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <Card key={index} className="h-[142px] sm:h-[154px] border-white/50 bg-white/60 backdrop-blur-md shadow-sm">
+                  <CardContent className="p-4 sm:p-5 flex flex-col h-full justify-between">
+                    <Skeleton className="w-12 h-12 rounded-2xl bg-primary/15" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-20 bg-primary/10" />
+                      <Skeleton className="h-4 w-16 bg-primary/10" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : featureConfig.map((feature) => {
               const Icon = feature.icon;
               const isEnabled = isFeatureEnabled(feature.featureKey);
               const disabledMessage = getDisabledMessage(feature.featureKey);
 
               const cardContent = (
-                <Card className={`h-full transition-all duration-300 ${!isEnabled
+                <Card className={`h-[142px] sm:h-[154px] transition-all duration-300 ${!isEnabled
                   ? 'opacity-60 border-muted border-dashed cursor-not-allowed bg-muted/10'
                   : `border-white/50 bg-white/70 backdrop-blur-md shadow-sm hover:shadow-card hover:-translate-y-1 cursor-pointer`
                   }`}>
@@ -412,10 +431,10 @@ const Index = () => {
                       )}
                     </div>
                     <div className="mt-auto">
-                      <h3 className="text-base sm:text-lg font-bold text-foreground truncate mb-1">
+                      <h3 className="text-base sm:text-lg font-bold text-foreground leading-tight mb-1">
                         {feature.title}
                       </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground truncate font-medium">
+                      <p className="text-xs sm:text-sm text-muted-foreground leading-snug font-medium">
                         {feature.subtitle}
                       </p>
                     </div>
