@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import express from "express";
 import multer from "multer";
 import path from "path";
@@ -77,6 +77,13 @@ const uploadMessageCard = multer({
     }
   }
 });
+
+type AppRole = "member" | "leader" | "future_leader" | "admin";
+
+function sanitizeUserRecord<T extends Record<string, any>>(user: T) {
+  const { password, ...safeUser } = user;
+  return safeUser;
+}
 
 export async function registerRoutes(app: Express) {
   app.use('/assets', express.static(path.join(process.cwd(), 'dist/public/assets'), {
@@ -157,28 +164,57 @@ export async function registerRoutes(app: Express) {
     return null;
   }
 
+  const requireRole = (...roles: AppRole[]): RequestHandler => async (req, res, next) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const role = await storage.getUserRole(userId);
+      if (!role || !roles.includes(role as AppRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      (req as any).legacyUserId = userId;
+      (req as any).userRole = role;
+      next();
+    } catch (error) {
+      console.error("[auth] Failed to check role:", error);
+      res.status(500).json({ error: "Authorization check failed" });
+    }
+  };
+
+  const requireSelfOrRole = (paramName: string, ...roles: AppRole[]): RequestHandler => async (req, res, next) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      if (req.params[paramName] === userId) {
+        (req as any).legacyUserId = userId;
+        return next();
+      }
+      const role = await storage.getUserRole(userId);
+      if (role && roles.includes(role as AppRole)) {
+        (req as any).legacyUserId = userId;
+        (req as any).userRole = role;
+        return next();
+      }
+      return res.status(403).json({ error: "Forbidden" });
+    } catch (error) {
+      console.error("[auth] Failed to check ownership:", error);
+      res.status(500).json({ error: "Authorization check failed" });
+    }
+  };
+
+  const requireSessionManager = requireRole("admin", "leader", "future_leader");
+  const requireLeader = requireRole("admin", "leader");
+  const requireAdmin = requireRole("admin");
+
   // Register health check FIRST - before any auth setup that might fail
   app.get("/api/health", async (req, res) => {
-    const poolStats = getPoolStats();
-    const memUsage = process.memoryUsage();
     res.json({
-      status: 'ok',
-      uptime: process.uptime(),
+      status: "ok",
       timestamp: new Date().toISOString(),
-      database: {
-        pool: poolStats,
-        healthy: poolStats.waitingCount < 10,
-      },
-      memory: {
-        heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
-        heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
-        rssMB: Math.round(memUsage.rss / 1024 / 1024),
-      },
-      cache: {
-        bible: bibleCache.getStats(),
-        timeline: timelineCache.getStats(),
-        api: apiCache.getStats(),
-      },
     });
   });
 
@@ -193,7 +229,7 @@ export async function registerRoutes(app: Express) {
   }
 
   // Health check endpoint - detailed with database
-  app.get("/api/health/detailed", async (req, res) => {
+  app.get("/api/health/detailed", requireAdmin, async (req, res) => {
     const startTime = Date.now();
     let dbStatus = "ok";
     let dbLatency = 0;
@@ -233,7 +269,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Database connection check endpoint
-  app.get("/api/health/db", async (req, res) => {
+  app.get("/api/health/db", requireAdmin, async (req, res) => {
     try {
       const start = Date.now();
       await pool.query("SELECT 1");
@@ -254,7 +290,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Debug endpoint to check database table counts
-  app.get("/api/debug/db-counts", async (req, res) => {
+  app.get("/api/debug/db-counts", requireAdmin, async (req, res) => {
     try {
       const bibleCount = await pool.query("SELECT COUNT(*) as count FROM chinese_union_trad");
       const timelineCount = await pool.query("SELECT COUNT(*) as count FROM jesus_4seasons");
@@ -278,7 +314,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Cache clear endpoint - useful for refreshing stale cached data
-  app.post("/api/cache/clear", async (req, res) => {
+  app.post("/api/cache/clear", requireAdmin, async (req, res) => {
     try {
       bibleCache.clear();
       timelineCache.clear();
@@ -294,7 +330,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sessions", async (req, res) => {
+  app.get("/api/sessions", requireLeader, async (req, res) => {
     try {
       const sessions = await storage.getSessions();
       res.json(sessions);
@@ -409,7 +445,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sessions", async (req, res) => {
+  app.post("/api/sessions", requireSessionManager, async (req, res) => {
     try {
       const parsed = insertSessionSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -422,7 +458,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/sessions/:id", async (req, res) => {
+  app.patch("/api/sessions/:id", requireSessionManager, async (req, res) => {
     try {
       const session = await storage.updateSession(req.params.id, req.body);
       if (!session) {
@@ -435,7 +471,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/sessions/:id", async (req, res) => {
+  app.delete("/api/sessions/:id", requireLeader, async (req, res) => {
     try {
       const session = await storage.getSession(req.params.id);
       if (!session) {
@@ -542,7 +578,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/participants/batch-assign-groups", async (req, res) => {
+  app.post("/api/participants/batch-assign-groups", requireSessionManager, async (req, res) => {
     try {
       const batchAssignSchema = z.object({
         assignments: z.array(z.object({
@@ -616,7 +652,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/sessions/:sessionId/submissions", async (req, res) => {
+  app.delete("/api/sessions/:sessionId/submissions", requireSessionManager, async (req, res) => {
     try {
       await storage.deleteSubmissionsBySession(req.params.sessionId);
       res.json({ success: true });
@@ -625,7 +661,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/sessions/:sessionId/participants", async (req, res) => {
+  app.delete("/api/sessions/:sessionId/participants", requireSessionManager, async (req, res) => {
     try {
       await storage.deleteParticipantsBySession(req.params.sessionId);
       res.json({ success: true });
@@ -635,7 +671,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Force verify all participants (set ready_confirmed = true)
-  app.post("/api/sessions/:sessionId/force-verify-all", async (req, res) => {
+  app.post("/api/sessions/:sessionId/force-verify-all", requireSessionManager, async (req, res) => {
     try {
       const count = await storage.forceVerifyAllParticipants(req.params.sessionId);
       res.json({ success: true, count });
@@ -646,7 +682,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Reset all participants' ready_confirmed status to false
-  app.post("/api/sessions/:sessionId/reset-ready-status", async (req, res) => {
+  app.post("/api/sessions/:sessionId/reset-ready-status", requireSessionManager, async (req, res) => {
     try {
       const count = await storage.resetAllReadyStatus(req.params.sessionId);
       res.json({ success: true, count });
@@ -657,7 +693,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Clear all group assignments (set group_number to null)
-  app.post("/api/sessions/:sessionId/clear-groups", async (req, res) => {
+  app.post("/api/sessions/:sessionId/clear-groups", requireSessionManager, async (req, res) => {
     try {
       const count = await storage.clearAllGroupAssignments(req.params.sessionId);
       res.json({ success: true, count });
@@ -676,7 +712,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/reports/:id", async (req, res) => {
+  app.delete("/api/reports/:id", requireSessionManager, async (req, res) => {
     try {
       await storage.deleteAiReport(req.params.id);
       res.json({ success: true });
@@ -685,7 +721,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sessions/:sessionId/reports", async (req, res) => {
+  app.post("/api/sessions/:sessionId/reports", requireSessionManager, async (req, res) => {
     try {
       const { reportType, groupNumber, filledOnly, fastMode } = req.body;
       console.log(`[report-gen] START type=${reportType} group=${groupNumber} fast=${fastMode} filled=${filledOnly} session=${req.params.sessionId}`);
@@ -850,7 +886,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Streaming version — sends SSE chunks as AI generates, much faster perceived latency
-  app.post("/api/sessions/:sessionId/reports/stream", async (req, res) => {
+  app.post("/api/sessions/:sessionId/reports/stream", requireSessionManager, async (req, res) => {
     try {
       const { reportType, groupNumber, filledOnly, fastMode } = req.body;
       console.log(`[report-stream] START type=${reportType} group=${groupNumber} fast=${fastMode}`);
@@ -1007,7 +1043,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sessions/:sessionId/reports/generate", async (req, res) => {
+  app.post("/api/sessions/:sessionId/reports/generate", requireSessionManager, async (req, res) => {
     try {
       const { reportType, groupNumber } = req.body;
       const submissions = await storage.getSubmissions(req.params.sessionId);
@@ -1240,7 +1276,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/study-responses/:id", async (req, res) => {
+  app.delete("/api/study-responses/:id", requireLeader, async (req, res) => {
     try {
       await storage.deleteStudyResponse(req.params.id);
       res.json({ success: true });
@@ -1274,7 +1310,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/prayers/:id", async (req, res) => {
+  app.patch("/api/prayers/:id", requireLeader, async (req, res) => {
     try {
       const updateData: Record<string, any> = {};
       if (req.body.isPinned !== undefined) updateData.isPinned = req.body.isPinned;
@@ -1295,7 +1331,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/prayers/:id", async (req, res) => {
+  app.delete("/api/prayers/:id", requireLeader, async (req, res) => {
     try {
       await storage.deletePrayer(req.params.id);
       prayerCache.invalidatePattern('prayers:');
@@ -1342,7 +1378,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/prayers/:id/comments/:commentId", async (req, res) => {
+  app.delete("/api/prayers/:id/comments/:commentId", requireLeader, async (req, res) => {
     try {
       await storage.deletePrayerComment(req.params.commentId);
       prayerCache.invalidatePattern('prayers:');
@@ -1379,7 +1415,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/feature-toggles/:id", async (req, res) => {
+  app.patch("/api/feature-toggles/:id", requireAdmin, async (req, res) => {
     try {
       const toggle = await storage.updateFeatureToggle(req.params.id, req.body);
       if (!toggle) {
@@ -1392,7 +1428,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/potential-members", async (req, res) => {
+  app.get("/api/potential-members", requireLeader, async (req, res) => {
     try {
       const members = await storage.getPotentialMembers();
       res.json(members);
@@ -2858,7 +2894,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/card-questions", async (req, res) => {
+  app.post("/api/card-questions", requireLeader, async (req, res) => {
     try {
       const { contentText, contentTextEn, level, isActive, sortOrder } = req.body;
       const question = await storage.createCardQuestion({
@@ -2874,7 +2910,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/card-questions/:id", async (req, res) => {
+  app.patch("/api/card-questions/:id", requireLeader, async (req, res) => {
     try {
       const question = await storage.updateCardQuestion(req.params.id, req.body);
       if (!question) {
@@ -2886,7 +2922,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/card-questions/:id", async (req, res) => {
+  app.delete("/api/card-questions/:id", requireLeader, async (req, res) => {
     try {
       await storage.deleteCardQuestion(req.params.id);
       res.json({ success: true });
@@ -2904,7 +2940,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/message-cards/all", async (req, res) => {
+  app.get("/api/message-cards/all", requireLeader, async (req, res) => {
     try {
       const cards = await storage.getAllMessageCards();
       res.json(cards);
@@ -2913,7 +2949,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/message-card-downloads", async (req, res) => {
+  app.get("/api/message-card-downloads", requireLeader, async (req, res) => {
     try {
       const downloads = await storage.getMessageCardDownloads();
       res.json(downloads);
@@ -2936,11 +2972,10 @@ export async function registerRoutes(app: Express) {
 
   // Get message card image
   app.get("/api/message-cards/image/:filename", (req, res) => {
-    const filename = req.params.filename;
+    const filename = path.basename(req.params.filename);
 
-    // Check if filename is a full URL (to handle redirected requests or database entries with full URLs)
-    if (filename.startsWith('http')) {
-      return res.redirect(filename);
+    if (!/^[a-zA-Z0-9._-]+$/.test(filename)) {
+      return res.status(400).json({ error: "Invalid filename" });
     }
 
     const filePath = path.join(process.cwd(), 'public', 'message-cards', filename);
@@ -2956,7 +2991,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Upload message card image
-  app.post("/api/message-cards/upload", uploadMessageCard.single('image'), async (req, res) => {
+  app.post("/api/message-cards/upload", requireLeader, uploadMessageCard.single('image'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No image file provided" });
@@ -2970,9 +3005,9 @@ export async function registerRoutes(app: Express) {
   });
 
   // Delete message card image
-  app.delete("/api/message-cards/image/:filename", async (req, res) => {
+  app.delete("/api/message-cards/image/:filename", requireLeader, async (req, res) => {
     try {
-      const filePath = path.join(process.cwd(), 'public', 'message-cards', req.params.filename);
+      const filePath = path.join(process.cwd(), 'public', 'message-cards', path.basename(req.params.filename));
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
@@ -2983,7 +3018,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/message-cards", async (req, res) => {
+  app.post("/api/message-cards", requireLeader, async (req, res) => {
     try {
       // Generate short code if not provided
       const shortCode = req.body.shortCode || Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -2998,7 +3033,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/message-cards/:id", async (req, res) => {
+  app.patch("/api/message-cards/:id", requireLeader, async (req, res) => {
     try {
       const card = await storage.updateMessageCard(req.params.id, req.body);
       if (!card) {
@@ -3011,7 +3046,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/message-cards/:id", async (req, res) => {
+  app.delete("/api/message-cards/:id", requireLeader, async (req, res) => {
     try {
       await storage.deleteMessageCard(req.params.id);
       res.json({ success: true });
@@ -3021,7 +3056,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/message-card-downloads/by-card/:cardId", async (req, res) => {
+  app.get("/api/message-card-downloads/by-card/:cardId", requireLeader, async (req, res) => {
     try {
       const downloads = await storage.getMessageCardDownloadsByCardId(req.params.cardId);
       res.json(downloads);
@@ -3030,11 +3065,8 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/users/:id/profile", async (req, res) => {
+  app.get("/api/users/:id/profile", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
     try {
-      if (!req.isAuthenticated || !req.isAuthenticated()) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
       const user = await storage.getUser(req.params.id);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -3052,11 +3084,8 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/users/:id/profile", async (req, res) => {
+  app.patch("/api/users/:id/profile", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
     try {
-      if (!req.isAuthenticated || !req.isAuthenticated()) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
       const { displayName, avatarUrl, birthday, userGender, address, church } = req.body;
 
       if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
@@ -3080,11 +3109,8 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/users/:id/avatar", async (req, res) => {
+  app.post("/api/users/:id/avatar", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
     try {
-      if (!req.isAuthenticated || !req.isAuthenticated()) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
       const multer = (await import("multer")).default;
       const upload = multer({
         storage: multer.memoryStorage(),
@@ -3120,11 +3146,8 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/users/:id/avatar", async (req, res) => {
+  app.delete("/api/users/:id/avatar", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
     try {
-      if (!req.isAuthenticated || !req.isAuthenticated()) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
       await storage.updateUser(req.params.id, { avatarUrl: null });
       res.json({ success: true });
     } catch (error) {
@@ -3132,16 +3155,16 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", requireLeader, async (req, res) => {
     try {
       const users = await storage.getUsers();
-      res.json(users);
+      res.json(users.map(sanitizeUserRecord));
     } catch (error) {
       res.status(500).json({ error: "Failed to get users" });
     }
   });
 
-  app.get("/api/user-roles", async (req, res) => {
+  app.get("/api/user-roles", requireLeader, async (req, res) => {
     try {
       const roles = await storage.getUserRoles();
       res.json(roles);
@@ -3150,9 +3173,12 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.put("/api/user-roles/:userId", async (req, res) => {
+  app.put("/api/user-roles/:userId", requireAdmin, async (req, res) => {
     try {
       const { role } = req.body;
+      if (!["member", "leader", "future_leader", "admin"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
       await storage.upsertUserRole(req.params.userId, role);
       res.json({ success: true });
     } catch (error) {
@@ -3160,7 +3186,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/potential-members/:id", async (req, res) => {
+  app.patch("/api/potential-members/:id", requireLeader, async (req, res) => {
     try {
       const updated = await storage.updatePotentialMember(req.params.id, req.body);
       if (!updated) {
@@ -3172,7 +3198,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/potential-members/:id", async (req, res) => {
+  app.delete("/api/potential-members/:id", requireLeader, async (req, res) => {
     try {
       await storage.deletePotentialMember(req.params.id);
       res.json({ success: true });
@@ -3181,7 +3207,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sessions/:sessionId/study-responses", async (req, res) => {
+  app.get("/api/sessions/:sessionId/study-responses", requireLeader, async (req, res) => {
     try {
       const responses = await storage.getStudyResponses(req.params.sessionId);
       res.json(responses);
@@ -3195,7 +3221,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Profile notification endpoint using Resend integration
-  app.post("/api/send-profile-notification", async (req, res) => {
+  app.post("/api/send-profile-notification", requireLeader, async (req, res) => {
     try {
       const { email, name, type, redirectUrl } = req.body;
 

@@ -16,6 +16,31 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const app = express();
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https://www.wechurch.online",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  );
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: false }));
 
@@ -33,8 +58,11 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-    if (path.startsWith("/api") && capturedJsonResponse) {
-      logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+    if (path.startsWith("/api") && capturedJsonResponse && res.statusCode >= 400) {
+      const body = typeof capturedJsonResponse === "object"
+        ? JSON.stringify({ error: capturedJsonResponse.error || capturedJsonResponse.message || "request failed" })
+        : "request failed";
+      logLine += ` :: ${body}`;
     }
     if (logLine.length > 120) {
       logLine = logLine.slice(0, 119) + "…";
@@ -96,4 +124,3 @@ app.use((req, res, next) => {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 })();
-

@@ -53,8 +53,8 @@ const ResetPasswordPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (password.length < 6) {
-      toast.error('密碼至少需要 6 個字元');
+    if (password.length < 8) {
+      toast.error('密碼至少需要 8 個字元');
       return;
     }
 
@@ -199,9 +199,9 @@ const ResetPasswordPage = () => {
                     id="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="至少 6 個字元"
+                    placeholder="至少 8 個字元"
                     required
-                    minLength={6}
+                    minLength={8}
                     className="h-11"
                     showStrength
                     data-testid="input-new-password"
@@ -219,7 +219,7 @@ const ResetPasswordPage = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="再次輸入新密碼"
                     required
-                    minLength={6}
+                    minLength={8}
                     className="h-11"
                     data-testid="input-confirm-password"
                   />

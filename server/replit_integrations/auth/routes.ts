@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import { randomBytes } from "crypto";
@@ -7,6 +7,33 @@ import { pool } from "../../db";
 import { sendEmail } from "../../resend";
 
 export function registerAuthRoutes(app: Express): void {
+  const authRateLimitMap = new Map<string, { count: number; resetTime: number }>();
+  const authRateLimit = (scope: string, maxAttempts = 10): RequestHandler => (req, res, next) => {
+    const identifier = typeof req.body?.email === "string"
+      ? req.body.email.trim().toLowerCase()
+      : req.ip || "unknown";
+    const key = `${scope}:${req.ip || "unknown"}:${identifier}`;
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000;
+    let entry = authRateLimitMap.get(key);
+    if (!entry || now > entry.resetTime) {
+      entry = { count: 0, resetTime: now + windowMs };
+      authRateLimitMap.set(key, entry);
+    }
+    entry.count++;
+    if (entry.count > maxAttempts) {
+      return res.status(429).json({ message: "嘗試次數過多，請稍後再試" });
+    }
+    next();
+  };
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of authRateLimitMap.entries()) {
+      if (now > entry.resetTime) authRateLimitMap.delete(key);
+    }
+  }, 60 * 1000).unref();
+
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -18,15 +45,15 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/auth/register", async (req: any, res) => {
+  app.post("/api/auth/register", authRateLimit("register", 5), async (req: any, res) => {
     try {
       const { email, password, displayName } = req.body;
 
       if (!email || typeof email !== "string") {
         return res.status(400).json({ message: "請提供電子郵件" });
       }
-      if (!password || typeof password !== "string" || password.length < 6) {
-        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+      if (!password || typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ message: "密碼至少需要 8 個字元" });
       }
 
       const normalizedEmail = email.trim().toLowerCase();
@@ -92,7 +119,7 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/auth/email-login", async (req: any, res) => {
+  app.post("/api/auth/email-login", authRateLimit("login", 10), async (req: any, res) => {
     try {
       const { email, password } = req.body;
 
@@ -185,7 +212,7 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", authRateLimit("forgot-password", 5), async (req, res) => {
     try {
       const { email } = req.body;
       if (!email || typeof email !== "string") {
@@ -216,9 +243,9 @@ export function registerAuthRoutes(app: Express): void {
         [normalizedEmail, token, expiresAt]
       );
 
-      const host = req.headers.host || process.env.REPLIT_DOMAINS || "localhost:5000";
-      const protocol = req.headers["x-forwarded-proto"] || "https";
-      const resetUrl = `${protocol}://${host}/reset-password?token=${token}`;
+      const baseUrl = process.env.PUBLIC_BASE_URL
+        || (process.env.NODE_ENV === "production" ? "https://www.wechurch.online" : `${req.protocol}://${req.headers.host || "localhost:5001"}`);
+      const resetUrl = `${baseUrl.replace(/\/$/, "")}/reset-password?token=${token}`;
 
       await sendEmail({
         to: normalizedEmail,
@@ -259,15 +286,15 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/reset-password", authRateLimit("reset-password", 10), async (req, res) => {
     try {
       const { token, password } = req.body;
 
       if (!token || typeof token !== "string") {
         return res.status(400).json({ message: "無效的重設連結" });
       }
-      if (!password || typeof password !== "string" || password.length < 6) {
-        return res.status(400).json({ message: "密碼至少需要 6 個字元" });
+      if (!password || typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ message: "密碼至少需要 8 個字元" });
       }
 
       const tokenResult = await pool.query(
