@@ -107,7 +107,10 @@ app.use((req, res, next) => {
   });
 
   // Graceful shutdown — close connections cleanly during Railway deploys
+  let isShuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
     log(`${signal} received, shutting down gracefully...`);
     server.close(() => {
       log('HTTP server closed');
