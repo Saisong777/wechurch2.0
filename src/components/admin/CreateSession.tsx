@@ -170,12 +170,12 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
           <div className="space-y-4 pt-2 border-t border-border">
             <p className="text-sm font-medium text-muted-foreground">課程設定</p>
             
-            {/* Icebreaker Toggle */}
+            {/* Post-group activity mode */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Gamepad2 className="w-4 h-4 text-secondary" />
                 <Label htmlFor="icebreaker-toggle" className="text-sm cursor-pointer">
-                  啟用真心話不用冒險
+                  使用內建抽卡分享
                 </Label>
               </div>
               <Switch
@@ -187,7 +187,7 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
             {icebreakerEnabled && (
               <div className="ml-6 space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  分組後會先進行真心話不用冒險環節
+                  組員確認後會先進入系統抽卡分享，再進三步驟查經。
                 </p>
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground">起始難度</Label>
@@ -214,6 +214,11 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
                   </div>
                 </div>
               </div>
+            )}
+            {!icebreakerEnabled && (
+              <p className="text-xs text-muted-foreground ml-6">
+                關閉後，組員確認完成會等待帶領者按「開始三步驟查經」。你可以在中間安排現場遊戲或未來模組。
+              </p>
             )}
 
             {/* Allow Latecomers Toggle */}

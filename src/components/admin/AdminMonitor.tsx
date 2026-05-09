@@ -45,6 +45,7 @@ export const AdminMonitor: React.FC = () => {
   const [isClearingGroups, setIsClearingGroups] = useState(false);
   const [isRegrouping, setIsRegrouping] = useState(false);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  const [isStartingStudy, setIsStartingStudy] = useState(false);
   const [groupReadyStatus, setGroupReadyStatus] = useState<GroupReadyStatus[]>([]);
   const [allowLatecomers, setAllowLatecomers] = useState(currentSession?.allowLatecomers || false);
   const [icebreakerEnabled, setIcebreakerEnabled] = useState(currentSession?.icebreakerEnabled || false);
@@ -54,6 +55,7 @@ export const AdminMonitor: React.FC = () => {
   const [fastMode, setFastMode] = useState(true);  // Default to fast mode
   const [filledOnly, setFilledOnly] = useState(false);
   const [allSubmittedNotified, setAllSubmittedNotified] = useState(false);
+  const [allGroupsReadyNotified, setAllGroupsReadyNotified] = useState(false);
 
   // Fetch study responses to check if we have data for AI analysis
   const { data: studyResponses } = useAdminStudyResponses({ 
@@ -105,6 +107,7 @@ export const AdminMonitor: React.FC = () => {
   // Reset notification flag when session changes
   useEffect(() => {
     setAllSubmittedNotified(false);
+    setAllGroupsReadyNotified(false);
   }, [currentSession?.id]);
   
   // Sync allowLatecomers and icebreakerEnabled with session
@@ -132,7 +135,7 @@ export const AdminMonitor: React.FC = () => {
     const success = await updateSessionIcebreakerEnabled(currentSession.id, checked);
     if (success) {
       setCurrentSession({ ...currentSession, icebreakerEnabled: checked });
-      toast.success(checked ? '已開啟真心話不用冒險環節' : '已關閉真心話不用冒險環節');
+      toast.success(checked ? '已啟用內建抽卡活動' : '已改為手動開始查經');
     } else {
       setIcebreakerEnabled(!checked); // Revert on failure
       toast.error('更新失敗');
@@ -146,16 +149,27 @@ export const AdminMonitor: React.FC = () => {
     const status = calculateGroupReadyStatus(participants);
     setGroupReadyStatus(status);
     
-    // Check if all groups are ready - auto-transition to studying
+    // Check if all groups are ready. Built-in activity can start automatically;
+    // manual/no-activity mode waits for the host so onsite games can happen here.
     const allReady = status.length > 0 && status.every(g => g.allReady);
     if (allReady && isVerificationPhase) {
-      await updateSessionStatus(currentSession.id, 'studying');
-      setCurrentSession({ ...currentSession, status: 'studying' });
-      toast.success('所有組員已確認，開始查經！', {
-        description: 'All members verified! Study phase started.',
-      });
+      if (icebreakerEnabled) {
+        await updateSessionStatus(currentSession.id, 'studying');
+        setCurrentSession({ ...currentSession, status: 'studying' });
+        toast.success('所有組員已確認，進入分組後活動！', {
+          description: 'Built-in activity started.',
+        });
+      } else if (!allGroupsReadyNotified) {
+        setAllGroupsReadyNotified(true);
+        toast.success('所有組員已確認，可以開始下一步', {
+          description: '可先進行現場活動，準備好再按「開始三步驟查經」。',
+          duration: 8000,
+        });
+      }
+    } else if (!allReady) {
+      setAllGroupsReadyNotified(false);
     }
-  }, [currentSession, setCurrentSession, isVerificationPhase]);
+  }, [currentSession, setCurrentSession, isVerificationPhase, icebreakerEnabled, allGroupsReadyNotified]);
 
   // Real-time submission updates
   useRealtime({
@@ -235,7 +249,7 @@ export const AdminMonitor: React.FC = () => {
   const flowSteps = [
     { id: 'join', label: '等待加入', detail: `${totalCount} 人`, icon: Users },
     { id: 'intro', label: '分組與自介', detail: `${groups.length || groupReadyStatus.length} 組`, icon: CheckCircle },
-    { id: 'icebreaker', label: '抽卡分享', detail: icebreakerEnabled ? '已啟用' : '略過', icon: Gamepad2 },
+    { id: 'icebreaker', label: '分組後活動', detail: icebreakerEnabled ? '內建抽卡' : '手動/略過', icon: Gamepad2 },
     { id: 'study', label: '三步驟查經', detail: `${studyProgressStats.completed}/${studyProgressStats.total || totalCount}`, icon: Dumbbell },
     { id: 'group-report', label: '小組 AI', detail: `${completedGroupReportCount}/${expectedGroupReports || 0}`, icon: Sparkles },
     { id: 'overall-report', label: '大組 AI', detail: hasOverallReport ? '完成' : '等待', icon: Eye },
@@ -258,6 +272,44 @@ export const AdminMonitor: React.FC = () => {
       toast.error(`操作失敗: ${result.error}`);
     }
     
+    setIsForceVerifying(false);
+  };
+
+  const handleStartStudyPhase = async () => {
+    if (!currentSession?.id) return;
+
+    setIsStartingStudy(true);
+    const success = await updateSessionStatus(currentSession.id, 'studying');
+    if (success) {
+      setCurrentSession({ ...currentSession, status: 'studying' });
+      toast.success(icebreakerEnabled ? '已開始分組後活動' : '已開始三步驟查經', {
+        description: icebreakerEnabled ? '學員會進入內建抽卡分享。' : '學員會進入三步驟查經。',
+      });
+    } else {
+      toast.error('開始失敗，請重試');
+    }
+    setIsStartingStudy(false);
+  };
+
+  const handleForceStartStudy = async () => {
+    if (!currentSession?.id) return;
+
+    setIsForceVerifying(true);
+    const result = await forceVerifyAllParticipants(currentSession.id);
+    if (!result.success) {
+      toast.error(`操作失敗: ${result.error}`);
+      setIsForceVerifying(false);
+      return;
+    }
+
+    const success = await updateSessionStatus(currentSession.id, 'studying');
+    if (success) {
+      setCurrentSession({ ...currentSession, status: 'studying' });
+      await refreshReadyStatus();
+      toast.success(`已確認 ${result.count} 位參與者並開始下一步`);
+    } else {
+      toast.error('確認完成，但開始下一步失敗，請再按一次');
+    }
     setIsForceVerifying(false);
   };
 
@@ -514,6 +566,7 @@ export const AdminMonitor: React.FC = () => {
   // Calculate overall ready progress
   const totalReadyCount = groupReadyStatus.reduce((acc, g) => acc + g.readyCount, 0);
   const totalMemberCount = groupReadyStatus.reduce((acc, g) => acc + g.totalMembers, 0);
+  const allGroupsReady = groupReadyStatus.length > 0 && groupReadyStatus.every(g => g.allReady);
   const readyPercentage = totalMemberCount > 0 ? (totalReadyCount / totalMemberCount) * 100 : 0;
 
   // Calculate study phase submission progress
@@ -540,18 +593,31 @@ export const AdminMonitor: React.FC = () => {
       };
     }
     if (activeFlowStep === 'intro') {
+      if (allGroupsReady) {
+        return {
+          title: icebreakerEnabled ? '現在：準備進入內建抽卡' : '現在：可安排現場活動',
+          description: icebreakerEnabled
+            ? '所有組員已確認。系統會進入內建抽卡分享；若需要也可以手動開始下一步。'
+            : '所有組員已確認。你可以先帶現場想到的遊戲，準備好後再開始三步驟查經。',
+          actionLabel: icebreakerEnabled ? '開始分組後活動' : '開始三步驟查經',
+          onClick: handleStartStudyPhase,
+          disabled: isStartingStudy,
+        };
+      }
       return {
         title: '現在：分組與自我介紹',
-        description: '請各組確認成員都在同一組，完成自我介紹後再進入查經。',
-        actionLabel: '強制進入查經',
-        onClick: handleForceVerifyAll,
+        description: icebreakerEnabled
+          ? '請各組確認成員並完成自我介紹。確認完成後會進入內建抽卡分享。'
+          : '請各組確認成員並完成自我介紹。若要穿插現場活動，可以等大家確認後再由主持台開始查經。',
+        actionLabel: '強制進入下一步',
+        onClick: handleForceStartStudy,
         disabled: isForceVerifying || totalMemberCount === 0,
       };
     }
     if (activeFlowStep === 'icebreaker') {
       return {
-        title: '現在：抽卡分享',
-        description: '請大家先完成抽卡分享。分享結束後，帶領者口頭宣布進入三步驟查經即可。',
+        title: '現在：分組後活動',
+        description: '內建抽卡分享正在進行。若臨時改用現場活動，請口頭帶領大家，完成後讓各組進入查經。',
         actionLabel: '等待分享完成',
         disabled: true,
       };
@@ -656,23 +722,31 @@ export const AdminMonitor: React.FC = () => {
             </div>
           )}
 
-          {/* Session Settings Status - Read-only indicators */}
+          {/* Session Settings */}
           <div className="mt-4 pt-4 border-t border-border space-y-3">
             <p className="text-xs font-medium text-muted-foreground">活動設定</p>
             
-            {/* Icebreaker Status */}
+            {/* Post-group activity mode */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Gamepad2 className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">真心話不用冒險</span>
+                <Label htmlFor="post-group-activity" className="text-sm cursor-pointer">分組後活動</Label>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                icebreakerEnabled 
-                  ? 'bg-accent/20 text-accent' 
-                  : 'bg-muted text-muted-foreground'
-              }`}>
-                {icebreakerEnabled ? '已啟用' : '未啟用'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  icebreakerEnabled
+                    ? 'bg-accent/20 text-accent'
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  {icebreakerEnabled ? '內建抽卡' : '手動/略過'}
+                </span>
+                <Switch
+                  id="post-group-activity"
+                  checked={icebreakerEnabled}
+                  onCheckedChange={handleToggleIcebreaker}
+                  disabled={isStudyingPhase}
+                />
+              </div>
             </div>
             
             {/* Latecomer Toggle */}
@@ -799,7 +873,7 @@ export const AdminMonitor: React.FC = () => {
                 onClick={flowGuidance.onClick}
                 disabled={flowGuidance.disabled || !flowGuidance.onClick}
               >
-                {(isForceVerifying || isGeneratingGroup || isGeneratingOverall) && flowGuidance.onClick ? (
+                {(isForceVerifying || isStartingStudy || isGeneratingGroup || isGeneratingOverall) && flowGuidance.onClick ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Sparkles className="w-4 h-4" />
@@ -889,12 +963,12 @@ export const AdminMonitor: React.FC = () => {
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-lg">確定要強制確認所有參與者嗎？</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      此操作會將所有 {totalMemberCount} 位參與者標記為「已確認」，並自動進入查經階段。
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-lg">確定要強制確認所有參與者嗎？</AlertDialogTitle>
+                      <AlertDialogDescription>
+                      此操作會將所有 {totalMemberCount} 位參與者標記為「已確認」。若未啟用內建抽卡，仍可由主持台決定何時開始三步驟查經。
                     </AlertDialogDescription>
-                  </AlertDialogHeader>
+                    </AlertDialogHeader>
                   <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
                     <AlertDialogCancel className="h-11 sm:h-10">取消</AlertDialogCancel>
                     <AlertDialogAction onClick={handleForceVerifyAll} className="h-11 sm:h-10">

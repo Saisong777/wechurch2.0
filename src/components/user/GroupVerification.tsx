@@ -178,12 +178,18 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     }
   }, [globalGroupNumber]);
 
+  const allGroupMembersReady = groupMembers.length > 0 && groupMembers.every(m => m.readyConfirmed);
+
   useEffect(() => {
-    if (!allReadyFiredRef.current && groupMembers.length > 0 && groupMembers.every(m => m.readyConfirmed)) {
+    if (
+      !allReadyFiredRef.current &&
+      allGroupMembersReady &&
+      currentSession?.status === 'studying'
+    ) {
       allReadyFiredRef.current = true;
       onAllReady();
     }
-  }, [groupMembers, onAllReady]);
+  }, [allGroupMembersReady, currentSession?.status, onAllReady]);
 
   const handleCheckMember = (memberId: string, checked: boolean) => {
     const newChecked = new Set(checkedMembers);
@@ -243,7 +249,9 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       } else if (data.success) {
         setHasConfirmed(true);
         setCurrentUser({ ...currentUser, readyConfirmed: true });
-        toast.success('已確認準備完成！等待其他組員...');
+        toast.success('已確認準備完成！', {
+          description: otherMembers.length === 0 ? '等待帶領者開始下一步。' : '等待其他組員與帶領者開始下一步。',
+        });
         await fetchMembers(); // Refresh to check if all ready
       } else {
         toast.error('驗證失敗：可能聚會狀態已變更或身份不符', {
@@ -507,7 +515,9 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
           ) : (
             <div className="text-center py-4 sm:py-3 bg-muted/30 rounded-lg">
               <p className="text-base sm:text-sm text-muted-foreground">
-                ✓ 您已準備完成，等待其他組員...
+                {allGroupMembersReady
+                  ? '✓ 全組已確認，等待帶領者開始下一步...'
+                  : '✓ 您已準備完成，等待其他組員...'}
               </p>
             </div>
           )}
