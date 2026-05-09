@@ -67,6 +67,9 @@ export const CreateSession: React.FC<CreateSessionProps> = ({ onCreated }) => {
         status: data.status as 'waiting' | 'grouping' | 'studying' | 'completed',
         createdAt: new Date(data.createdAt),
         groups: [],
+        allowLatecomers: data.allowLatecomers || false,
+        icebreakerEnabled: data.icebreakerEnabled || false,
+        icebreakerLevel: (data.icebreakerLevel as 'L1' | 'L2' | 'L3') || 'L1',
       });
       setIsAdmin(true);
       

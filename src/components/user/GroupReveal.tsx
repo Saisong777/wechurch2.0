@@ -179,7 +179,7 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
               onClick={onContinue}
               className="mt-8 w-full sm:w-auto h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
             >
-              開始查經 Start Study
+              前往組員確認
               <ArrowRight className="w-5 h-5" />
             </Button>
           </div>

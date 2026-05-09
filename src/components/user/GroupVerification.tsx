@@ -161,6 +161,10 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
       if (session.status && currentSession) {
         setCurrentSession({ ...currentSession, ...session } as any);
       }
+      if (session.status === 'studying' && !allReadyFiredRef.current) {
+        allReadyFiredRef.current = true;
+        onAllReady();
+      }
       if (session.status === 'completed' && onSessionEnded) {
         onSessionEnded();
       }
@@ -414,6 +418,12 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
           
           {/* Member List */}
           <div className="space-y-3">
+            {otherMembers.length === 0 && (
+              <div className="p-4 sm:p-3 rounded-lg border bg-muted/30 border-border text-sm text-muted-foreground">
+                目前這組只有您一位，確認後即可進入下一步。
+              </div>
+            )}
+
             {otherMembers.map((member) => (
               <div
                 key={member.id}
@@ -480,8 +490,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
               size="lg"
               className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
               onClick={handleReady}
-              disabled={isSubmitting || otherMembers.length === 0 || 
-                !otherMembers.every(m => checkedMembers.has(m.id))}
+              disabled={isSubmitting || !otherMembers.every(m => checkedMembers.has(m.id))}
             >
               {isSubmitting ? (
                 <>
