@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { assignGroupsToParticipants } from '@/lib/api-helpers';
-import { Users, UserCheck, Settings, Shuffle, Scale, Copy, UserX, Share2 } from 'lucide-react';
+import { Users, UserCheck, Settings, Shuffle, Scale, Copy, UserX, Share2, Minus, Plus } from 'lucide-react';
 import { GroupingSettings, User } from '@/types/bible-study';
 import { toast } from 'sonner';
 import { SessionQRCode } from './SessionQRCode';
@@ -40,6 +40,60 @@ const fetchParticipantsFromAPI = async (sessionId: string): Promise<User[]> => {
 interface AdminWaitingRoomProps {
   onGroupingComplete: () => void;
 }
+
+interface GroupSizeStepperProps {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}
+
+const GroupSizeStepper: React.FC<GroupSizeStepperProps> = ({ id, label, value, min, max, onChange }) => {
+  const updateValue = (nextValue: number) => {
+    onChange(Math.max(min, Math.min(max, nextValue)));
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-sm sm:text-base">{label}</Label>
+      <div className="grid grid-cols-[52px_1fr_52px] sm:grid-cols-[48px_1fr_48px] rounded-2xl border bg-background overflow-hidden">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-14 sm:h-12 rounded-none border-r"
+          onClick={() => updateValue(value - 1)}
+          disabled={value <= min}
+          aria-label={`${label} 減少`}
+        >
+          <Minus className="w-5 h-5" />
+        </Button>
+        <Input
+          id={id}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value}
+          onChange={(e) => updateValue(parseInt(e.target.value, 10) || min)}
+          className="h-14 sm:h-12 rounded-none border-0 text-center text-2xl sm:text-xl font-semibold focus-visible:ring-0"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-14 sm:h-12 rounded-none border-l"
+          onClick={() => updateValue(value + 1)}
+          disabled={value >= max}
+          aria-label={`${label} 增加`}
+        >
+          <Plus className="w-5 h-5" />
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingComplete }) => {
   const { users, setUsers, currentSession, setCurrentSession, addUser } = useSession();
@@ -151,6 +205,23 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
       toast.error('分組失敗，請重試');
       setIsGrouping(false);
     }
+  };
+
+  const updateMinSize = (value: number) => {
+    const nextValue = Math.max(2, Math.min(10, value));
+    setMinSize(nextValue);
+    if (nextValue > maxSize) setMaxSize(nextValue);
+  };
+
+  const updateMaxSize = (value: number) => {
+    const nextValue = Math.max(2, Math.min(12, value));
+    setMaxSize(nextValue);
+    if (nextValue < minSize) setMinSize(nextValue);
+  };
+
+  const applySizePreset = (nextMin: number, nextMax: number) => {
+    setMinSize(nextMin);
+    setMaxSize(nextMax);
   };
 
   return (
@@ -286,40 +357,45 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
         </CardHeader>
         {showSettings && (
           <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-6">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="minSize" className="text-sm sm:text-base">每組最少人數 Min</Label>
-                <Input
-                  id="minSize"
-                  type="number"
-                  min={2}
-                  max={10}
-                  value={minSize}
-                  onChange={(e) => {
-                    const val = Math.max(2, Math.min(10, parseInt(e.target.value) || 2));
-                    setMinSize(val);
-                    if (val > maxSize) setMaxSize(val);
-                  }}
-                  className="text-center text-lg font-medium h-12 sm:h-11"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="maxSize" className="text-sm sm:text-base">每組最多人數 Max</Label>
-                <Input
-                  id="maxSize"
-                  type="number"
-                  min={2}
-                  max={12}
-                  value={maxSize}
-                  onChange={(e) => {
-                    const val = Math.max(2, Math.min(12, parseInt(e.target.value) || 2));
-                    setMaxSize(val);
-                    if (val < minSize) setMinSize(val);
-                  }}
-                  className="text-center text-lg font-medium h-12 sm:h-11"
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <GroupSizeStepper
+                id="minSize"
+                label="每組最少人數 Min"
+                value={minSize}
+                min={2}
+                max={10}
+                onChange={updateMinSize}
+              />
+
+              <GroupSizeStepper
+                id="maxSize"
+                label="每組最多人數 Max"
+                value={maxSize}
+                min={2}
+                max={12}
+                onChange={updateMaxSize}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: '小組 3-4', min: 3, max: 4 },
+                { label: '常用 4-6', min: 4, max: 6 },
+                { label: '大組 5-7', min: 5, max: 7 },
+              ].map((preset) => {
+                const isActive = minSize === preset.min && maxSize === preset.max;
+                return (
+                  <Button
+                    key={preset.label}
+                    type="button"
+                    variant={isActive ? 'default' : 'outline'}
+                    className="h-11 text-sm"
+                    onClick={() => applySizePreset(preset.min, preset.max)}
+                  >
+                    {preset.label}
+                  </Button>
+                );
+              })}
             </div>
             
             <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
