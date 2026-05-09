@@ -163,7 +163,7 @@ export const HistoryBrowser: React.FC = () => {
 
       const [responsesRes, reportsRes] = await Promise.all([
         fetch(`/api/sessions/${selectedSessionId}/study-responses`),
-        fetch(`/api/sessions/${selectedSessionId}/reports`),
+        fetch(`/api/admin/sessions/${selectedSessionId}/reports`),
       ]);
 
       const responses = responsesRes.ok ? await responsesRes.json() : [];

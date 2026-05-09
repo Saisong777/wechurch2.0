@@ -41,7 +41,7 @@ export function useAdminStudyResponses({ sessionId, enabled = true }: UseAdminSt
 
       const [responsesRes, participantsRes] = await Promise.all([
         fetch(`/api/sessions/${sessionId}/study-responses`),
-        fetch(`/api/sessions/${sessionId}/participants`),
+        fetch(`/api/admin/sessions/${sessionId}/participants`),
       ]);
 
       if (!responsesRes.ok || !participantsRes.ok) {

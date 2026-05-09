@@ -154,13 +154,15 @@ export const findSmallestGroup = async (sessionId: string, location: string = "O
 // Assign a latecomer to the smallest group
 export const assignLatecomerToGroup = async (
   participantId: string,
-  groupNumber: number
+  groupNumber: number,
+  sessionId: string,
+  email: string
 ): Promise<boolean> => {
   try {
     const response = await fetch(`/api/participants/${participantId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupNumber, readyConfirmed: false }),
+      body: JSON.stringify({ sessionId, email, groupNumber, readyConfirmed: false }),
     });
     return response.ok;
   } catch (error) {
@@ -179,22 +181,19 @@ export const joinSession = async (
 ): Promise<User | null> => {
   try {
     // Check if user already exists
-    const response = await fetch(`/api/sessions/${sessionId}/participants`);
+    const response = await fetch(`/api/sessions/${sessionId}/participants/by-email/${encodeURIComponent(email)}`);
     if (response.ok) {
-      const participants = await response.json();
-      const existing = participants.find((p: any) => p.email === email);
-      if (existing) {
-        return {
-          id: existing.id,
-          name: existing.name,
-          email: existing.email,
-          gender: existing.gender as "male" | "female",
-          groupNumber: existing.groupNumber || undefined,
-          joinedAt: new Date(existing.joinedAt),
-          location: existing.location,
-          readyConfirmed: existing.readyConfirmed,
-        };
-      }
+      const existing = await response.json();
+      return {
+        id: existing.id,
+        name: existing.name,
+        email: existing.email,
+        gender: existing.gender as "male" | "female",
+        groupNumber: existing.groupNumber || undefined,
+        joinedAt: new Date(existing.joinedAt),
+        location: existing.location,
+        readyConfirmed: existing.readyConfirmed,
+      };
     }
 
     // New user - insert
@@ -249,7 +248,7 @@ export const fetchParticipantsSecure = async (sessionId: string): Promise<User[]
 // Fetch participants with full data (for session owners only)
 export const fetchParticipants = async (sessionId: string): Promise<User[]> => {
   try {
-    const response = await fetch(`/api/sessions/${sessionId}/participants`);
+    const response = await fetch(`/api/admin/sessions/${sessionId}/participants`);
     if (!response.ok) return [];
     const data = await response.json();
 
@@ -687,7 +686,7 @@ export const fetchAIReports = async (
   groupNumber?: number
 ): Promise<{ id: string; content: string; reportType: string; groupNumber: number | null; createdAt: Date }[]> => {
   try {
-    const response = await fetch(`/api/sessions/${sessionId}/reports`);
+    const response = await fetch(`/api/admin/sessions/${sessionId}/reports`);
     if (!response.ok) return [];
     const data = await response.json();
     let reports = data.map((r: any) => ({

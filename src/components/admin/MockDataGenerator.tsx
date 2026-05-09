@@ -79,7 +79,7 @@ export const MockDataGenerator: React.FC<MockDataGeneratorProps> = ({ sessionId 
 
     try {
       // Get participants for this session via Express API
-      const participantsResponse = await fetch(`/api/sessions/${sessionId}/participants`, {
+      const participantsResponse = await fetch(`/api/admin/sessions/${sessionId}/participants`, {
         credentials: 'include',
       });
       if (!participantsResponse.ok) throw new Error('Failed to fetch participants');

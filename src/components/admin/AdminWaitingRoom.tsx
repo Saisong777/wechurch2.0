@@ -17,7 +17,7 @@ import { getSessionJoinUrl } from '@/lib/url-helpers';
 // Fetch participants from Express API
 const fetchParticipantsFromAPI = async (sessionId: string): Promise<User[]> => {
   try {
-    const response = await fetch(`/api/sessions/${sessionId}/participants`, {
+    const response = await fetch(`/api/admin/sessions/${sessionId}/participants`, {
       credentials: 'include',
     });
     if (!response.ok) return [];

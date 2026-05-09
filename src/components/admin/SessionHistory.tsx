@@ -60,7 +60,7 @@ export const SessionHistory: React.FC<SessionHistoryProps> = ({
         
         const sessionsWithCounts = await Promise.all(
           filteredSessions.map(async (session: any) => {
-            const participantsRes = await fetch(`/api/sessions/${session.id}/participants`);
+            const participantsRes = await fetch(`/api/admin/sessions/${session.id}/participants`);
             const participants = participantsRes.ok ? await participantsRes.json() : [];
             
             return {

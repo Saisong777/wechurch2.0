@@ -210,6 +210,39 @@ export async function registerRoutes(app: Express) {
   const requireLeader = requireRole("admin", "leader");
   const requireAdmin = requireRole("admin");
 
+  const sessionManagerRoles: AppRole[] = ["admin", "leader", "future_leader"];
+
+  const getRequestRole = async (req: any): Promise<AppRole | null> => {
+    const userId = await resolveUserId(req);
+    if (!userId) return null;
+    const role = await storage.getUserRole(userId);
+    return role ? role as AppRole : null;
+  };
+
+  const canManageSession = async (req: any): Promise<boolean> => {
+    const role = await getRequestRole(req);
+    return !!role && sessionManagerRoles.includes(role);
+  };
+
+  const sanitizeParticipant = (participant: any) => ({
+    id: participant.id,
+    sessionId: participant.sessionId,
+    name: participant.name,
+    gender: participant.gender,
+    groupNumber: participant.groupNumber,
+    group_number: participant.groupNumber,
+    location: participant.location,
+    readyConfirmed: participant.readyConfirmed,
+    ready_confirmed: participant.readyConfirmed,
+    joinedAt: participant.joinedAt,
+    updatedAt: participant.updatedAt,
+  });
+
+  const filterReportsForParticipant = (reports: any[], participant: any) => reports.filter((report) => {
+    if (report.reportType === "overall" || report.groupNumber === null || report.groupNumber === 0) return true;
+    return participant.groupNumber !== null && report.groupNumber === participant.groupNumber;
+  });
+
   // Register health check FIRST - before any auth setup that might fail
   app.get("/api/health", async (req, res) => {
     res.json({
@@ -485,7 +518,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sessions/:sessionId/participants", async (req, res) => {
+  app.get("/api/admin/sessions/:sessionId/participants", requireSessionManager, async (req, res) => {
     try {
       const groupNumber = req.query.groupNumber ? parseInt(req.query.groupNumber as string) : undefined;
       const result = await storage.getParticipants(req.params.sessionId, { groupNumber });
@@ -495,15 +528,38 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/sessions/:sessionId/participants", async (req, res) => {
+    try {
+      const groupNumber = req.query.groupNumber ? parseInt(req.query.groupNumber as string) : undefined;
+      const result = await storage.getParticipants(req.params.sessionId, { groupNumber });
+      res.json(result.map(sanitizeParticipant));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get participants" });
+    }
+  });
+
   // Get participant by email for session restore
   app.get("/api/sessions/:sessionId/participants/by-email/:email", async (req, res) => {
     try {
       const participants = await storage.getParticipants(req.params.sessionId);
-      const participant = participants.find(p => p.email === decodeURIComponent(req.params.email));
+      const email = decodeURIComponent(req.params.email).trim().toLowerCase();
+      const participant = participants.find(p => p.email.trim().toLowerCase() === email);
       if (!participant) {
         return res.status(404).json({ error: "Participant not found" });
       }
       res.json(participant);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get participant" });
+    }
+  });
+
+  app.get("/api/sessions/:sessionId/participants/:participantId", async (req, res) => {
+    try {
+      const participant = await storage.getParticipant(req.params.participantId);
+      if (!participant || participant.sessionId !== req.params.sessionId) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+      res.json(sanitizeParticipant(participant));
     } catch (error) {
       res.status(500).json({ error: "Failed to get participant" });
     }
@@ -527,7 +583,36 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/participants/:id", async (req, res) => {
     try {
-      const participant = await storage.updateParticipant(req.params.id, req.body);
+      const existing = await storage.getParticipant(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+
+      let updateData = req.body;
+      if (!(await canManageSession(req))) {
+        const selfUpdateSchema = z.object({
+          sessionId: z.string().uuid(),
+          email: z.string().email(),
+          groupNumber: z.number().int().positive().nullable().optional(),
+          readyConfirmed: z.boolean().optional(),
+        });
+
+        const parsed = selfUpdateSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+
+        const emailMatches = existing.email.trim().toLowerCase() === parsed.data.email.trim().toLowerCase();
+        if (existing.sessionId !== parsed.data.sessionId || !emailMatches) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+
+        updateData = {};
+        if (parsed.data.groupNumber !== undefined) updateData.groupNumber = parsed.data.groupNumber;
+        if (parsed.data.readyConfirmed !== undefined) updateData.readyConfirmed = parsed.data.readyConfirmed;
+      }
+
+      const participant = await storage.updateParticipant(req.params.id, updateData);
       if (!participant) {
         return res.status(404).json({ error: "Participant not found" });
       }
@@ -703,10 +788,49 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sessions/:sessionId/reports", async (req, res) => {
+  app.get("/api/admin/sessions/:sessionId/reports", requireSessionManager, async (req, res) => {
     try {
       const reports = await storage.getAiReports(req.params.sessionId);
       res.json(reports);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get reports" });
+    }
+  });
+
+  app.get("/api/sessions/:sessionId/reports", async (req, res) => {
+    try {
+      const reports = await storage.getAiReports(req.params.sessionId);
+
+      if (await canManageSession(req)) {
+        return res.json(reports);
+      }
+
+      const participantId = typeof req.query.participantId === "string" ? req.query.participantId : undefined;
+      if (participantId) {
+        const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : "";
+        if (!email) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+        const participant = await storage.getParticipant(participantId);
+        if (!participant || participant.sessionId !== req.params.sessionId || participant.email.trim().toLowerCase() !== email) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+        return res.json(filterReportsForParticipant(reports, participant));
+      }
+
+      const user = (req as any).user;
+      const email = (user?.email || user?.claims?.email || "").trim().toLowerCase();
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const participants = await storage.getParticipants(req.params.sessionId);
+      const participant = participants.find(p => p.email.trim().toLowerCase() === email);
+      if (!participant) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      res.json(filterReportsForParticipant(reports, participant));
     } catch (error) {
       res.status(500).json({ error: "Failed to get reports" });
     }

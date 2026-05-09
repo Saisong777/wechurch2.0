@@ -26,7 +26,15 @@ export function useSessionAnalysis({ sessionId, groupNumber, reportType, isParti
   const { data: analyses, isLoading, error, refetch } = useQuery({
     queryKey,
     queryFn: async (): Promise<SessionAnalysis[]> => {
-      const response = await fetch(`/api/sessions/${sessionId}/reports`);
+      const participantId = localStorage.getItem('bible_study_participant_id');
+      const participantEmail = localStorage.getItem('user_email') || localStorage.getItem('bible_study_guest_email');
+      const participantParams = participantId && participantEmail
+        ? `?participantId=${encodeURIComponent(participantId)}&email=${encodeURIComponent(participantEmail)}`
+        : '';
+      const endpoint = isParticipant
+        ? `/api/sessions/${sessionId}/reports${participantParams}`
+        : `/api/admin/sessions/${sessionId}/reports`;
+      const response = await fetch(endpoint);
       if (!response.ok) throw new Error('Failed to fetch reports');
       const data = await response.json();
       

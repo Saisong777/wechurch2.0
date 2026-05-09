@@ -70,7 +70,7 @@ export const AdminPage: React.FC = () => {
       const sessionData = await sessionResponse.json();
 
       // Load participants
-      const participantsResponse = await fetch(`/api/sessions/${sessionId}/participants`);
+      const participantsResponse = await fetch(`/api/admin/sessions/${sessionId}/participants`);
       const participants = participantsResponse.ok ? await participantsResponse.json() : [];
 
       // Load submissions

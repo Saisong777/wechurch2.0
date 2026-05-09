@@ -192,7 +192,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
 
     try {
       // Get current participants with group assignments via Express API
-      const response = await fetch(`/api/sessions/${currentSession.id}/participants`, {
+      const response = await fetch(`/api/admin/sessions/${currentSession.id}/participants`, {
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to fetch participants');
@@ -316,7 +316,7 @@ export const StressTestSimulator: React.FC<StressTestSimulatorProps> = ({
       });
 
       // Clear participants via Express API
-      const response = await fetch(`/api/sessions/${currentSession.id}/participants`, {
+      const response = await fetch(`/api/admin/sessions/${currentSession.id}/participants`, {
         method: 'DELETE',
         credentials: 'include',
       });

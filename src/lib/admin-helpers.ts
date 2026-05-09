@@ -37,7 +37,7 @@ export const fetchParticipantsWithReadyStatus = async (sessionId: string): Promi
   location: string;
 }[]> => {
   try {
-    const response = await fetch(`/api/sessions/${sessionId}/participants`);
+    const response = await fetch(`/api/admin/sessions/${sessionId}/participants`);
     if (!response.ok) {
       return [];
     }

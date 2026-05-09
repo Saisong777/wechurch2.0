@@ -80,7 +80,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
         if (isLatecomer) {
           const smallestGroup = await findSmallestGroup(currentSession.id, location);
           if (smallestGroup) {
-            const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup);
+            const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup, currentSession.id, email);
             if (assigned) {
               joinedUser.groupNumber = smallestGroup;
               toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`);
