@@ -194,6 +194,52 @@ export const AdminMonitor: React.FC = () => {
   }));
   const submittedCount = submissions.length;
   const totalCount = users.length;
+  const completedGroupReportNumbers = new Set(
+    existingReports
+      .filter(r => r.reportType === 'group' && r.status === 'COMPLETED' && r.groupNumber)
+      .map(r => r.groupNumber)
+  );
+  const completedGroupReportCount = completedGroupReportNumbers.size;
+  const hasOverallReport = existingReports.some(r => r.reportType === 'overall' && r.status === 'COMPLETED');
+  const expectedGroupReports = groups.length || groupReadyStatus.length;
+
+  const activeFlowStep = React.useMemo(() => {
+    if (currentSession?.status === 'completed') return 'completed';
+    if (currentSession?.status === 'waiting') return 'join';
+    if (currentSession?.status === 'grouping') return 'intro';
+    if (currentSession?.status === 'studying') {
+      if (icebreakerEnabled && studyProgressStats.total > 0 && studyProgressStats.completed === 0 && completedGroupReportCount === 0) {
+        return 'icebreaker';
+      }
+      if (studyProgressStats.total === 0 || studyProgressStats.completed < studyProgressStats.total) {
+        return 'study';
+      }
+      if (expectedGroupReports > 0 && completedGroupReportCount < expectedGroupReports) {
+        return 'group-report';
+      }
+      if (!hasOverallReport) return 'overall-report';
+    }
+    return hasOverallReport ? 'completed' : 'study';
+  }, [
+    currentSession?.status,
+    icebreakerEnabled,
+    studyProgressStats.total,
+    studyProgressStats.completed,
+    completedGroupReportCount,
+    expectedGroupReports,
+    hasOverallReport,
+  ]);
+
+  const flowSteps = [
+    { id: 'join', label: '等待加入', detail: `${totalCount} 人`, icon: Users },
+    { id: 'intro', label: '分組與自介', detail: `${groups.length || groupReadyStatus.length} 組`, icon: CheckCircle },
+    { id: 'icebreaker', label: '抽卡分享', detail: icebreakerEnabled ? '已啟用' : '略過', icon: Gamepad2 },
+    { id: 'study', label: '三步驟查經', detail: `${studyProgressStats.completed}/${studyProgressStats.total || totalCount}`, icon: Dumbbell },
+    { id: 'group-report', label: '小組 AI', detail: `${completedGroupReportCount}/${expectedGroupReports || 0}`, icon: Sparkles },
+    { id: 'overall-report', label: '大組 AI', detail: hasOverallReport ? '完成' : '等待', icon: Eye },
+    { id: 'completed', label: '完成', detail: currentSession?.status === 'completed' ? '已封存' : '未完成', icon: LogOut },
+  ];
+  const activeFlowIndex = Math.max(0, flowSteps.findIndex(step => step.id === activeFlowStep));
 
   const handleForceVerifyAll = async () => {
     if (!currentSession?.id) return;
@@ -650,6 +696,52 @@ export const AdminMonitor: React.FC = () => {
                 </AlertDialog>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="py-4 px-4 sm:px-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">SoulGym 現場流程</p>
+              <p className="text-base sm:text-lg font-semibold text-foreground">
+                {flowSteps[activeFlowIndex]?.label || '進行中'}
+              </p>
+            </div>
+            <Badge variant="outline" className="shrink-0">
+              {activeFlowIndex + 1}/{flowSteps.length}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            {flowSteps.map((step, index) => {
+              const Icon = step.icon;
+              const isDone = index < activeFlowIndex || (step.id === 'completed' && currentSession?.status === 'completed');
+              const isActive = index === activeFlowIndex && !isDone;
+              return (
+                <div
+                  key={step.id}
+                  className={`rounded-lg border px-3 py-2 min-h-[76px] transition-colors ${
+                    isActive
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : isDone
+                        ? 'border-accent/40 bg-accent/10 text-accent'
+                        : 'border-border bg-muted/20 text-muted-foreground'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {isDone ? (
+                      <CheckCircle className="w-4 h-4 shrink-0" />
+                    ) : (
+                      <Icon className="w-4 h-4 shrink-0" />
+                    )}
+                    <span className="text-xs font-medium truncate">{step.label}</span>
+                  </div>
+                  <p className="text-[11px] opacity-80">{step.detail}</p>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
