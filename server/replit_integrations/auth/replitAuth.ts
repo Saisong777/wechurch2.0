@@ -32,7 +32,8 @@ export function getSession() {
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({ conString: process.env.DATABASE_URL, createTableIfMissing: false, ttl: sessionTtl, tableName: "auth_sessions" });
   const isDev = process.env.NODE_ENV === "development";
-  return session({ secret: process.env.SESSION_SECRET!, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: !isDev, sameSite: "lax", maxAge: sessionTtl } });
+  const allowInsecureLocalCookies = process.env.LOCAL_INSECURE_COOKIES === "1";
+  return session({ secret: process.env.SESSION_SECRET!, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: !(isDev || allowInsecureLocalCookies), sameSite: "lax", maxAge: sessionTtl } });
 }
 
 export async function setupAuth(app: Express) {

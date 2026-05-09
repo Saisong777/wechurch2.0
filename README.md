@@ -104,6 +104,7 @@ npm run local:db     # 用 Docker 啟動本機 PostgreSQL
 npm run db:push:local # 將 schema 推到本機 PostgreSQL
 npm run content:sync:local # 只把 Railway 內容資料同步到本機 DB
 npm run soulgym:sync:local # 只把 Railway SoulGym 資料同步到本機 DB
+npm run local:admin-password # 設定本機 admin 測試密碼
 npm run safe:check   # push 前完整檢查：build + test + audit + browser smoke
 npm run safe:check:full # 含 Docker PostgreSQL 的完整本機檢查
 ```
@@ -140,6 +141,21 @@ npm run local:prod
 ```
 
 開啟網站：`http://localhost:5099`
+
+本機登入測試帳號可在 Docker DB 內設定，不會影響 Railway 正式站。`local:prod` 會自動允許 localhost 使用非 HTTPS session cookie。
+
+預設本機 admin 登入：
+
+```text
+Email: saisong@gmail.com
+Password: localdev123
+```
+
+如果重新同步 SoulGym 資料後登入失效，可執行：
+
+```bash
+npm run local:admin-password
+```
 
 如果本機需要聖經與耶穌四季資料，可只同步內容資料：
 
