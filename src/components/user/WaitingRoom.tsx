@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useSession } from '@/contexts/SessionContext';
 import { useRealtimeSecure, ConnectionState } from '@/hooks/useRealtimeSecure';
 import { ConnectionStatus } from '@/components/ui/connection-status';
-import { Clock, Users, MapPin, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, MapPin, RefreshCw, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { withRetry } from '@/lib/retry-utils';
 interface WaitingRoomProps {
@@ -143,7 +143,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
       </div>
 
       <Card variant="highlight" className="text-center">
-        <CardContent className="py-10 sm:py-12">
+        <CardContent className="px-4 py-8 sm:px-6 sm:py-10">
           <div className="relative inline-block mb-6">
             <div className="absolute inset-0 bg-secondary/30 rounded-full blur-xl animate-pulse-soft" />
             <div className="relative w-24 h-24 sm:w-20 sm:h-20 rounded-full gradient-gold flex items-center justify-center glow-gold">
@@ -152,22 +152,41 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
           </div>
           
           <h2 className="font-serif text-2xl sm:text-2xl font-bold text-foreground mb-2">
-            等待主持人開始...
+            你已經進入活動
           </h2>
-          <p className="text-base sm:text-base text-muted-foreground">
-            Waiting for the host to start grouping
+          <p className="mx-auto max-w-xs text-base leading-relaxed text-muted-foreground">
+            請留在這個畫面，主持人開始分組後會自動顯示你的組別。
           </p>
+
+          <div className="mt-6 rounded-2xl border bg-background/80 p-3 text-left">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div>
+                <p className="font-semibold text-foreground">現在不用操作</p>
+                <p className="text-sm text-muted-foreground">看到組別後，再去找你的組員。</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="py-5 sm:py-6 px-4 sm:px-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="w-5 h-5 sm:w-5 sm:h-5" />
-              <span className="font-medium text-base sm:text-sm">已加入成員</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border bg-muted/30 p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span className="text-sm font-medium">已加入</span>
+              </div>
+              <p className="mt-2 text-2xl font-bold text-primary">{users.length} 人</p>
             </div>
-            <span className="text-xl sm:text-lg font-bold text-primary">{users.length} 人</span>
+            <div className="rounded-2xl border bg-muted/30 p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-medium">下一步</span>
+              </div>
+              <p className="mt-2 text-base font-semibold leading-tight text-foreground">自動分組</p>
+            </div>
           </div>
 
           {currentSession?.verseReference && (
@@ -194,8 +213,8 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
 
           {/* Manual Refresh Button for Mobile Users */}
           <div className="mt-6 pt-4 border-t text-center">
-            <p className="text-xs text-muted-foreground mb-3">
-              📱 手機用戶若畫面沒更新，請點擊下方按鈕
+            <p className="mb-3 text-sm text-muted-foreground">
+              畫面停太久沒有變化，可以手動同步一次。
             </p>
             <Button 
               variant="outline" 
@@ -205,7 +224,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ onGroupingStarted, onS
               className="w-full h-14 sm:h-11 text-base sm:text-sm text-foreground border-primary/50 hover:bg-primary/10 touch-manipulation active:scale-[0.98]"
             >
               <RefreshCw className={`w-5 h-5 sm:w-4 sm:h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? '更新中...' : '狀態沒更新？點此刷新'}
+              {isRefreshing ? '同步中...' : '同步最新狀態'}
             </Button>
           </div>
         </CardContent>

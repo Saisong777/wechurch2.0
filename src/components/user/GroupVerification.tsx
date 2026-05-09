@@ -7,7 +7,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useRealtimeSecure } from '@/hooks/useRealtimeSecure';
 import { fetchGroupMembers } from '@/lib/api-helpers';
 import { User } from '@/types/bible-study';
-import { Users, CheckCircle, Loader2, MapPin, RefreshCw, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Loader2, MapPin, RefreshCw, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface GroupVerificationProps {
@@ -269,6 +269,11 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
   const readyCount = groupMembers.filter(m => m.readyConfirmed).length;
   const totalCount = groupMembers.length;
   const otherMembers = groupMembers.filter(m => m.id !== currentUser?.id);
+  const allOtherMembersChecked = otherMembers.every(m => checkedMembers.has(m.id));
+
+  const handleCheckAllMembers = () => {
+    setCheckedMembers(new Set(otherMembers.map((member) => member.id)));
+  };
 
   // Display-safe group number - use localGroupNumber if available, otherwise globalGroupNumber
   const displayGroupNumber = localGroupNumber ?? globalGroupNumber ?? 0;
@@ -420,9 +425,25 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6 space-y-4">
-          <p className="text-base sm:text-sm text-muted-foreground">
-            請確認以下組員都已到場，然後點擊「準備完成」
-          </p>
+          <div className="rounded-2xl border bg-primary/5 p-4">
+            <p className="text-sm font-semibold text-primary">現在要做</p>
+            <p className="mt-1 text-base leading-relaxed text-foreground">
+              找到組員並完成自我介紹後，點選名單確認到齊。
+            </p>
+          </div>
+
+          {otherMembers.length > 0 && !hasConfirmed && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-12 w-full text-base"
+              onClick={handleCheckAllMembers}
+            >
+              <UserCheck className="mr-2 h-5 w-5" />
+              我已看到所有組員
+            </Button>
+          )}
           
           {/* Member List */}
           <div className="space-y-3">
@@ -432,45 +453,62 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
               </div>
             )}
 
-            {otherMembers.map((member) => (
-              <div
-                key={member.id}
-                className={`flex items-center gap-3 p-4 sm:p-3 rounded-lg border transition-all touch-manipulation ${
-                  member.readyConfirmed 
-                    ? 'bg-accent/10 border-accent' 
-                    : 'bg-muted/30 border-border'
-                }`}
-              >
-                {hasConfirmed ? (
-                  <div className={`w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center ${
-                    member.readyConfirmed ? 'text-accent' : 'text-muted-foreground'
-                  }`}>
-                    {member.readyConfirmed ? (
-                      <CheckCircle className="w-6 h-6 sm:w-5 sm:h-5" />
-                    ) : (
-                      <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
-                    )}
-                  </div>
-                ) : (
-                  <Checkbox
-                    id={member.id}
-                    checked={checkedMembers.has(member.id)}
-                    onCheckedChange={(checked) => 
-                      handleCheckMember(member.id, checked as boolean)
+            {otherMembers.map((member) => {
+              const isChecked = checkedMembers.has(member.id);
+
+              return (
+                <div
+                  key={member.id}
+                  role={!hasConfirmed ? 'button' : undefined}
+                  tabIndex={!hasConfirmed ? 0 : undefined}
+                  onClick={() => {
+                    if (!hasConfirmed) handleCheckMember(member.id, !isChecked);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!hasConfirmed && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      handleCheckMember(member.id, !isChecked);
                     }
-                    className="w-6 h-6 sm:w-5 sm:h-5"
-                  />
-                )}
-                
-                <div className="flex-1">
-                  <p className="font-medium text-base sm:text-sm">{member.name}</p>
-                  <p className="text-sm sm:text-xs text-muted-foreground">
-                    {member.gender === 'male' ? '男' : '女'}
-                    {member.readyConfirmed && ' • ✓ 已確認'}
-                  </p>
+                  }}
+                  className={`flex items-center gap-3 p-4 sm:p-3 rounded-lg border transition-all touch-manipulation ${
+                    member.readyConfirmed || isChecked
+                      ? 'bg-accent/10 border-accent'
+                      : 'bg-muted/30 border-border'
+                  } ${!hasConfirmed ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+                >
+                  {hasConfirmed ? (
+                    <div className={`w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center ${
+                      member.readyConfirmed ? 'text-accent' : 'text-muted-foreground'
+                    }`}>
+                      {member.readyConfirmed ? (
+                        <CheckCircle className="w-6 h-6 sm:w-5 sm:h-5" />
+                      ) : (
+                        <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
+                      )}
+                    </div>
+                  ) : (
+                    <Checkbox
+                      id={member.id}
+                      checked={isChecked}
+                      onClick={(event) => event.stopPropagation()}
+                      onCheckedChange={(checked) =>
+                        handleCheckMember(member.id, checked as boolean)
+                      }
+                      className="w-6 h-6 sm:w-5 sm:h-5"
+                    />
+                  )}
+
+                  <div className="flex-1">
+                    <p className="font-medium text-base sm:text-sm">{member.name}</p>
+                    <p className="text-sm sm:text-xs text-muted-foreground">
+                      {member.gender === 'male' ? '男' : '女'}
+                      {member.readyConfirmed && ' • 已確認'}
+                      {!hasConfirmed && isChecked && ' • 已看到'}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {/* Current user (always shown at bottom) */}
             <div className={`flex items-center gap-3 p-4 sm:p-3 rounded-lg border ${
@@ -498,7 +536,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
               size="lg"
               className="w-full h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
               onClick={handleReady}
-              disabled={isSubmitting || !otherMembers.every(m => checkedMembers.has(m.id))}
+              disabled={isSubmitting || !allOtherMembersChecked}
             >
               {isSubmitting ? (
                 <>
@@ -508,7 +546,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
               ) : (
                 <>
                   <CheckCircle className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
-                  準備完成 Ready
+                  自我介紹完成，進入下一步
                 </>
               )}
             </Button>

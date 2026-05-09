@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, MapPin } from 'lucide-react';
+import { ArrowRight, CheckCircle2, MapPin, Users } from 'lucide-react';
 import { staggeredStart } from '@/lib/retry-utils';
 
 interface GroupRevealProps {
@@ -111,6 +111,10 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
   
   // Get color based on local group number (use 1 only for color if undefined)
   const groupColor = getGroupColor(localNumber || 1);
+  const groupMembers = useMemo(
+    () => users.filter((user) => user.groupNumber === globalGroupNumber),
+    [globalGroupNumber, users]
+  );
   
   // Show loading state if group number not yet assigned
   if (!localNumber) {
@@ -165,13 +169,29 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
         )}
         
         {showDetails && (
-          <div className="mt-10 sm:mt-12 animate-fade-in space-y-4">
-            <p className="text-lg sm:text-lg text-muted-foreground">
-              {isRemote ? '請與您的線上小組成員會合' : '請移動至您的小組座位區'}
-            </p>
-            <p className="text-base sm:text-base text-muted-foreground">
-              {isRemote ? 'Please join your online group members' : 'Please move to your group seating area'}
-            </p>
+          <div className="mt-8 sm:mt-10 animate-fade-in space-y-4">
+            <div className="mx-auto max-w-sm rounded-2xl border bg-card p-4 text-left shadow-sm">
+              <p className="mb-3 text-sm font-semibold text-primary">現在要做</p>
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                  <p className="text-base leading-snug text-foreground">
+                    {isRemote ? '進入你的線上小組，確認大家都在。' : '移動到第 ' + localNumber + ' 組的位置。'}
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Users className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                  <p className="text-sm leading-snug text-muted-foreground">
+                    找到組員後，下一頁會讓你確認大家是否到齊。
+                  </p>
+                </div>
+              </div>
+              {groupMembers.length > 0 && (
+                <div className="mt-4 rounded-xl bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  目前第 {localNumber} 組：{groupMembers.map((member) => member.name).join('、')}
+                </div>
+              )}
+            </div>
             
             <Button
               variant="gold"
@@ -179,7 +199,7 @@ export const GroupReveal: React.FC<GroupRevealProps> = ({ onContinue }) => {
               onClick={onContinue}
               className="mt-8 w-full sm:w-auto h-14 sm:h-12 text-lg sm:text-base touch-manipulation active:scale-[0.98]"
             >
-              前往組員確認
+              我知道了，前往組員確認
               <ArrowRight className="w-5 h-5" />
             </Button>
           </div>

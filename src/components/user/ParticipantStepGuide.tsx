@@ -78,23 +78,48 @@ export const ParticipantStepGuide = ({
   const currentIndex = steps.findIndex((step) => step.id === currentStep);
   const activeStep = steps[currentIndex] ?? steps[0];
   const nextStep = currentIndex >= 0 ? steps[currentIndex + 1] : undefined;
+  const ActiveIcon = activeStep.icon;
+  const progressValue = currentIndex >= 0 ? ((currentIndex + 1) / steps.length) * 100 : 0;
 
   return (
-    <Card className={cn('mb-4 border-primary/10 bg-primary/5 shadow-sm', className)}>
+    <Card className={cn('mb-4 border-primary/15 bg-primary/5 shadow-sm', className)}>
       <CardContent className="p-3 sm:p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-primary">現在進度</p>
-            <p className="truncate text-base font-semibold text-foreground">{activeStep.title}</p>
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <ActiveIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold text-primary">現在要做</p>
+              <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                {currentIndex + 1}/{steps.length}
+              </span>
+            </div>
+            <p className="mt-1 text-lg font-semibold leading-tight text-foreground">{activeStep.title}</p>
+            <p className="mt-1 text-sm leading-snug text-muted-foreground">{activeStep.next}</p>
           </div>
           {nextStep && (
-            <div className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-              下一步：{nextStep.title}
+            <div className="hidden rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-foreground sm:block">
+              下一步 {nextStep.title}
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-background">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-500"
+            style={{ width: `${progressValue}%` }}
+          />
+        </div>
+
+        {nextStep && (
+          <div className="mt-3 rounded-xl border border-primary/10 bg-background px-3 py-2 text-sm text-muted-foreground sm:hidden">
+            下一步：<span className="font-semibold text-foreground">{nextStep.title}</span>
+          </div>
+        )}
+
+        <div className="-mx-1 mt-3 overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2 px-1">
           {steps.map((step, index) => {
             const Icon = step.icon;
             const isDone = currentIndex > index;
@@ -103,8 +128,9 @@ export const ParticipantStepGuide = ({
             return (
               <div
                 key={step.id}
+                aria-current={isCurrent ? 'step' : undefined}
                 className={cn(
-                  'rounded-xl border bg-background p-2 text-center transition-colors',
+                  'w-24 rounded-xl border bg-background p-2 text-center transition-colors sm:w-28',
                   isDone && 'border-primary/20 bg-primary/10',
                   isCurrent && 'border-primary shadow-sm ring-2 ring-primary/15'
                 )}
@@ -119,14 +145,10 @@ export const ParticipantStepGuide = ({
                   {isDone ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                 </div>
                 <p className="text-[11px] font-semibold leading-tight text-foreground">{step.title}</p>
-                {isCurrent && (
-                  <p className="mt-1 hidden text-[11px] leading-tight text-muted-foreground sm:block">
-                    {step.next}
-                  </p>
-                )}
               </div>
             );
           })}
+          </div>
         </div>
       </CardContent>
     </Card>
