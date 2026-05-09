@@ -13,18 +13,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, BookMarked, User, Settings, Home, Dumbbell, BookOpen, Gamepad2, Share2, Shield, ChevronLeft } from 'lucide-react';
+import { LogOut, BookMarked, User, Settings, Shield, ChevronLeft } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
 import { useUserRole } from '@/hooks/useUserRole';
-
-const navItems = [
-  { id: 'home', label: '首頁', href: '/', icon: Home },
-  { id: 'live', label: 'Soul Gym', href: '/user', icon: Dumbbell },
-  { id: 'learn', label: '讀聖經', href: '/learn', icon: BookOpen },
-  { id: 'play', label: '實用小工具', href: '/play', icon: Gamepad2 },
-  { id: 'share', label: '來禱告', href: '/share', icon: Share2 },
-];
+import { appNavItems, isNavItemActive } from '@/lib/navigation';
 
 interface HeaderProps {
   title?: string;
@@ -51,14 +44,6 @@ export const Header: React.FC<HeaderProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
-
-  const isNavActive = (href: string) => {
-    if (href === '/') return location.pathname === '/';
-    if (href === '/play') {
-      return location.pathname.startsWith('/play') || location.pathname.startsWith('/icebreaker') || location.pathname.startsWith('/grouper');
-    }
-    return location.pathname.startsWith(href);
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -201,9 +186,9 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Desktop: Navigation links */}
           <nav className="hidden md:flex items-center gap-1" data-testid="nav-top">
-            {navItems.map((item) => {
+            {appNavItems.map((item) => {
               const Icon = item.icon;
-              const active = isNavActive(item.href);
+              const active = isNavItemActive(location.pathname, item);
               return (
                 <Link
                   key={item.id}

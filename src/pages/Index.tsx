@@ -34,6 +34,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ClickableVerse } from '@/components/scripture/ClickableVerse';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { appNavItems, isNavItemActive } from '@/lib/navigation';
 
 interface BlessingVerse {
   verseId: number;
@@ -60,7 +61,7 @@ const featureConfig = [
   {
     id: 'live',
     featureKey: 'we_live',
-    title: 'Soul Gym',
+    title: 'SoulGym',
     subtitle: '靈魂健身房',
     icon: Dumbbell,
     href: '/user',
@@ -183,15 +184,9 @@ const Index = () => {
 
           {/* Desktop: Navigation links */}
           <nav className="hidden md:flex items-center gap-1" data-testid="nav-top-index">
-            {[
-              { id: 'home', label: '首頁', href: '/', icon: Home },
-              { id: 'live', label: 'Soul Gym', href: '/user', icon: Dumbbell },
-              { id: 'learn', label: '讀聖經', href: '/learn', icon: BookOpen },
-              { id: 'play', label: '實用小工具', href: '/play', icon: Gamepad2 },
-              { id: 'share', label: '來禱告', href: '/share', icon: Share2 },
-            ].map((item) => {
+            {appNavItems.map((item) => {
               const Icon = item.icon;
-              const active = item.href === '/' ? location.pathname === '/' : location.pathname.startsWith(item.href);
+              const active = isNavItemActive(location.pathname, item);
               return (
                 <Link
                   key={item.id}

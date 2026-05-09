@@ -1,52 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Dumbbell, BookOpen, Gamepad2, Share2, Home } from 'lucide-react';
 import { cn, vibrate } from '@/lib/utils';
-
-const navItems = [
-  {
-    id: 'home',
-    label: '首頁',
-    href: '/',
-    icon: Home,
-  },
-  {
-    id: 'live',
-    label: 'SoulGYM',
-    href: '/user',
-    icon: Dumbbell,
-  },
-  {
-    id: 'learn',
-    label: '讀聖經',
-    href: '/learn',
-    icon: BookOpen,
-  },
-  {
-    id: 'play',
-    label: '小工具',
-    href: '/play',
-    icon: Gamepad2,
-  },
-  {
-    id: 'share',
-    label: '來禱告',
-    href: '/share',
-    icon: Share2,
-  },
-];
+import { appNavItems, isNavItemActive } from '@/lib/navigation';
 
 export const BottomNav = () => {
   const location = useLocation();
-
-  const isActive = (href: string) => {
-    if (href === '/') {
-      return location.pathname === '/';
-    }
-    if (href === '/play') {
-      return location.pathname.startsWith('/play') || location.pathname.startsWith('/icebreaker') || location.pathname.startsWith('/grouper');
-    }
-    return location.pathname.startsWith(href);
-  };
 
   return (
     <nav
@@ -55,9 +12,9 @@ export const BottomNav = () => {
       data-testid="nav-bottom"
     >
       <div className="flex items-center justify-around h-14 max-w-xl mx-auto px-2">
-        {navItems.map((item) => {
+        {appNavItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.href);
+          const active = isNavItemActive(location.pathname, item);
 
           return (
             <Link
@@ -88,7 +45,7 @@ export const BottomNav = () => {
                     : "font-normal text-[#999]"
                 )}
               >
-                {item.label}
+                {item.shortLabel}
               </span>
             </Link>
           );

@@ -1,19 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense, type ComponentType } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
 import { AuthForm } from '@/components/auth/AuthForm';
-import { SessionHistory } from '@/components/admin/SessionHistory';
-import { CreateSession } from '@/components/admin/CreateSession';
-import { AdminWaitingRoom } from '@/components/admin/AdminWaitingRoom';
-import { AdminMonitor } from '@/components/admin/AdminMonitor';
-import { HistoryBrowser } from '@/components/admin/HistoryBrowser';
-import { CardQuestionManager } from '@/components/admin/CardQuestionManager';
-import { MessageCardManager } from '@/components/admin/MessageCardManager';
-import { FeatureToggleManager } from '@/components/admin/FeatureToggleManager';
-import { PrayerMeetingAdmin } from '@/components/admin/PrayerMeetingAdmin';
-import { AdminMailComposer } from '@/components/admin/AdminMailComposer';
-import { AdminInbox } from '@/components/admin/AdminInbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -25,6 +13,31 @@ import { toast } from 'sonner';
 import { apiRequest } from '@/lib/queryClient';
 
 type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'mail' | 'inbox' | 'create' | 'waiting' | 'monitor';
+
+function lazyAdminComponent<T extends Record<string, unknown>>(
+  factory: () => Promise<T>,
+  name: keyof T
+) {
+  return lazy(() => factory().then((module) => ({ default: module[name] as ComponentType<any> })));
+}
+
+const SessionHistory = lazyAdminComponent(() => import('@/components/admin/SessionHistory'), 'SessionHistory');
+const CreateSession = lazyAdminComponent(() => import('@/components/admin/CreateSession'), 'CreateSession');
+const AdminWaitingRoom = lazyAdminComponent(() => import('@/components/admin/AdminWaitingRoom'), 'AdminWaitingRoom');
+const AdminMonitor = lazyAdminComponent(() => import('@/components/admin/AdminMonitor'), 'AdminMonitor');
+const HistoryBrowser = lazyAdminComponent(() => import('@/components/admin/HistoryBrowser'), 'HistoryBrowser');
+const CardQuestionManager = lazyAdminComponent(() => import('@/components/admin/CardQuestionManager'), 'CardQuestionManager');
+const MessageCardManager = lazyAdminComponent(() => import('@/components/admin/MessageCardManager'), 'MessageCardManager');
+const FeatureToggleManager = lazyAdminComponent(() => import('@/components/admin/FeatureToggleManager'), 'FeatureToggleManager');
+const PrayerMeetingAdmin = lazyAdminComponent(() => import('@/components/admin/PrayerMeetingAdmin'), 'PrayerMeetingAdmin');
+const AdminMailComposer = lazyAdminComponent(() => import('@/components/admin/AdminMailComposer'), 'AdminMailComposer');
+const AdminInbox = lazyAdminComponent(() => import('@/components/admin/AdminInbox'), 'AdminInbox');
+
+const AdminSectionLoader = () => (
+  <div className="flex min-h-[280px] items-center justify-center">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -377,7 +390,9 @@ export const AdminPage: React.FC = () => {
           </div>
         )}
 
-        {renderStep()}
+        <Suspense fallback={<AdminSectionLoader />}>
+          {renderStep()}
+        </Suspense>
       </main>
     </div>
   );

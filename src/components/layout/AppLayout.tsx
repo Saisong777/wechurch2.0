@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
+import { NetworkStatusBanner } from './NetworkStatusBanner';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -17,6 +18,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   return (
     <div className="min-h-screen flex flex-col bg-brand-warm">
+      <NetworkStatusBanner />
       <div className={showNav ? "md:pb-0" : ""} style={showNav ? { paddingBottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' } : undefined}>
         {children}
       </div>
