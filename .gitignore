@@ -37,6 +37,7 @@ out/
 coverage/
 .nyc_output/
 artifacts/
+exports/
 
 # ── 日誌
 logs/

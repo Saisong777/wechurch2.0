@@ -102,6 +102,7 @@ npm run db:push      # 推送 Drizzle schema
 npm run local:verify # 本機 production build 瀏覽器白屏檢查
 npm run local:db     # 用 Docker 啟動本機 PostgreSQL
 npm run db:push:local # 將 schema 推到本機 PostgreSQL
+npm run content:sync:local # 只把 Railway 內容資料同步到本機 DB
 npm run safe:check   # push 前完整檢查：build + test + audit + browser smoke
 npm run safe:check:full # 含 Docker PostgreSQL 的完整本機檢查
 ```
@@ -138,6 +139,14 @@ npm run local:prod
 ```
 
 開啟網站：`http://localhost:5099`
+
+如果本機需要聖經與耶穌四季資料，可只同步內容資料：
+
+```bash
+npm run content:sync:local
+```
+
+這個指令只處理 `chinese_union_trad`、`blessing_verses`、`jesus_4seasons`，不會同步使用者、禱告、筆記、小組或登入資料。匯出的暫存檔會放在 `exports/content/`，此資料夾不會被 git 追蹤。
 
 如果要一次跑「資料庫 + schema + build + test + audit + 瀏覽器白屏檢查」：
 

@@ -19,7 +19,11 @@
     "local:db:down": "cat compose.yml | docker compose -f - down",
     "local:db:reset": "cat compose.yml | docker compose -f - down -v && cat compose.yml | docker compose -f - up -d db && npm run local:db:wait && DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:push",
     "db:push:local": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:push",
-    "safe:check:full": "npm run local:db && npm run local:db:wait && npm run db:push:local && DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run safe:check"
+    "safe:check:full": "npm run local:db && npm run local:db:wait && npm run db:push:local && DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run safe:check",
+    "content:export": "node scripts/content-export.cjs",
+    "content:export:railway": "railway run --service Postgres sh -c 'DATABASE_URL=\"$DATABASE_PUBLIC_URL\" node scripts/content-export.cjs'",
+    "content:import:local": "DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev} node scripts/content-import.cjs",
+    "content:sync:local": "npm run content:export:railway && npm run local:db && npm run local:db:wait && npm run db:push:local && npm run content:import:local"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
