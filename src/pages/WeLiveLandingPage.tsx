@@ -7,8 +7,8 @@ import { FeatureGate } from '@/components/ui/feature-gate';
 const features = [
   {
     id: 'study',
-    title: 'Soul Gym 共同查經',
-    subtitle: '加入查經課程，與弟兄姊妹一起學習',
+    title: '加入查經',
+    subtitle: '輸入代碼或掃 QR 開始',
     icon: Dumbbell,
     href: '/user/study',
     bgColor: 'bg-primary/15',
@@ -16,8 +16,8 @@ const features = [
   },
   {
     id: 'notebook',
-    title: 'Soul Gym 查經筆記本',
-    subtitle: '個人查經紀錄與小組彙整',
+    title: '打開查經筆記',
+    subtitle: '個人紀錄與小組彙整',
     icon: BookMarked,
     href: '/user/notebook',
     bgColor: 'bg-amber-500/15',
@@ -33,15 +33,15 @@ export const WeLiveLandingPage = () => {
       description="Soul Gym 功能目前暫時關閉，請稍後再試"
     >
       <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-        <Header title="Soul Gym" subtitle="靈魂健身房" variant="compact" />
+        <Header title="SoulGym" subtitle="靈魂健身房" variant="compact" />
         <div className="container mx-auto px-4 py-6 md:py-10">
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-6 md:mb-8">
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/15 mb-3">
                 <Dumbbell className="w-7 h-7 text-primary" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">Soul Gym</h1>
-              <p className="text-sm text-muted-foreground mt-1">靈魂健身房</p>
+              <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">SoulGym</h1>
+              <p className="text-sm text-muted-foreground mt-1">一起查經，一起整理</p>
             </div>
 
             <div className="grid gap-3 md:gap-4">

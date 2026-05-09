@@ -35,6 +35,7 @@ import { ClickableVerse } from '@/components/scripture/ClickableVerse';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface BlessingVerse {
   verseId: number;
@@ -61,8 +62,8 @@ const featureConfig = [
   {
     id: 'live',
     featureKey: 'we_live',
-    title: 'SoulGym',
-    subtitle: '靈魂健身房',
+    title: '加入查經',
+    subtitle: 'SoulGym',
     icon: Dumbbell,
     href: '/user',
     bgColor: 'bg-secondary/15',
@@ -72,8 +73,8 @@ const featureConfig = [
   {
     id: 'learn',
     featureKey: 'we_learn',
-    title: '讀聖經',
-    subtitle: '學習成長',
+    title: '打開聖經',
+    subtitle: '閱讀與筆記',
     icon: BookOpen,
     href: '/learn',
     bgColor: 'bg-primary/15',
@@ -83,8 +84,8 @@ const featureConfig = [
   {
     id: 'play',
     featureKey: 'we_play',
-    title: '實用小工具',
-    subtitle: '互動遊戲',
+    title: '帶互動',
+    subtitle: '分組與遊戲',
     icon: Gamepad2,
     href: '/play',
     bgColor: 'bg-emerald-500/15',
@@ -94,8 +95,8 @@ const featureConfig = [
   {
     id: 'share',
     featureKey: 'we_share',
-    title: '來禱告',
-    subtitle: '分享代禱',
+    title: '寫代禱',
+    subtitle: '一起禱告',
     icon: Share2,
     href: '/share',
     bgColor: 'bg-rose-500/15',
@@ -110,6 +111,7 @@ const Index = () => {
   const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
   const { profile } = useUserProfile();
+  const { canCreateSession } = useUserRole();
   const { isFeatureEnabled, getDisabledMessage, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
 
@@ -154,6 +156,44 @@ const Index = () => {
   const greeting = currentHour < 12 ? '早安' : currentHour < 18 ? '午安' : '晚安';
   const displayName = getDisplayName();
   const greetingName = user ? displayName : '朋友';
+  const quickActions = [
+    {
+      id: 'study',
+      featureKey: 'we_live',
+      title: '加入查經',
+      subtitle: '輸入代碼或掃 QR',
+      href: '/user/study',
+      icon: Dumbbell,
+      iconClass: 'bg-secondary/15 text-secondary',
+    },
+    {
+      id: 'today-reading',
+      featureKey: 'we_learn',
+      title: todaySummary && !todaySummary.isCompleted ? '開始今日讀經' : '打開聖經',
+      subtitle: todaySummary && !todaySummary.isCompleted ? todaySummary.scriptureReference || todaySummary.planName : '搜尋、收藏、做筆記',
+      href: todaySummary && !todaySummary.isCompleted ? `/learn/reading-plans/${todaySummary.planId}/read` : '/learn/bible',
+      icon: BookOpen,
+      iconClass: 'bg-primary/15 text-primary',
+    },
+    {
+      id: 'prayer',
+      featureKey: 'we_share',
+      title: '寫代禱',
+      subtitle: '留下今天的需要',
+      href: '/prayer-wall',
+      icon: Share2,
+      iconClass: 'bg-rose-500/15 text-rose-500',
+    },
+    ...(canCreateSession ? [{
+      id: 'host-study',
+      featureKey: 'we_live',
+      title: '開查經',
+      subtitle: '建立課程與分組',
+      href: '/admin',
+      icon: Settings,
+      iconClass: 'bg-amber-500/15 text-amber-600',
+    }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
@@ -386,6 +426,40 @@ const Index = () => {
               </Card>
             ) : null}
           </section>
+
+          {!featuresLoading && (
+            <section className="animate-fade-in" style={{ animationDelay: '80ms' }} aria-labelledby="quick-actions-title">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 id="quick-actions-title" className="text-base font-semibold text-foreground">
+                  現在開始
+                </h2>
+                <span className="text-xs font-medium text-muted-foreground">
+                  選一件事
+                </span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {quickActions.filter(action => isFeatureEnabled(action.featureKey)).map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <Link key={action.id} to={action.href} className="group block" data-testid={`link-quick-action-${action.id}`}>
+                      <Card className="h-full border-white/60 bg-white/75 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+                        <CardContent className="flex h-full items-center gap-3 p-4">
+                          <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${action.iconClass}`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-sm font-semibold text-foreground">{action.title}</h3>
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{action.subtitle}</p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5 animate-fade-in" style={{ animationDelay: '100ms' }}>
             {featuresLoading ? (

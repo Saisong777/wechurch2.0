@@ -6,8 +6,8 @@ import { Header } from "@/components/layout/Header";
 const features = [
   {
     id: "icebreaker",
-    title: "真心話不用冒險",
-    subtitle: "破冰互動卡牌遊戲",
+    title: "抽破冰題",
+    subtitle: "真心話不用冒險",
     icon: Gamepad2,
     href: "/icebreaker",
     bgColor: "bg-emerald-500/15",
@@ -16,8 +16,8 @@ const features = [
   },
   {
     id: "grouper",
-    title: "只能說是神的安排",
-    subtitle: "隨機分組工具",
+    title: "立即分組",
+    subtitle: "只能說是神的安排",
     icon: Shuffle,
     href: "/grouper",
     bgColor: "bg-amber-500/15",
@@ -27,8 +27,8 @@ const features = [
   // ✅ 新增聖經問答
   {
     id: "bible-quiz",
-    title: "聖經問答 Quiz",
-    subtitle: "208題挑戰你對聖經的認識",
+    title: "玩聖經問答",
+    subtitle: "208 題 Quiz",
     icon: BookOpen,
     href: "/play/bible-quiz",
     bgColor: "bg-yellow-500/15",
@@ -37,8 +37,8 @@ const features = [
   },
   {
     id: "disciple-quiz",
-    title: "你像哪個門徒？",
-    subtitle: "24 題測出你的門徒人格",
+    title: "測門徒人格",
+    subtitle: "你像哪個門徒？",
     icon: ScrollText,
     href: "/play/disciple-quiz",
     bgColor: "bg-orange-500/15",
@@ -61,10 +61,10 @@ export const WePlayPage = () => {
               className="text-2xl font-bold text-foreground"
               data-testid="text-page-title"
             >
-              實用小工具
+              小工具
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              互動遊戲與分組工具
+              現場一點就能用
             </p>
           </div>
           <div className="grid gap-3 md:gap-4">

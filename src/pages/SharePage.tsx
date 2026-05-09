@@ -1,9 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, ImageIcon, ChevronRight, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 
@@ -11,9 +10,8 @@ const shareFeatures = [
   {
     id: 'prayer',
     featureKey: 'prayer_wall',
-    title: '禱告牆',
-    subtitle: 'Prayer Wall',
-    description: '分享代禱事項，一起為彼此禱告',
+    title: '寫代禱',
+    subtitle: '分享代禱事項',
     icon: Heart,
     href: '/prayer-wall',
     color: 'from-rose-500 to-pink-600',
@@ -23,9 +21,8 @@ const shareFeatures = [
   {
     id: 'prayer-meeting',
     featureKey: 'prayer_meeting',
-    title: '禱告會',
-    subtitle: 'Prayer Meeting',
-    description: '分組禱告，彼此代禱',
+    title: '進入禱告會',
+    subtitle: '分組禱告，彼此代禱',
     icon: Sparkles,
     href: '/prayer-meeting',
     color: 'from-purple-500 to-pink-600',
@@ -35,9 +32,8 @@ const shareFeatures = [
   {
     id: 'card',
     featureKey: 'message_cards',
-    title: '信息圖卡',
-    subtitle: 'Message Cards',
-    description: '下載本週信息摘要圖片',
+    title: '下載信息圖卡',
+    subtitle: '本週信息摘要圖片',
     icon: ImageIcon,
     href: '/card',
     color: 'from-violet-500 to-purple-600',
