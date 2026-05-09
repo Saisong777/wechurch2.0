@@ -103,6 +103,7 @@ npm run local:verify # 本機 production build 瀏覽器白屏檢查
 npm run local:db     # 用 Docker 啟動本機 PostgreSQL
 npm run db:push:local # 將 schema 推到本機 PostgreSQL
 npm run content:sync:local # 只把 Railway 內容資料同步到本機 DB
+npm run soulgym:sync:local # 只把 Railway SoulGym 資料同步到本機 DB
 npm run safe:check   # push 前完整檢查：build + test + audit + browser smoke
 npm run safe:check:full # 含 Docker PostgreSQL 的完整本機檢查
 ```
@@ -147,6 +148,14 @@ npm run content:sync:local
 ```
 
 這個指令只處理 `chinese_union_trad`、`blessing_verses`、`jesus_4seasons`，不會同步使用者、禱告、筆記、小組或登入資料。匯出的暫存檔會放在 `exports/content/`，此資料夾不會被 git 追蹤。
+
+如果本機需要 SoulGym 真實資料，可只同步 SoulGym 相關資料：
+
+```bash
+npm run soulgym:sync:local
+```
+
+這個指令只處理 SoulGym 的使用者、角色、查經場次、參與者、回應、AI 報告、潛在成員與破冰卡/遊戲資料，不會同步禱告牆或訊息卡資料。匯出的暫存檔會放在 `exports/soulgym/`，此資料夾不會被 git 追蹤。
 
 如果要一次跑「資料庫 + schema + build + test + audit + 瀏覽器白屏檢查」：
 

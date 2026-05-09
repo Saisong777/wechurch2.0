@@ -23,7 +23,10 @@
     "content:export": "node scripts/content-export.cjs",
     "content:export:railway": "railway run --service Postgres sh -c 'DATABASE_URL=\"$DATABASE_PUBLIC_URL\" node scripts/content-export.cjs'",
     "content:import:local": "DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev} node scripts/content-import.cjs",
-    "content:sync:local": "npm run content:export:railway && npm run local:db && npm run local:db:wait && npm run db:push:local && npm run content:import:local"
+    "content:sync:local": "npm run content:export:railway && npm run local:db && npm run local:db:wait && npm run db:push:local && npm run content:import:local",
+    "soulgym:export:railway": "railway run --service Postgres sh -c 'DATABASE_URL=\"$DATABASE_PUBLIC_URL\" TABLE_EXPORT_CONFIG=scripts/soulgym-tables.cjs TABLE_EXPORT_DIR=exports/soulgym node scripts/table-export.cjs'",
+    "soulgym:import:local": "DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev} TABLE_EXPORT_CONFIG=scripts/soulgym-tables.cjs TABLE_EXPORT_DIR=exports/soulgym node scripts/table-import.cjs",
+    "soulgym:sync:local": "npm run soulgym:export:railway && npm run local:db && npm run local:db:wait && npm run db:push:local && npm run soulgym:import:local"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
