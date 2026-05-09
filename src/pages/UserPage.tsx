@@ -11,6 +11,7 @@ import { SpiritualFitnessForm } from '@/components/user/SpiritualFitnessForm';
 import { SubmissionReview } from '@/components/user/SubmissionReview';
 import { QRCodeScanner } from '@/components/user/QRCodeScanner';
 import { MyNotebook } from '@/components/user/MyNotebook';
+import { ParticipantStepGuide } from '@/components/user/ParticipantStepGuide';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -417,6 +418,20 @@ export const UserPage: React.FC = () => {
     await loadSessionAndCheckAuth(scannedId);
   };
 
+  const renderWithGuide = (
+    guideStep: Exclude<UserStep, 'landing' | 'notebook'>,
+    content: React.ReactNode,
+    className = 'px-3 sm:px-4 py-4 sm:py-8'
+  ) => (
+    <div className={className}>
+      <ParticipantStepGuide
+        currentStep={guideStep}
+        icebreakerEnabled={currentSession?.icebreakerEnabled ?? true}
+      />
+      {content}
+    </div>
+  );
+
   const renderStep = () => {
     switch (step) {
       case 'landing':
@@ -452,8 +467,8 @@ export const UserPage: React.FC = () => {
 
       case 'enter-session':
         const storedEmail = localStorage.getItem('bible_study_guest_email');
-        return (
-          <div className="w-full max-w-md md:max-w-lg mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8 animate-fade-in">
+        return renderWithGuide('enter-session', (
+          <div className="w-full max-w-md md:max-w-lg mx-auto animate-fade-in">
             {/* Back to Home Button */}
             <Button variant="ghost" size="sm" asChild className="mb-4">
               <Link to="/" className="gap-2">
@@ -550,7 +565,7 @@ export const UserPage: React.FC = () => {
               onScan={handleQRScan}
             />
           </div>
-        );
+        ), 'px-3 sm:px-4 md:px-6 py-6 sm:py-8');
 
       case 'notebook':
         const notebookEmail = localStorage.getItem('bible_study_guest_email') || '';
@@ -572,91 +587,77 @@ export const UserPage: React.FC = () => {
         );
 
       case 'join':
-        return (
-          <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <JoinForm onJoined={(isLatecomer) => {
-              if (isLatecomer) {
-                setStep('verification');
-              } else {
-                setStep('waiting');
-              }
-            }} />
-          </div>
-        );
+        return renderWithGuide('join', (
+          <JoinForm onJoined={(isLatecomer) => {
+            if (isLatecomer) {
+              setStep('verification');
+            } else {
+              setStep('waiting');
+            }
+          }} />
+        ));
 
       case 'waiting':
-        return (
-          <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <WaitingRoom
-              onGroupingStarted={() => setStep('group-reveal')}
-              onSessionEnded={handleSessionEnded}
-            />
-          </div>
-        );
+        return renderWithGuide('waiting', (
+          <WaitingRoom
+            onGroupingStarted={() => setStep('group-reveal')}
+            onSessionEnded={handleSessionEnded}
+          />
+        ));
 
       case 'group-reveal':
-        return (
-          <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <GroupReveal onContinue={() => setStep('verification')} />
-          </div>
-        );
+        return renderWithGuide('group-reveal', (
+          <GroupReveal onContinue={() => setStep('verification')} />
+        ));
 
       case 'verification':
-        return (
-          <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <GroupVerification
-              onAllReady={() => {
-                // Check if icebreaker is enabled for this session
-                if (currentSession?.icebreakerEnabled && currentUser?.groupNumber) {
-                  setStep('icebreaker');
-                } else {
-                  setStep('study');
-                }
-              }}
-              onSessionEnded={handleSessionEnded}
-            />
-          </div>
-        );
+        return renderWithGuide('verification', (
+          <GroupVerification
+            onAllReady={() => {
+              // Check if icebreaker is enabled for this session
+              if (currentSession?.icebreakerEnabled && currentUser?.groupNumber) {
+                setStep('icebreaker');
+              } else {
+                setStep('study');
+              }
+            }}
+            onSessionEnded={handleSessionEnded}
+          />
+        ));
 
       case 'icebreaker':
         if (!currentSession?.id || !currentUser?.groupNumber || !currentUser?.id) {
           setStep('study');
           return null;
         }
-        return (
-          <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <GroupIcebreaker
-              sessionId={currentSession.id}
-              groupNumber={currentUser.groupNumber}
-              currentUserId={currentUser.id}
-              initialLevel={currentSession.icebreakerLevel || 'L1'}
-              onComplete={() => {
-                // Mark icebreaker as completed in localStorage
-                localStorage.setItem(`icebreaker_completed_${currentSession.id}_${currentUser.id}`, 'true');
-                setStep('study');
-              }}
-              onSkip={() => {
-                // Mark icebreaker as completed even when skipped
-                localStorage.setItem(`icebreaker_completed_${currentSession.id}_${currentUser.id}`, 'true');
-                setStep('study');
-              }}
-            />
-          </div>
-        );
+        return renderWithGuide('icebreaker', (
+          <GroupIcebreaker
+            sessionId={currentSession.id}
+            groupNumber={currentUser.groupNumber}
+            currentUserId={currentUser.id}
+            initialLevel={currentSession.icebreakerLevel || 'L1'}
+            onComplete={() => {
+              // Mark icebreaker as completed in localStorage
+              localStorage.setItem(`icebreaker_completed_${currentSession.id}_${currentUser.id}`, 'true');
+              setStep('study');
+            }}
+            onSkip={() => {
+              // Mark icebreaker as completed even when skipped
+              localStorage.setItem(`icebreaker_completed_${currentSession.id}_${currentUser.id}`, 'true');
+              setStep('study');
+            }}
+          />
+        ));
 
       case 'study':
-        return (
-          <div className="px-2 sm:px-4 py-3 sm:py-8">
-            <SpiritualFitnessForm onSubmitted={() => setStep('review')} />
-          </div>
-        );
+        return renderWithGuide('study', (
+          <SpiritualFitnessForm onSubmitted={() => setStep('review')} />
+        ), 'px-2 sm:px-4 py-3 sm:py-8');
 
       case 'review':
-        return (
-          <div className="px-3 sm:px-4 py-4 sm:py-8">
-            <SubmissionReview onEdit={() => setStep('study')} />
-          </div>
-        );
+        return renderWithGuide('review', (
+          <SubmissionReview onEdit={() => setStep('study')} />
+        ));
 
       default:
         // Safety net: if step is corrupted (e.g., multiple test accounts on same device),
