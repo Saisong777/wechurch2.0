@@ -103,6 +103,24 @@ export const useRealtimeSecure = ({
 
       const { session, participants, submissions } = data;
 
+      if (session) {
+        const sessionData: Partial<Session> = {
+          id: session.id,
+          verseReference: session.verseReference,
+          status: session.status as Session["status"],
+        };
+
+        const prev = sessionRef.current;
+        if (
+          !prev ||
+          prev.status !== sessionData.status ||
+          prev.verseReference !== sessionData.verseReference
+        ) {
+          sessionRef.current = sessionData;
+          onSessionUpdatedRef.current?.(sessionData);
+        }
+      }
+
       if (participants) {
         participants.forEach((p: any) => {
           const user: User = {
@@ -135,24 +153,6 @@ export const useRealtimeSecure = ({
             }
           }
         });
-      }
-
-      if (session) {
-        const sessionData: Partial<Session> = {
-          id: session.id,
-          verseReference: session.verseReference,
-          status: session.status as Session["status"],
-        };
-
-        const prev = sessionRef.current;
-        if (
-          !prev ||
-          prev.status !== sessionData.status ||
-          prev.verseReference !== sessionData.verseReference
-        ) {
-          sessionRef.current = sessionData;
-          onSessionUpdatedRef.current?.(sessionData);
-        }
       }
 
       if (submissions) {

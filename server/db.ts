@@ -10,19 +10,23 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Connection pool configuration optimized for 2000+ concurrent users
+function envNumber(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+// Railway Postgres plans can have fairly small connection limits. Keep the
+// default pool conservative and let production scale it explicitly with env vars.
 const poolConfig = {
   connectionString: process.env.DATABASE_URL,
-  // Maximum number of clients in the pool
-  max: 50,
-  // Minimum number of idle clients maintained
-  min: 10,
-  // How long a client can sit idle before being closed (30 seconds)
-  idleTimeoutMillis: 30000,
-  // How long to wait for a connection (10 seconds)
-  connectionTimeoutMillis: 10000,
-  // Maximum times a connection can be reused
-  maxUses: 7500,
+  max: envNumber("DB_POOL_MAX", 20, 1, 50),
+  min: envNumber("DB_POOL_MIN", 0, 0, 10),
+  idleTimeoutMillis: envNumber("DB_POOL_IDLE_TIMEOUT_MS", 30000, 5000, 120000),
+  connectionTimeoutMillis: envNumber("DB_POOL_CONNECTION_TIMEOUT_MS", 5000, 1000, 30000),
+  maxUses: envNumber("DB_POOL_MAX_USES", 5000, 500, 20000),
 };
 
 export const pool = new Pool(poolConfig);

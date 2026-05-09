@@ -90,7 +90,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
 
         setCurrentUser(joinedUser);
         addUser(joinedUser);
-        localStorage.removeItem('pending_session_id');
+        localStorage.setItem('pending_session_id', currentSession.id);
         localStorage.setItem('bible_study_participant_id', joinedUser.id);
         localStorage.setItem('user_email', email);
         toast.success('成功加入查經活動！');

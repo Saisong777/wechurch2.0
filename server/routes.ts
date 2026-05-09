@@ -95,9 +95,11 @@ export async function registerRoutes(app: Express) {
 
   const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
   const RATE_LIMIT_WINDOW_MS = 60000;
-  const RATE_LIMIT_MAX_REQUESTS = 200;
+  const RATE_LIMIT_MAX_REQUESTS = Number.parseInt(process.env.API_RATE_LIMIT_MAX || "200", 10);
+  const RATE_LIMIT_WRITE_MAX_REQUESTS = Number.parseInt(process.env.API_WRITE_RATE_LIMIT_MAX || "120", 10);
+  const RATE_LIMIT_LIVE_READ_MAX_REQUESTS = Number.parseInt(process.env.API_LIVE_READ_RATE_LIMIT_MAX || "2000", 10);
 
-  setInterval(() => {
+  const rateLimitCleanup = setInterval(() => {
     const now = Date.now();
     for (const [key, value] of rateLimitMap.entries()) {
       if (now > value.resetTime) {
@@ -105,9 +107,68 @@ export async function registerRoutes(app: Express) {
       }
     }
   }, 30000);
+  rateLimitCleanup.unref?.();
+
+  const getApiPath = (req: any) => req.originalUrl.split("?")[0];
+
+  const isLiveReadEndpoint = (req: any) => {
+    if (req.method !== "GET") return false;
+    const apiPath = getApiPath(req);
+    return (
+      /^\/api\/sessions\/[^/]+\/poll$/.test(apiPath) ||
+      /^\/api\/sessions\/[^/]+$/.test(apiPath) ||
+      /^\/api\/sessions\/by-code\/[^/]+$/.test(apiPath) ||
+      /^\/api\/sessions\/[^/]+\/participants(\/.*)?$/.test(apiPath) ||
+      /^\/api\/study-responses\/[^/]+\/[^/]+$/.test(apiPath) ||
+      apiPath === "/api/feature-toggles"
+    );
+  };
+
+  const decodePathValue = (value: string) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+
+  const getRateLimitIdentity = (req: any) => {
+    const apiPath = getApiPath(req);
+    const body = req.body || {};
+    const query = req.query || {};
+    const authUserId = req.user?.id || req.user?.claims?.sub;
+    const emailInPath = apiPath.match(/\/participants\/by-email\/([^/]+)$/)?.[1];
+    const participantInPath = apiPath.match(/\/participants\/([^/]+)$/)?.[1];
+    const headerParticipant = req.get?.("x-participant-id");
+
+    const identity =
+      authUserId ||
+      body.participantId ||
+      body.userId ||
+      body.email ||
+      body.participantEmail ||
+      query.participantId ||
+      query.userId ||
+      query.email ||
+      headerParticipant ||
+      (emailInPath ? decodePathValue(emailInPath) : null) ||
+      (participantInPath && participantInPath !== "by-email" ? participantInPath : null) ||
+      req.ip ||
+      "unknown";
+
+    return String(identity).trim().toLowerCase();
+  };
 
   app.use('/api/', (req, res, next) => {
-    const clientId = (req as any).user?.id || req.ip || 'unknown';
+    const isLiveRead = isLiveReadEndpoint(req);
+    const isWrite = req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS";
+    const limit = isLiveRead
+      ? RATE_LIMIT_LIVE_READ_MAX_REQUESTS
+      : isWrite
+        ? RATE_LIMIT_WRITE_MAX_REQUESTS
+        : RATE_LIMIT_MAX_REQUESTS;
+    const scope = isLiveRead ? "live" : isWrite ? "write" : "read";
+    const clientId = `${scope}:${getRateLimitIdentity(req)}`;
     const now = Date.now();
 
     let entry = rateLimitMap.get(clientId);
@@ -118,10 +179,10 @@ export async function registerRoutes(app: Express) {
 
     entry.count++;
 
-    res.setHeader('X-RateLimit-Limit', RATE_LIMIT_MAX_REQUESTS.toString());
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, RATE_LIMIT_MAX_REQUESTS - entry.count).toString());
+    res.setHeader('X-RateLimit-Limit', limit.toString());
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, limit - entry.count).toString());
 
-    if (entry.count > RATE_LIMIT_MAX_REQUESTS) {
+    if (entry.count > limit) {
       return res.status(429).json({ error: 'Too many requests. Please try again later.' });
     }
 
@@ -541,9 +602,8 @@ export async function registerRoutes(app: Express) {
   // Get participant by email for session restore
   app.get("/api/sessions/:sessionId/participants/by-email/:email", async (req, res) => {
     try {
-      const participants = await storage.getParticipants(req.params.sessionId);
       const email = decodeURIComponent(req.params.email).trim().toLowerCase();
-      const participant = participants.find(p => p.email.trim().toLowerCase() === email);
+      const participant = await storage.getParticipantBySessionEmail(req.params.sessionId, email);
       if (!participant) {
         return res.status(404).json({ error: "Participant not found" });
       }
@@ -571,6 +631,10 @@ export async function registerRoutes(app: Express) {
       if (!parsed.success) {
         console.error("[create-participant] Validation error:", (parsed as any).error.errors);
         return res.status(400).json({ error: "Invalid participant data", details: (parsed as any).error.errors });
+      }
+      const existing = await storage.getParticipantBySessionEmail(req.params.sessionId, parsed.data.email);
+      if (existing) {
+        return res.status(200).json(existing);
       }
       const participant = await storage.createParticipant(parsed.data);
       sessionCache.invalidate(`poll:${req.params.sessionId}`);

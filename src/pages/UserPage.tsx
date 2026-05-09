@@ -170,9 +170,7 @@ export const UserPage: React.FC = () => {
           restoredStep = 'study';
         }
       } else if (sessionData.status === 'grouping') {
-        if (participant.readyConfirmed) {
-          restoredStep = 'study'; // All confirmed, waiting for others
-        } else if (participant.groupNumber) {
+        if (participant.groupNumber) {
           restoredStep = 'verification';
         } else {
           restoredStep = 'waiting';
@@ -321,6 +319,40 @@ export const UserPage: React.FC = () => {
       setStep('group-reveal');
     }
   }, [currentUser?.groupNumber, step]);
+
+  // Recovery guard: if a mobile browser refreshed exactly during grouping, it
+  // may land on group-reveal before the assigned group has been hydrated.
+  useEffect(() => {
+    if (step !== 'group-reveal' || !currentSession?.id || !currentUser?.id || currentUser.groupNumber) return;
+
+    let cancelled = false;
+    const userSnapshot = currentUser;
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/sessions/${currentSession.id}/participants/${userSnapshot.id}`);
+        if (!res.ok || cancelled) return;
+
+        const participant = await res.json();
+        if (participant.groupNumber) {
+          setCurrentUser({
+            ...userSnapshot,
+            ...participant,
+            email: userSnapshot.email,
+            groupNumber: participant.groupNumber || undefined,
+            joinedAt: new Date(participant.joinedAt),
+          });
+        } else if (currentSession.status === 'grouping') {
+          setStep('waiting');
+        }
+      } catch {
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [step, currentSession?.id, currentSession?.status, currentUser?.id, currentUser?.groupNumber, setCurrentUser]);
 
   // Lightweight session status poller for steps that don't have their own
   // realtime hooks (group-reveal, icebreaker, study). This ensures the user

@@ -42,6 +42,7 @@ export interface IStorage {
 
   getParticipants(sessionId: string, filters?: { groupNumber?: number }): Promise<Participant[]>;
   getParticipant(id: string): Promise<Participant | undefined>;
+  getParticipantBySessionEmail(sessionId: string, email: string): Promise<Participant | undefined>;
   createParticipant(participant: InsertParticipant): Promise<Participant>;
   updateParticipant(id: string, data: Partial<Participant>): Promise<Participant | undefined>;
   deleteParticipantsBySession(sessionId: string): Promise<void>;
@@ -285,6 +286,16 @@ export class DatabaseStorage implements IStorage {
 
   async getParticipant(id: string): Promise<Participant | undefined> {
     const [participant] = await db.select().from(participants).where(eq(participants.id, id)).limit(1);
+    return participant;
+  }
+
+  async getParticipantBySessionEmail(sessionId: string, email: string): Promise<Participant | undefined> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const [participant] = await db
+      .select()
+      .from(participants)
+      .where(and(eq(participants.sessionId, sessionId), sql`lower(trim(${participants.email})) = ${normalizedEmail}`))
+      .limit(1);
     return participant;
   }
 

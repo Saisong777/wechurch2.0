@@ -10,7 +10,8 @@ class SimpleCache {
   constructor(defaultTTLSeconds: number = 300) {
     this.defaultTTL = defaultTTLSeconds * 1000;
     
-    setInterval(() => this.cleanup(), 60000);
+    const cleanupTimer = setInterval(() => this.cleanup(), 60000);
+    cleanupTimer.unref?.();
   }
 
   set<T>(key: string, value: T, ttlSeconds?: number): void {
@@ -91,7 +92,8 @@ class SessionCache {
   private defaultTTL = 2000;
 
   constructor() {
-    setInterval(() => this.cleanup(), 10000);
+    const cleanupTimer = setInterval(() => this.cleanup(), 10000);
+    cleanupTimer.unref?.();
   }
 
   get<T>(key: string): T | null {
