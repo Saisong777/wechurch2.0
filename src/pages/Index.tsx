@@ -194,6 +194,48 @@ const Index = () => {
       iconClass: 'bg-amber-500/15 text-amber-600',
     }] : []),
   ];
+  const productJourneys = [
+    {
+      id: 'participant',
+      featureKey: 'we_live',
+      title: '我正在現場',
+      subtitle: '輸入代碼加入 SoulGym',
+      href: '/user/study',
+      icon: Dumbbell,
+      iconClass: 'bg-secondary/15 text-secondary',
+      enabled: true,
+    },
+    {
+      id: 'host',
+      featureKey: 'we_live',
+      title: canCreateSession ? '我今晚要主持' : '我是參與者',
+      subtitle: canCreateSession ? '打開一頁式主持台' : '加入查經或查看筆記',
+      href: canCreateSession ? '/admin' : '/user',
+      icon: Settings,
+      iconClass: 'bg-amber-500/15 text-amber-600',
+      enabled: true,
+    },
+    {
+      id: 'devotion',
+      featureKey: 'we_learn',
+      title: '我想安靜讀經',
+      subtitle: '聖經、讀經計畫、筆記',
+      href: '/learn',
+      icon: BookOpen,
+      iconClass: 'bg-primary/15 text-primary',
+      enabled: true,
+    },
+    {
+      id: 'care',
+      featureKey: 'we_share',
+      title: '我想留下代禱',
+      subtitle: '寫下需要，彼此扶持',
+      href: '/share',
+      icon: Share2,
+      iconClass: 'bg-rose-500/15 text-rose-500',
+      enabled: true,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
@@ -457,6 +499,42 @@ const Index = () => {
                     </Link>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {!featuresLoading && (
+            <section className="animate-fade-in" style={{ animationDelay: '90ms' }} aria-labelledby="journey-title">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 id="journey-title" className="text-base font-semibold text-foreground">
+                  依照此刻開始
+                </h2>
+                <span className="text-xs font-medium text-muted-foreground">
+                  不用找功能
+                </span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {productJourneys
+                  .filter((journey) => journey.enabled && isFeatureEnabled(journey.featureKey))
+                  .map((journey) => {
+                    const Icon = journey.icon;
+                    return (
+                      <Link key={journey.id} to={journey.href} className="group block" data-testid={`link-journey-${journey.id}`}>
+                        <Card className="h-full border-white/60 bg-white/75 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+                          <CardContent className="flex h-full items-center gap-3 p-4">
+                            <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${journey.iconClass}`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="truncate text-sm font-semibold text-foreground">{journey.title}</h3>
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground">{journey.subtitle}</p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    );
+                  })}
               </div>
             </section>
           )}

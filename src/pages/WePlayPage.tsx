@@ -1,115 +1,84 @@
-import { Link } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Gamepad2, Shuffle, BookOpen, ScrollText, ChevronRight } from "lucide-react";
-import { Header } from "@/components/layout/Header";
+import { BookOpen, Gamepad2, ScrollText, Shuffle } from 'lucide-react';
+import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
+import { FeatureGate } from '@/components/ui/feature-gate';
+import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 
-const features = [
+const actions: Array<FeaturePortalAction & { featureKeys: string[] }> = [
   {
-    id: "icebreaker",
-    title: "抽破冰題",
-    subtitle: "真心話不用冒險",
+    id: 'icebreaker',
+    title: '抽破冰題',
+    subtitle: '真心話不用冒險',
     icon: Gamepad2,
-    href: "/icebreaker",
-    bgColor: "bg-emerald-500/15",
-    iconColor: "text-emerald-600",
-    featureKeys: ["we_play", "icebreaker_game"] as string[],
+    href: '/icebreaker',
+    tone: 'bg-emerald-500/15',
+    iconTone: 'text-emerald-600',
+    badge: '暖場',
+    testId: 'link-feature-icebreaker',
+    featureKeys: ['we_play', 'icebreaker_game'],
   },
   {
-    id: "grouper",
-    title: "立即分組",
-    subtitle: "只能說是神的安排",
+    id: 'grouper',
+    title: '立即分組',
+    subtitle: '人到齊就可以快速分組',
     icon: Shuffle,
-    href: "/grouper",
-    bgColor: "bg-amber-500/15",
-    iconColor: "text-amber-600",
-    featureKeys: ["we_play", "random_grouper"] as string[],
+    href: '/grouper',
+    tone: 'bg-amber-500/15',
+    iconTone: 'text-amber-600',
+    badge: '現場',
+    testId: 'link-feature-grouper',
+    featureKeys: ['we_play', 'random_grouper'],
   },
-  // ✅ 新增聖經問答
   {
-    id: "bible-quiz",
-    title: "玩聖經問答",
-    subtitle: "208 題 Quiz",
+    id: 'bible-quiz',
+    title: '玩聖經問答',
+    subtitle: '208 題 Quiz',
     icon: BookOpen,
-    href: "/play/bible-quiz",
-    bgColor: "bg-yellow-500/15",
-    iconColor: "text-yellow-600",
-    featureKeys: ["we_play", "bible_quiz"] as string[],
+    href: '/play/bible-quiz',
+    tone: 'bg-yellow-500/15',
+    iconTone: 'text-yellow-600',
+    badge: '挑戰',
+    testId: 'link-feature-bible-quiz',
+    featureKeys: ['we_play', 'bible_quiz'],
   },
   {
-    id: "disciple-quiz",
-    title: "測門徒人格",
-    subtitle: "你像哪個門徒？",
+    id: 'disciple-quiz',
+    title: '測門徒人格',
+    subtitle: '你像哪個門徒？',
     icon: ScrollText,
-    href: "/play/disciple-quiz",
-    bgColor: "bg-orange-500/15",
-    iconColor: "text-orange-600",
-    featureKeys: ["we_play", "disciple_quiz"] as string[],
+    href: '/play/disciple-quiz',
+    tone: 'bg-orange-500/15',
+    iconTone: 'text-orange-600',
+    badge: '分享',
+    testId: 'link-feature-disciple-quiz',
+    featureKeys: ['we_play', 'disciple_quiz'],
   },
 ];
 
 export const WePlayPage = () => {
+  const { isFeatureEnabled } = useFeatureToggles();
+  const enabledActions = actions.filter((action) => action.featureKeys.every(isFeatureEnabled));
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-      <Header variant="compact" />
-      <div className="container mx-auto px-4 py-6 md:py-10">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-6 md:mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/15 mb-3">
-              <Gamepad2 className="w-7 h-7 text-emerald-600" />
-            </div>
-            <h1
-              className="text-2xl font-bold text-foreground"
-              data-testid="text-page-title"
-            >
-              小工具
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              現場一點就能用
-            </p>
-          </div>
-          <div className="grid gap-3 md:gap-4">
-            {features.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <Link
-                  key={feature.id}
-                  to={feature.href}
-                  className="block"
-                  data-testid={`link-feature-${feature.id}`}
-                >
-                  <Card className="hover-elevate active-elevate-2 cursor-pointer">
-                    <CardContent className="p-4 sm:p-5">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-12 h-12 rounded-xl ${feature.bgColor} flex items-center justify-center flex-shrink-0`}
-                        >
-                          <Icon className={`w-6 h-6 ${feature.iconColor}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3
-                            className="text-base font-semibold text-foreground"
-                            data-testid={`text-feature-title-${feature.id}`}
-                          >
-                            {feature.title}
-                          </h3>
-                          <p
-                            className="text-sm text-muted-foreground mt-0.5"
-                            data-testid={`text-feature-subtitle-${feature.id}`}
-                          >
-                            {feature.subtitle}
-                          </p>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
+    <FeatureGate
+      featureKey="we_play"
+      title="小工具維護中"
+      description="現場互動工具目前暫時關閉，請稍後再試"
+    >
+      <FeaturePortalPage
+        title="小工具"
+        subtitle="現場互動"
+        eyebrow="Tools for groups"
+        description="把聚會現場常用的小工具放在同一個入口，分組、破冰、問答和分享都能更快開始。"
+        icon={Gamepad2}
+        iconTone="bg-emerald-500/15 text-emerald-600"
+        actions={enabledActions}
+        moments={[
+          { label: '暖場', value: '抽題、問答、門徒人格' },
+          { label: '分組', value: '快速產生小組名單' },
+          { label: '延伸', value: '可接到 SoulGym 查經流程' },
+        ]}
+      />
+    </FeatureGate>
   );
 };
 

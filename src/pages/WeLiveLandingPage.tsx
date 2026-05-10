@@ -1,77 +1,64 @@
-import { Link } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dumbbell, BookMarked, ChevronRight } from 'lucide-react';
-import { Header } from '@/components/layout/Header';
+import { Dumbbell, BookMarked, QrCode, ClipboardList } from 'lucide-react';
 import { FeatureGate } from '@/components/ui/feature-gate';
+import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
 
-const features = [
+const actions: FeaturePortalAction[] = [
   {
     id: 'study',
     title: '加入查經',
     subtitle: '輸入代碼或掃 QR 開始',
-    icon: Dumbbell,
+    icon: QrCode,
     href: '/user/study',
-    bgColor: 'bg-primary/15',
-    iconColor: 'text-primary',
+    tone: 'bg-primary/15',
+    iconTone: 'text-primary',
+    badge: '現場使用',
+    testId: 'link-feature-study',
   },
   {
     id: 'notebook',
     title: '打開查經筆記',
-    subtitle: '個人紀錄與小組彙整',
+    subtitle: '個人紀錄、小組整理與會後回顧',
     icon: BookMarked,
     href: '/user/notebook',
-    bgColor: 'bg-amber-500/15',
-    iconColor: 'text-amber-600',
+    tone: 'bg-amber-500/15',
+    iconTone: 'text-amber-600',
+    badge: '會後整理',
+    testId: 'link-feature-notebook',
+  },
+  {
+    id: 'admin',
+    title: '主持 SoulGym',
+    subtitle: '建立查經、邀請成員、分組、查看 AI 成果',
+    icon: ClipboardList,
+    href: '/admin',
+    tone: 'bg-secondary/15',
+    iconTone: 'text-secondary',
+    badge: '帶領者',
+    testId: 'link-feature-admin',
   },
 ];
 
 export const WeLiveLandingPage = () => {
   return (
     <FeatureGate
-      featureKeys={["we_live"]}
+      featureKeys={['we_live']}
       title="靈魂健身房維護中"
       description="Soul Gym 功能目前暫時關閉，請稍後再試"
     >
-      <div className="min-h-screen bg-gradient-to-b from-background to-primary/5">
-        <Header title="SoulGym" subtitle="靈魂健身房" variant="compact" />
-        <div className="container mx-auto px-4 py-6 md:py-10">
-          <div className="max-w-2xl mx-auto">
-            <div className="text-center mb-6 md:mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/15 mb-3">
-                <Dumbbell className="w-7 h-7 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">SoulGym</h1>
-              <p className="text-sm text-muted-foreground mt-1">一起查經，一起整理</p>
-            </div>
-
-            <div className="grid gap-3 md:gap-4">
-              {features.map((feature) => {
-                const Icon = feature.icon;
-                return (
-                  <Link key={feature.id} to={feature.href} className="block" data-testid={`link-feature-${feature.id}`}>
-                    <Card className="hover-elevate cursor-pointer transition-all">
-                      <CardHeader className="flex flex-row items-center gap-3 sm:gap-4 py-3 sm:py-4 px-3 sm:px-6">
-                        <div className={`p-2 sm:p-3 rounded-lg ${feature.bgColor} flex items-center justify-center flex-shrink-0`}>
-                          <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${feature.iconColor}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base sm:text-lg" data-testid={`text-feature-title-${feature.id}`}>
-                            {feature.title}
-                          </CardTitle>
-                          <CardDescription className="mt-0.5 sm:mt-1 text-xs sm:text-sm line-clamp-2" data-testid={`text-feature-subtitle-${feature.id}`}>
-                            {feature.subtitle}
-                          </CardDescription>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+      <FeaturePortalPage
+        title="SoulGym"
+        subtitle="靈魂健身房"
+        eyebrow="Bible study flow"
+        description="從加入、分組、分享、查經到 AI 整理，讓一場查經班可以穩定地走完，也留下可以回看的屬靈成果。"
+        icon={Dumbbell}
+        iconTone="bg-primary/15 text-primary"
+        actions={actions}
+        moments={[
+          { label: '進場', value: '代碼、QR Code、手機加入' },
+          { label: '現場', value: '分組、抽卡、三步驟查經' },
+          { label: '會後', value: '小組摘要、大組總結、個人筆記' },
+        ]}
+      />
     </FeatureGate>
   );
 };

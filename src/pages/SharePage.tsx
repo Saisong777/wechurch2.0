@@ -1,12 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, ImageIcon, ChevronRight, Sparkles } from 'lucide-react';
+import { Heart, ImageIcon, Sparkles } from 'lucide-react';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
+import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
 
-const shareFeatures = [
+const shareFeatures: Array<FeaturePortalAction & { featureKey: string }> = [
   {
     id: 'prayer',
     featureKey: 'prayer_wall',
@@ -14,20 +12,22 @@ const shareFeatures = [
     subtitle: '分享代禱事項',
     icon: Heart,
     href: '/prayer-wall',
-    color: 'from-rose-500 to-pink-600',
-    bgColor: 'bg-rose-500/10',
-    iconColor: 'text-rose-600',
+    tone: 'bg-rose-500/15',
+    iconTone: 'text-rose-600',
+    badge: '彼此代禱',
+    testId: 'link-feature-prayer',
   },
   {
     id: 'prayer-meeting',
     featureKey: 'prayer_meeting',
     title: '進入禱告會',
-    subtitle: '分組禱告，彼此代禱',
+    subtitle: '分組禱告，彼此扶持',
     icon: Sparkles,
     href: '/prayer-meeting',
-    color: 'from-purple-500 to-pink-600',
-    bgColor: 'bg-purple-500/10',
-    iconColor: 'text-purple-600',
+    tone: 'bg-purple-500/15',
+    iconTone: 'text-purple-600',
+    badge: '同步聚集',
+    testId: 'link-feature-prayer-meeting',
   },
   {
     id: 'card',
@@ -36,56 +36,37 @@ const shareFeatures = [
     subtitle: '本週信息摘要圖片',
     icon: ImageIcon,
     href: '/card',
-    color: 'from-violet-500 to-purple-600',
-    bgColor: 'bg-violet-500/10',
-    iconColor: 'text-violet-600',
+    tone: 'bg-violet-500/15',
+    iconTone: 'text-violet-600',
+    badge: '分享素材',
+    testId: 'link-feature-card',
   },
 ];
 
 const SharePage: React.FC = () => {
   const { isFeatureEnabled } = useFeatureToggles();
+  const enabledFeatures = shareFeatures.filter((feature) => isFeatureEnabled(feature.featureKey));
 
   return (
-    <FeatureGate 
-      featureKey="we_share" 
+    <FeatureGate
+      featureKey="we_share"
       title="分享功能維護中"
       description="來禱告功能目前暫時關閉，請稍後再試"
     >
-      <div className="min-h-screen bg-background">
-        <Header title="來禱告" subtitle="分享代禱" variant="compact" />
-        
-        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
-          <div className="max-w-2xl md:max-w-3xl mx-auto">
-            <div className="grid gap-3 sm:gap-4">
-              {shareFeatures.filter(f => isFeatureEnabled(f.featureKey)).map((feature) => {
-                const Icon = feature.icon;
-                return (
-                  <Link key={feature.id} to={feature.href} className="block group">
-                    <Card className="transition-all duration-300 border hover:border-primary/30 hover:shadow-md hover-elevate">
-                      <CardHeader className="py-3 sm:py-4 px-3 sm:px-6">
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${feature.bgColor} flex items-center justify-center group-hover:scale-105 transition-transform`}>
-                            <Icon className={`w-5 h-5 sm:w-7 sm:h-7 ${feature.iconColor}`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-lg flex items-center justify-between gap-2">
-                              <span className="truncate">{feature.title}</span>
-                              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
-                            </CardTitle>
-                            <CardDescription className="text-xs sm:text-sm line-clamp-1">
-                              {feature.subtitle}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </main>
-      </div>
+      <FeaturePortalPage
+        title="來禱告"
+        subtitle="分享代禱"
+        eyebrow="Prayer and care"
+        description="讓代禱、禱告會和信息圖卡都集中在一個地方，聚會前後都能延續彼此關心。"
+        icon={Heart}
+        iconTone="bg-rose-500/15 text-rose-600"
+        actions={enabledFeatures}
+        moments={[
+          { label: '個人', value: '寫下今天的代禱' },
+          { label: '群體', value: '一起進入禱告會' },
+          { label: '分享', value: '保存信息圖卡與內容' },
+        ]}
+      />
     </FeatureGate>
   );
 };
