@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown, Mail, Inbox, Plus, BookOpen } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown, Mail, Inbox, Plus, BookOpen, QrCode, Gauge } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -18,6 +18,40 @@ const hostFlowSteps: Array<{ step: AdminStep; label: string; hint: string }> = [
   { step: 'create', label: '建立聚會', hint: '設定經文' },
   { step: 'waiting', label: '邀請與分組', hint: 'QR、成員、分組' },
   { step: 'monitor', label: '主持查經', hint: '進度、AI、結束' },
+];
+
+const dashboardHostCards: Array<{
+  step: AdminStep;
+  title: string;
+  description: string;
+  icon: typeof Plus;
+  tone: string;
+  iconTone: string;
+}> = [
+  {
+    step: 'create',
+    title: '開一場查經',
+    description: '設定經文、主題與查經流程',
+    icon: Plus,
+    tone: 'bg-primary/10 border-primary/20',
+    iconTone: 'text-primary',
+  },
+  {
+    step: 'waiting',
+    title: '帶大家進場',
+    description: 'QR Code、報名、分組與確認',
+    icon: QrCode,
+    tone: 'bg-secondary/10 border-secondary/20',
+    iconTone: 'text-secondary',
+  },
+  {
+    step: 'monitor',
+    title: '看進度與 AI',
+    description: '查經進度、資料品質、成果整理',
+    icon: Gauge,
+    tone: 'bg-emerald-500/10 border-emerald-500/20',
+    iconTone: 'text-emerald-600',
+  },
 ];
 
 function lazyAdminComponent<T extends Record<string, unknown>>(
@@ -181,6 +215,60 @@ export const AdminPage: React.FC = () => {
                 建立查經活動
               </Button>
             </div>
+
+            <section className="rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-primary">今晚主持台</p>
+                  <h3 className="mt-1 text-xl font-bold text-foreground">從開場到 AI 成果，一頁往前走</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    先建立查經，接著邀請與分組，最後在主持台看進度與整理成果。
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setStep('create')}
+                  className="h-11 gap-2 self-stretch sm:self-auto"
+                  data-testid="button-dashboard-primary-create"
+                >
+                  <Plus className="h-4 w-4" />
+                  立即開場
+                </Button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {dashboardHostCards.map((card, index) => {
+                  const Icon = card.icon;
+                  return (
+                    <button
+                      key={card.step}
+                      type="button"
+                      onClick={() => {
+                        if (card.step === 'create' || currentSession) {
+                          setStep(card.step);
+                          return;
+                        }
+                        toast.info('先選擇今日 SoulGym', {
+                          description: '下方選擇一場活動後，就能進入等候室或主持台。',
+                        });
+                      }}
+                      className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}
+                      data-testid={`button-host-card-${card.step}`}
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-background/80">
+                          <Icon className={`h-5 w-5 ${card.iconTone}`} />
+                        </div>
+                        <span className="rounded-full bg-background/80 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-semibold text-foreground">{card.title}</h4>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
 
             <div>
               <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
