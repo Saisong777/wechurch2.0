@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { MyNotebook } from '@/components/user/MyNotebook';
+import { ReportTakeawayPanel } from '@/components/admin/report-viewer/ReportTakeawayPanel';
+import { parseSingleReport } from '@/components/admin/report-viewer/parse';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +52,53 @@ interface AiReport {
   status: string;
   createdAt: string;
 }
+
+const AiReportPreview = ({
+  report,
+  variant,
+}: {
+  report: AiReport;
+  variant: 'group' | 'overall';
+}) => {
+  const [showFullReport, setShowFullReport] = useState(false);
+  const parsedReport = parseSingleReport(report.content);
+  parsedReport.groupNumber = variant === 'overall' ? 0 : report.groupNumber || 0;
+  parsedReport.groupInfo = variant === 'overall' ? '全體查經成果' : `第 ${report.groupNumber || '-'} 組查經成果`;
+
+  return (
+    <div className="rounded-xl border bg-background/80 p-3 sm:p-4">
+      <ReportTakeawayPanel
+        section={parsedReport}
+        variant={variant}
+        className="mb-3 border-primary/15 bg-primary/5"
+      />
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            {variant === 'overall' ? '完整全體報告' : '完整小組報告'}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            先看重點，需要帶領或回顧時再展開全文。
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 shrink-0 rounded-xl"
+          onClick={() => setShowFullReport((value) => !value)}
+        >
+          {showFullReport ? '收起' : '展開'}
+        </Button>
+      </div>
+      {showFullReport && (
+        <div className="mt-3 whitespace-pre-wrap rounded-lg bg-muted/35 p-3 text-sm leading-6 text-muted-foreground">
+          {report.content}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ResponseDetail = ({ response }: { response: GroupResponse }) => {
   const parsedCats = parseCategories(response.core_insight_category);
@@ -217,9 +266,7 @@ const GroupSessionCard = ({ session, preloadedReports }: { session: SessionInfo;
                 <BookOpen className="w-4 h-4" />
                 小組 AI 報告
               </h4>
-              <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-md">
-                {groupReport.content}
-              </div>
+              <AiReportPreview report={groupReport} variant="group" />
             </div>
           )}
 
@@ -322,9 +369,7 @@ const OverallSessionCard = ({ session, preloadedReports }: { session: SessionInf
                     <Globe className="w-4 h-4" />
                     全體 AI 報告
                   </h4>
-                  <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-md">
-                    {overallReport.content}
-                  </div>
+                  <AiReportPreview report={overallReport} variant="overall" />
                 </div>
               )}
 
@@ -336,11 +381,9 @@ const OverallSessionCard = ({ session, preloadedReports }: { session: SessionInf
                   </h4>
                   <div className="space-y-3">
                     {groupReports.map(report => (
-                      <div key={report.id} className="bg-muted/30 p-3 rounded-md">
+                      <div key={report.id} className="space-y-2">
                         <Badge variant="outline" className="mb-2">第{report.groupNumber}組</Badge>
-                        <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {report.content}
-                        </div>
+                        <AiReportPreview report={report} variant="group" />
                       </div>
                     ))}
                   </div>
