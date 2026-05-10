@@ -16,6 +16,7 @@ import {
   Settings,
   User,
   CheckCircle2,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -56,6 +57,19 @@ interface TodayReadingSummary {
   scriptureReference: string;
   previewVerses: Array<{ verse: number; text: string }>;
   todayCompleted: boolean;
+}
+
+interface DevotionalNoteSummary {
+  id: string;
+  readingPlanId: string | null;
+  actionPlan: string | null;
+  updatedAt: string;
+}
+
+interface NotebookEntrySummary {
+  id: string;
+  action_plan: string | null;
+  session_date: string;
 }
 
 const featureConfig = [
@@ -127,6 +141,30 @@ const Index = () => {
     retry: false,
   });
 
+  const userEmail = user?.email || localStorage.getItem('bible_study_guest_email') || '';
+
+  const { data: devotionalNotes = [] } = useQuery<DevotionalNoteSummary[]>({
+    queryKey: ['/api/devotional-notes'],
+    enabled: !!user,
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: 60000,
+  });
+
+  const { data: notebookEntries = [] } = useQuery<NotebookEntrySummary[]>({
+    queryKey: ['/api/notebook', userEmail],
+    queryFn: async () => {
+      const res = await fetch(`/api/notebook?email=${encodeURIComponent(userEmail)}`);
+      if (!res.ok) throw new Error('Failed to fetch notebook');
+      const data = await res.json();
+      return (data?.entries || []) as NotebookEntrySummary[];
+    },
+    enabled: !!user && !!userEmail,
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: 60000,
+  });
+
   useEffect(() => {
     const sessionId = searchParams.get('session');
     if (sessionId) {
@@ -156,6 +194,31 @@ const Index = () => {
   const greeting = currentHour < 12 ? '早安' : currentHour < 18 ? '午安' : '晚安';
   const displayName = getDisplayName();
   const greetingName = user ? displayName : '朋友';
+  const spiritualSnapshot = useMemo(() => {
+    const readingNoteCount = devotionalNotes.filter((note) => note.readingPlanId !== null).length;
+    const freeNoteCount = devotionalNotes.filter((note) => note.readingPlanId === null).length;
+    const studyNoteCount = notebookEntries.length;
+    const actionTexts = [
+      ...devotionalNotes.map((note) => note.actionPlan),
+      ...notebookEntries.map((entry) => entry.action_plan),
+    ].filter(Boolean) as string[];
+    const latestDates = [
+      ...devotionalNotes.map((note) => note.updatedAt),
+      ...notebookEntries.map((entry) => entry.session_date),
+    ]
+      .filter(Boolean)
+      .map((date) => new Date(date))
+      .sort((a, b) => b.getTime() - a.getTime());
+
+    return {
+      readingNoteCount,
+      freeNoteCount,
+      studyNoteCount,
+      actionCount: actionTexts.length,
+      latestAction: actionTexts[0] || '今天可以從一段經文、一個代禱，或一場 SoulGym 開始。',
+      latestActivity: latestDates[0],
+    };
+  }, [devotionalNotes, notebookEntries]);
   const quickActions = [
     {
       id: 'study',
@@ -468,6 +531,70 @@ const Index = () => {
               </Card>
             ) : null}
           </section>
+
+          {user && (
+            <section className="animate-fade-in" style={{ animationDelay: '70ms' }} aria-labelledby="snapshot-title">
+              <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
+                <Card className="border-white/60 bg-white/80 shadow-sm">
+                  <CardContent className="p-4 sm:p-5">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-primary">我的今天</p>
+                        <h2 id="snapshot-title" className="mt-1 text-lg font-bold text-foreground">
+                          回來就接得上
+                        </h2>
+                      </div>
+                      <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl">
+                        <Link to="/learn/my-notes">
+                          看筆記
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border bg-background/80 p-3">
+                        <BookOpen className="mb-2 h-4 w-4 text-primary" />
+                        <p className="text-xl font-bold text-foreground">{spiritualSnapshot.readingNoteCount}</p>
+                        <p className="text-[11px] text-muted-foreground">讀經筆記</p>
+                      </div>
+                      <div className="rounded-xl border bg-background/80 p-3">
+                        <Dumbbell className="mb-2 h-4 w-4 text-secondary" />
+                        <p className="text-xl font-bold text-foreground">{spiritualSnapshot.studyNoteCount}</p>
+                        <p className="text-[11px] text-muted-foreground">查經紀錄</p>
+                      </div>
+                      <div className="rounded-xl border bg-background/80 p-3">
+                        <ClipboardCheck className="mb-2 h-4 w-4 text-emerald-600" />
+                        <p className="text-xl font-bold text-foreground">{spiritualSnapshot.actionCount}</p>
+                        <p className="text-[11px] text-muted-foreground">行動操練</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-white/60 bg-white/80 shadow-sm">
+                  <CardContent className="flex h-full flex-col justify-between p-4 sm:p-5">
+                    <div>
+                      <div className="mb-2 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-secondary" />
+                        <h2 className="text-sm font-semibold text-foreground">下一步提醒</h2>
+                      </div>
+                      <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
+                        {spiritualSnapshot.latestAction}
+                      </p>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                      <span>最近更新</span>
+                      <span className="font-semibold text-foreground">
+                        {spiritualSnapshot.latestActivity
+                          ? spiritualSnapshot.latestActivity.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })
+                          : '尚未開始'}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+          )}
 
           {!featuresLoading && (
             <section className="animate-fade-in" style={{ animationDelay: '80ms' }} aria-labelledby="quick-actions-title">
