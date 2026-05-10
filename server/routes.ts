@@ -28,6 +28,7 @@ import {
 import type { ReportDashboardNote } from "./prompts/devotional-analysis";
 import {
   getPlatformSummary,
+  getProductGrowthBrief,
   recordAiUsage,
   recordAppEvent,
   recordErrorEvent,
@@ -470,6 +471,16 @@ export async function registerRoutes(app: Express) {
       res.json(summary);
     } catch (error) {
       res.status(500).json({ error: "Failed to get platform summary" });
+    }
+  });
+
+  app.get("/api/admin/product-growth-brief", requireAdmin, async (req, res) => {
+    try {
+      const brief = await getProductGrowthBrief();
+      res.json(brief);
+    } catch (error) {
+      console.error("Error fetching product growth brief:", error);
+      res.status(500).json({ error: "Failed to get product growth brief" });
     }
   });
 

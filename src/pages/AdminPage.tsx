@@ -73,6 +73,7 @@ const PrayerMeetingAdmin = lazyAdminComponent(() => import('@/components/admin/P
 const AdminMailComposer = lazyAdminComponent(() => import('@/components/admin/AdminMailComposer'), 'AdminMailComposer');
 const AdminInbox = lazyAdminComponent(() => import('@/components/admin/AdminInbox'), 'AdminInbox');
 const PlatformMaturityPanel = lazyAdminComponent(() => import('@/components/admin/PlatformMaturityPanel'), 'PlatformMaturityPanel');
+const ProductGrowthPanel = lazyAdminComponent(() => import('@/components/admin/ProductGrowthPanel'), 'ProductGrowthPanel');
 
 const AdminSectionLoader = () => (
   <div className="flex min-h-[280px] items-center justify-center">
@@ -271,6 +272,7 @@ export const AdminPage: React.FC = () => {
               </div>
             </section>
 
+            <ProductGrowthPanel />
             <PlatformMaturityPanel />
 
             <div>
