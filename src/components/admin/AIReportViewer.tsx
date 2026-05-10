@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation, Search, ChevronLeft, ChevronRight, X, ClipboardList, Send } from 'lucide-react';
+import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation, Search, ChevronLeft, ChevronRight, X, ClipboardList, Send, BarChart3, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -100,6 +100,47 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     if (!reports) return '';
     return reports.map(r => r.content).join('\n\n');
   }, [reports]);
+
+  const reportMetrics = React.useMemo(() => {
+    const structuredKeys: Array<keyof GroupReport> = [
+      'topic',
+      'observations',
+      'theology',
+      'applications',
+      'highlights',
+      'divergence',
+      'soulGym',
+      'summary',
+      'themes',
+      'insights',
+      'contributions',
+    ];
+    const structuredCount = parsedSections.filter(section =>
+      structuredKeys.some(key => Boolean(section[key]))
+    ).length;
+    const totalChars = allContentText.trim().length;
+    const readingMinutes = totalChars > 0 ? Math.max(1, Math.ceil(totalChars / 500)) : 0;
+    const overallReady = parsedSections.some(section => section.groupNumber === 0);
+    const groupCount = parsedSections.filter(section => section.groupNumber > 0).length;
+    const structureScore = parsedSections.length > 0
+      ? Math.round((structuredCount / parsedSections.length) * 100)
+      : 0;
+    const nextAction = overallReady
+      ? '先看全組總結，再複製主持稿帶現場回應。'
+      : groupCount > 0
+        ? '先確認各組摘要，再產生大組總結。'
+        : '目前還沒有可用報告，請先生成 AI 整理。';
+
+    return {
+      groupCount,
+      overallReady,
+      structuredCount,
+      structureScore,
+      totalChars,
+      readingMinutes,
+      nextAction,
+    };
+  }, [allContentText, parsedSections]);
 
   // --- Copy handlers ---
   const handleCopyAll = () => {
@@ -691,6 +732,58 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {parsedSections.length > 0 && (
+          <div className="px-3 sm:px-6 py-3 border-b bg-primary/5">
+            <div className="grid grid-cols-2 lg:grid-cols-[1.1fr_1fr_1fr_1.5fr] gap-2">
+              <div className="rounded-lg border bg-background/85 px-3 py-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Users className="w-3.5 h-3.5 text-primary" />
+                  報告範圍
+                </div>
+                <p className="mt-1 text-sm font-semibold">
+                  {reportMetrics.overallReady ? '含大組總結' : '小組報告'}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {reportMetrics.groupCount} 組
+                  </span>
+                </p>
+              </div>
+              <div className="rounded-lg border bg-background/85 px-3 py-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <BarChart3 className="w-3.5 h-3.5 text-secondary" />
+                  結構化程度
+                </div>
+                <p className="mt-1 text-sm font-semibold">
+                  {reportMetrics.structureScore}%
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {reportMetrics.structuredCount}/{parsedSections.length}
+                  </span>
+                </p>
+              </div>
+              <div className="rounded-lg border bg-background/85 px-3 py-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5 text-accent" />
+                  閱讀時間
+                </div>
+                <p className="mt-1 text-sm font-semibold">
+                  約 {reportMetrics.readingMinutes} 分鐘
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {reportMetrics.totalChars.toLocaleString()} 字
+                  </span>
+                </p>
+              </div>
+              <div className="rounded-lg border bg-background/85 px-3 py-2 col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckCircle className="w-3.5 h-3.5 text-primary" />
+                  主持人下一步
+                </div>
+                <p className="mt-1 text-sm font-medium leading-5">
+                  {reportMetrics.nextAction}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6" ref={printRef}>

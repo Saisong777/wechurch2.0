@@ -8,7 +8,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { useRealtime } from '@/hooks/useRealtime';
 import { fetchSubmissions, generateAIReport, exportSubmissionsAsCSV, exportStudyResponsesAsCSV, updateSessionStatus, fetchParticipants, updateSessionAllowLatecomers, updateSessionIcebreakerEnabled } from '@/lib/api-helpers';
 import { forceVerifyAllParticipants, fetchParticipantsWithReadyStatus, calculateGroupReadyStatus, GroupReadyStatus, resetAllReadyStatus, clearAllGroupAssignments, regroupParticipants, endStudySession } from '@/lib/admin-helpers';
-import { Users, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye, Trash2, ChevronDown } from 'lucide-react';
+import { Users, CheckCircle, Clock, Sparkles, Download, Loader2, AlertCircle, Zap, MapPin, RotateCcw, RefreshCw, Shuffle, UserPlus, Dumbbell, Gamepad2, LogOut, Eye, Trash2, ChevronDown, BarChart3, Gauge } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -31,6 +31,7 @@ import { MockDataGenerator } from './MockDataGenerator';
 import { AIReportViewer, ReportItem } from './AIReportViewer';
 import { useAdminStudyResponses } from '@/hooks/useAdminStudyResponses';
 import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
+import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 
 export const AdminMonitor: React.FC = () => {
   const navigate = useNavigate();
@@ -87,6 +88,117 @@ export const AdminMonitor: React.FC = () => {
     
     return { notStarted, inProgress, completed, total: studyResponses.length };
   }, [studyResponses]);
+
+  const aiDataQuality = React.useMemo(() => {
+    const rows = studyResponses || [];
+    const total = rows.length;
+    const hasValue = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+    const fields = [
+      { key: 'titlePhrase', label: '標題' },
+      { key: 'heartbeatVerse', label: '感動經文' },
+      { key: 'observation', label: '觀察' },
+      { key: 'coreInsightNote', label: '亮光' },
+      { key: 'actionPlan', label: '行動' },
+      { key: 'coolDownNote', label: '補充' },
+    ] as const;
+
+    const effective = rows.filter(({ response }) =>
+      hasValue(response?.observation) ||
+      hasValue(response?.coreInsightNote) ||
+      hasValue(response?.actionPlan)
+    ).length;
+
+    const fieldStats = fields.map(({ key, label }) => {
+      const filled = rows.filter(({ response }) => hasValue(response?.[key])).length;
+      const percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
+      return { key, label, filled, percentage };
+    });
+
+    const categoryCounts = INSIGHT_CATEGORIES.map((category) => {
+      const count = rows.filter(({ response }) => {
+        if (!response) return false;
+        const selected = parseCategories(response.coreInsightCategory);
+        const notes = parseNotes(response.coreInsightNote, selected);
+        return selected.includes(category.value) || hasValue(notes[category.value]);
+      }).length;
+      return { ...category, count };
+    });
+
+    const groupStats = Array.from(
+      rows.reduce((acc, row) => {
+        const groupNumber = row.groupNumber || 0;
+        if (!acc.has(groupNumber)) {
+          acc.set(groupNumber, { groupNumber, total: 0, effective: 0, completed: 0 });
+        }
+        const stat = acc.get(groupNumber)!;
+        stat.total += 1;
+        if (
+          hasValue(row.response?.observation) ||
+          hasValue(row.response?.coreInsightNote) ||
+          hasValue(row.response?.actionPlan)
+        ) {
+          stat.effective += 1;
+        }
+        if (row.progressStatus === 'stretching') stat.completed += 1;
+        return acc;
+      }, new Map<number, { groupNumber: number; total: number; effective: number; completed: number }>())
+    )
+      .map(([, stat]) => ({
+        ...stat,
+        effectivePercentage: stat.total > 0 ? Math.round((stat.effective / stat.total) * 100) : 0,
+        completedPercentage: stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0,
+      }))
+      .sort((a, b) => a.groupNumber - b.groupNumber);
+
+    const averageFieldCompletion = fieldStats.length > 0
+      ? Math.round(fieldStats.reduce((sum, stat) => sum + stat.percentage, 0) / fieldStats.length)
+      : 0;
+    const effectivePercentage = total > 0 ? Math.round((effective / total) * 100) : 0;
+    const completedPercentage = total > 0 ? Math.round((studyProgressStats.completed / total) * 100) : 0;
+    const categoryCoverage = categoryCounts.filter((category) => category.count > 0).length;
+    const categoryScore = Math.round((categoryCoverage / INSIGHT_CATEGORIES.length) * 100);
+    const qualityScore = Math.round(
+      effectivePercentage * 0.35 +
+      completedPercentage * 0.25 +
+      averageFieldCompletion * 0.3 +
+      categoryScore * 0.1
+    );
+    const weakestFields = fieldStats
+      .filter((stat) => stat.percentage < 60)
+      .sort((a, b) => a.percentage - b.percentage)
+      .slice(0, 2);
+
+    let label = '資料不足';
+    let tone = 'text-destructive';
+    let recommendation = '先請大家補上觀察、亮光或行動，再生成 AI 報告。';
+    if (qualityScore >= 75) {
+      label = '可產生高品質報告';
+      tone = 'text-accent';
+      recommendation = '資料量足夠，適合使用高品質模式生成完整報告。';
+    } else if (qualityScore >= 50) {
+      label = '可生成，但建議補強';
+      tone = 'text-secondary';
+      recommendation = weakestFields.length > 0
+        ? `建議先補強：${weakestFields.map((field) => field.label).join('、')}。`
+        : '可以先生成草稿，再由主持人補充現場觀察。';
+    }
+
+    return {
+      total,
+      effective,
+      effectivePercentage,
+      completedPercentage,
+      fieldStats,
+      categoryCounts,
+      groupStats,
+      averageFieldCompletion,
+      qualityScore,
+      label,
+      tone,
+      recommendation,
+      weakestFields,
+    };
+  }, [studyResponses, studyProgressStats.completed]);
   
   // Check if everyone has completed and show notification
   useEffect(() => {
@@ -1253,6 +1365,120 @@ export const AdminMonitor: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 px-4 sm:px-6">
+            <div className="rounded-xl border bg-primary/5 p-4 space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                    <Gauge className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-primary">AI 資料品質</p>
+                    <p className={`text-lg font-semibold ${aiDataQuality.tone}`}>
+                      {aiDataQuality.label}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {aiDataQuality.recommendation}
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-background px-4 py-3 text-center border min-w-[116px]">
+                  <p className="text-xs text-muted-foreground">品質分數</p>
+                  <p className="text-3xl font-bold text-primary">{aiDataQuality.qualityScore}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                <div className="rounded-lg bg-background/80 border p-3">
+                  <p className="text-xs text-muted-foreground">有效筆記</p>
+                  <p className="text-xl font-bold text-foreground">
+                    {aiDataQuality.effective}/{aiDataQuality.total}
+                  </p>
+                  <Progress value={aiDataQuality.effectivePercentage} className="h-1.5 mt-2" />
+                </div>
+                <div className="rounded-lg bg-background/80 border p-3">
+                  <p className="text-xs text-muted-foreground">完成率</p>
+                  <p className="text-xl font-bold text-foreground">{aiDataQuality.completedPercentage}%</p>
+                  <Progress value={aiDataQuality.completedPercentage} className="h-1.5 mt-2" />
+                </div>
+                <div className="rounded-lg bg-background/80 border p-3">
+                  <p className="text-xs text-muted-foreground">欄位完整度</p>
+                  <p className="text-xl font-bold text-foreground">{aiDataQuality.averageFieldCompletion}%</p>
+                  <Progress value={aiDataQuality.averageFieldCompletion} className="h-1.5 mt-2" />
+                </div>
+                <div className="rounded-lg bg-background/80 border p-3">
+                  <p className="text-xs text-muted-foreground">AI 模型策略</p>
+                  <p className="text-sm font-semibold text-foreground mt-1">
+                    {fastMode ? 'Flash Lite 快速省錢' : 'Flash 完整分析'}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {fastMode ? '適合即時預覽' : '適合正式成果'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="rounded-lg bg-background/80 border p-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart3 className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-semibold">欄位完成率</p>
+                  </div>
+                  <div className="space-y-2">
+                    {aiDataQuality.fieldStats.map((field) => (
+                      <div key={field.key} className="grid grid-cols-[72px_1fr_42px] items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">{field.label}</span>
+                        <Progress value={field.percentage} className="h-1.5" />
+                        <span className="text-right font-medium">{field.percentage}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-background/80 border p-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-4 h-4 text-secondary" />
+                    <p className="text-sm font-semibold">亮光標籤分布</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {aiDataQuality.categoryCounts.map((category) => (
+                      <div key={category.value} className="rounded-md bg-muted/40 px-3 py-2">
+                        <p className="text-xs text-muted-foreground">
+                          {category.emoji} {category.label}
+                        </p>
+                        <p className="text-lg font-bold text-foreground">{category.count}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {aiDataQuality.groupStats.length > 0 && (
+                <div className="rounded-lg bg-background/80 border p-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="w-4 h-4 text-accent" />
+                    <p className="text-sm font-semibold">各組 AI 準備度</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {aiDataQuality.groupStats.map((group) => (
+                      <div key={group.groupNumber} className="rounded-md border bg-muted/20 px-3 py-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-semibold">
+                            {group.groupNumber === 0 ? '未分組' : `第 ${group.groupNumber} 組`}
+                          </p>
+                          <Badge variant={group.effectivePercentage >= 70 ? 'default' : 'outline'} className="text-[10px]">
+                            {group.effective}/{group.total}
+                          </Badge>
+                        </div>
+                        <Progress value={group.effectivePercentage} className="h-1.5" />
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          完成 {group.completedPercentage}% · 有效 {group.effectivePercentage}%
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* AI Options - stacked on mobile */}
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 p-3 bg-muted/30 rounded-lg border border-dashed">
               <div className="flex items-center gap-2">
