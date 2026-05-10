@@ -35,6 +35,25 @@ const STORAGE_KEYS = {
   USER_STEP: 'bible_study_user_step',
 };
 
+const extractSessionIdentifier = (rawValue: string) => {
+  const trimmed = rawValue.trim();
+  if (!trimmed) return '';
+
+  try {
+    const url = new URL(trimmed);
+    const sessionFromQuery = url.searchParams.get('session') || url.searchParams.get('session_id');
+    if (sessionFromQuery) return sessionFromQuery.trim().toUpperCase();
+  } catch {
+  }
+
+  const queryMatch = trimmed.match(/[?&](session|session_id)=([^&#]+)/i);
+  if (queryMatch?.[2]) {
+    return decodeURIComponent(queryMatch[2]).trim().toUpperCase();
+  }
+
+  return trimmed.toUpperCase();
+};
+
 export const UserPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { currentUser, currentSession, setCurrentSession, setCurrentUser } = useSession();
@@ -270,7 +289,7 @@ export const UserPage: React.FC = () => {
   const loadSessionAndCheckAuth = async (idOrCode: string) => {
     setIsLoading(true);
 
-    const trimmedInput = idOrCode.trim().toUpperCase();
+    const trimmedInput = extractSessionIdentifier(idOrCode);
 
     try {
       // Try short code first, then UUID
@@ -406,16 +425,17 @@ export const UserPage: React.FC = () => {
 
   const handleEnterSession = async () => {
     if (!sessionId.trim()) {
-      toast.error('請輸入活動代碼');
+      toast.error('請輸入活動代碼或貼上查經連結');
       return;
     }
     await loadSessionAndCheckAuth(sessionId);
   };
 
   const handleQRScan = async (scannedId: string) => {
-    setSessionId(scannedId);
+    const parsedId = extractSessionIdentifier(scannedId);
+    setSessionId(parsedId);
     toast.success('QR Code 掃描成功！');
-    await loadSessionAndCheckAuth(scannedId);
+    await loadSessionAndCheckAuth(parsedId);
   };
 
   const renderWithGuide = (
@@ -495,13 +515,13 @@ export const UserPage: React.FC = () => {
                   <Input
                     id="sessionId"
                     value={sessionId}
-                    onChange={(e) => setSessionId(e.target.value.toUpperCase())}
-                    placeholder="例如: AB12"
-                    className="h-16 sm:h-14 text-2xl sm:text-xl font-mono text-center tracking-[0.3em] uppercase"
-                    maxLength={4}
+                    onChange={(e) => setSessionId(extractSessionIdentifier(e.target.value))}
+                    placeholder="AB12 或貼上連結"
+                    className="h-16 sm:h-14 text-xl sm:text-lg font-mono text-center uppercase"
+                    maxLength={120}
                   />
                   <p className="text-sm text-muted-foreground text-center">
-                    輸入帶領者提供的 4 碼代碼
+                    也可以直接貼上帶領者分享的查經連結
                   </p>
                 </div>
 
