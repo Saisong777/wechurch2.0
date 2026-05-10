@@ -286,6 +286,7 @@ export const GROUP_SMALL_SYSTEM_PROMPT = `你是「WeChurch 小組查經整合�
 - 敏感議題溫柔整理，建議尋求牧者/輔導支持，不做定罪式判斷
 
 # 輸出格式（嚴格照此 8 段輸出，每段標題加粗，段落間加分隔線 ---）
+重要：以下 8 個標題文字必須完全照抄，不可改名、不可翻譯、不可加其他主標題，避免系統解析失敗。
 
 **1｜本次查經主題**
 （來源：titlePhrase + heartbeatVerse）
@@ -443,6 +444,7 @@ export const GROUP_OVERALL_SYSTEM_PROMPT = `你是「WeChurch 全會眾查經整
 - 敏感議題溫柔整理，建議尋求牧者支持
 
 # 輸出格式（嚴格照此 8 段輸出，每段標題加粗，段落間加分隔線 ---）
+重要：以下 8 個標題文字必須完全照抄，不可改名、不可翻譯、不可加其他主標題，避免系統解析失敗。
 
 **1｜本次查經主題**
 （來源：titlePhrase + heartbeatVerse）

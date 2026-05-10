@@ -8,6 +8,7 @@ import { EnhancedSection } from '@/components/admin/report-elements';
 import {
   parseReportContent as parseReportContentFull,
   generateSectionMarkdown,
+  generateShareText,
   downloadBlob,
   GroupReport,
 } from '@/components/admin/report-viewer';
@@ -66,8 +67,11 @@ function parseReportContent(content: string): ParsedReport {
 
 // Generate structured Markdown from a parsed report (for downloads)
 function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verseReference?: string): string {
-  // Convert ParsedReport to GroupReport format for the shared generator
-  const section: GroupReport = {
+  return generateSectionMarkdown(buildGroupReportSection(parsed, groupNumber), verseReference);
+}
+
+function buildGroupReportSection(parsed: ParsedReport, groupNumber: number): GroupReport {
+  return {
     groupNumber,
     groupInfo: `第 ${groupNumber} 組`,
     members: parsed.members,
@@ -85,8 +89,6 @@ function generateReportMarkdown(parsed: ParsedReport, groupNumber: number, verse
     summary: parsed.summary,
     raw: parsed.raw,
   };
-  
-  return generateSectionMarkdown(section, verseReference);
 }
 
 export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
@@ -113,7 +115,9 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
 
   const handleShare = async () => {
     if (!report) return;
-    handleCopy();
+    const parsed = parseReportContent(report);
+    navigator.clipboard.writeText(generateShareText([buildGroupReportSection(parsed, groupNumber)], verseReference));
+    toast.success('分享版已複製！');
   };
 
   const handleCopy = () => {

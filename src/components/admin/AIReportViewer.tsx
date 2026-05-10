@@ -16,12 +16,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Sparkles, Copy, Printer, Download, FileText, ChevronDown, Users, FileDown, BookOpen, LayoutGrid, List, Columns, Presentation, Search, ChevronLeft, ChevronRight, X, ClipboardList, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 import {
   parseSingleReport,
+  generateFacilitatorPacketMarkdown,
+  generateShareText,
   generateSectionMarkdown,
   generatePrintHTML,
   downloadBlob,
@@ -107,6 +109,18 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     }
   };
 
+  const handleCopyShareText = () => {
+    if (!parsedSections.length) return;
+    navigator.clipboard.writeText(generateShareText(parsedSections, verseReference));
+    toast.success('群組分享版已複製！');
+  };
+
+  const handleCopyFacilitatorPacket = () => {
+    if (!parsedSections.length) return;
+    navigator.clipboard.writeText(generateFacilitatorPacketMarkdown(parsedSections, verseReference));
+    toast.success('主持人成果包已複製！');
+  };
+
   const handleCopyGroup = (groupNumber: number) => {
     const section = parsedSections.find(s => s.groupNumber === groupNumber);
     if (section) {
@@ -143,6 +157,17 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
     downloadBlob(blob, filename);
 
     toast.success('Markdown 已下載！');
+  };
+
+  const handleDownloadFacilitatorPacket = () => {
+    if (!parsedSections.length) return;
+
+    const markdown = generateFacilitatorPacketMarkdown(parsedSections, verseReference);
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
+    const filename = `主持人成果包-${verseReference || 'SoulGym'}-${new Date().toISOString().split('T')[0]}.md`;
+    downloadBlob(blob, filename);
+
+    toast.success('主持人成果包已下載！');
   };
 
   const handleDownloadMarkdownGroup = (groupNumber: number) => {
@@ -589,6 +614,14 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               <span className="hidden sm:inline">複製全部</span>
               <span className="sm:hidden">複製</span>
             </Button>
+            <Button variant="outline" size="sm" onClick={handleCopyShareText} className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm hidden sm:flex">
+              <Send className="w-3.5 h-3.5" />
+              分享版
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleCopyFacilitatorPacket} className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm hidden md:flex">
+              <ClipboardList className="w-3.5 h-3.5" />
+              主持稿
+            </Button>
             <Button variant="outline" size="sm" onClick={() => handlePrint()} className="gap-1.5 h-8 px-2 sm:px-3 text-xs sm:text-sm hidden sm:flex">
               <Printer className="w-3.5 h-3.5" />
               列印
@@ -605,6 +638,15 @@ export const AIReportViewer: React.FC<AIReportViewerProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 z-50 bg-popover">
+              <DropdownMenuItem onClick={handleCopyShareText}>
+                <Send className="w-4 h-4 mr-2" />
+                複製群組分享版
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadFacilitatorPacket}>
+                <ClipboardList className="w-4 h-4 mr-2" />
+                主持人成果包
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleDownloadMarkdownAll}>
                 <FileText className="w-4 h-4 mr-2" />
                 全部報告 (Markdown)

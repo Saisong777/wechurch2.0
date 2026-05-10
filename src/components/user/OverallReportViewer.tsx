@@ -8,6 +8,7 @@ import { EnhancedSection } from '@/components/admin/report-elements';
 import {
   parseReportContent as parseReportContentFull,
   generateSectionMarkdown,
+  generateShareText,
   downloadBlob,
   GroupReport,
 } from '@/components/admin/report-viewer';
@@ -79,9 +80,30 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
   const report = isCompleted && latestAnalysis ? latestAnalysis.content : null;
   const reportDate = latestAnalysis?.createdAt || null;
 
+  const buildOverallReportSection = (parsed: ParsedOverallReport): GroupReport => ({
+    groupNumber: 0,
+    groupInfo: '全體綜合分析',
+    members: parsed.members,
+    verse: parsed.verse,
+    contributions: parsed.contributions,
+    themes: parsed.themes,
+    observations: parsed.observations,
+    insights: parsed.insights,
+    applications: parsed.applications,
+    topic: parsed.topic,
+    theology: parsed.theology,
+    highlights: parsed.highlights,
+    divergence: parsed.divergence,
+    soulGym: parsed.soulGym,
+    summary: parsed.summary,
+    raw: parsed.raw,
+  });
+
   const handleShare = async () => {
     if (!report) return;
-    handleCopy();
+    const parsed = parseOverallReport(report);
+    navigator.clipboard.writeText(generateShareText([buildOverallReportSection(parsed)], verseReference));
+    toast.success('分享版已複製！');
   };
 
   const handleCopy = () => {
@@ -94,24 +116,7 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
     if (!report) return;
 
     const parsed = parseOverallReport(report);
-    const section: GroupReport = {
-      groupNumber: 0,
-      groupInfo: '全體綜合分析',
-      members: parsed.members,
-      verse: parsed.verse,
-      contributions: parsed.contributions,
-      themes: parsed.themes,
-      observations: parsed.observations,
-      insights: parsed.insights,
-      applications: parsed.applications,
-      topic: parsed.topic,
-      theology: parsed.theology,
-      highlights: parsed.highlights,
-      divergence: parsed.divergence,
-      soulGym: parsed.soulGym,
-      summary: parsed.summary,
-      raw: parsed.raw,
-    };
+    const section = buildOverallReportSection(parsed);
     const markdown = generateSectionMarkdown(section, verseReference);
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
     const filename = `全體報告-${verseReference || 'export'}.md`;

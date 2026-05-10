@@ -5,6 +5,8 @@ export type { GroupReport } from './parse';
 
 export { 
   generateSectionMarkdown, 
+  generateFacilitatorPacketMarkdown,
+  generateShareText,
   generatePrintHTML, 
   generatePPTHTML,
   generatePPTX,

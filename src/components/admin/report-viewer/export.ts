@@ -3,6 +3,38 @@
 import { GroupReport } from './parse';
 import PptxGenJS from 'pptxgenjs';
 
+const reportDate = () => new Date().toLocaleDateString('zh-TW', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+
+const compactLines = (value?: string, maxLines = 3): string[] => {
+  if (!value) return [];
+  return value
+    .replace(/\*\*/g, '')
+    .split('\n')
+    .map((line) => line.replace(/^[-•]\s*/, '').trim())
+    .filter(Boolean)
+    .slice(0, maxLines);
+};
+
+const firstLine = (value?: string): string => compactLines(value, 1)[0] || '';
+
+const sectionSummary = (section: GroupReport): string => (
+  firstLine(section.summary)
+  || firstLine(section.topic)
+  || firstLine(section.themes)
+  || firstLine(section.raw)
+  || '尚無摘要'
+);
+
+const sectionAction = (section: GroupReport): string => (
+  firstLine(section.soulGym)
+  || firstLine(section.applications)
+  || '尚無行動整理'
+);
+
 // Generate structured Markdown from a parsed section (for downloads)
 export function generateSectionMarkdown(section: GroupReport, verseReference?: string): string {
   const lines: string[] = [];
@@ -70,6 +102,90 @@ export function generateSectionMarkdown(section: GroupReport, verseReference?: s
     lines.push(section.raw);
   }
   
+  return lines.join('\n');
+}
+
+export function generateFacilitatorPacketMarkdown(sections: GroupReport[], verseReference?: string): string {
+  const overall = sections.find((section) => section.groupNumber === 0);
+  const groups = sections
+    .filter((section) => section.groupNumber > 0)
+    .sort((a, b) => a.groupNumber - b.groupNumber);
+  const primary = overall || groups[0];
+  const lines: string[] = [];
+
+  lines.push('# SoulGym 主持人成果包');
+  lines.push('');
+  lines.push(`日期：${reportDate()}`);
+  if (verseReference || primary?.verse) lines.push(`經文：${verseReference || primary?.verse}`);
+  lines.push('');
+  lines.push('## 1. 可以直接開口說的總結');
+  lines.push(sectionSummary(primary));
+  lines.push('');
+
+  lines.push('## 2. 帶領者快速看板');
+  if (primary?.topic || primary?.themes) lines.push(`- 今日主題：${firstLine(primary.topic || primary.themes)}`);
+  if (primary?.observations) lines.push(`- 共同觀察：${firstLine(primary.observations)}`);
+  if (primary?.theology || primary?.insights) lines.push(`- 主要亮光：${firstLine(primary.theology || primary.insights)}`);
+  if (primary?.applications || primary?.soulGym) lines.push(`- 下一步行動：${sectionAction(primary)}`);
+  lines.push('');
+
+  if (groups.length > 0) {
+    lines.push('## 3. 各組快速掃描');
+    groups.forEach((group) => {
+      lines.push(`### 第 ${group.groupNumber} 組`);
+      lines.push(`- 一句話：${sectionSummary(group)}`);
+      lines.push(`- 行動方向：${sectionAction(group)}`);
+      const highlight = firstLine(group.highlights || group.insights);
+      if (highlight) lines.push(`- 可分享亮光：${highlight}`);
+      lines.push('');
+    });
+  }
+
+  lines.push('## 4. 群組分享版');
+  lines.push(generateShareText(sections, verseReference));
+  lines.push('');
+
+  lines.push('## 5. 完整報告');
+  lines.push('');
+  lines.push(sections.map((section) => generateSectionMarkdown(section, verseReference)).join('\n\n---\n\n'));
+
+  return lines.join('\n');
+}
+
+export function generateShareText(sections: GroupReport[], verseReference?: string): string {
+  const overall = sections.find((section) => section.groupNumber === 0);
+  const groups = sections
+    .filter((section) => section.groupNumber > 0)
+    .sort((a, b) => a.groupNumber - b.groupNumber);
+  const primary = overall || groups[0];
+  const lines: string[] = [];
+
+  lines.push('SoulGym 查經成果');
+  if (verseReference || primary?.verse) lines.push(`經文：${verseReference || primary?.verse}`);
+  lines.push('');
+  lines.push(`一句話：${sectionSummary(primary)}`);
+
+  const observations = compactLines(primary?.observations, 3);
+  if (observations.length > 0) {
+    lines.push('');
+    lines.push('共同看見：');
+    observations.forEach((item) => lines.push(`- ${item}`));
+  }
+
+  const actions = compactLines(primary?.soulGym || primary?.applications, 3);
+  if (actions.length > 0) {
+    lines.push('');
+    lines.push('接下來可以操練：');
+    actions.forEach((item) => lines.push(`- ${item}`));
+  }
+
+  if (!overall && groups.length === 1 && groups[0].groupNumber > 0) {
+    lines.splice(1, 0, `小組：第 ${groups[0].groupNumber} 組`);
+  } else if (groups.length > 0) {
+    lines.push('');
+    lines.push(`本次包含 ${groups.length} 個小組成果。`);
+  }
+
   return lines.join('\n');
 }
 
