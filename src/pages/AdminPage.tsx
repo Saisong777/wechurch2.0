@@ -72,6 +72,7 @@ const FeatureToggleManager = lazyAdminComponent(() => import('@/components/admin
 const PrayerMeetingAdmin = lazyAdminComponent(() => import('@/components/admin/PrayerMeetingAdmin'), 'PrayerMeetingAdmin');
 const AdminMailComposer = lazyAdminComponent(() => import('@/components/admin/AdminMailComposer'), 'AdminMailComposer');
 const AdminInbox = lazyAdminComponent(() => import('@/components/admin/AdminInbox'), 'AdminInbox');
+const PlatformMaturityPanel = lazyAdminComponent(() => import('@/components/admin/PlatformMaturityPanel'), 'PlatformMaturityPanel');
 
 const AdminSectionLoader = () => (
   <div className="flex min-h-[280px] items-center justify-center">
@@ -269,6 +270,8 @@ export const AdminPage: React.FC = () => {
                 })}
               </div>
             </section>
+
+            <PlatformMaturityPanel />
 
             <div>
               <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">

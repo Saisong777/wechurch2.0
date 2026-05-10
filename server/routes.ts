@@ -26,6 +26,14 @@ import {
   formatReportDataDashboard,
 } from "./prompts/devotional-analysis";
 import type { ReportDashboardNote } from "./prompts/devotional-analysis";
+import {
+  getPlatformSummary,
+  recordAiUsage,
+  recordAppEvent,
+  recordErrorEvent,
+  requestContext,
+  scoreAiReportQuality,
+} from "./observability";
 
 // Legacy proxy client (keep for unchanged endpoints until fully migrated)
 let _openaiClient: OpenAI | null = null;
@@ -56,6 +64,31 @@ function getSoulGymAiModel(fastMode?: boolean): string {
   if (process.env.SOULGYM_AI_MODEL) return process.env.SOULGYM_AI_MODEL;
   if (fastMode) return process.env.SOULGYM_AI_FAST_MODEL || "gemini-2.5-flash-lite";
   return "gemini-2.5-flash";
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runWithAiRetry<T>(operation: () => Promise<T>, options: { maxRetries?: number } = {}) {
+  const maxRetries = options.maxRetries ?? 2;
+  let retryCount = 0;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return { result: await operation(), retryCount };
+    } catch (error: any) {
+      lastError = error;
+      const message = String(error?.message || error);
+      const retryable = error?.status === 429 || error?.status === 500 || error?.status === 503 || /429|rate|timeout|temporar/i.test(message);
+      if (!retryable || attempt === maxRetries) break;
+      retryCount += 1;
+      await sleep(700 * retryCount);
+    }
+  }
+
+  throw Object.assign(lastError instanceof Error ? lastError : new Error(String(lastError)), { retryCount });
 }
 
 function prependReportDashboard(
@@ -328,6 +361,59 @@ export async function registerRoutes(app: Express) {
     });
   });
 
+  app.post("/api/events", async (req, res) => {
+    const eventSchema = z.object({
+      eventName: z.string().min(1).max(120),
+      path: z.string().max(500).optional(),
+      sessionId: z.string().uuid().optional(),
+      participantId: z.string().uuid().optional(),
+      userEmail: z.string().email().optional(),
+      metadata: z.record(z.unknown()).optional(),
+    });
+
+    const parsed = eventSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid event data" });
+    }
+
+    const context = requestContext(req);
+    await recordAppEvent({
+      ...parsed.data,
+      source: "client",
+      path: parsed.data.path || context.path,
+      userAgent: context.userAgent,
+      ipHash: context.ipHash,
+    });
+    res.status(202).json({ success: true });
+  });
+
+  app.post("/api/client-errors", async (req, res) => {
+    const errorSchema = z.object({
+      message: z.string().min(1).max(2000),
+      stack: z.string().max(6000).optional(),
+      path: z.string().max(500).optional(),
+      metadata: z.record(z.unknown()).optional(),
+    });
+
+    const parsed = errorSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid error data" });
+    }
+
+    const context = requestContext(req);
+    await recordErrorEvent({
+      source: "client",
+      message: parsed.data.message,
+      stack: parsed.data.stack,
+      path: parsed.data.path || context.path,
+      method: context.method,
+      metadata: parsed.data.metadata,
+      userAgent: context.userAgent,
+      ipHash: context.ipHash,
+    });
+    res.status(202).json({ success: true });
+  });
+
   // Setup auth with error handling
   try {
     await setupAuth(app);
@@ -376,6 +462,15 @@ export async function registerRoutes(app: Express) {
         unit: "MB"
       }
     });
+  });
+
+  app.get("/api/admin/platform-summary", requireAdmin, async (req, res) => {
+    try {
+      const summary = await getPlatformSummary();
+      res.json(summary);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get platform summary" });
+    }
   });
 
   // Database connection check endpoint
@@ -975,6 +1070,11 @@ export async function registerRoutes(app: Express) {
       const overallMaxTokens = fastMode ? 12000 : 20000;
       // In fast mode, truncate each member's notes to 400 chars to reduce input tokens
       const inputTruncate = fastMode ? 400 : undefined;
+      let aiInputChars = 0;
+      let aiOutputChars = 0;
+      let aiLatencyMs = 0;
+      let aiFinishReason: string | null = null;
+      let aiRetryCount = 0;
 
       let content: string;
       if (reportType === 'group' && groupNumber) {
@@ -1015,23 +1115,45 @@ export async function registerRoutes(app: Express) {
           { reportType: 'group', groupNumber, model: aiModel, fastMode }
         );
         console.log(`[report-gen] group ${groupNumber}: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
+        aiInputChars = userContent.length;
+        const aiStartedAt = Date.now();
         try {
           // Use systemInstruction instead of stuffing prompt into user message
           const model = genAI.getGenerativeModel({
             model: aiModel,
             systemInstruction: groupSystemPrompt,
           });
-          const resultObj = await model.generateContent({
+          const { result: resultObj, retryCount } = await runWithAiRetry(() => model.generateContent({
             contents: [{ role: 'user', parts: [{ text: userContent }] }],
             generationConfig: { maxOutputTokens: groupMaxTokens }
-          });
+          }));
+          aiRetryCount = retryCount;
+          aiLatencyMs = Date.now() - aiStartedAt;
           const finishReason = resultObj.response.candidates?.[0]?.finishReason;
+          aiFinishReason = finishReason || null;
           content = resultObj.response.text() || '（AI 未回應）';
+          aiOutputChars = content.length;
           console.log(`[report-gen] group ${groupNumber}: AI OK, contentLen=${content.length}, finishReason=${finishReason}`);
           if (finishReason === 'MAX_TOKENS') {
             console.warn(`[report-gen] group ${groupNumber}: ⚠️ TRUNCATED by MAX_TOKENS (limit=${groupMaxTokens})`);
           }
         } catch (err: any) {
+          aiLatencyMs = Date.now() - aiStartedAt;
+          aiRetryCount = err?.retryCount || aiRetryCount;
+          await recordAiUsage({
+            provider: 'google',
+            model: aiModel,
+            feature: 'soulgym-report',
+            reportType,
+            sessionId: req.params.sessionId,
+            groupNumber,
+            inputChars: aiInputChars,
+            outputChars: 0,
+            latencyMs: aiLatencyMs,
+            status: 'FAILED',
+            retryCount: aiRetryCount,
+            errorMessage: err?.message || String(err),
+          });
           console.error(`[report-gen] group ${groupNumber}: AI ERROR`, err?.status, err?.message?.slice(0, 200));
           const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
           if (is429) {
@@ -1077,23 +1199,45 @@ export async function registerRoutes(app: Express) {
         );
         const overallSystemPrompt = GROUP_OVERALL_SYSTEM_PROMPT;
         console.log(`[report-gen] overall: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
+        aiInputChars = userContent.length;
+        const aiStartedAt = Date.now();
         try {
           // Use systemInstruction instead of stuffing prompt into user message
           const model = genAI.getGenerativeModel({
             model: aiModel,
             systemInstruction: overallSystemPrompt,
           });
-          const resultObj = await model.generateContent({
+          const { result: resultObj, retryCount } = await runWithAiRetry(() => model.generateContent({
             contents: [{ role: 'user', parts: [{ text: userContent }] }],
             generationConfig: { maxOutputTokens: overallMaxTokens }
-          });
+          }));
+          aiRetryCount = retryCount;
+          aiLatencyMs = Date.now() - aiStartedAt;
           const finishReason = resultObj.response.candidates?.[0]?.finishReason;
+          aiFinishReason = finishReason || null;
           content = resultObj.response.text() || '（AI 未回應）';
+          aiOutputChars = content.length;
           console.log(`[report-gen] overall: AI OK, contentLen=${content.length}, finishReason=${finishReason}`);
           if (finishReason === 'MAX_TOKENS') {
             console.warn(`[report-gen] overall: ⚠️ TRUNCATED by MAX_TOKENS (limit=${overallMaxTokens})`);
           }
         } catch (err: any) {
+          aiLatencyMs = Date.now() - aiStartedAt;
+          aiRetryCount = err?.retryCount || aiRetryCount;
+          await recordAiUsage({
+            provider: 'google',
+            model: aiModel,
+            feature: 'soulgym-report',
+            reportType,
+            sessionId: req.params.sessionId,
+            groupNumber,
+            inputChars: aiInputChars,
+            outputChars: 0,
+            latencyMs: aiLatencyMs,
+            status: 'FAILED',
+            retryCount: aiRetryCount,
+            errorMessage: err?.message || String(err),
+          });
           console.error(`[report-gen] overall: AI ERROR`, err?.status, err?.message?.slice(0, 200));
           const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
           if (is429) {
@@ -1112,6 +1256,22 @@ export async function registerRoutes(app: Express) {
         status: "COMPLETED"
       });
       console.log(`[report-gen] DONE id=${report.id}`);
+      await recordAiUsage({
+        provider: 'google',
+        model: aiModel,
+        feature: 'soulgym-report',
+        reportType,
+        sessionId: req.params.sessionId,
+        reportId: report.id,
+        groupNumber,
+        inputChars: aiInputChars,
+        outputChars: aiOutputChars,
+        latencyMs: aiLatencyMs,
+        status: 'COMPLETED',
+        finishReason: aiFinishReason,
+        qualityScore: scoreAiReportQuality(content),
+        retryCount: aiRetryCount,
+      });
 
       res.status(201).json(report);
     } catch (error) {
@@ -1254,6 +1414,9 @@ export async function registerRoutes(app: Express) {
       res.flushHeaders();
 
       let fullContent = '';
+      let streamRetryCount = 0;
+      let streamFinishReason: string | null = null;
+      const streamStartedAt = Date.now();
       try {
         // Use systemInstruction instead of stuffing prompt into user message
         const model = genAI.getGenerativeModel({
@@ -1267,6 +1430,8 @@ export async function registerRoutes(app: Express) {
         });
 
         for await (const chunk of result.stream) {
+          const finishReason = (chunk as any).response?.candidates?.[0]?.finishReason;
+          if (finishReason) streamFinishReason = finishReason;
           const delta = chunk.text();
           if (delta) {
             fullContent += delta;
@@ -1274,6 +1439,21 @@ export async function registerRoutes(app: Express) {
           }
         }
       } catch (err: any) {
+        streamRetryCount = err?.retryCount || 0;
+        await recordAiUsage({
+          provider: 'google',
+          model: aiModel,
+          feature: 'soulgym-report-stream',
+          reportType,
+          sessionId: req.params.sessionId,
+          groupNumber,
+          inputChars: userContent?.length || 0,
+          outputChars: fullContent.length,
+          latencyMs: Date.now() - streamStartedAt,
+          status: 'FAILED',
+          retryCount: streamRetryCount,
+          errorMessage: err?.message || String(err),
+        });
         const is429 = err?.status === 429 || err?.message?.includes('429') || String(err).includes('429');
         if (is429) {
           res.write(`data: ${JSON.stringify({ type: 'error', error: '請求過多，請稍後再試（Gemini rate limit）' })}\n\n`);
@@ -1292,6 +1472,22 @@ export async function registerRoutes(app: Express) {
         groupNumber,
         content: fullContent,
         status: "COMPLETED"
+      });
+      await recordAiUsage({
+        provider: 'google',
+        model: aiModel,
+        feature: 'soulgym-report-stream',
+        reportType,
+        sessionId: req.params.sessionId,
+        reportId: report.id,
+        groupNumber,
+        inputChars: userContent.length,
+        outputChars: fullContent.length,
+        latencyMs: Date.now() - streamStartedAt,
+        status: 'COMPLETED',
+        finishReason: streamFinishReason,
+        qualityScore: scoreAiReportQuality(fullContent),
+        retryCount: streamRetryCount,
       });
 
       res.write(`data: ${JSON.stringify({ type: 'done', reportId: report.id })}\n\n`);

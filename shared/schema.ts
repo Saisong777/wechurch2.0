@@ -248,6 +248,72 @@ export const messageCardDownloads = pgTable("message_card_downloads", {
   downloadedAt: timestamp("downloaded_at").defaultNow().notNull(),
 });
 
+export const appEvents = pgTable("app_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventName: text("event_name").notNull(),
+  source: text("source").default("client").notNull(),
+  path: text("path"),
+  sessionId: uuid("session_id").references(() => sessions.id),
+  participantId: uuid("participant_id").references(() => participants.id),
+  userId: uuid("user_id").references(() => users.id),
+  userEmail: text("user_email"),
+  metadata: jsonb("metadata"),
+  userAgent: text("user_agent"),
+  ipHash: text("ip_hash"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  eventNameIdx: index("app_events_event_name_idx").on(table.eventName),
+  createdAtIdx: index("app_events_created_at_idx").on(table.createdAt),
+  sessionIdx: index("app_events_session_id_idx").on(table.sessionId),
+}));
+
+export const appErrorEvents = pgTable("app_error_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  source: text("source").default("server").notNull(),
+  level: text("level").default("error").notNull(),
+  message: text("message").notNull(),
+  stack: text("stack"),
+  path: text("path"),
+  method: text("method"),
+  statusCode: integer("status_code"),
+  sessionId: uuid("session_id").references(() => sessions.id),
+  participantId: uuid("participant_id").references(() => participants.id),
+  userId: uuid("user_id").references(() => users.id),
+  metadata: jsonb("metadata"),
+  userAgent: text("user_agent"),
+  ipHash: text("ip_hash"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  sourceIdx: index("app_error_events_source_idx").on(table.source),
+  createdAtIdx: index("app_error_events_created_at_idx").on(table.createdAt),
+  statusIdx: index("app_error_events_status_code_idx").on(table.statusCode),
+}));
+
+export const aiUsageEvents = pgTable("ai_usage_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  feature: text("feature").notNull(),
+  reportType: text("report_type"),
+  sessionId: uuid("session_id").references(() => sessions.id),
+  reportId: uuid("report_id").references(() => aiReports.id),
+  groupNumber: integer("group_number"),
+  inputChars: integer("input_chars").default(0).notNull(),
+  outputChars: integer("output_chars").default(0).notNull(),
+  latencyMs: integer("latency_ms").default(0).notNull(),
+  status: text("status").notNull(),
+  finishReason: text("finish_reason"),
+  qualityScore: integer("quality_score"),
+  retryCount: integer("retry_count").default(0).notNull(),
+  estimatedCostUnits: integer("estimated_cost_units").default(0).notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  featureIdx: index("ai_usage_events_feature_idx").on(table.feature),
+  createdAtIdx: index("ai_usage_events_created_at_idx").on(table.createdAt),
+  sessionIdx: index("ai_usage_events_session_id_idx").on(table.sessionId),
+}));
+
 // ============================================
 // Rejesus Integration Tables
 // ============================================
@@ -558,6 +624,9 @@ export type IcebreakerGame = typeof icebreakerGames.$inferSelect;
 export type IcebreakerPlayer = typeof icebreakerPlayers.$inferSelect;
 export type CardQuestion = typeof cardQuestions.$inferSelect;
 export type MessageCard = typeof messageCards.$inferSelect;
+export type AppEvent = typeof appEvents.$inferSelect;
+export type AppErrorEvent = typeof appErrorEvents.$inferSelect;
+export type AiUsageEvent = typeof aiUsageEvents.$inferSelect;
 
 // Rejesus Types
 export type ChineseUnionTrad = typeof chineseUnionTrad.$inferSelect;

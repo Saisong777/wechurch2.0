@@ -36,6 +36,15 @@ async function waitForUrl(url, timeoutMs = 30000) {
   throw lastError || new Error(`Timed out waiting for ${url}`);
 }
 
+async function isUrlAvailable(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(1200) });
+    return res.status < 500;
+  } catch {
+    return false;
+  }
+}
+
 function findChromeExecutable() {
   const candidates = [
     process.env.CHROME_PATH,
@@ -249,9 +258,11 @@ async function runBrowserCheck() {
 }
 
 async function main() {
-  const server = spawnServer();
+  const healthcheckUrl = `${baseUrl}/__healthcheck`;
+  const server = await isUrlAvailable(healthcheckUrl) ? null : spawnServer();
+  if (!server) log(`using existing server on ${baseUrl}`);
   try {
-    await waitForUrl(`${baseUrl}/__healthcheck`, 45000);
+    await waitForUrl(healthcheckUrl, 45000);
     await runBrowserCheck();
   } finally {
     await terminateChild(server, "SIGINT");

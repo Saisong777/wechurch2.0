@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
+import { recordErrorEvent, requestContext } from "./observability";
 
 // Catch any uncaught errors so they show in Railway App Logs
 process.on("uncaughtException", (err) => {
@@ -64,6 +65,24 @@ app.use((req, res, next) => {
         : "request failed";
       logLine += ` :: ${body}`;
     }
+    if (path.startsWith("/api") && res.statusCode >= 500) {
+      const context = requestContext(req);
+      void recordErrorEvent({
+        source: "server",
+        level: "error",
+        message: typeof capturedJsonResponse === "object"
+          ? String(capturedJsonResponse.error || capturedJsonResponse.message || "request failed")
+          : "request failed",
+        path: context.path,
+        method: context.method,
+        statusCode: res.statusCode,
+        sessionId: context.sessionId,
+        participantId: context.participantId,
+        metadata: { response: capturedJsonResponse || null },
+        userAgent: context.userAgent,
+        ipHash: context.ipHash,
+      });
+    }
     if (logLine.length > 120) {
       logLine = logLine.slice(0, 119) + "…";
     }
@@ -83,11 +102,25 @@ app.use((req, res, next) => {
   await registerRoutes(app);
 
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const context = requestContext(_req);
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
     if (!res.headersSent) {
       res.status(status).json({ message });
     }
+    void recordErrorEvent({
+      source: "server",
+      level: "error",
+      message,
+      stack: err.stack,
+      path: context.path,
+      method: context.method,
+      statusCode: status,
+      sessionId: context.sessionId,
+      participantId: context.participantId,
+      userAgent: context.userAgent,
+      ipHash: context.ipHash,
+    });
     console.error(err);
   });
 
