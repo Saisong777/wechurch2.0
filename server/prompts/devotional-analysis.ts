@@ -272,6 +272,8 @@ export const GROUP_SMALL_SYSTEM_PROMPT = `你是「WeChurch 小組查經整合�
 - 相近或重複的回應：合併歸納，忠於原意，不扭曲原文
 - 不同或互補的觀點：並列呈現，不強行統一
 - 合併時在括號內標示來源成員
+- 請優先使用輸入最前方的「SoulGym AI 資料看板」判斷資料量、完成率與標籤分布
+- 當資料看板顯示某欄位完成率偏低，該段必須明確標示資料限制，不可假裝資料完整
 
 ## 亮光辨識與標註
 - 獨到亮光（只有 1 人提到的獨特洞見）：【亮光｜{成員名}】{原文}
@@ -292,6 +294,7 @@ export const GROUP_SMALL_SYSTEM_PROMPT = `你是「WeChurch 小組查經整合�
 （來源：titlePhrase + heartbeatVerse）
 - 從各成員標題與最感動經文中歸納
 - 輸出：經文範圍、小組主題句（從 titlePhrase 提煉）、最多人有共鳴的經文及人數
+- 必須加入「資料看板」小段：筆記數、有效筆記比例、完成率最低的欄位、主要標籤分布
 - 主題句只能從成員 titlePhrase 提煉，不可新增神學詮釋
 - 若各成員 heartbeatVerse 各異，列出所有人的選擇
 
@@ -434,6 +437,8 @@ export const GROUP_OVERALL_SYSTEM_PROMPT = `你是「WeChurch 全會眾查經整
 - 相近或重複的回應合併歸納，忠於原意
 - 不同觀點並列呈現，不強行統一
 - 不標示個人名字
+- 請優先使用輸入最前方的「SoulGym AI 資料看板」判斷資料量、完成率、各組筆記量與標籤分布
+- 當資料看板顯示某欄位完成率偏低，該段必須明確標示資料限制，不可假裝資料完整
 
 ## 亮光辨識
 - 格式：【亮光】{整合後的洞見內容}（不標記個人）
@@ -450,6 +455,7 @@ export const GROUP_OVERALL_SYSTEM_PROMPT = `你是「WeChurch 全會眾查經整
 （來源：titlePhrase + heartbeatVerse）
 - 歸納式陳述全會眾的查經主題方向
 - 列出經文範圍、整體主題句
+- 必須加入「資料看板」小段：筆記數、有效筆記比例、各組筆記量、完成率最低的欄位、主要標籤分布
 - 統計最多人有共鳴的經文段落及大約人數比例
 
 ---
@@ -547,5 +553,127 @@ export function formatGroupNotesInput(
     lines.push(content.trim());
     lines.push('');
   });
+  return lines.join('\n');
+}
+
+export type ReportDashboardNote = {
+  name?: string | null;
+  groupNumber?: number | null;
+  titlePhrase?: string | null;
+  heartbeatVerse?: string | null;
+  observation?: string | null;
+  coreInsightCategory?: string | null;
+  coreInsightNote?: string | null;
+  scholarsNote?: string | null;
+  actionPlan?: string | null;
+  coolDownNote?: string | null;
+};
+
+const REPORT_FIELD_LABELS: Array<{ key: keyof ReportDashboardNote; label: string }> = [
+  { key: 'titlePhrase', label: '標題' },
+  { key: 'heartbeatVerse', label: '最感動經文' },
+  { key: 'observation', label: '經文觀察' },
+  { key: 'coreInsightNote', label: '神學亮光' },
+  { key: 'scholarsNote', label: '參考資料/注釋' },
+  { key: 'actionPlan', label: '行動計畫' },
+  { key: 'coolDownNote', label: '其他補充' },
+];
+
+function hasReportValue(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim() !== '（未填寫）';
+}
+
+function percent(part: number, total: number): string {
+  if (total <= 0) return '0%';
+  return `${Math.round((part / total) * 100)}%`;
+}
+
+function getInsightCategoryKeys(note: ReportDashboardNote): string[] {
+  const keys = new Set<string>();
+  parseInsightCategories(note.coreInsightCategory).forEach((key) => keys.add(key));
+
+  try {
+    const parsed = note.coreInsightNote ? JSON.parse(note.coreInsightNote) : null;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (hasReportValue(value)) keys.add(key);
+      });
+    }
+  } catch {}
+
+  return Array.from(keys);
+}
+
+export function formatReportDataDashboard(
+  notes: ReportDashboardNote[],
+  options: { reportType: 'group' | 'overall'; groupNumber?: number | null; model: string; fastMode?: boolean }
+): string {
+  const total = notes.length;
+  const effectiveNotes = notes.filter((note) =>
+    hasReportValue(note.observation)
+    || hasReportValue(note.coreInsightNote)
+    || hasReportValue(note.actionPlan)
+  ).length;
+
+  const fieldStats = REPORT_FIELD_LABELS.map(({ key, label }) => {
+    const filled = notes.filter((note) => hasReportValue(note[key])).length;
+    return { label, filled };
+  });
+
+  const categoryCounts = notes.reduce<Record<string, number>>((acc, note) => {
+    getInsightCategoryKeys(note).forEach((key) => {
+      const label = CATEGORY_LABEL_MAP[key] || key;
+      acc[label] = (acc[label] || 0) + 1;
+    });
+    return acc;
+  }, {});
+
+  const groupCounts = notes.reduce<Record<number, number>>((acc, note) => {
+    if (typeof note.groupNumber !== 'number') return acc;
+    acc[note.groupNumber] = (acc[note.groupNumber] || 0) + 1;
+    return acc;
+  }, {});
+
+  const missingWarnings = fieldStats
+    .filter((stat) => total > 0 && stat.filled / total < 0.5)
+    .map((stat) => `${stat.label}完成率偏低（${stat.filled}/${total}，${percent(stat.filled, total)}）`);
+
+  const lines: string[] = [];
+  lines.push('=== SoulGym AI 資料看板 ===');
+  lines.push(`報告範圍：${options.reportType === 'overall' ? '全會眾綜合報告' : `第 ${options.groupNumber} 組小組報告`}`);
+  lines.push(`AI 模型：${options.model}${options.fastMode ? '（快速/低成本模式）' : '（完整分析模式）'}`);
+  lines.push(`筆記數：${total}`);
+  lines.push(`有效筆記：${effectiveNotes}/${total}（${percent(effectiveNotes, total)}）`);
+  lines.push('');
+  lines.push('欄位完成率：');
+  fieldStats.forEach((stat) => {
+    lines.push(`- ${stat.label}：${stat.filled}/${total}（${percent(stat.filled, total)}）`);
+  });
+  lines.push('');
+  lines.push('四標籤分布：');
+  if (Object.keys(categoryCounts).length > 0) {
+    Object.entries(categoryCounts)
+      .sort(([, a], [, b]) => b - a)
+      .forEach(([label, count]) => lines.push(`- ${label}：${count}`));
+  } else {
+    lines.push('- 尚無可辨識標籤');
+  }
+
+  if (options.reportType === 'overall' && Object.keys(groupCounts).length > 0) {
+    lines.push('');
+    lines.push('各組筆記量：');
+    Object.entries(groupCounts)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .forEach(([group, count]) => lines.push(`- 第 ${group} 組：${count}`));
+  }
+
+  lines.push('');
+  lines.push('資料品質提醒：');
+  if (missingWarnings.length > 0) {
+    missingWarnings.forEach((warning) => lines.push(`- ${warning}`));
+  } else {
+    lines.push('- 主要欄位資料量充足，可進行完整整合。');
+  }
+  lines.push('=== 資料看板結束，以下為成員原始筆記 ===');
   return lines.join('\n');
 }

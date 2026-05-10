@@ -23,7 +23,9 @@ import {
   formatSingleNoteInput,
   formatMultiNoteInput,
   formatGroupNotesInput,
+  formatReportDataDashboard,
 } from "./prompts/devotional-analysis";
+import type { ReportDashboardNote } from "./prompts/devotional-analysis";
 
 // Legacy proxy client (keep for unchanged endpoints until fully migrated)
 let _openaiClient: OpenAI | null = null;
@@ -49,6 +51,20 @@ function getGeminiClient(): GoogleGenerativeAI {
 }
 
 const gameCreationLocks = new Map<string, Promise<any>>();
+
+function getSoulGymAiModel(fastMode?: boolean): string {
+  if (process.env.SOULGYM_AI_MODEL) return process.env.SOULGYM_AI_MODEL;
+  if (fastMode) return process.env.SOULGYM_AI_FAST_MODEL || "gemini-2.5-flash-lite";
+  return "gemini-2.5-flash";
+}
+
+function prependReportDashboard(
+  notesInput: string,
+  dashboardNotes: ReportDashboardNote[],
+  options: { reportType: "group" | "overall"; groupNumber?: number | null; model: string; fastMode?: boolean }
+): string {
+  return `${formatReportDataDashboard(dashboardNotes, options)}\n\n${notesInput}`;
+}
 
 // Configure multer for file uploads
 const messageCardStorage = multer.diskStorage({
@@ -952,7 +968,7 @@ export async function registerRoutes(app: Express) {
       const verseRange = session?.verseReference || undefined;
 
       const genAI = getGeminiClient();
-      const aiModel = "gemini-2.5-flash";
+      const aiModel = getSoulGymAiModel(fastMode);
       // Gemini 2.5 Flash uses thinking tokens that count toward maxOutputTokens.
       // Must set generous limits so thinking + actual output both fit.
       const groupMaxTokens = fastMode ? 10000 : 16000;
@@ -981,7 +997,23 @@ export async function registerRoutes(app: Express) {
           }),
         }));
         const groupSystemPrompt = GROUP_SMALL_SYSTEM_PROMPT;
-        const userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
+        const dashboardNotes: ReportDashboardNote[] = filtered.map((r: any) => ({
+          name: r.participant_name || '匿名',
+          groupNumber,
+          titlePhrase: r.title_phrase,
+          heartbeatVerse: r.heartbeat_verse,
+          observation: r.observation,
+          coreInsightCategory: r.core_insight_category,
+          coreInsightNote: r.core_insight_note,
+          scholarsNote: r.scholars_note,
+          actionPlan: r.action_plan,
+          coolDownNote: r.cool_down_note,
+        }));
+        const userContent = prependReportDashboard(
+          formatGroupNotesInput(members, verseRange, inputTruncate),
+          dashboardNotes,
+          { reportType: 'group', groupNumber, model: aiModel, fastMode }
+        );
         console.log(`[report-gen] group ${groupNumber}: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
           // Use systemInstruction instead of stuffing prompt into user message
@@ -1026,7 +1058,23 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholarsNote, actionPlan: r.actionPlan, coolDownNote: r.coolDownNote,
           }),
         }));
-        const userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
+        const dashboardNotes: ReportDashboardNote[] = filtered.map((r: any) => ({
+          name: r.participantName || '匿名',
+          groupNumber: r.groupNumber,
+          titlePhrase: r.titlePhrase,
+          heartbeatVerse: r.heartbeatVerse,
+          observation: r.observation,
+          coreInsightCategory: r.coreInsightCategory,
+          coreInsightNote: r.coreInsightNote,
+          scholarsNote: r.scholarsNote,
+          actionPlan: r.actionPlan,
+          coolDownNote: r.coolDownNote,
+        }));
+        const userContent = prependReportDashboard(
+          formatGroupNotesInput(members, verseRange, inputTruncate),
+          dashboardNotes,
+          { reportType: 'overall', model: aiModel, fastMode }
+        );
         const overallSystemPrompt = GROUP_OVERALL_SYSTEM_PROMPT;
         console.log(`[report-gen] overall: ${members.length} members, inputLen=${userContent.length}, model=${aiModel}`);
         try {
@@ -1116,7 +1164,7 @@ export async function registerRoutes(app: Express) {
       const verseRange = session?.verseReference || undefined;
 
       const genAI = getGeminiClient();
-      const aiModel = "gemini-2.5-flash";
+      const aiModel = getSoulGymAiModel(fastMode);
       // Gemini 2.5 Flash thinking tokens count toward maxOutputTokens
       const groupMaxTokens = fastMode ? 10000 : 16000;
       const overallMaxTokens = fastMode ? 12000 : 20000;
@@ -1142,8 +1190,24 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholars_note, actionPlan: r.action_plan, coolDownNote: r.cool_down_note,
           }),
         }));
+        const dashboardNotes: ReportDashboardNote[] = filtered.map((r: any) => ({
+          name: r.participant_name || '匿名',
+          groupNumber,
+          titlePhrase: r.title_phrase,
+          heartbeatVerse: r.heartbeat_verse,
+          observation: r.observation,
+          coreInsightCategory: r.core_insight_category,
+          coreInsightNote: r.core_insight_note,
+          scholarsNote: r.scholars_note,
+          actionPlan: r.action_plan,
+          coolDownNote: r.cool_down_note,
+        }));
         systemPrompt = GROUP_SMALL_SYSTEM_PROMPT;
-        userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
+        userContent = prependReportDashboard(
+          formatGroupNotesInput(members, verseRange, inputTruncate),
+          dashboardNotes,
+          { reportType: 'group', groupNumber, model: aiModel, fastMode }
+        );
         maxTokens = groupMaxTokens;
       } else {
         const allRows = await storage.getStudyResponses(req.params.sessionId);
@@ -1161,8 +1225,24 @@ export async function registerRoutes(app: Express) {
             scholarsNote: r.scholarsNote, actionPlan: r.actionPlan, coolDownNote: r.coolDownNote,
           }),
         }));
+        const dashboardNotes: ReportDashboardNote[] = filtered.map((r: any) => ({
+          name: r.participantName || '匿名',
+          groupNumber: r.groupNumber,
+          titlePhrase: r.titlePhrase,
+          heartbeatVerse: r.heartbeatVerse,
+          observation: r.observation,
+          coreInsightCategory: r.coreInsightCategory,
+          coreInsightNote: r.coreInsightNote,
+          scholarsNote: r.scholarsNote,
+          actionPlan: r.actionPlan,
+          coolDownNote: r.coolDownNote,
+        }));
         systemPrompt = GROUP_OVERALL_SYSTEM_PROMPT;
-        userContent = formatGroupNotesInput(members, verseRange, inputTruncate);
+        userContent = prependReportDashboard(
+          formatGroupNotesInput(members, verseRange, inputTruncate),
+          dashboardNotes,
+          { reportType: 'overall', model: aiModel, fastMode }
+        );
         maxTokens = overallMaxTokens;
       }
 
