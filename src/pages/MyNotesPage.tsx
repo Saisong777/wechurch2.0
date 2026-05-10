@@ -15,7 +15,7 @@ import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen, EyeOff, Download, Save } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen, EyeOff, Download, Save, ArrowRight, Sparkles } from 'lucide-react';
 import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -663,6 +663,52 @@ const MyNotesPage = () => {
 
   const readingPlanNotes = devotionalNotes?.filter(n => n.readingPlanId !== null) || [];
   const devotionalOnlyNotes = devotionalNotes?.filter(n => n.readingPlanId === null) || [];
+  const totalNotes = readingPlanNotes.length + devotionalOnlyNotes.length + (notebookEntries?.length || 0);
+  const latestDevotionalNote = [...readingPlanNotes, ...devotionalOnlyNotes]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+  const latestStudyNote = [...(notebookEntries || [])]
+    .sort((a, b) => new Date(b.session_date).getTime() - new Date(a.session_date).getTime())[0];
+  const latestNoteDate = [
+    latestDevotionalNote?.updatedAt,
+    latestStudyNote?.session_date,
+  ]
+    .filter(Boolean)
+    .map((date) => new Date(date as string))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  const actionItemsCount = [
+    ...(devotionalNotes || []).map((note) => note.actionPlan),
+    ...(notebookEntries || []).map((entry) => entry.action_plan),
+  ].filter(Boolean).length;
+  const nextActionText =
+    latestDevotionalNote?.actionPlan ||
+    latestStudyNote?.action_plan ||
+    '今天可以先打開聖經或加入下一次 SoulGym，留下第一個可回看的行動。';
+  const noteStats = [
+    {
+      label: '讀經計劃',
+      value: readingPlanNotes.length,
+      icon: BookOpen,
+      tone: 'bg-primary/10 text-primary',
+    },
+    {
+      label: '經文感動',
+      value: devotionalOnlyNotes.length,
+      icon: BookMarked,
+      tone: 'bg-rose-500/10 text-rose-500',
+    },
+    {
+      label: '共同查經',
+      value: notebookEntries?.length || 0,
+      icon: Dumbbell,
+      tone: 'bg-secondary/10 text-secondary',
+    },
+    {
+      label: '行動操練',
+      value: actionItemsCount,
+      icon: Target,
+      tone: 'bg-emerald-500/10 text-emerald-600',
+    },
+  ];
 
   const handleExport = () => {
     let content = '';
@@ -722,6 +768,62 @@ const MyNotesPage = () => {
         <Header variant="compact" title="我的筆記" backTo="/learn" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8">
           <div className="max-w-2xl md:max-w-3xl mx-auto">
+            <section className="mb-5 rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-primary">我的屬靈生活</p>
+                  <h1 className="mt-1 text-xl font-bold text-foreground">把讀經、查經和行動接在一起</h1>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    這裡會累積你在 WeChurch 留下的讀經筆記、SoulGym 查經紀錄和下一步操練。
+                  </p>
+                </div>
+                <Button asChild className="h-10 shrink-0 gap-2">
+                  <Link to="/learn/bible">
+                    繼續讀經
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {noteStats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <div key={stat.label} className="rounded-xl border bg-background/80 p-3">
+                      <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${stat.tone}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-[0.95fr_1.05fr]">
+                <div className="rounded-xl border bg-background/80 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Sparkles className="h-4 w-4 text-secondary" />
+                    回訪狀態
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {totalNotes > 0
+                      ? `已累積 ${totalNotes} 則紀錄${latestNoteDate ? `，最近更新於 ${format(latestNoteDate, 'M月d日', { locale: zhTW })}` : ''}。`
+                      : '目前還沒有紀錄，今天可以從讀經或 SoulGym 開始。'}
+                  </p>
+                </div>
+                <div className="rounded-xl border bg-background/80 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Target className="h-4 w-4 text-emerald-600" />
+                    下一步操練
+                  </div>
+                  <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
+                    {nextActionText}
+                  </p>
+                </div>
+              </div>
+            </section>
+
             <Tabs defaultValue="reading-plan" value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
                 <TabsList className="grid grid-cols-3 flex-1 min-w-0" data-testid="notes-tabs">
