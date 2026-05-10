@@ -11,6 +11,7 @@ import {
   generateShareText,
   downloadBlob,
   GroupReport,
+  ReportTakeawayPanel,
 } from '@/components/admin/report-viewer';
 import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
 
@@ -172,6 +173,7 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
   }
 
   const parsed = parseOverallReport(report);
+  const reportSection = buildOverallReportSection(parsed);
   const isNewFormat = !!(parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary);
   const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications
     || parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary;
@@ -201,6 +203,8 @@ export const OverallReportViewer: React.FC<OverallReportViewerProps> = ({
         )}
       </CardHeader>
       <CardContent className="space-y-4 sm:space-y-5 p-4 sm:p-6 pt-0 sm:pt-0">
+        <ReportTakeawayPanel section={reportSection} variant="overall" />
+
         {verseReference && (
           <div className="bg-gradient-to-r from-muted/60 to-muted/30 p-3 sm:p-4 rounded-lg">
             <p className="text-xs sm:text-sm flex items-start gap-1 sm:gap-2">

@@ -12,6 +12,7 @@ import {
 import { Copy, Download, ChevronDown, Users, FileText, FileDown, Printer, User, BarChart3 } from 'lucide-react';
 import { EnhancedSection } from '../report-elements';
 import { GroupReport } from './parse';
+import { ReportTakeawayPanel } from './ReportTakeawayPanel';
 import { cn } from '@/lib/utils';
 
 interface GroupSectionProps {
@@ -113,6 +114,11 @@ export const GroupSection: React.FC<GroupSectionProps> = ({
           </div>
         </div>
       )}
+
+      <ReportTakeawayPanel
+        section={section}
+        variant={isOverall ? 'overall' : 'group'}
+      />
       
       {/* Group Meta Info */}
       {(section.members || section.verse) && (

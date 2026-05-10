@@ -11,6 +11,7 @@ import {
   generateShareText,
   downloadBlob,
   GroupReport,
+  ReportTakeawayPanel,
 } from '@/components/admin/report-viewer';
 import { useSessionAnalysis } from '@/hooks/useSessionAnalysis';
 
@@ -189,6 +190,7 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
   }
 
   const parsed = parseReportContent(report);
+  const reportSection = buildGroupReportSection(parsed, groupNumber);
   const isNewFormat = !!(parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary);
   const hasStructuredContent = parsed.contributions || parsed.themes || parsed.observations || parsed.insights || parsed.applications
     || parsed.topic || parsed.theology || parsed.highlights || parsed.divergence || parsed.soulGym || parsed.summary;
@@ -223,6 +225,8 @@ export const GroupReportViewer: React.FC<GroupReportViewerProps> = ({
         
       </CardHeader>
       <CardContent className="space-y-4 sm:space-y-5 p-4 sm:p-6 pt-0 sm:pt-0">
+        <ReportTakeawayPanel section={reportSection} variant="group" />
+
         {/* Group Meta Info */}
         {(parsed.members || parsed.verse) && (
           <div className="bg-gradient-to-r from-muted/60 to-muted/30 p-3 sm:p-4 rounded-lg">

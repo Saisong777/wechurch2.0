@@ -15,5 +15,6 @@ export {
 } from './export';
 
 export { GroupSection } from './GroupSection';
+export { ReportTakeawayPanel } from './ReportTakeawayPanel';
 export { OverallReportCharts } from './OverallReportCharts';
 export { ReportComparison } from './ReportComparison';
