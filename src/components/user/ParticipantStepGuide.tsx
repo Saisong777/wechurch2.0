@@ -82,7 +82,7 @@ export const ParticipantStepGuide = ({
   const progressValue = currentIndex >= 0 ? ((currentIndex + 1) / steps.length) * 100 : 0;
 
   return (
-    <Card className={cn('mb-4 border-primary/15 bg-primary/5 shadow-sm', className)}>
+    <Card className={cn('mb-3 border-primary/15 bg-primary/5 shadow-sm sm:mb-4', className)}>
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -118,7 +118,7 @@ export const ParticipantStepGuide = ({
           </div>
         )}
 
-        <div className="-mx-1 mt-3 overflow-x-auto pb-1">
+        <div className="-mx-1 mt-3 hidden overflow-x-auto pb-1 sm:block">
           <div className="flex min-w-max gap-2 px-1">
           {steps.map((step, index) => {
             const Icon = step.icon;

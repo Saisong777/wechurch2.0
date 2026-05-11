@@ -62,6 +62,12 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
     }
   }, [handleComplete, isDirty, saveNow]);
 
+  const focusField = React.useCallback((fieldId: string) => {
+    const target = document.getElementById(fieldId);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => target?.focus(), 250);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -76,9 +82,14 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
     formData.action_plan.trim(),
   ].filter(Boolean).length;
   const progressPercent = Math.round((completedFields / 3) * 100);
+  const stepShortcuts = [
+    { id: 'observation', label: '看見', done: !!formData.observation.trim(), tone: 'border-emerald-500 text-emerald-700 bg-emerald-50' },
+    { id: 'receiving', label: '領受', done: !!receivingValue.trim(), tone: 'border-sky-500 text-sky-700 bg-sky-50' },
+    { id: 'action_plan', label: '回應', done: !!formData.action_plan.trim(), tone: 'border-amber-500 text-amber-700 bg-amber-50' },
+  ];
 
   return (
-    <div className="w-full max-w-2xl lg:max-w-3xl mx-auto animate-fade-in space-y-3 sm:space-y-4 md:space-y-6 pb-24 md:pb-8">
+    <div className="w-full max-w-2xl lg:max-w-3xl mx-auto animate-fade-in space-y-3 sm:space-y-4 md:space-y-6 pb-32 md:pb-8">
       <Card variant="highlight">
         <CardContent className="py-3 px-3 sm:px-4 md:py-4">
           <div className="flex items-center justify-between gap-2">
@@ -117,6 +128,24 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
         </CardContent>
       </Card>
 
+      <div className="sticky top-[64px] z-20 -mx-2 rounded-2xl border bg-background/95 p-2 shadow-sm backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none">
+        <div className="grid grid-cols-3 gap-2">
+          {stepShortcuts.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => focusField(item.id)}
+              className={`flex h-12 items-center justify-center gap-1 rounded-xl border text-sm font-semibold transition active:scale-[0.98] ${
+                item.done ? item.tone : 'border-border bg-muted/40 text-muted-foreground'
+              }`}
+            >
+              {item.done ? <Check className="h-4 w-4" /> : <span>{index + 1}</span>}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/10 overflow-hidden">
         <CardHeader className="py-3 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3">
           <CardTitle className="flex items-center gap-2 text-base md:text-lg text-emerald-700 dark:text-emerald-400">
@@ -137,6 +166,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             minRows={5}
             maxRows={10}
             className="text-base md:text-sm"
+            enterKeyHint="next"
           />
         </CardContent>
       </Card>
@@ -161,6 +191,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             minRows={5}
             maxRows={10}
             className="text-base md:text-sm"
+            enterKeyHint="next"
           />
         </CardContent>
       </Card>
@@ -185,19 +216,20 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             minRows={5}
             maxRows={10}
             className="text-base md:text-sm"
+            enterKeyHint="done"
           />
         </CardContent>
       </Card>
 
       {handleComplete && (
-        <div className="fixed bottom-0 left-0 right-0 p-3 bg-background/95 backdrop-blur-sm border-t shadow-lg md:static md:p-0 md:bg-transparent md:border-0 md:shadow-none md:pt-4 z-50">
+        <div className="fixed bottom-0 left-0 right-0 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-background/95 backdrop-blur-sm border-t shadow-lg md:static md:p-0 md:bg-transparent md:border-0 md:shadow-none md:pt-4 z-50">
           <Button
             type="button"
             variant="gold"
             size="lg"
             className="w-full text-sm sm:text-base py-3 sm:py-4 md:max-w-xs md:mx-auto md:flex touch-manipulation active:scale-[0.98]"
             onClick={handleSubmit}
-            disabled={isSubmitting || isSaving}
+            disabled={isSubmitting}
           >
             {isSubmitting ? (
               <>
@@ -207,7 +239,7 @@ export const SpiritualFitnessForm: React.FC<SpiritualFitnessFormProps> = ({ onCo
             ) : (
               <>
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                完成查經
+                {isSaving ? '儲存並完成' : '完成查經'}
               </>
             )}
           </Button>

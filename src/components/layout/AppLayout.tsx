@@ -7,7 +7,7 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-const hiddenNavPaths = ['/login', '/reset-password', '/admin', '/admin/crm'];
+const hiddenNavPaths = ['/login', '/reset-password', '/admin', '/admin/crm', '/user/study'];
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();

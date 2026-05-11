@@ -169,6 +169,8 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                 placeholder="請輸入您的姓名"
                 required
                 className="h-14 sm:h-12 text-lg sm:text-base"
+                autoComplete="name"
+                enterKeyHint="next"
                 data-testid="input-name"
               />
             </div>
@@ -186,6 +188,11 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                 placeholder="your@email.com"
                 required
                 className="h-14 sm:h-12 text-lg sm:text-base"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="email"
+                enterKeyHint="next"
                 data-testid="input-email"
               />
             </div>
@@ -254,6 +261,8 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
                     placeholder="例如：桃園教會、台中小組"
                     required={isRemote}
                     className="h-14 sm:h-12 text-lg sm:text-base"
+                    autoComplete="organization"
+                    enterKeyHint="done"
                     data-testid="input-location"
                   />
                 </div>

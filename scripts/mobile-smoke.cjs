@@ -41,11 +41,25 @@ function killProcessGroup(child) {
   }
 }
 
+function removeProfileDir(profile) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      fs.rmSync(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+      return;
+    } catch (error) {
+      if (attempt === 4) {
+        console.warn(`[mobile-smoke] could not remove temp profile ${profile}: ${error.message}`);
+      }
+    }
+  }
+}
+
 function captureRoute(route) {
   return new Promise((resolve) => {
     const name = nameForRoute(route);
     const screenshot = path.join(outputDir, `${name}.png`);
     const profile = path.join("/tmp", `wechurch-mobile-smoke-${name}-${Date.now()}`);
+    fs.rmSync(screenshot, { force: true });
     const child = spawn(chrome, [
       "--headless=new",
       "--disable-gpu",
@@ -79,7 +93,7 @@ function captureRoute(route) {
       clearTimeout(timer);
       clearInterval(fileCheck);
       killProcessGroup(child);
-      fs.rmSync(profile, { recursive: true, force: true });
+      setTimeout(() => removeProfileDir(profile), 250);
       resolve(result);
     };
 

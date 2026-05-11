@@ -516,9 +516,19 @@ export const UserPage: React.FC = () => {
                     id="sessionId"
                     value={sessionId}
                     onChange={(e) => setSessionId(extractSessionIdentifier(e.target.value))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && sessionId.trim() && !isLoading) {
+                        void handleEnterSession();
+                      }
+                    }}
                     placeholder="AB12 或貼上連結"
                     className="h-16 sm:h-14 text-xl sm:text-lg font-mono text-center uppercase"
                     maxLength={120}
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    autoComplete="off"
+                    enterKeyHint="go"
                   />
                   <p className="text-sm text-muted-foreground text-center">
                     也可以直接貼上帶領者分享的查經連結

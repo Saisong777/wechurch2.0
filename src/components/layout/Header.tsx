@@ -139,14 +139,24 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={cn(
-      'w-full',
+      'w-full sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40',
       variant === 'default' ? 'py-3 sm:py-5 md:py-3' : 'py-2 sm:py-3',
       className
     )}>
       <div className="container mx-auto px-3 sm:px-4 md:px-6">
         <div className="flex items-center justify-between">
-          {/* Mobile: Left spacer for balance (wider when rightContent is present) */}
-          <div className={cn("md:hidden", rightContent ? "w-[5.25rem] sm:w-24" : "w-10 sm:w-12")} />
+          <div className={cn("md:hidden flex items-center", backTo ? "w-20 sm:w-24" : rightContent ? "w-[5.25rem] sm:w-24" : "w-10 sm:w-12")}>
+            {backTo && (
+              <button
+                onClick={() => navigate(backTo)}
+                className="inline-flex h-10 items-center gap-0.5 whitespace-nowrap rounded-full px-1.5 text-muted-foreground transition-colors active:bg-muted"
+                aria-label="返回上一頁"
+              >
+                <ChevronLeft className="h-5 w-5" />
+                <span className="text-sm font-medium">返回</span>
+              </button>
+            )}
+          </div>
 
           {/* Desktop: Logo on left */}
           <Link to="/" className="hidden md:flex items-center gap-2 hover:opacity-80 transition-opacity group shrink-0">
@@ -212,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
             {backTo && (
               <button
                 onClick={() => navigate(backTo)}
-                className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-1 sm:mr-2 pr-1"
+                className="hidden md:flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors mr-1 sm:mr-2 pr-1"
                 aria-label="返回上一頁"
               >
                 <ChevronLeft className="w-5 h-5 mx-[-2px]" />

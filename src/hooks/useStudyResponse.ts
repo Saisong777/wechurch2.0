@@ -31,6 +31,25 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
 
   const participantEmail = userEmail || localStorage.getItem('bible_study_guest_email') || '';
 
+  const buildSavePayload = useCallback((data: Partial<StudyResponseFormData>) => {
+    if (!sessionId || !userId || !participantEmail) return null;
+
+    const { core_insight_category, core_insight_note, ...rest } = data;
+
+    return {
+      sessionId,
+      participantId: userId,
+      participantEmail,
+      ...rest,
+      ...(core_insight_category !== undefined && {
+        core_insight_category: serializeCategories(core_insight_category as any),
+      }),
+      ...(core_insight_note !== undefined && {
+        core_insight_note: serializeNotes(core_insight_note as any),
+      }),
+    };
+  }, [participantEmail, sessionId, userId]);
+
   const { data: response, isLoading, error } = useQuery({
     queryKey,
     queryFn: async () => {
@@ -78,20 +97,8 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       if (!sessionId || !userId) throw new Error('Missing session or user ID');
       if (!participantEmail) throw new Error('Missing participant email');
 
-      const { core_insight_category, core_insight_note, ...rest } = data;
-
-      const payload = {
-        sessionId,
-        participantId: userId,
-        participantEmail,
-        ...rest,
-        ...(core_insight_category !== undefined && {
-          core_insight_category: serializeCategories(core_insight_category as any),
-        }),
-        ...(core_insight_note !== undefined && {
-          core_insight_note: serializeNotes(core_insight_note as any),
-        }),
-      };
+      const payload = buildSavePayload(data);
+      if (!payload) throw new Error('Missing save payload');
 
       const res = await fetch('/api/study-responses', {
         method: 'POST',
@@ -156,6 +163,41 @@ export function useStudyResponse({ sessionId, userId, userEmail, enabled = true 
       }
     }
   }, [isDirty, localFormData, upsertMutation]);
+
+  useEffect(() => {
+    const flushDraft = () => {
+      if (!isDirtyRef.current) return;
+      const payload = buildSavePayload(localFormData);
+      if (!payload) return;
+
+      const body = JSON.stringify(payload);
+      if (navigator.sendBeacon) {
+        const blob = new Blob([body], { type: 'application/json' });
+        navigator.sendBeacon('/api/study-responses', blob);
+        return;
+      }
+
+      void fetch('/api/study-responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body,
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushDraft();
+    };
+
+    window.addEventListener('pagehide', flushDraft);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pagehide', flushDraft);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [buildSavePayload, localFormData]);
 
   useEffect(() => {
     return () => {
