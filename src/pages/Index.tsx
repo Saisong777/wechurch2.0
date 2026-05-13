@@ -72,53 +72,6 @@ interface NotebookEntrySummary {
   session_date: string;
 }
 
-const featureConfig = [
-  {
-    id: 'live',
-    featureKey: 'we_live',
-    title: '加入查經',
-    subtitle: 'SoulGym',
-    icon: Dumbbell,
-    href: '/user',
-    bgColor: 'bg-secondary/15',
-    iconColor: 'text-secondary',
-    hoverBorder: 'hover:border-secondary/40',
-  },
-  {
-    id: 'learn',
-    featureKey: 'we_learn',
-    title: '打開聖經',
-    subtitle: '閱讀與筆記',
-    icon: BookOpen,
-    href: '/learn',
-    bgColor: 'bg-primary/15',
-    iconColor: 'text-primary',
-    hoverBorder: 'hover:border-primary/40',
-  },
-  {
-    id: 'play',
-    featureKey: 'we_play',
-    title: '帶互動',
-    subtitle: '分組與遊戲',
-    icon: Gamepad2,
-    href: '/play',
-    bgColor: 'bg-emerald-500/15',
-    iconColor: 'text-emerald-600',
-    hoverBorder: 'hover:border-emerald-400/40',
-  },
-  {
-    id: 'share',
-    featureKey: 'we_share',
-    title: '寫代禱',
-    subtitle: '一起禱告',
-    icon: Share2,
-    href: '/share',
-    bgColor: 'bg-rose-500/15',
-    iconColor: 'text-rose-500',
-    hoverBorder: 'hover:border-rose-400/40',
-  },
-];
-
 const Index = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -126,7 +79,7 @@ const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { profile } = useUserProfile();
   const { canCreateSession } = useUserRole();
-  const { isFeatureEnabled, getDisabledMessage, loading: featuresLoading } = useFeatureToggles();
+  const { isFeatureEnabled, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
 
   const { data: randomVerse, isLoading: isVerseLoading } = useQuery<BlessingVerse>({
@@ -219,85 +172,58 @@ const Index = () => {
       latestActivity: latestDates[0],
     };
   }, [devotionalNotes, notebookEntries]);
-  const quickActions = [
+  const primaryActions = [
     {
       id: 'study',
       featureKey: 'we_live',
-      title: '加入查經',
-      subtitle: '輸入代碼或掃 QR',
+      title: '加入 SoulGym 查經',
+      subtitle: '掃 QR 或輸入代碼，直接進入今晚流程',
       href: '/user/study',
       icon: Dumbbell,
-      iconClass: 'bg-secondary/15 text-secondary',
+      className: 'border-secondary/20 bg-secondary/10',
+      iconClass: 'bg-secondary text-secondary-foreground',
     },
     {
       id: 'today-reading',
       featureKey: 'we_learn',
-      title: todaySummary && !todaySummary.isCompleted ? '開始今日讀經' : '打開聖經',
-      subtitle: todaySummary && !todaySummary.isCompleted ? todaySummary.scriptureReference || todaySummary.planName : '搜尋、收藏、做筆記',
-      href: todaySummary && !todaySummary.isCompleted ? `/learn/reading-plans/${todaySummary.planId}/read` : '/learn/bible',
+      title: todaySummary && !todaySummary.isCompleted ? '繼續今日讀經' : '打開聖經',
+      subtitle: todaySummary && !todaySummary.isCompleted ? todaySummary.scriptureReference || todaySummary.planName : '閱讀、搜尋、收藏、寫下亮光',
+      href: todaySummary && !todaySummary.isCompleted ? `/learn/reading-plans/${todaySummary.planId}/read` : '/learn',
       icon: BookOpen,
-      iconClass: 'bg-primary/15 text-primary',
+      className: 'border-primary/20 bg-primary/10',
+      iconClass: 'bg-primary text-primary-foreground',
     },
-    {
-      id: 'prayer',
-      featureKey: 'we_share',
-      title: '寫代禱',
-      subtitle: '留下今天的需要',
-      href: '/prayer-wall',
-      icon: Share2,
-      iconClass: 'bg-rose-500/15 text-rose-500',
-    },
-    ...(canCreateSession ? [{
-      id: 'host-study',
-      featureKey: 'we_live',
-      title: '開查經',
-      subtitle: '建立課程與分組',
-      href: '/admin',
-      icon: Settings,
-      iconClass: 'bg-amber-500/15 text-amber-600',
-    }] : []),
   ];
-  const productJourneys = [
+
+  const secondaryActions = [
     {
-      id: 'participant',
-      featureKey: 'we_live',
-      title: '我正在現場',
-      subtitle: '輸入代碼加入 SoulGym',
-      href: '/user/study',
-      icon: Dumbbell,
-      iconClass: 'bg-secondary/15 text-secondary',
-      enabled: true,
-    },
-    {
-      id: 'host',
-      featureKey: 'we_live',
-      title: canCreateSession ? '我今晚要主持' : '我是參與者',
-      subtitle: canCreateSession ? '打開一頁式主持台' : '加入查經或查看筆記',
-      href: canCreateSession ? '/admin' : '/user',
-      icon: Settings,
-      iconClass: 'bg-amber-500/15 text-amber-600',
-      enabled: true,
-    },
-    {
-      id: 'devotion',
-      featureKey: 'we_learn',
-      title: '我想安靜讀經',
-      subtitle: '聖經、讀經計畫、筆記',
-      href: '/learn',
-      icon: BookOpen,
-      iconClass: 'bg-primary/15 text-primary',
-      enabled: true,
-    },
-    {
-      id: 'care',
+      id: 'share',
       featureKey: 'we_share',
-      title: '我想留下代禱',
-      subtitle: '寫下需要，彼此扶持',
+      title: '代禱',
       href: '/share',
       icon: Share2,
-      iconClass: 'bg-rose-500/15 text-rose-500',
-      enabled: true,
     },
+    {
+      id: 'play',
+      featureKey: 'we_play',
+      title: '小工具',
+      href: '/play',
+      icon: Gamepad2,
+    },
+    ...(user ? [{
+      id: 'notes',
+      featureKey: 'we_learn',
+      title: '我的筆記',
+      href: '/learn/my-notes',
+      icon: BookMarked,
+    }] : []),
+    ...(canCreateSession ? [{
+      id: 'admin',
+      featureKey: 'we_live',
+      title: '主持台',
+      href: '/admin',
+      icon: Settings,
+    }] : []),
   ];
 
   return (
@@ -544,12 +470,12 @@ const Index = () => {
                           回來就接得上
                         </h2>
                       </div>
-                      <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl">
-                        <Link to="/learn/my-notes">
-                          看筆記
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
+                      <Link
+                        to="/learn/my-notes"
+                        className="mt-1 text-xs font-semibold text-primary hover:underline"
+                      >
+                        看筆記
+                      </Link>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-xl border bg-background/80 p-3">
@@ -596,141 +522,80 @@ const Index = () => {
             </section>
           )}
 
-          {!featuresLoading && (
-            <section className="animate-fade-in" style={{ animationDelay: '80ms' }} aria-labelledby="quick-actions-title">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 id="quick-actions-title" className="text-base font-semibold text-foreground">
-                  現在開始
+          <section className="animate-fade-in" style={{ animationDelay: '80ms' }} aria-labelledby="home-actions-title">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 id="home-actions-title" className="text-base font-semibold text-foreground">
+                  今天要做什麼？
                 </h2>
-                <span className="text-xs font-medium text-muted-foreground">
-                  選一件事
-                </span>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  首頁只放最常用的入口。
+                </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {quickActions.filter(action => isFeatureEnabled(action.featureKey)).map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <Link key={action.id} to={action.href} className="group block" data-testid={`link-quick-action-${action.id}`}>
-                      <Card className="h-full border-white/60 bg-white/75 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
-                        <CardContent className="flex h-full items-center gap-3 p-4">
-                          <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${action.iconClass}`}>
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="truncate text-sm font-semibold text-foreground">{action.title}</h3>
-                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{action.subtitle}</p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          )}
+            </div>
 
-          {!featuresLoading && (
-            <section className="animate-fade-in" style={{ animationDelay: '90ms' }} aria-labelledby="journey-title">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 id="journey-title" className="text-base font-semibold text-foreground">
-                  依照此刻開始
-                </h2>
-                <span className="text-xs font-medium text-muted-foreground">
-                  不用找功能
-                </span>
-              </div>
+            {featuresLoading ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                {productJourneys
-                  .filter((journey) => journey.enabled && isFeatureEnabled(journey.featureKey))
-                  .map((journey) => {
-                    const Icon = journey.icon;
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <Card key={index} className="border-white/50 bg-white/60 shadow-sm">
+                    <CardContent className="flex min-h-[116px] items-center gap-4 p-4 sm:p-5">
+                      <Skeleton className="h-12 w-12 rounded-2xl bg-primary/15" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <Skeleton className="h-5 w-32 bg-primary/10" />
+                        <Skeleton className="h-4 w-44 max-w-full bg-primary/10" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {primaryActions.filter(action => isFeatureEnabled(action.featureKey)).map((action) => {
+                    const Icon = action.icon;
                     return (
-                      <Link key={journey.id} to={journey.href} className="group block" data-testid={`link-journey-${journey.id}`}>
-                        <Card className="h-full border-white/60 bg-white/75 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
-                          <CardContent className="flex h-full items-center gap-3 p-4">
-                            <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${journey.iconClass}`}>
-                              <Icon className="h-5 w-5" />
+                      <Link key={action.id} to={action.href} className="group block" data-testid={`link-primary-action-${action.id}`}>
+                        <Card className={`h-full border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${action.className}`}>
+                          <CardContent className="flex min-h-[116px] items-center gap-4 p-4 sm:p-5">
+                            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm ${action.iconClass}`}>
+                              <Icon className="h-6 w-6" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="truncate text-sm font-semibold text-foreground">{journey.title}</h3>
-                              <p className="mt-0.5 truncate text-xs text-muted-foreground">{journey.subtitle}</p>
+                              <h3 className="text-base font-bold text-foreground">{action.title}</h3>
+                              <p className="mt-1 text-sm leading-5 text-muted-foreground">{action.subtitle}</p>
                             </div>
-                            <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                           </CardContent>
                         </Card>
                       </Link>
                     );
                   })}
-              </div>
-            </section>
-          )}
+                </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5 animate-fade-in" style={{ animationDelay: '100ms' }}>
-            {featuresLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <Card key={index} className="h-[142px] sm:h-[154px] border-white/50 bg-white/60 backdrop-blur-md shadow-sm">
-                  <CardContent className="p-4 sm:p-5 flex flex-col h-full justify-between">
-                    <Skeleton className="w-12 h-12 rounded-2xl bg-primary/15" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-5 w-20 bg-primary/10" />
-                      <Skeleton className="h-4 w-16 bg-primary/10" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : featureConfig.map((feature) => {
-              const Icon = feature.icon;
-              const isEnabled = isFeatureEnabled(feature.featureKey);
-              const disabledMessage = getDisabledMessage(feature.featureKey);
-
-              const cardContent = (
-                <Card className={`h-[142px] sm:h-[154px] transition-all duration-300 ${!isEnabled
-                  ? 'opacity-60 border-muted border-dashed cursor-not-allowed bg-muted/10'
-                  : `border-white/50 bg-white/70 backdrop-blur-md shadow-sm hover:shadow-card hover:-translate-y-1 cursor-pointer`
-                  }`}>
-                  <CardContent className="p-4 sm:p-5 flex flex-col h-full justify-between">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-2xl ${feature.bgColor} flex items-center justify-center shadow-inner`}>
-                        <Icon className={`w-6 h-6 ${feature.iconColor}`} />
-                      </div>
-                      {!isEnabled ? (
-                        <span className="text-[10px] px-2 py-1 rounded-full bg-muted text-muted-foreground flex-shrink-0 font-medium tracking-wide">
-                          {disabledMessage}
-                        </span>
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ChevronRight className="w-4 h-4 text-foreground/70" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-auto">
-                      <h3 className="text-base sm:text-lg font-bold text-foreground leading-tight mb-1">
-                        {feature.title}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground leading-snug font-medium">
-                        {feature.subtitle}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-
-              if (!isEnabled) {
-                return (
-                  <div key={feature.id} className="block">
-                    {cardContent}
+                <div className="mt-4 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm">
+                  <p className="px-1 text-xs font-semibold text-muted-foreground">
+                    其他功能
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {secondaryActions.filter(action => isFeatureEnabled(action.featureKey)).map((action) => {
+                      const Icon = action.icon;
+                      return (
+                        <Link
+                          key={action.id}
+                          to={action.href}
+                          className="flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-medium text-muted-foreground transition hover:bg-primary/10 hover:text-primary"
+                          data-testid={`link-secondary-action-${action.id}`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {action.title}
+                        </Link>
+                      );
+                    })}
                   </div>
-                );
-              }
-
-              return (
-                <Link key={feature.id} to={feature.href} className="block group">
-                  {cardContent}
-                </Link>
-              );
-            })}
-          </div>
+                </div>
+              </>
+            )}
+          </section>
 
 
         </div>
