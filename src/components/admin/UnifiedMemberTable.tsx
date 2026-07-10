@@ -16,8 +16,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, UserCheck, Bell, BellOff, Link2, Trash2, Shield, Crown, Star, Users } from 'lucide-react';
+import { MoreHorizontal, UserCheck, Bell, BellOff, Link2, Trash2, Shield, Crown, Star, Users, Church } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import type { UnifiedMember, PotentialMember } from '@/hooks/useUnifiedMembers';
@@ -31,16 +34,25 @@ interface UnifiedMemberTableProps {
   onUpdateRole: (userId: string, role: AppRole) => void;
   onUpdateStatus: (id: string, status: PotentialMember['status']) => void;
   onToggleSubscription: (id: string, subscribed: boolean) => void;
+  onAssignGroup?: (member: UnifiedMember, groupId: string) => void;
+  onUpdateChurch?: (member: UnifiedMember, church: string) => void;
   onLinkUser: (id: string) => void;
   onDelete: (id: string) => void;
   isAdmin: boolean;
+  groups?: Array<{ id: string; name: string; church: string; memberCount?: number }>;
+  churches?: Array<{ id: string; name: string }>;
+  groupsLoading?: boolean;
 }
 
 const roleConfig: Record<AppRole, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode }> = {
-  admin: { label: '管理員', variant: 'destructive', icon: <Shield className="w-3 h-3" /> },
+  admin: { label: '系統管理員', variant: 'destructive', icon: <Shield className="w-3 h-3" /> },
+  senior_pastor: { label: '主任牧師', variant: 'destructive', icon: <Crown className="w-3 h-3" /> },
+  pastor: { label: '牧師', variant: 'default', icon: <UserCheck className="w-3 h-3" /> },
+  minister: { label: '傳道人', variant: 'secondary', icon: <Star className="w-3 h-3" /> },
+  group_leader: { label: '小組長', variant: 'default', icon: <Crown className="w-3 h-3" /> },
   leader: { label: '小組長', variant: 'default', icon: <Crown className="w-3 h-3" /> },
-  future_leader: { label: '儲備', variant: 'secondary', icon: <Star className="w-3 h-3" /> },
-  member: { label: '成員', variant: 'outline', icon: <Users className="w-3 h-3" /> },
+  future_leader: { label: '儲備領袖', variant: 'secondary', icon: <Star className="w-3 h-3" /> },
+  member: { label: '會友', variant: 'outline', icon: <Users className="w-3 h-3" /> },
 };
 
 const statusConfig = {
@@ -57,9 +69,14 @@ export const UnifiedMemberTable = ({
   onUpdateRole,
   onUpdateStatus,
   onToggleSubscription,
+  onAssignGroup,
+  onUpdateChurch,
   onLinkUser,
   onDelete,
   isAdmin,
+  groups = [],
+  churches = [],
+  groupsLoading = false,
 }: UnifiedMemberTableProps) => {
   const selectableMembers = members.filter(m => m.type === 'potential');
   const allSelected = selectableMembers.length > 0 && selectableMembers.every(m => selectedIds.has(m.id));
@@ -156,11 +173,32 @@ export const UnifiedMemberTable = ({
                             disabled={member.role === 'admin'}
                           >
                             <Shield className="h-4 w-4 mr-2" />
-                            設為管理員
+                            設為系統管理員
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onUpdateRole(member.userId!, 'senior_pastor')}
+                            disabled={member.role === 'senior_pastor'}
+                          >
+                            <Crown className="h-4 w-4 mr-2" />
+                            設為主任牧師
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onUpdateRole(member.userId!, 'pastor')}
+                            disabled={member.role === 'pastor'}
+                          >
+                            <UserCheck className="h-4 w-4 mr-2" />
+                            設為牧師
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onUpdateRole(member.userId!, 'minister')}
+                            disabled={member.role === 'minister'}
+                          >
+                            <Star className="h-4 w-4 mr-2" />
+                            設為傳道人
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => onUpdateRole(member.userId!, 'leader')}
-                            disabled={member.role === 'leader'}
+                            onClick={() => onUpdateRole(member.userId!, 'group_leader')}
+                            disabled={member.role === 'group_leader' || member.role === 'leader'}
                           >
                             <Crown className="h-4 w-4 mr-2" />
                             設為小組長
@@ -222,6 +260,49 @@ export const UnifiedMemberTable = ({
                             </>
                           )}
                         </DropdownMenuItem>
+                      )}
+
+                      {isAdmin && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <Users className="h-4 w-4 mr-2" />
+                              分到小組
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+                              {groupsLoading ? (
+                                <DropdownMenuItem disabled>讀取小組中</DropdownMenuItem>
+                              ) : groups.length === 0 ? (
+                                <DropdownMenuItem disabled>尚無小組</DropdownMenuItem>
+                              ) : (
+                                groups.map((group) => (
+                                  <DropdownMenuItem key={group.id} onClick={() => onAssignGroup?.(member, group.id)}>
+                                    {group.name}
+                                    <span className="ml-2 text-xs text-muted-foreground">{group.church}</span>
+                                  </DropdownMenuItem>
+                                ))
+                              )}
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <Church className="h-4 w-4 mr-2" />
+                              調整教會
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              {churches.length === 0 ? (
+                                <DropdownMenuItem disabled>尚無教會選項</DropdownMenuItem>
+                              ) : (
+                                churches.map((church) => (
+                                  <DropdownMenuItem key={church.id} onClick={() => onUpdateChurch?.(member, church.id)}>
+                                    {church.name}
+                                  </DropdownMenuItem>
+                                ))
+                              )}
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                        </>
                       )}
 
                       {!isRegistered && !member.userId && (

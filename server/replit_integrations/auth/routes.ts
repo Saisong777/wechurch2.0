@@ -152,17 +152,8 @@ export function registerAuthRoutes(app: Express): void {
       if (isBcryptHash) {
         passwordMatch = await bcrypt.compare(password, dbUser.password);
       } else if (dbUser.password.length >= 6 && dbUser.password.length <= 30) {
-        const { timingSafeEqual } = await import("crypto");
-        const a = Buffer.from(password, "utf8");
-        const b = Buffer.from(dbUser.password, "utf8");
-        if (a.length === b.length) {
-          passwordMatch = timingSafeEqual(a, b);
-        }
-        if (passwordMatch) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, dbUser.id]);
-          console.log("[Auth] Upgraded legacy password to bcrypt for:", normalizedEmail);
-        }
+        console.warn("[Auth] Legacy plaintext password login blocked for:", normalizedEmail);
+        return res.status(401).json({ message: "請使用忘記密碼重新設定密碼" });
       }
 
       if (!passwordMatch) {

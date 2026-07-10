@@ -436,7 +436,17 @@ export const AdminPage: React.FC = () => {
               <>
                 {role && (
                   <span className="text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden md:inline">
-                    {role === 'admin' ? '管理員' : role === 'leader' ? '小組長' : '儲備'}
+                    {role === 'admin'
+                      ? '系統管理員'
+                      : role === 'senior_pastor'
+                        ? '主任牧師'
+                        : role === 'pastor'
+                          ? '牧師'
+                          : role === 'minister'
+                            ? '傳道人'
+                            : role === 'group_leader' || role === 'leader'
+                              ? '小組長'
+                              : '儲備'}
                   </span>
                 )}
                 <span className="text-xs sm:text-sm opacity-90 hidden lg:inline truncate max-w-32">

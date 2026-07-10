@@ -10,6 +10,7 @@ interface AuthUser {
   legacyUserId?: string;
   displayName?: string;
   role?: string;
+  church?: string | null;
   user_metadata?: {
     display_name?: string;
     avatar_url?: string;
@@ -40,6 +41,7 @@ function mapUserData(userData: any): AuthUser {
     legacyUserId: userData.legacyUserId,
     displayName: userData.displayName,
     role: userData.role,
+    church: userData.church,
     user_metadata: {
       display_name: userData.displayName || (userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined),
       avatar_url: userData.profileImageUrl,

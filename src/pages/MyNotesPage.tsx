@@ -15,8 +15,10 @@ import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { mergeLocalDevotionalNotes, removeLocalDevotionalNote } from '@/lib/localDevotionalNotes';
 import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Dumbbell, Target, MessageCircle, BookOpen, EyeOff, Download, Save, ArrowRight, Sparkles } from 'lucide-react';
 import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
+import { getChurchReadingByReference, getChurchReadingForDayNumber } from '@/lib/churchReading';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 
@@ -59,30 +61,54 @@ const getCategoryInfo = (category: string | null) => {
   return INSIGHT_CATEGORIES.find(c => c.value === category);
 };
 
+const getDevotionalReceivingText = (note: DevotionalNote): string => {
+  const categories = parseCategories(note.coreInsightCategory);
+  const notes = parseNotes(note.coreInsightNote, categories);
+  return (
+    notes.GOD_ATTRIBUTE ||
+    Object.values(notes).filter(Boolean).join('\n') ||
+    note.coreInsightNote ||
+    note.heartbeatVerse ||
+    ''
+  );
+};
+
 const countFilledFields = (note: DevotionalNote): number => {
   return [
-    note.titlePhrase,
-    note.heartbeatVerse,
     note.observation,
-    note.coreInsightNote,
-    note.scholarsNote,
+    getDevotionalReceivingText(note),
     note.actionPlan,
-    note.coolDownNote,
   ].filter(Boolean).length;
 };
 
 const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showReadingContext, setShowReadingContext] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showHideConfirm, setShowHideConfirm] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const filledCount = countFilledFields(note);
-  const categoryInfo = getCategoryInfo(note.coreInsightCategory);
+  const receivingText = getDevotionalReceivingText(note);
   const isFromReadingPlan = !!note.readingPlanId;
+  const readingContext = note.dayNumber
+    ? getChurchReadingForDayNumber(note.dayNumber)
+    : getChurchReadingByReference(note.verseReference);
+  const sourceVerses = readingContext?.previewVerses?.length
+    ? readingContext.previewVerses
+    : (note.verseText || '')
+      .split('\n')
+      .filter(Boolean)
+      .map((text, index) => ({ verse: index + 1, text }));
 
   const hideMutation = useMutation({
-    mutationFn: () => apiRequest('PATCH', `/api/devotional-notes/${note.id}/hidden`, { hidden: true }),
+    mutationFn: async () => {
+      if (note.id.startsWith('local-devotional-')) {
+        removeLocalDevotionalNote(note.id);
+        return;
+      }
+      await apiRequest('PATCH', `/api/devotional-notes/${note.id}/hidden`, { hidden: true });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
       toast({ title: '筆記已隱藏' });
@@ -128,7 +154,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Badge variant="secondary" className="text-xs" data-testid={`text-filled-count-${note.id}`}>
-                {filledCount}/7
+                {filledCount}/3
               </Badge>
               {expanded ? (
                 <ChevronUp className="w-5 h-5 text-muted-foreground" />
@@ -141,79 +167,88 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
 
         {expanded && (
           <CardContent className="pt-0 space-y-4 border-t">
-            {note.titlePhrase && (
-              <div className="flex gap-2">
-                <BookMarked className="w-4 h-4 text-green-500 shrink-0 mt-1" />
-                <div>
-                  <p className="text-sm font-medium mb-1">1. 標題分段</p>
-                  <p className="text-sm text-muted-foreground">{note.titlePhrase}</p>
-                </div>
-              </div>
-            )}
+            {(sourceVerses.length > 0 || readingContext?.devotionalText) && (
+              <div className="rounded-xl border bg-muted/20 p-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto w-full justify-between gap-3 px-0 py-0 text-left hover:bg-transparent"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowReadingContext((current) => !current);
+                  }}
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
+                    <BookOpen className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="truncate">當天經文與靈修短文</span>
+                  </span>
+                  {showReadingContext ? (
+                    <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                </Button>
 
-            {note.heartbeatVerse && (
-              <div className="flex gap-2">
-                <Heart className="w-4 h-4 text-red-500 shrink-0 mt-1" />
-                <div>
-                  <p className="text-sm font-medium mb-1">2. 最感動的經文</p>
-                  <p className="text-sm text-muted-foreground">{note.heartbeatVerse}</p>
-                </div>
+                {showReadingContext && (
+                  <div
+                    className="mt-3 space-y-3 border-t pt-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {sourceVerses.length > 0 && (
+                      <div className="rounded-lg bg-background p-3">
+                        <p className="mb-2 text-xs font-semibold text-primary">經文</p>
+                        <div className="space-y-2">
+                          {sourceVerses.map((verse, index) => (
+                            <p key={`${verse.verse}-${index}`} className="text-sm leading-6 text-muted-foreground">
+                              {readingContext?.previewVerses?.length ? (
+                                <span className="mr-1.5 font-semibold text-primary/70">{verse.verse}</span>
+                              ) : null}
+                              {verse.text}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {readingContext?.devotionalText && (
+                      <div className="rounded-lg bg-sky-50/70 p-3">
+                        <p className="mb-1 text-xs font-semibold text-sky-700">靈修短文</p>
+                        <h4 className="text-sm font-bold text-foreground">{readingContext.devotionalTitle}</h4>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">{readingContext.devotionalText}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {note.observation && (
               <div className="flex gap-2">
-                <Eye className="w-4 h-4 text-blue-500 shrink-0 mt-1" />
+                <Eye className="w-4 h-4 text-emerald-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">3. 經文上的資訊</p>
+                  <p className="text-sm font-medium mb-1">1. 看見</p>
                   <p className="text-sm text-muted-foreground">{note.observation}</p>
                 </div>
               </div>
             )}
 
-            {(categoryInfo || note.coreInsightNote) && (
+            {receivingText && (
               <div className="flex gap-2">
-                <Dumbbell className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
+                <Heart className="w-4 h-4 text-sky-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">4. 思想神的話</p>
-                  {categoryInfo && (
-                    <Badge variant="outline" className="mb-1">
-                      {categoryInfo.label}
-                    </Badge>
-                  )}
-                  {note.coreInsightNote && (
-                    <p className="text-sm text-muted-foreground">{note.coreInsightNote}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {note.scholarsNote && (
-              <div className="flex gap-2">
-                <MessageCircle className="w-4 h-4 text-purple-500 shrink-0 mt-1" />
-                <div>
-                  <p className="text-sm font-medium mb-1">5. 注釋書或其他的參考資料</p>
-                  <p className="text-sm text-muted-foreground">{note.scholarsNote}</p>
+                  <p className="text-sm font-medium mb-1">2. 領受</p>
+                  <p className="text-sm text-muted-foreground">{receivingText}</p>
                 </div>
               </div>
             )}
 
             {note.actionPlan && (
               <div className="flex gap-2">
-                <Target className="w-4 h-4 text-teal-500 shrink-0 mt-1" />
+                <Target className="w-4 h-4 text-amber-500 shrink-0 mt-1" />
                 <div>
-                  <p className="text-sm font-medium mb-1">6. 與神同行的行動</p>
+                  <p className="text-sm font-medium mb-1">3. 回應</p>
                   <p className="text-sm text-muted-foreground">{note.actionPlan}</p>
-                </div>
-              </div>
-            )}
-
-            {note.coolDownNote && (
-              <div className="flex gap-2">
-                <Heart className="w-4 h-4 text-indigo-500 shrink-0 mt-1" />
-                <div>
-                  <p className="text-sm font-medium mb-1">7. 其他</p>
-                  <p className="text-sm text-muted-foreground">{note.coolDownNote}</p>
                 </div>
               </div>
             )}
@@ -590,16 +625,10 @@ const formatDevotionalNoteMarkdown = (note: DevotionalNote): string => {
   const date = format(new Date(note.updatedAt), 'yyyy-MM-dd', { locale: zhTW });
   const lines: string[] = [];
   lines.push(`## ${note.verseReference} (${date})`);
-  if (note.titlePhrase) lines.push(`**1. 標題分段:** ${note.titlePhrase}`);
-  if (note.heartbeatVerse) lines.push(`**2. 最感動的經文:** ${note.heartbeatVerse}`);
-  if (note.observation) lines.push(`**3. 經文上的資訊:** ${note.observation}`);
-  if (note.coreInsightNote) {
-    const catInfo = getCategoryInfo(note.coreInsightCategory);
-    lines.push(`**4. 思想神的話${catInfo ? ` (${catInfo.label})` : ''}:** ${note.coreInsightNote}`);
-  }
-  if (note.scholarsNote) lines.push(`**5. 注釋書或其他的參考資料:** ${note.scholarsNote}`);
-  if (note.actionPlan) lines.push(`**6. 與神同行的行動:** ${note.actionPlan}`);
-  if (note.coolDownNote) lines.push(`**7. 其他:** ${note.coolDownNote}`);
+  const receivingText = getDevotionalReceivingText(note);
+  if (note.observation) lines.push(`**1. 看見:** ${note.observation}`);
+  if (receivingText) lines.push(`**2. 領受:** ${receivingText}`);
+  if (note.actionPlan) lines.push(`**3. 回應:** ${note.actionPlan}`);
   return lines.join('\n\n');
 };
 
@@ -644,6 +673,15 @@ const MyNotesPage = () => {
 
   const { data: devotionalNotes, isLoading: notesLoading } = useQuery<DevotionalNote[]>({
     queryKey: ['/api/devotional-notes'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/devotional-notes', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch devotional notes');
+        return mergeLocalDevotionalNotes((await res.json()) as DevotionalNote[]);
+      } catch {
+        return mergeLocalDevotionalNotes<DevotionalNote>([]);
+      }
+    },
     enabled: !!user,
   });
 

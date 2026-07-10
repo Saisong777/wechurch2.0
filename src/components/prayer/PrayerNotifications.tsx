@@ -32,7 +32,7 @@ export const PrayerNotifications: React.FC = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative h-11 w-11 rounded-lg" aria-label="禱告通知">
           <Bell className="h-5 w-5" />
           {unreadCount && unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-rose-500 text-white text-xs flex items-center justify-center font-bold">
@@ -64,6 +64,7 @@ export const PrayerNotifications: React.FC = () => {
                 className="h-7 text-xs text-muted-foreground hover:text-destructive"
                 onClick={() => clearAllMutation.mutate()}
                 disabled={clearAllMutation.isPending}
+                aria-label="清除通知"
               >
                 <Trash2 className="h-3 w-3" />
               </Button>

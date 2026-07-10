@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import {
@@ -17,7 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { INSIGHT_CATEGORIES, type InsightCategory } from '@/types/spiritual-fitness';
+import {
+  createLocalDevotionalNoteId,
+  findLocalDevotionalNoteByPlanDay,
+  upsertLocalDevotionalNote,
+} from '@/lib/localDevotionalNotes';
+import type { InsightCategory } from '@/types/spiritual-fitness';
 import { cn } from '@/lib/utils';
 
 interface PlanInfo {
@@ -75,6 +79,20 @@ interface DevotionalNote {
 type TtsState = 'idle' | 'playing' | 'paused';
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5];
+const RECEIVE_KEY: InsightCategory = 'GOD_ATTRIBUTE';
+
+function getReceivingText(coreInsightNote: string | null, heartbeatVerse: string | null): string {
+  if (!coreInsightNote) return heartbeatVerse || '';
+
+  try {
+    const parsed = JSON.parse(coreInsightNote);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed[RECEIVE_KEY] || Object.values(parsed).filter(Boolean).join('\n') || heartbeatVerse || '';
+    }
+  } catch {}
+
+  return coreInsightNote || heartbeatVerse || '';
+}
 
 function parseScriptureReference(ref: string): { bookName: string; chapterStart: number; chapterEnd: number }[] {
   if (!ref) return [];
@@ -208,10 +226,15 @@ const ReadingExperiencePage = () => {
   const { data: existingNote } = useQuery<DevotionalNote | null>({
     queryKey: ['/api/user-reading-plans', planId, 'devotional', selectedDay],
     queryFn: async () => {
-      const res = await fetch(`/api/user-reading-plans/${planId}/devotional/${selectedDay}`, { credentials: 'include' });
-      if (res.status === 404) return null;
-      if (!res.ok) return null;
-      return res.json();
+      const localNote = planId ? findLocalDevotionalNoteByPlanDay(planId, selectedDay) : null;
+      try {
+        const res = await fetch(`/api/user-reading-plans/${planId}/devotional/${selectedDay}`, { credentials: 'include' });
+        if (res.status === 404) return localNote;
+        if (!res.ok) return localNote;
+        return (await res.json()) || localNote;
+      } catch {
+        return localNote;
+      }
     },
     enabled: !!planId && !!user,
   });
@@ -231,8 +254,8 @@ const ReadingExperiencePage = () => {
         titlePhrase: existingNote.titlePhrase || '',
         heartbeatVerse: existingNote.heartbeatVerse || '',
         observation: existingNote.observation || '',
-        coreInsightCategory: (existingNote.coreInsightCategory as InsightCategory) || null,
-        coreInsightNote: existingNote.coreInsightNote || '',
+        coreInsightCategory: existingNote.coreInsightNote ? RECEIVE_KEY : null,
+        coreInsightNote: getReceivingText(existingNote.coreInsightNote, existingNote.heartbeatVerse),
         scholarsNote: existingNote.scholarsNote || '',
         actionPlan: existingNote.actionPlan || '',
         coolDownNote: existingNote.coolDownNote || '',
@@ -331,26 +354,54 @@ const ReadingExperiencePage = () => {
     };
 
     try {
-      if (devotionalNoteId) {
-        await apiRequest('PATCH', `/api/devotional-notes/${devotionalNoteId}`, body);
+      let savedNote: DevotionalNote;
+      if (devotionalNoteId && !devotionalNoteId.startsWith('local-devotional-')) {
+        const res = await apiRequest('PATCH', `/api/devotional-notes/${devotionalNoteId}`, body);
+        savedNote = await res.json();
       } else {
         const res = await apiRequest('POST', '/api/devotional-notes', body);
-        const data = await res.json();
-        if (data.id) setDevotionalNoteId(data.id);
+        savedNote = await res.json();
       }
+      if (savedNote.id) setDevotionalNoteId(savedNote.id);
+      upsertLocalDevotionalNote(savedNote);
       queryClient.invalidateQueries({ queryKey: ['/api/user-reading-plans', planId, 'devotional', selectedDay] });
+      queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
       setSavingState('saved');
       toast({ title: '筆記已儲存' });
       setTimeout(() => setSavingState('idle'), 2000);
     } catch (err) {
-      console.error('Failed to save devotional note:', err);
-      setSavingState('idle');
-      toast({ title: '儲存失敗', description: '請稍後再試', variant: 'destructive' });
+      const now = new Date().toISOString();
+      const localNote: DevotionalNote = {
+        id: devotionalNoteId || createLocalDevotionalNoteId(),
+        createdAt: existingNote?.createdAt || now,
+        updatedAt: now,
+        ...body,
+      };
+      setDevotionalNoteId(localNote.id);
+      upsertLocalDevotionalNote(localNote);
+      queryClient.setQueryData<DevotionalNote[]>(['/api/devotional-notes'], (current = []) => [
+        localNote,
+        ...current.filter((note) => note.id !== localNote.id),
+      ]);
+      queryClient.setQueryData(['/api/user-reading-plans', planId, 'devotional', selectedDay], localNote);
+      queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
+      setSavingState('saved');
+      toast({ title: '筆記已儲存' });
+      setTimeout(() => setSavingState('idle'), 2000);
     }
-  }, [user, planId, selectedDay, devotionalForm, devotionalNoteId, currentDayEntry, allVerses, toast]);
+  }, [user, planId, selectedDay, devotionalForm, devotionalNoteId, currentDayEntry, allVerses, toast, existingNote?.createdAt]);
 
   const updateDevotionalField = useCallback((field: string, value: string | InsightCategory | null) => {
     setDevotionalForm(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const updateReceivingField = useCallback((value: string) => {
+    setDevotionalForm(prev => ({
+      ...prev,
+      heartbeatVerse: value,
+      coreInsightCategory: RECEIVE_KEY,
+      coreInsightNote: value,
+    }));
   }, []);
 
   const speakVerse = useCallback((verse: BibleVerse, index: number) => {
@@ -487,14 +538,9 @@ const ReadingExperiencePage = () => {
   }
 
   const filledFields = [
-    devotionalForm.titlePhrase,
-    devotionalForm.heartbeatVerse,
     devotionalForm.observation,
-    devotionalForm.coreInsightCategory,
     devotionalForm.coreInsightNote,
-    devotionalForm.scholarsNote,
     devotionalForm.actionPlan,
-    devotionalForm.coolDownNote,
   ].filter(Boolean).length;
 
   return (
@@ -744,7 +790,7 @@ const ReadingExperiencePage = () => {
                 靈修筆記
                 {filledFields > 0 && (
                   <Badge variant="secondary" className="text-xs">
-                    {filledFields}/8
+                    {filledFields}/3
                   </Badge>
                 )}
               </CardTitle>
@@ -757,137 +803,62 @@ const ReadingExperiencePage = () => {
           </CardHeader>
 
           {devotionalExpanded && (
-            <CardContent className="px-3 sm:px-4 pb-4 space-y-6" data-testid="devotional-form">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="text-sm font-medium">暖身 Warm-up</span>
+            <CardContent className="px-3 sm:px-4 pb-4 space-y-4" data-testid="devotional-form">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3 space-y-2 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span className="text-sm font-semibold">1. 看見</span>
+                  {devotionalForm.observation && <Check className="w-3.5 h-3.5 text-green-500" />}
                 </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="dev-titlePhrase" className="text-xs sm:text-sm">
-                    1. 標題分段
-                  </Label>
-                  <Input
-                    id="dev-titlePhrase"
-                    value={devotionalForm.titlePhrase}
-                    onChange={(e) => updateDevotionalField('titlePhrase', e.target.value)}
-                    placeholder="幫這段經文下一個標題"
-                    data-testid="input-title-phrase"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="dev-heartbeatVerse" className="text-xs sm:text-sm">
-                    2. 最感動的經文
-                  </Label>
-                  <AutoResizeTextarea
-                    id="dev-heartbeatVerse"
-                    value={devotionalForm.heartbeatVerse}
-                    onChange={(e) => updateDevotionalField('heartbeatVerse', e.target.value)}
-                    placeholder="哪一節經文最感動你？"
-                    minRows={2}
-                    data-testid="textarea-heartbeat-verse"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="dev-observation" className="text-xs sm:text-sm">
-                    3. 經文上的資訊
-                  </Label>
-                  <AutoResizeTextarea
-                    id="dev-observation"
-                    value={devotionalForm.observation}
-                    onChange={(e) => updateDevotionalField('observation', e.target.value)}
-                    placeholder="你觀察到什麼？"
-                    minRows={2}
-                    data-testid="textarea-observation"
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground">這段經文中，我觀察到什麼？</p>
+                <Label htmlFor="dev-observation" className="sr-only">看見</Label>
+                <AutoResizeTextarea
+                  id="dev-observation"
+                  value={devotionalForm.observation}
+                  onChange={(e) => updateDevotionalField('observation', e.target.value)}
+                  placeholder="例如：人物、場景、重複的詞、讓你注意到的細節..."
+                  minRows={4}
+                  data-testid="textarea-observation"
+                  className="text-base md:text-sm"
+                />
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <span className="text-sm font-medium">重訓 Core Training</span>
+              <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-3 space-y-2 dark:border-sky-900/50 dark:bg-sky-950/20">
+                <div className="flex items-center gap-2 text-sky-700 dark:text-sky-400">
+                  <div className="w-3 h-3 rounded-full bg-sky-500" />
+                  <span className="text-sm font-semibold">2. 領受</span>
+                  {devotionalForm.coreInsightNote && <Check className="w-3.5 h-3.5 text-green-500" />}
                 </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs sm:text-sm">4. 思想神的話</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {INSIGHT_CATEGORIES.map((cat) => (
-                      <Button
-                        key={cat.value}
-                        variant={devotionalForm.coreInsightCategory === cat.value ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => {
-                          updateDevotionalField('coreInsightCategory', cat.value);
-                        }}
-                        className="text-xs gap-1"
-                        data-testid={`button-category-${cat.value}`}
-                      >
-                        <span>{cat.emoji}</span>
-                        {cat.label}
-                      </Button>
-                    ))}
-                  </div>
-                  <AutoResizeTextarea
-                    value={devotionalForm.coreInsightNote}
-                    onChange={(e) => updateDevotionalField('coreInsightNote', e.target.value)}
-                    placeholder="從經文中你學到什麼？"
-                    minRows={2}
-                    data-testid="textarea-core-insight"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="dev-scholarsNote" className="text-xs sm:text-sm">
-                    5. 注釋書或其他的參考資料
-                  </Label>
-                  <AutoResizeTextarea
-                    id="dev-scholarsNote"
-                    value={devotionalForm.scholarsNote}
-                    onChange={(e) => updateDevotionalField('scholarsNote', e.target.value)}
-                    placeholder="查閱資料或聽過的教導"
-                    minRows={2}
-                    data-testid="textarea-scholars-note"
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground">神透過這段經文對我說什麼？</p>
+                <Label htmlFor="dev-receiving" className="sr-only">領受</Label>
+                <AutoResizeTextarea
+                  id="dev-receiving"
+                  value={devotionalForm.coreInsightNote}
+                  onChange={(e) => updateReceivingField(e.target.value)}
+                  placeholder="例如：我對神有什麼新的認識？哪句話觸動我？我被提醒、安慰或光照的是什麼？"
+                  minRows={4}
+                  data-testid="textarea-core-insight"
+                  className="text-base md:text-sm"
+                />
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span className="text-sm font-medium">伸展 Stretch</span>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-3 space-y-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <span className="text-sm font-semibold">3. 回應</span>
+                  {devotionalForm.actionPlan && <Check className="w-3.5 h-3.5 text-green-500" />}
                 </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="dev-actionPlan" className="text-xs sm:text-sm">
-                    6. 與神同行的行動
-                  </Label>
-                  <AutoResizeTextarea
-                    id="dev-actionPlan"
-                    value={devotionalForm.actionPlan}
-                    onChange={(e) => updateDevotionalField('actionPlan', e.target.value)}
-                    placeholder="今天你要如何實踐？"
-                    minRows={2}
-                    data-testid="textarea-action-plan"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="dev-coolDownNote" className="text-xs sm:text-sm">
-                    7. 其他
-                  </Label>
-                  <AutoResizeTextarea
-                    id="dev-coolDownNote"
-                    value={devotionalForm.coolDownNote}
-                    onChange={(e) => updateDevotionalField('coolDownNote', e.target.value)}
-                    placeholder="安靜在神面前，寫下你的禱告"
-                    minRows={2}
-                    data-testid="textarea-cool-down"
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground">我接下來要怎麼實踐？</p>
+                <Label htmlFor="dev-actionPlan" className="sr-only">回應</Label>
+                <AutoResizeTextarea
+                  id="dev-actionPlan"
+                  value={devotionalForm.actionPlan}
+                  onChange={(e) => updateDevotionalField('actionPlan', e.target.value)}
+                  placeholder="例如：今天或這週的一個具體行動、我要如何禱告或調整生活..."
+                  minRows={4}
+                  data-testid="textarea-action-plan"
+                  className="text-base md:text-sm"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t">

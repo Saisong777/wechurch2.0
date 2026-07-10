@@ -1,4 +1,4 @@
-import { BookOpen, Dumbbell, Gamepad2, Home, Share2, type LucideIcon } from 'lucide-react';
+import { BookOpen, Dumbbell, HandHeart, Home, Share2, type LucideIcon } from 'lucide-react';
 
 export interface AppNavItem {
   id: string;
@@ -20,35 +20,35 @@ export const appNavItems: AppNavItem[] = [
   },
   {
     id: 'live',
-    label: 'SoulGym',
-    shortLabel: 'SoulGym',
+    label: '查經',
+    shortLabel: '查經',
     href: '/user',
     icon: Dumbbell,
     match: ['/user'],
   },
   {
     id: 'learn',
-    label: '讀聖經',
-    shortLabel: '讀聖經',
+    label: '聖經',
+    shortLabel: '聖經',
     href: '/learn',
     icon: BookOpen,
     match: ['/learn', '/bible', '/jesus-timeline'],
   },
   {
-    id: 'play',
-    label: '小工具',
-    shortLabel: '小工具',
-    href: '/play',
-    icon: Gamepad2,
-    match: ['/play', '/icebreaker', '/grouper', '/card', '/cards'],
-  },
-  {
     id: 'share',
-    label: '來禱告',
-    shortLabel: '來禱告',
+    label: '禱告',
+    shortLabel: '禱告',
     href: '/share',
     icon: Share2,
     match: ['/share', '/prayer-wall', '/prayer-meeting'],
+  },
+  {
+    id: 'care',
+    label: '關懷',
+    shortLabel: '關懷',
+    href: '/care',
+    icon: HandHeart,
+    match: ['/care'],
   },
 ];
 
