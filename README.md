@@ -53,7 +53,7 @@ npm install
 # 3. 設定環境變數
 cp .env.example .env
 
-# 4. 初始化資料庫
+# 4. 初始化本機資料庫
 npm run db:push
 
 # 5. 啟動開發伺服器
@@ -86,8 +86,12 @@ npm run dev
 ## 資料庫設定
 
 ```bash
-npm run db:push      # 推送 schema
+npm run db:push:local       # 本機快速同步 schema
+npm run db:generate         # 從 schema 產生可審查的 migration
+npm run db:migrate:local    # 本機套用已提交的 migration
 ```
+
+正式與 staging 不直接執行 `db:push`。schema 變更先用 `db:generate` 產生 migration，確認 SQL 後提交；部署前在 staging 執行 `db:migrate`，驗收後再對 production 備份並套用同一份 migration。
 
 ---
 
@@ -99,6 +103,8 @@ npm run build        # 建置生產版本
 npm run lint         # ESLint 檢查
 npm test             # 執行測試
 npm run db:push      # 推送 Drizzle schema
+npm run db:generate  # 產生 migration
+npm run db:migrate   # 套用已提交的 migration
 npm run local:verify # 本機 production build 瀏覽器白屏檢查
 npm run local:db     # 用 Docker 啟動本機 PostgreSQL
 npm run db:push:local # 將 schema 推到本機 PostgreSQL
@@ -181,9 +187,11 @@ npm run safe:check:full
 
 ---
 
-## 部署（Railway）
+## 發版流程（Railway）
 
-此專案目前由 GitHub repo `Saisong777/wechurch2.0` 連到 Railway。
+固定流程是：`feature/*` → `integration`（staging）→ `main`（production）。
+
+`main` 只放正式版；`integration` 對應獨立的 Railway staging service 與 PostgreSQL。staging 不可連到 production `DATABASE_URL`，也不可寄送真實 email、呼叫 production webhook 或執行 production cron。
 
 Railway 會依照 `nixpacks.toml`：
 
@@ -191,6 +199,8 @@ Railway 會依照 `nixpacks.toml`：
 2. 以 `npm start` 啟動 Express server
 
 Railway production service 需要設定 `DATABASE_URL`、`SESSION_SECRET`、AI keys，以及 OAuth/email 相關 secrets。請在 Railway Variables 管理，不要提交到 repo。
+
+資料庫 migration 必須先在 staging 驗證，再於 production 備份後執行。新牧養、排班、場地、框架、LINE 與每日靈修功能由 release flag 控制，先關閉，確認 health check、錯誤紀錄與角色流程正常後再逐項開放。
 
 ---
 

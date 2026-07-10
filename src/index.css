@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,54 +10,53 @@
   }
 
   body {
-    background-color: #FAFAF7;
+    background-color: #F8FAF9;
     font-family: var(--font-sans);
   }
 
   :root {
-    /* WeChurch - Joyful & Modern Palette (Sky Blue + Warm Accents) */
-    --background: 210 40% 98%;
-    --foreground: 215 25% 20%;
+    /* WeChurch - calm, durable product palette */
+    --background: 150 24% 98%;
+    --foreground: 218 28% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 20%;
+    --card-foreground: 218 28% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 20%;
+    --popover-foreground: 218 28% 18%;
 
-    /* Sky Blue - openness, calm, trust */
-    --primary: 205 85% 50%;
+    /* Ink blue - daily office, Scripture, active navigation */
+    --primary: 218 40% 28%;
     --primary-foreground: 0 0% 100%;
 
-    /* Coral/Peach - warmth, community, joy */
-    --secondary: 25 95% 60%;
+    /* Clay - prayer and present action */
+    --secondary: 17 55% 53%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 30% 94%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 155 18% 93%;
+    --muted-foreground: 214 12% 42%;
 
-    /* Vibrant blue accent */
-    --accent: 200 90% 48%;
+    --accent: 162 50% 38%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 65% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 25% 88%;
-    --input: 210 25% 88%;
-    --ring: 205 85% 50%;
+    --border: 160 14% 86%;
+    --input: 160 14% 86%;
+    --ring: 204 72% 38%;
 
-    --radius: 1.5rem;
+    --radius: 0.5rem;
 
     /* Custom tokens - WeChurch style */
-    --sky-gradient: linear-gradient(135deg, hsl(200, 85%, 55%) 0%, hsl(210, 90%, 45%) 100%);
-    --coral-gradient: linear-gradient(135deg, hsl(35, 95%, 60%) 0%, hsl(15, 90%, 55%) 100%);
-    --warm-gradient: linear-gradient(135deg, hsl(25, 95%, 60%) 0%, hsl(35, 100%, 65%) 100%);
-    --sunset-gradient: linear-gradient(135deg, hsl(200, 85%, 55%) 0%, hsl(25, 95%, 60%) 100%);
-    --card-shadow: 0 4px 24px -4px hsla(210, 50%, 30%, 0.08);
-    --card-shadow-hover: 0 12px 40px -8px hsla(210, 50%, 30%, 0.15);
-    --glow-sky: 0 0 40px hsla(205, 85%, 50%, 0.25);
-    --glow-coral: 0 0 40px hsla(25, 95%, 60%, 0.25);
+    --sky-gradient: linear-gradient(135deg, hsl(218, 40%, 32%) 0%, hsl(214, 38%, 24%) 100%);
+    --coral-gradient: linear-gradient(135deg, hsl(22, 55%, 56%) 0%, hsl(14, 52%, 48%) 100%);
+    --warm-gradient: linear-gradient(135deg, hsl(39, 80%, 57%) 0%, hsl(18, 82%, 54%) 100%);
+    --sunset-gradient: linear-gradient(135deg, hsl(204, 72%, 42%) 0%, hsl(18, 82%, 54%) 100%);
+    --card-shadow: 0 14px 40px -28px hsla(214, 36%, 24%, 0.28);
+    --card-shadow-hover: 0 18px 46px -26px hsla(214, 36%, 24%, 0.34);
+    --glow-sky: 0 0 0 4px hsla(204, 72%, 38%, 0.1);
+    --glow-coral: 0 0 0 4px hsla(18, 82%, 54%, 0.1);
 
     --sidebar-background: 215 25% 18%;
     --sidebar-foreground: 210 40% 98%;
@@ -110,21 +109,20 @@
   /* Prevent mobile overscroll bounce showing white background */
   html,
   body {
-    background-color: hsl(210, 40%, 98%);
+    background-color: hsl(var(--background));
     overscroll-behavior-y: none;
-    -webkit-overflow-scrolling: touch;
   }
 
   html {
-    height: 100%;
+    min-height: 100%;
     overscroll-behavior: none;
   }
 
   body {
     @apply text-foreground antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Inter', sans-serif;
     min-height: 100%;
-    overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: none;
     font-size: 16px;
   }
@@ -149,7 +147,16 @@
   h6 {
     font-family: 'Nunito', sans-serif;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
+  }
+
+  :lang(zh) h1,
+  :lang(zh) h2,
+  :lang(zh) h3,
+  :lang(zh) h4,
+  :lang(zh) h5,
+  :lang(zh) h6 {
+    font-family: 'Nunito', 'Noto Sans TC', 'PingFang TC', sans-serif;
   }
 }
 
@@ -221,6 +228,55 @@
     box-shadow: var(--glow-sky);
   }
 
+  @media (max-width: 640px) {
+    .mobile-readable {
+      font-size: 17px;
+    }
+
+    .mobile-readable .text-\[11px\] {
+      font-size: 0.82rem;
+      line-height: 1.35rem;
+    }
+
+    .mobile-readable .text-xs {
+      font-size: 0.88rem;
+      line-height: 1.5rem;
+    }
+
+    .mobile-readable .text-sm {
+      font-size: 1rem;
+      line-height: 1.75rem;
+    }
+
+    .mobile-readable .text-base {
+      font-size: 1.08rem;
+      line-height: 1.8rem;
+    }
+
+    .mobile-readable h3 {
+      font-size: 1.35rem;
+      line-height: 1.75rem;
+    }
+
+    .mobile-readable h4,
+    .mobile-readable h5 {
+      font-size: 1.1rem;
+      line-height: 1.75rem;
+    }
+
+    .mobile-readable p,
+    .mobile-readable textarea,
+    .mobile-readable input {
+      letter-spacing: 0;
+    }
+
+    .mobile-readable textarea,
+    .mobile-readable input {
+      font-size: 1rem;
+      line-height: 1.65rem;
+    }
+  }
+
   .glow-orange {
     box-shadow: var(--glow-coral);
   }
@@ -263,6 +319,15 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .scripture-paper {
+    background: #FBF8F1;
+    border-color: #E7DDCC;
+  }
+
+  .scripture-serif {
+    font-family: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
   }
 
   .animate-float {
@@ -401,6 +466,23 @@
   .animate-float,
   .animate-bounce-soft {
     animation: none !important;
+  }
+}
+
+@layer components {
+  .mobile-bottom-nav {
+    position: fixed !important;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    contain: layout paint style;
+  }
+
+  .mobile-bottom-nav > div {
+    height: 3.5rem;
   }
 }
 

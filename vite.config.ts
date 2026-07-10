@@ -6,6 +6,14 @@ export default defineConfig({
   server: {
     allowedHosts: true,
   },
+  esbuild: {
+    target: "esnext",
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "esnext",
+    },
+  },
   plugins: [react()],
   resolve: {
     alias: {
@@ -16,7 +24,7 @@ export default defineConfig({
   build: {
     outDir: "dist/public",
     emptyOutDir: true,
-    target: "es2020",
+    target: "esnext",
     cssCodeSplit: true,
     sourcemap: false,
     chunkSizeWarningLimit: 700,

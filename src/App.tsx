@@ -47,7 +47,10 @@ const UserPage = lazyNamed(() => import("./pages/UserPage"), "UserPage");
 const SoulGymNotebookPage = lazyNamed(() => import("./pages/SoulGymNotebookPage"), "SoulGymNotebookPage");
 const AdminPage = lazyNamed(() => import("./pages/AdminPage"), "AdminPage");
 const CRMPage = lazyPage(() => import("./pages/CRMPage"));
+const PastoralPersonPage = lazyPage(() => import("./pages/PastoralPersonPage"));
 const NotebookPage = lazyPage(() => import("./pages/NotebookPage"));
+const MePage = lazyPage(() => import("./pages/MePage"));
+const LoveJourneyPage = lazyPage(() => import("./pages/LoveJourneyPage"));
 const LoginPage = lazyPage(() => import("./pages/LoginPage"));
 const ResetPasswordPage = lazyPage(() => import("./pages/ResetPasswordPage"));
 const WePlayPage = lazyNamed(() => import("./pages/WePlayPage"), "WePlayPage");
@@ -56,7 +59,10 @@ const GrouperPage = lazyNamed(() => import("./pages/GrouperPage"), "GrouperPage"
 const PrayerWallPage = lazyPage(() => import("./pages/PrayerWallPage"));
 const MessageCardPage = lazyPage(() => import("./pages/MessageCardPage"));
 const SharePage = lazyPage(() => import("./pages/SharePage"));
+const GraceRecordPage = lazyPage(() => import("./pages/GraceRecordPage"));
+const CarePage = lazyPage(() => import("./pages/CarePage"));
 const LearnPage = lazyPage(() => import("./pages/LearnPage"));
+const ChurchReadingPage = lazyPage(() => import("./pages/ChurchReadingPage"));
 const BiblePage = lazyPage(() => import("./pages/BiblePage"));
 const JesusTimelinePage = lazyPage(() => import("./pages/JesusTimelinePage"));
 const ReadingPlansPage = lazyPage(() => import("./pages/ReadingPlansPage"));
@@ -68,8 +74,14 @@ const NotFound = lazyPage(() => import("./pages/NotFound"));
 
 // Minimal loading fallback for Suspense
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-background">
-    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  <div className="flex min-h-screen items-center justify-center bg-background px-6">
+    <div className="w-full max-w-sm space-y-4 rounded-lg border border-border/70 bg-card p-5 text-center shadow-[0_16px_48px_-34px_rgba(30,58,95,0.42)]">
+      <div className="mx-auto h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">正在載入 WeChurch</p>
+        <p className="text-xs text-muted-foreground">馬上就好</p>
+      </div>
+    </div>
   </div>
 );
 
@@ -91,7 +103,10 @@ const App = () => (
                     <Route path="/user/notebook" element={<SoulGymNotebookPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/admin/crm" element={<CRMPage />} />
+                    <Route path="/admin/crm/person/:personId" element={<PastoralPersonPage />} />
                     <Route path="/notebook" element={<NotebookPage />} />
+                    <Route path="/me" element={<MePage />} />
+                    <Route path="/me/love-journey" element={<LoveJourneyPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/play" element={<WePlayPage />} />
@@ -102,7 +117,10 @@ const App = () => (
                     <Route path="/prayer-wall" element={<PrayerWallPage />} />
                     <Route path="/card" element={<MessageCardPage />} />
                     <Route path="/share" element={<SharePage />} />
+                    <Route path="/grace-record" element={<GraceRecordPage />} />
+                    <Route path="/care" element={<CarePage />} />
                     <Route path="/learn" element={<LearnPage />} />
+                    <Route path="/learn/church-reading" element={<ChurchReadingPage />} />
                     <Route path="/learn/bible" element={<BiblePage />} />
                     <Route path="/bible" element={<BiblePage />} />
                     <Route path="/learn/jesus-timeline" element={<JesusTimelinePage />} />

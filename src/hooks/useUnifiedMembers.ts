@@ -8,6 +8,7 @@ export interface PotentialMember {
   email: string;
   name: string;
   gender: string | null;
+  church: string | null;
   userId: string | null;
   status: 'pending' | 'member' | 'declined';
   subscribed: boolean;
@@ -24,6 +25,7 @@ export interface UnifiedMember {
   email: string;
   name: string;
   gender: string | null;
+  church: string | null;
   userId: string | null;
   role: AppRole | null;
   status: 'pending' | 'member' | 'declined';
@@ -40,19 +42,22 @@ interface UseUnifiedMembersOptions {
   status?: 'pending' | 'member' | 'declined' | 'all';
   subscribed?: boolean | 'all';
   role?: AppRole | 'all';
+  church?: string | 'all';
 }
 
 export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
-  const { tab, status = 'all', subscribed = 'all', role = 'all' } = options;
+  const { tab, status = 'all', subscribed = 'all', role = 'all', church = 'all' } = options;
   const queryClient = useQueryClient();
 
+  const churchQuery = `?${new URLSearchParams({ church }).toString()}`;
+
   const query = useQuery({
-    queryKey: ['unified-members', { tab, status, subscribed, role }],
+    queryKey: ['unified-members', { tab, status, subscribed, role, church }],
     queryFn: async () => {
       const [usersRes, rolesRes, pmRes] = await Promise.all([
-        fetch('/api/users'),
-        fetch('/api/user-roles'),
-        fetch('/api/potential-members'),
+        fetch(`/api/users${churchQuery}`),
+        fetch(`/api/user-roles${churchQuery}`),
+        fetch(`/api/potential-members${churchQuery}`),
       ]);
 
       if (!usersRes.ok || !rolesRes.ok || !pmRes.ok) {
@@ -78,6 +83,7 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
             email: user.email || '',
             name: user.displayName || user.email?.split('@')[0] || '',
             gender: linkedPm?.gender || null,
+            church: user.church || linkedPm?.church || null,
             userId: user.id,
             role: (userRole?.role as AppRole) || 'member',
             status: 'member',
@@ -106,6 +112,7 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
             email: pm.email,
             name: pm.name,
             gender: pm.gender,
+            church: pm.church || null,
             userId: null,
             role: null,
             status: pm.status as 'pending' | 'member' | 'declined',
@@ -122,7 +129,16 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
       members.sort((a, b) => {
         if (a.type !== b.type) return a.type === 'registered' ? -1 : 1;
         if (a.role && b.role) {
-          const roleOrder: Record<AppRole, number> = { admin: 0, leader: 1, future_leader: 2, member: 3 };
+          const roleOrder: Record<AppRole, number> = {
+            admin: 0,
+            senior_pastor: 1,
+            pastor: 2,
+            minister: 3,
+            group_leader: 4,
+            leader: 4,
+            future_leader: 5,
+            member: 6,
+          };
           if (roleOrder[a.role] !== roleOrder[b.role]) return roleOrder[a.role] - roleOrder[b.role];
         }
         return a.name.localeCompare(b.name);
@@ -134,12 +150,12 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
   });
 
   const stats = useQuery({
-    queryKey: ['unified-members-stats'],
+    queryKey: ['unified-members-stats', { church }],
     queryFn: async () => {
       const [usersRes, rolesRes, pmRes] = await Promise.all([
-        fetch('/api/users'),
-        fetch('/api/user-roles'),
-        fetch('/api/potential-members'),
+        fetch(`/api/users${churchQuery}`),
+        fetch(`/api/user-roles${churchQuery}`),
+        fetch(`/api/potential-members${churchQuery}`),
       ]);
 
       const [users, roles, pm] = await Promise.all([
@@ -149,8 +165,8 @@ export const useUnifiedMembers = (options: UseUnifiedMembersOptions) => {
       ]);
 
       const registeredCount = users?.length || 0;
-      const adminCount = roles?.filter((r: any) => r.role === 'admin').length || 0;
-      const leaderCount = roles?.filter((r: any) => r.role === 'leader').length || 0;
+      const adminCount = roles?.filter((r: any) => r.role === 'admin' || r.role === 'senior_pastor').length || 0;
+      const leaderCount = roles?.filter((r: any) => ['pastor', 'minister', 'group_leader', 'leader', 'future_leader'].includes(r.role)).length || 0;
 
       const potentialTotal = pm?.length || 0;
       const linkedCount = pm?.filter((p: any) => p.userId !== null).length || 0;

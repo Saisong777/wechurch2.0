@@ -3,14 +3,81 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { randomBytes } from "crypto";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { storage } from "./storage";
 import { db } from "./db";
-import { insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertPrayerSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants } from "@shared/schema";
+import { careActions, careContacts, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants, userEmailPreferences } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { pool, getPoolStats } from "./db";
 import { bibleCache, timelineCache, apiCache, sessionCache, prayerCache, cacheKeys } from "./cache";
+import { getKnownChurchOptions, normalizeChurch, UNASSIGNED_CHURCH_ID } from "./churches";
+import {
+  canAssignCrmScopes,
+  filterPotentialMembersForCrmAccess,
+  filterUsersForCrmAccess,
+  getCrmAccessContext,
+} from "./crmPermissions";
+import { buildLoveJourneyTemplateSeed } from "./loveJourneyTemplate";
+import {
+  createNextStepTaskForPerson,
+  createPastoralTask,
+  dismissPersonMergeSuggestion,
+  ensureLoveJourneyTemplate,
+  getPastoralPersonDetail,
+  getPastoralPersons,
+  getSelfLoveJourney,
+  isPastoralSchemaMissingError,
+  listPersonMergeSuggestions,
+  listPastoralTasks,
+  mergePastoralPersons,
+  reconcilePastoralPersons,
+  startLoveJourneyForPerson,
+  startSelfLoveJourney,
+  updatePastoralTask,
+  updateSelfJourneyProgress,
+  updateJourneyMilestone,
+  updateJourneyProgress,
+} from "./pastoralJourneyRepository";
+import {
+  createServingAssignment,
+  createServingEvent,
+  createServingRole,
+  createServingTeam,
+  createServingTeamMember,
+  getServingScheduleOverview,
+  isServingSchemaMissingError,
+  seedDefaultServingTeams,
+  updateServingAssignment,
+  updateServingEventStatus,
+} from "./servingScheduleRepository";
+import {
+  createFacilityBooking,
+  createFacilityRoom,
+  FacilityBookingConflictError,
+  getFacilityBookingOverview,
+  isFacilitySchemaMissingError,
+  seedDefaultFacilityRooms,
+  updateFacilityBookingStatus,
+} from "./facilityBookingRepository";
+import {
+  getPastoralFrameworkOverview,
+  isPastoralFrameworkSchemaMissingError,
+  seedPastoralFramework153,
+  updatePersonPastoralStage,
+} from "./pastoralFrameworkRepository";
+import {
+  ensureLineLinkedUser,
+  isLineSchemaMissingError,
+  type LineVerifiedProfile,
+} from "./lineIntegrationRepository";
+import {
+  parseAuthenticatedPrayerBody,
+  parseDevotionalNotePatch,
+  prayerCommentBodySchema,
+  prayerPatchSchema,
+} from "./securityPolicies";
 import compression from "compression";
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -35,6 +102,8 @@ import {
   requestContext,
   scoreAiReportQuality,
 } from "./observability";
+import { buildFallbackDailyDevotionBrief, fetchDailyDevotionBrief } from "./dailyDevotion";
+import { releaseFlags } from "@shared/releaseFlags";
 
 // Legacy proxy client (keep for unchanged endpoints until fully migrated)
 let _openaiClient: OpenAI | null = null;
@@ -60,6 +129,268 @@ function getGeminiClient(): GoogleGenerativeAI {
 }
 
 const gameCreationLocks = new Map<string, Promise<any>>();
+const careContactBodySchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  relationship: z.string().trim().max(80).optional().nullable(),
+  need: z.string().trim().max(500).optional(),
+  nextAction: z.string().trim().max(300).optional(),
+  prayer: z.string().trim().max(500).optional(),
+  source: z.string().trim().max(60).optional(),
+  visibility: z.enum(["private", "pastoral", "team"]).optional(),
+});
+const careContactPatchSchema = careContactBodySchema.partial().extend({
+  isArchived: z.boolean().optional(),
+});
+const careActionBodySchema = z.object({
+  actionType: z.string().trim().min(1).max(40).default("note"),
+  note: z.string().trim().max(500).optional(),
+});
+const careActionTypesThatUpdateLastCared = new Set(["care", "message", "visit", "call", "invite"]);
+const crmScopeAssignmentBodySchema = z.object({
+  assigneeUserId: z.string().uuid(),
+  scopeType: z.enum(["church", "group", "member"]),
+  church: z.string().trim().max(120).optional().nullable(),
+  groupId: z.string().uuid().optional().nullable(),
+  memberUserId: z.string().uuid().optional().nullable(),
+  potentialMemberId: z.string().uuid().optional().nullable(),
+  canViewPersonal: z.boolean().optional(),
+  canManageCare: z.boolean().optional(),
+  canManageMembers: z.boolean().optional(),
+  note: z.string().trim().max(500).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.scopeType === "church" && !data.church) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["church"], message: "Church is required for church scope" });
+  }
+  if (data.scopeType === "group" && !data.groupId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["groupId"], message: "Group is required for group scope" });
+  }
+  if (data.scopeType === "member" && !data.memberUserId && !data.potentialMemberId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["memberUserId"], message: "Member is required for member scope" });
+  }
+});
+const crmGroupBodySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  church: z.string().trim().min(1).max(120),
+  leaderUserId: z.string().uuid().optional().nullable(),
+  pastorUserId: z.string().uuid().optional().nullable(),
+});
+const crmGroupMemberBodySchema = z.object({
+  userId: z.string().uuid().optional().nullable(),
+  potentialMemberId: z.string().uuid().optional().nullable(),
+  memberEmail: z.string().email().optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (!data.userId && !data.potentialMemberId && !data.memberEmail) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["userId"], message: "Member identifier is required" });
+  }
+});
+const journeyProgressPatchSchema = z.object({
+  status: z.enum(["not_started", "in_progress", "completed", "skipped"]).optional(),
+  responseText: z.string().max(4000).optional().nullable(),
+  mentorNote: z.string().max(4000).optional().nullable(),
+  needsFollowUp: z.boolean().optional(),
+});
+const journeyMilestonePatchSchema = z.object({
+  status: z.enum(["planned", "scheduled", "completed", "skipped"]).optional(),
+  note: z.string().max(4000).optional().nullable(),
+  scheduledAt: z.string().optional().nullable(),
+});
+const pastoralTaskBodySchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(800).optional().nullable(),
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  dueAt: z.string().optional().nullable(),
+  assignedToUserId: z.string().uuid().optional().nullable(),
+  sourceType: z.string().trim().max(80).optional().nullable(),
+  sourceId: z.string().trim().max(120).optional().nullable(),
+  visibility: z.enum(["private", "pastoral", "team"]).optional(),
+});
+const pastoralTaskPatchSchema = pastoralTaskBodySchema.partial().extend({
+  status: z.enum(["open", "done", "deferred", "cancelled"]).optional(),
+});
+const mergeSuggestionBodySchema = z.object({
+  primaryPersonId: z.string().uuid(),
+  duplicatePersonId: z.string().uuid(),
+});
+const servingTeamBodySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  category: z.string().trim().max(60).optional(),
+  description: z.string().trim().max(800).optional().nullable(),
+  leaderUserId: z.string().uuid().optional().nullable(),
+  defaultLocation: z.string().trim().max(160).optional().nullable(),
+  defaultStartTime: z.string().trim().max(20).optional().nullable(),
+});
+const servingRoleBodySchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  description: z.string().trim().max(500).optional().nullable(),
+  requiredCount: z.number().int().min(1).max(20).optional(),
+  sortOrder: z.number().int().min(0).max(999).optional(),
+});
+const servingMemberBodySchema = z.object({
+  personId: z.string().uuid(),
+  roleLabel: z.string().trim().max(80).optional(),
+  note: z.string().trim().max(500).optional().nullable(),
+});
+const servingEventBodySchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  serviceDate: z.string().trim().min(8).max(20),
+  startTime: z.string().trim().max(20).optional().nullable(),
+  endTime: z.string().trim().max(20).optional().nullable(),
+  location: z.string().trim().max(160).optional().nullable(),
+  note: z.string().trim().max(800).optional().nullable(),
+});
+const servingAssignmentBodySchema = z.object({
+  eventId: z.string().uuid(),
+  roleId: z.string().uuid(),
+  personId: z.string().uuid(),
+  status: z.enum(["pending", "confirmed", "declined", "substitute", "done", "cancelled"]).optional(),
+  note: z.string().trim().max(500).optional().nullable(),
+});
+const servingAssignmentPatchSchema = z.object({
+  status: z.enum(["pending", "confirmed", "declined", "substitute", "done", "cancelled"]).optional(),
+  note: z.string().trim().max(500).optional().nullable(),
+});
+const servingEventStatusSchema = z.object({
+  status: z.enum(["draft", "published", "completed", "cancelled"]),
+});
+const facilityRoomBodySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  category: z.enum(["classroom", "small_group", "service", "meeting", "event", "kids", "youth", "maintenance"]).optional(),
+  location: z.string().trim().max(160).optional().nullable(),
+  capacity: z.number().int().min(1).max(500).optional(),
+  description: z.string().trim().max(800).optional().nullable(),
+  priority: z.number().int().min(0).max(100).optional(),
+});
+const facilityBookingBodySchema = z.object({
+  roomId: z.string().uuid(),
+  title: z.string().trim().min(1).max(160),
+  purpose: z.enum([
+    "small_group",
+    "classroom",
+    "service",
+    "event",
+    "meeting",
+    "pastoral",
+    "outside_rental",
+    "children",
+    "youth",
+    "prayer",
+    "visit",
+    "worship_night",
+    "maintenance",
+  ]).optional(),
+  requesterPersonId: z.string().uuid().optional().nullable(),
+  startAt: z.string().trim().min(10).max(40),
+  endAt: z.string().trim().min(10).max(40),
+  priority: z.number().int().min(0).max(100).optional(),
+  note: z.string().trim().max(800).optional().nullable(),
+  allowConflict: z.boolean().optional(),
+});
+const facilityBookingStatusSchema = z.object({
+  status: z.enum(["pending", "approved", "declined", "cancelled", "completed"]),
+});
+const personStagePatchSchema = z.object({
+  stageSlug: z.enum(["friend", "family", "follow", "firemaker", "frame", "follower", "leader", "newcomer", "member", "care"]),
+  note: z.string().trim().max(800).optional().nullable(),
+});
+
+function getPublicBaseUrl(req: any) {
+  const configured = process.env.PUBLIC_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  const host = req.headers.host || "localhost:5001";
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  return `${protocol}://${host}`.replace(/\/$/, "");
+}
+
+function getLineLoginConfig(req: any) {
+  const callbackPath = process.env.LINE_CALLBACK_PATH || "/api/line-login/callback";
+  const baseUrl = getPublicBaseUrl(req);
+  const callbackUrl = process.env.LINE_CALLBACK_URL || `${baseUrl}${callbackPath}`;
+  const channelId = process.env.LINE_CHANNEL_ID || process.env.LINE_LOGIN_CHANNEL_ID || "";
+  const channelSecret = process.env.LINE_CHANNEL_SECRET || process.env.LINE_LOGIN_CHANNEL_SECRET || "";
+  return {
+    configured: Boolean(channelId && channelSecret),
+    channelId,
+    channelSecret,
+    liffId: process.env.LINE_LIFF_ID || "",
+    officialAccountId: process.env.LINE_OFFICIAL_ACCOUNT_ID || "",
+    callbackPath,
+    callbackUrl,
+  };
+}
+
+function getSafeRedirectPath(value: unknown) {
+  const redirectPath = typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : "/";
+  return redirectPath.slice(0, 240);
+}
+
+async function exchangeLineCodeForProfile(input: {
+  code: string;
+  redirectUri: string;
+  channelId: string;
+  channelSecret: string;
+  expectedNonce?: string | null;
+}): Promise<LineVerifiedProfile> {
+  const tokenResponse = await fetch("https://api.line.me/oauth2/v2.1/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code: input.code,
+      redirect_uri: input.redirectUri,
+      client_id: input.channelId,
+      client_secret: input.channelSecret,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    const text = await tokenResponse.text();
+    throw new Error(`LINE token exchange failed: ${tokenResponse.status} ${text}`);
+  }
+
+  const tokenJson = await tokenResponse.json() as { id_token?: string };
+  if (!tokenJson.id_token) {
+    throw new Error("LINE token response did not include id_token");
+  }
+
+  const verifyResponse = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      id_token: tokenJson.id_token,
+      client_id: input.channelId,
+    }),
+  });
+
+  if (!verifyResponse.ok) {
+    const text = await verifyResponse.text();
+    throw new Error(`LINE id_token verify failed: ${verifyResponse.status} ${text}`);
+  }
+
+  const profile = await verifyResponse.json() as {
+    sub?: string;
+    name?: string;
+    picture?: string;
+    email?: string;
+    aud?: string;
+    nonce?: string;
+  };
+
+  if (!profile.sub) throw new Error("LINE verified profile did not include sub");
+  if (profile.aud && profile.aud !== input.channelId) throw new Error("LINE id_token audience mismatch");
+  if (input.expectedNonce && profile.nonce && profile.nonce !== input.expectedNonce) {
+    throw new Error("LINE nonce mismatch");
+  }
+
+  return {
+    lineUserId: profile.sub,
+    displayName: profile.name ?? null,
+    pictureUrl: profile.picture ?? null,
+    email: profile.email ?? null,
+    channelId: input.channelId,
+  };
+}
 
 function getSoulGymAiModel(fastMode?: boolean): string {
   if (process.env.SOULGYM_AI_MODEL) return process.env.SOULGYM_AI_MODEL;
@@ -128,7 +459,9 @@ const uploadMessageCard = multer({
   }
 });
 
-type AppRole = "member" | "leader" | "future_leader" | "admin";
+type AppRole = "member" | "leader" | "future_leader" | "admin" | "senior_pastor" | "pastor" | "minister" | "group_leader";
+
+const knownChurches = getKnownChurchOptions();
 
 function sanitizeUserRecord<T extends Record<string, any>>(user: T) {
   const { password, ...safeUser } = user;
@@ -184,32 +517,25 @@ export async function registerRoutes(app: Express) {
 
   const getRateLimitIdentity = (req: any) => {
     const apiPath = getApiPath(req);
-    const body = req.body || {};
-    const query = req.query || {};
     const authUserId = req.user?.id || req.user?.claims?.sub;
     const emailInPath = apiPath.match(/\/participants\/by-email\/([^/]+)$/)?.[1];
     const participantInPath = apiPath.match(/\/participants\/([^/]+)$/)?.[1];
     const headerParticipant = req.get?.("x-participant-id");
+    const ip = req.ip || "unknown";
 
     const identity =
       authUserId ||
-      body.participantId ||
-      body.userId ||
-      body.email ||
-      body.participantEmail ||
-      query.participantId ||
-      query.userId ||
-      query.email ||
       headerParticipant ||
       (emailInPath ? decodePathValue(emailInPath) : null) ||
       (participantInPath && participantInPath !== "by-email" ? participantInPath : null) ||
-      req.ip ||
+      ip ||
       "unknown";
 
-    return String(identity).trim().toLowerCase();
+    return `${ip}:${String(identity).trim().toLowerCase()}`;
   };
 
   app.use('/api/', (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
     const isLiveRead = isLiveReadEndpoint(req);
     const isWrite = req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS";
     const limit = isLiveRead
@@ -317,11 +643,69 @@ export async function registerRoutes(app: Express) {
     }
   };
 
-  const requireSessionManager = requireRole("admin", "leader", "future_leader");
-  const requireLeader = requireRole("admin", "leader");
+  const crmLeaderRoles: AppRole[] = ["admin", "senior_pastor", "pastor", "minister", "group_leader", "leader", "future_leader"];
+  const requireSessionManager = requireRole(...crmLeaderRoles);
+  const requireLeader = requireRole(...crmLeaderRoles);
+  const requireCrmDirector = requireRole("admin", "senior_pastor");
   const requireAdmin = requireRole("admin");
 
-  const sessionManagerRoles: AppRole[] = ["admin", "leader", "future_leader"];
+  const requireReleaseFeature = (featureKey: string): RequestHandler => async (_req, res, next) => {
+    try {
+      const feature = await storage.getFeatureToggle(featureKey);
+      if (!feature) {
+        return res.status(503).json({
+          error: "Feature flag is not ready",
+          featureKey,
+          featureReady: false,
+        });
+      }
+      if (!feature.isEnabled) {
+        return res.status(404).json({
+          error: "Feature is not available",
+          featureKey,
+          featureEnabled: false,
+        });
+      }
+      return next();
+    } catch (error) {
+      console.error(`[release] Failed to read feature flag ${featureKey}:`, error);
+      return res.status(503).json({ error: "Feature flag unavailable", featureKey });
+    }
+  };
+
+  app.use("/api/pastoral", requireReleaseFeature(releaseFlags.pastoral));
+  app.use("/api/me/love-journey", requireReleaseFeature(releaseFlags.pastoral));
+  app.use("/api/care", requireReleaseFeature(releaseFlags.pastoral));
+  app.use("/api/serving", requireReleaseFeature(releaseFlags.serving));
+  app.use("/api/facilities", requireReleaseFeature(releaseFlags.facilities));
+  app.use("/api/line-login", requireReleaseFeature(releaseFlags.lineLogin));
+
+  const sessionManagerRoles: AppRole[] = crmLeaderRoles;
+
+  const getChurchScope = async (req: any): Promise<string | null> => {
+    const userId = req.legacyUserId || await resolveUserId(req);
+    if (!userId) return null;
+
+    const [role, currentUser] = await Promise.all([
+      storage.getUserRole(userId),
+      storage.getUser(userId),
+    ]);
+    const requestedChurch = normalizeChurch(typeof req.query?.church === "string" ? req.query.church : null);
+
+    if (role === "admin") {
+      if (requestedChurch && requestedChurch !== "all") return requestedChurch;
+      if (requestedChurch === "all") return null;
+      return normalizeChurch(currentUser?.church);
+    }
+
+    if (role === "senior_pastor") {
+      const ownChurch = normalizeChurch(currentUser?.church);
+      if (requestedChurch && requestedChurch !== "all" && requestedChurch === ownChurch) return requestedChurch;
+      return ownChurch || UNASSIGNED_CHURCH_ID;
+    }
+
+    return normalizeChurch(currentUser?.church) || UNASSIGNED_CHURCH_ID;
+  };
 
   const getRequestRole = async (req: any): Promise<AppRole | null> => {
     const userId = await resolveUserId(req);
@@ -333,6 +717,13 @@ export async function registerRoutes(app: Express) {
   const canManageSession = async (req: any): Promise<boolean> => {
     const role = await getRequestRole(req);
     return !!role && sessionManagerRoles.includes(role);
+  };
+
+  const getCrmAccessForRequest = async (req: any) => {
+    const userId = req.legacyUserId || await resolveUserId(req);
+    if (!userId) return null;
+    const role = await storage.getUserRole(userId);
+    return getCrmAccessContext(userId, role);
   };
 
   const sanitizeParticipant = (participant: any) => ({
@@ -481,6 +872,334 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching product growth brief:", error);
       res.status(500).json({ error: "Failed to get product growth brief" });
+    }
+  });
+
+  app.get("/api/churches", requireLeader, async (req, res) => {
+    try {
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const role = userId ? await storage.getUserRole(userId) : null;
+      const currentUser = userId ? await storage.getUser(userId) : null;
+
+      if (role !== "admin") {
+        const church = normalizeChurch(currentUser?.church);
+        return res.json(church ? [{ id: church, name: church }] : knownChurches);
+      }
+
+      const usersResult = await pool.query(
+        "SELECT DISTINCT church FROM users WHERE church IS NOT NULL AND trim(church) <> '' ORDER BY church"
+      );
+      const potentialResult = await pool.query(
+        "SELECT DISTINCT church FROM potential_members WHERE church IS NOT NULL AND trim(church) <> '' ORDER BY church"
+      );
+      const unassignedResult = await pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM users WHERE church IS NULL OR trim(church) = '')::int
+          +
+          (SELECT COUNT(*) FROM potential_members WHERE church IS NULL OR trim(church) = '')::int
+          AS count
+      `);
+
+      const seen = new Set<string>();
+      const churches = [...knownChurches];
+      for (const church of churches) seen.add(church.id);
+      for (const row of [...usersResult.rows, ...potentialResult.rows]) {
+        const value = normalizeChurch(row.church);
+        if (value && !seen.has(value)) {
+          seen.add(value);
+          churches.push({ id: value, name: value });
+        }
+      }
+      if ((unassignedResult.rows[0]?.count || 0) > 0) {
+        churches.push({ id: UNASSIGNED_CHURCH_ID, name: "未分配教會" });
+      }
+
+      res.json(churches);
+    } catch (error) {
+      console.error("Error fetching churches:", error);
+      res.status(500).json({ error: "Failed to get churches" });
+    }
+  });
+
+  app.get("/api/crm/access", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const role = await storage.getUserRole(userId);
+      const access = await getCrmAccessContext(userId, role);
+      res.json({
+        role: access.role,
+        canEnterCrm: access.canEnterCrm,
+        accessLevel: access.accessLevel,
+        canAssignScopes: access.canAssignScopes,
+        canManageMembers: access.canManageMembers,
+        canManageCare: access.canManageCare,
+        canViewPersonal: access.canViewPersonal,
+        scope: {
+          churches: access.churchScopes,
+          groups: access.groupIds,
+          members: access.userIds.filter((id) => id !== userId).length + access.potentialMemberIds.length,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching CRM access:", error);
+      res.status(500).json({ error: "Failed to get CRM access" });
+    }
+  });
+
+  app.get("/api/crm/scope-assignments", requireCrmDirector, async (req, res) => {
+    try {
+      const directorUserId = (req as any).legacyUserId || await resolveUserId(req);
+      const directorRole = directorUserId ? await storage.getUserRole(directorUserId) : null;
+      if (!canAssignCrmScopes(directorRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const director = directorUserId ? await storage.getUser(directorUserId) : undefined;
+      const directorChurch = normalizeChurch(director?.church);
+      const result = directorRole === "senior_pastor" && directorChurch
+        ? await pool.query(
+            `SELECT a.*, u.display_name AS assignee_name, u.email AS assignee_email
+               FROM crm_scope_assignments a
+               JOIN users u ON u.id = a.assignee_user_id
+              WHERE a.is_active = true
+                AND (
+                  a.church = $1
+                  OR a.group_id IN (SELECT id FROM small_groups WHERE church = $1)
+                  OR a.member_user_id IN (SELECT id FROM users WHERE church = $1)
+                  OR a.potential_member_id IN (SELECT id FROM potential_members WHERE church = $1)
+                )
+              ORDER BY a.created_at DESC`,
+            [directorChurch]
+          )
+        : await pool.query(
+            `SELECT a.*, u.display_name AS assignee_name, u.email AS assignee_email
+               FROM crm_scope_assignments a
+               JOIN users u ON u.id = a.assignee_user_id
+              WHERE a.is_active = true
+              ORDER BY a.created_at DESC`
+          );
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching CRM assignments:", error);
+      res.status(500).json({ error: "Failed to get CRM assignments" });
+    }
+  });
+
+  app.post("/api/crm/scope-assignments", requireCrmDirector, async (req, res) => {
+    try {
+      const input = crmScopeAssignmentBodySchema.parse(req.body);
+      const directorUserId = (req as any).legacyUserId || await resolveUserId(req);
+      const directorRole = directorUserId ? await storage.getUserRole(directorUserId) : null;
+      if (!directorUserId || !canAssignCrmScopes(directorRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const director = await storage.getUser(directorUserId);
+      const directorChurch = normalizeChurch(director?.church);
+      const normalizedChurch = normalizeChurch(input.church);
+
+      if (directorRole === "senior_pastor") {
+        if (input.scopeType === "church" && normalizedChurch !== directorChurch) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+        if (input.scopeType === "group") {
+          const groupResult = await pool.query("SELECT church FROM small_groups WHERE id = $1", [input.groupId]);
+          if (normalizeChurch(groupResult.rows[0]?.church) !== directorChurch) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
+        if (input.scopeType === "member" && input.memberUserId) {
+          const target = await storage.getUser(input.memberUserId);
+          if (normalizeChurch(target?.church) !== directorChurch) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
+        if (input.scopeType === "member" && input.potentialMemberId) {
+          const targetResult = await pool.query("SELECT church FROM potential_members WHERE id = $1", [input.potentialMemberId]);
+          if (normalizeChurch(targetResult.rows[0]?.church) !== directorChurch) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
+      }
+
+      const result = await pool.query(
+        `INSERT INTO crm_scope_assignments (
+          assignee_user_id, assigned_by_user_id, scope_type, church, group_id,
+          member_user_id, potential_member_id, can_view_personal, can_manage_care,
+          can_manage_members, note, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+        RETURNING *`,
+        [
+          input.assigneeUserId,
+          directorUserId,
+          input.scopeType,
+          normalizedChurch,
+          input.groupId || null,
+          input.memberUserId || null,
+          input.potentialMemberId || null,
+          input.canViewPersonal ?? false,
+          input.canManageCare ?? true,
+          input.canManageMembers ?? false,
+          input.note || null,
+        ]
+      );
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating CRM assignment:", error);
+      res.status(400).json({ error: "Failed to create CRM assignment" });
+    }
+  });
+
+  app.delete("/api/crm/scope-assignments/:id", requireCrmDirector, async (req, res) => {
+    try {
+      const directorUserId = (req as any).legacyUserId || await resolveUserId(req);
+      const directorRole = directorUserId ? await storage.getUserRole(directorUserId) : null;
+      if (!canAssignCrmScopes(directorRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      await pool.query(
+        "UPDATE crm_scope_assignments SET is_active = false, updated_at = NOW() WHERE id = $1",
+        [req.params.id]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting CRM assignment:", error);
+      res.status(500).json({ error: "Failed to delete CRM assignment" });
+    }
+  });
+
+  app.get("/api/crm/groups", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const requestedChurch = normalizeChurch(typeof req.query?.church === "string" ? req.query.church : null);
+      const params: any[] = [];
+      const conditions = ["g.is_active = true"];
+
+      if (access.role !== "admin") {
+        if (access.role === "senior_pastor" && access.churchScopes.length > 0) {
+          params.push(access.churchScopes);
+          conditions.push(`g.church = ANY($${params.length}::text[])`);
+        } else {
+          const scopeConditions: string[] = [];
+          if (access.churchScopes.length > 0) {
+            params.push(access.churchScopes);
+            scopeConditions.push(`g.church = ANY($${params.length}::text[])`);
+          }
+          if (access.groupIds.length > 0) {
+            params.push(access.groupIds);
+            scopeConditions.push(`g.id = ANY($${params.length}::uuid[])`);
+          }
+          if (scopeConditions.length === 0) return res.json([]);
+          conditions.push(`(${scopeConditions.join(" OR ")})`);
+        }
+      }
+
+      if (requestedChurch && requestedChurch !== "all") {
+        params.push(requestedChurch);
+        conditions.push(`g.church = $${params.length}`);
+      }
+
+      const result = await pool.query(
+        `SELECT
+          g.id,
+          g.name,
+          g.church,
+          g.leader_user_id AS "leaderUserId",
+          g.pastor_user_id AS "pastorUserId",
+          leader.display_name AS "leaderName",
+          pastor.display_name AS "pastorName",
+          COUNT(m.id)::int AS "memberCount"
+        FROM small_groups g
+        LEFT JOIN users leader ON leader.id = g.leader_user_id
+        LEFT JOIN users pastor ON pastor.id = g.pastor_user_id
+        LEFT JOIN small_group_members m ON m.group_id = g.id AND m.is_active = true
+        WHERE ${conditions.join(" AND ")}
+        GROUP BY g.id, leader.display_name, pastor.display_name
+        ORDER BY g.church, g.name`,
+        params
+      );
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching CRM groups:", error);
+      res.status(500).json({ error: "Failed to get CRM groups" });
+    }
+  });
+
+  app.post("/api/crm/groups", requireCrmDirector, async (req, res) => {
+    try {
+      const input = crmGroupBodySchema.parse(req.body);
+      const creatorUserId = (req as any).legacyUserId || await resolveUserId(req);
+      const creatorRole = creatorUserId ? await storage.getUserRole(creatorUserId) : null;
+      const creator = creatorUserId ? await storage.getUser(creatorUserId) : undefined;
+      const church = normalizeChurch(input.church);
+
+      if (!church) {
+        return res.status(400).json({ error: "Church is required" });
+      }
+      if (creatorRole === "senior_pastor" && normalizeChurch(creator?.church) !== church) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO small_groups (church, name, leader_user_id, pastor_user_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())
+         RETURNING id, name, church, leader_user_id AS "leaderUserId", pastor_user_id AS "pastorUserId"`,
+        [church, input.name, input.leaderUserId || null, input.pastorUserId || null]
+      );
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating CRM group:", error);
+      res.status(400).json({ error: "Failed to create CRM group" });
+    }
+  });
+
+  app.post("/api/crm/groups/:id/members", requireLeader, async (req, res) => {
+    try {
+      const input = crmGroupMemberBodySchema.parse(req.body);
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageMembers) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const groupResult = await pool.query("SELECT id, church FROM small_groups WHERE id = $1 AND is_active = true", [req.params.id]);
+      const group = groupResult.rows[0];
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      if (access.role !== "admin" && access.role !== "senior_pastor") {
+        const canUseGroup = access.groupIds.includes(group.id) || access.churchScopes.includes(normalizeChurch(group.church) || "");
+        if (!canUseGroup) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+
+      if (input.userId) {
+        await pool.query("UPDATE small_group_members SET is_active = false, updated_at = NOW() WHERE user_id = $1", [input.userId]);
+      }
+      if (input.potentialMemberId) {
+        await pool.query("UPDATE small_group_members SET is_active = false, updated_at = NOW() WHERE potential_member_id = $1", [input.potentialMemberId]);
+      }
+      if (input.memberEmail) {
+        await pool.query("UPDATE small_group_members SET is_active = false, updated_at = NOW() WHERE lower(member_email) = lower($1)", [input.memberEmail]);
+      }
+
+      const result = await pool.query(
+        `INSERT INTO small_group_members (group_id, user_id, potential_member_id, member_email, joined_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())
+         RETURNING *`,
+        [req.params.id, input.userId || null, input.potentialMemberId || null, input.memberEmail || null]
+      );
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("Error assigning CRM group member:", error);
+      res.status(400).json({ error: "Failed to assign group member" });
     }
   });
 
@@ -893,26 +1612,34 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/sessions/:sessionId/submissions", async (req, res) => {
     try {
-      const parsed = insertSubmissionSchema.safeParse({ ...req.body, sessionId: req.params.sessionId });
+      const body = req.body as Record<string, unknown>;
+      const participantId = typeof body.participantId === "string" ? body.participantId : undefined;
+      const legacyParticipantId = typeof body.userId === "string" ? body.userId : undefined;
+      const parsed = insertSubmissionSchema.safeParse({
+        ...body,
+        sessionId: req.params.sessionId,
+        participantId: participantId || legacyParticipantId,
+      });
       if (!parsed.success) {
         console.error("[create-submission] Validation error:", (parsed as any).error.errors);
         return res.status(400).json({ error: "Invalid submission data", details: (parsed as any).error.errors });
       }
+      const submissionInput = parsed.data;
       // Ensure all fields are present or default to empty string to satisfy DB schema
       const submissionData = {
-        sessionId: req.params.sessionId,
-        participantId: req.body.userId || req.body.participantId,
-        groupNumber: req.body.groupNumber,
-        name: req.body.name,
-        email: req.body.email,
-        bibleVerse: req.body.bibleVerse,
-        theme: req.body.theme || "",
-        movingVerse: req.body.movingVerse || "",
-        factsDiscovered: req.body.factsDiscovered || "",
-        traditionalExegesis: req.body.traditionalExegesis || "",
-        inspirationFromGod: req.body.inspirationFromGod || "",
-        applicationInLife: req.body.applicationInLife || "",
-        others: req.body.others || "",
+        sessionId: submissionInput.sessionId,
+        participantId: submissionInput.participantId,
+        groupNumber: submissionInput.groupNumber,
+        name: submissionInput.name,
+        email: submissionInput.email,
+        bibleVerse: submissionInput.bibleVerse,
+        theme: submissionInput.theme || "",
+        movingVerse: submissionInput.movingVerse || "",
+        factsDiscovered: submissionInput.factsDiscovered || "",
+        traditionalExegesis: submissionInput.traditionalExegesis || "",
+        inspirationFromGod: submissionInput.inspirationFromGod || "",
+        applicationInLife: submissionInput.applicationInLife || "",
+        others: submissionInput.others || "",
       };
       const submission = await storage.createSubmission(submissionData as any);
       sessionCache.invalidate(`poll:${req.params.sessionId}`);
@@ -1763,6 +2490,10 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/prayers", async (req, res) => {
     try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
       const cached = prayerCache.get<any[]>(cacheKeys.prayers());
       if (cached) {
         return res.json(cached);
@@ -1777,21 +2508,49 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/prayers", async (req, res) => {
     try {
-      const prayer = await storage.createPrayer(req.body);
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const parsed = parseAuthenticatedPrayerBody(req.body, userId);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid prayer data", details: parsed.error.flatten() });
+      }
+      const prayer = await storage.createPrayer(parsed.data);
       prayerCache.invalidatePattern('prayers:');
       res.status(201).json(prayer);
     } catch (error) {
+      console.error("[create-prayer] Error:", error);
       res.status(500).json({ error: "Failed to create prayer" });
     }
   });
 
-  app.patch("/api/prayers/:id", requireLeader, async (req, res) => {
+  app.patch("/api/prayers/:id", async (req, res) => {
     try {
+      const existingPrayer = (await storage.getPrayers()).find((prayer) => prayer.id === req.params.id);
+      if (!existingPrayer) {
+        return res.status(404).json({ error: "Prayer not found" });
+      }
+
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const role = userId ? await storage.getUserRole(userId) : null;
+      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole);
+      if (!canManage) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const parsed = prayerPatchSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid prayer update", details: parsed.error.flatten() });
+      }
       const updateData: Record<string, any> = {};
-      if (req.body.isPinned !== undefined) updateData.isPinned = req.body.isPinned;
-      if (req.body.isAnswered !== undefined) {
-        updateData.isAnswered = req.body.isAnswered;
-        updateData.answeredAt = req.body.isAnswered ? new Date() : null;
+      if (parsed.data.isPinned !== undefined) updateData.isPinned = parsed.data.isPinned;
+      if (parsed.data.isAnswered !== undefined) {
+        updateData.isAnswered = parsed.data.isAnswered;
+        updateData.answeredAt = parsed.data.isAnswered ? new Date() : null;
       }
 
       const prayer = await storage.updatePrayer(req.params.id, updateData);
@@ -1806,8 +2565,23 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/prayers/:id", requireLeader, async (req, res) => {
+  app.delete("/api/prayers/:id", async (req, res) => {
     try {
+      const existingPrayer = (await storage.getPrayers()).find((prayer) => prayer.id === req.params.id);
+      if (!existingPrayer) {
+        return res.status(404).json({ error: "Prayer not found" });
+      }
+
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const role = userId ? await storage.getUserRole(userId) : null;
+      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole);
+      if (!canManage) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       await storage.deletePrayer(req.params.id);
       prayerCache.invalidatePattern('prayers:');
       res.json({ success: true });
@@ -1818,7 +2592,11 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/prayers/:id/amen", async (req, res) => {
     try {
-      const amen = await storage.createPrayerAmen(req.params.id, req.body.userId);
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const amen = await storage.createPrayerAmen(req.params.id, userId);
       prayerCache.invalidatePattern('prayers:');
       res.status(201).json(amen);
     } catch (error) {
@@ -1829,7 +2607,10 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/prayers/:id/comments", async (req, res) => {
     try {
-      const currentUserId = req.query.userId as string | undefined;
+      const currentUserId = await resolveUserId(req);
+      if (!currentUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
       const comments = await storage.getPrayerComments(req.params.id, currentUserId);
       res.json(comments);
     } catch (error) {
@@ -1840,11 +2621,15 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/prayers/:id/comments", async (req, res) => {
     try {
-      const { userId, content } = req.body;
-      if (!userId || !content) {
-        return res.status(400).json({ error: "userId and content are required" });
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
       }
-      const comment = await storage.createPrayerComment(req.params.id, userId, content);
+      const parsed = prayerCommentBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid prayer comment", details: parsed.error.flatten() });
+      }
+      const comment = await storage.createPrayerComment(req.params.id, userId, parsed.data.content);
       prayerCache.invalidatePattern('prayers:');
       res.status(201).json(comment);
     } catch (error) {
@@ -1861,6 +2646,187 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error("[delete-prayer-comment] Error:", error);
       res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  app.get("/api/care/contacts", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const contacts = await db
+        .select()
+        .from(careContacts)
+        .where(and(eq(careContacts.userId, userId), eq(careContacts.isArchived, false)))
+        .orderBy(desc(careContacts.createdAt));
+
+      if (contacts.length === 0) {
+        return res.json([]);
+      }
+
+      const actions = await db
+        .select()
+        .from(careActions)
+        .where(eq(careActions.userId, userId))
+        .orderBy(desc(careActions.createdAt));
+
+      const prayerCounts = new Map<string, number>();
+      const lastActionAt = new Map<string, Date>();
+      for (const action of actions) {
+        if (action.actionType === "prayer") {
+          prayerCounts.set(action.contactId, (prayerCounts.get(action.contactId) || 0) + 1);
+        }
+        if (!lastActionAt.has(action.contactId)) {
+          lastActionAt.set(action.contactId, action.createdAt);
+        }
+      }
+
+      res.json(contacts.map((contact) => ({
+        ...contact,
+        prayerCount: prayerCounts.get(contact.id) || 0,
+        lastActionAt: lastActionAt.get(contact.id) || null,
+      })));
+    } catch (error) {
+      console.error("[care-contacts] Error:", error);
+      res.status(500).json({ error: "Failed to get care contacts" });
+    }
+  });
+
+  app.post("/api/care/contacts", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const input = careContactBodySchema.parse(req.body);
+      const [contact] = await db.insert(careContacts).values({
+        userId,
+        name: input.name,
+        relationship: input.relationship || null,
+        need: input.need || "需要更多了解與陪伴。",
+        nextAction: input.nextAction || "這週主動問候一次。",
+        prayer: input.prayer || "求主讓我用合宜的方式關心他。",
+        source: input.source || "personal",
+        visibility: input.visibility || "private",
+        isArchived: false,
+      }).returning();
+      res.status(201).json({ ...contact, prayerCount: 0, lastActionAt: null });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid care contact", details: error.flatten() });
+      }
+      console.error("[create-care-contact] Error:", error);
+      res.status(500).json({ error: "Failed to create care contact" });
+    }
+  });
+
+  app.patch("/api/care/contacts/:id", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const input = careContactPatchSchema.parse(req.body);
+      const updateData: Record<string, any> = { updatedAt: new Date() };
+      if (input.name !== undefined) updateData.name = input.name;
+      if (input.relationship !== undefined) updateData.relationship = input.relationship || null;
+      if (input.need !== undefined) updateData.need = input.need || "";
+      if (input.nextAction !== undefined) updateData.nextAction = input.nextAction || "";
+      if (input.prayer !== undefined) updateData.prayer = input.prayer || "";
+      if (input.source !== undefined) updateData.source = input.source || "personal";
+      if (input.visibility !== undefined) updateData.visibility = input.visibility || "private";
+      if (input.isArchived !== undefined) updateData.isArchived = input.isArchived;
+
+      const [contact] = await db
+        .update(careContacts)
+        .set(updateData)
+        .where(and(eq(careContacts.id, req.params.id), eq(careContacts.userId, userId)))
+        .returning();
+
+      if (!contact) {
+        return res.status(404).json({ error: "Care contact not found" });
+      }
+
+      res.json(contact);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid care contact", details: error.flatten() });
+      }
+      console.error("[update-care-contact] Error:", error);
+      res.status(500).json({ error: "Failed to update care contact" });
+    }
+  });
+
+  app.delete("/api/care/contacts/:id", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const [contact] = await db
+        .update(careContacts)
+        .set({ isArchived: true, updatedAt: new Date() })
+        .where(and(eq(careContacts.id, req.params.id), eq(careContacts.userId, userId)))
+        .returning();
+
+      if (!contact) {
+        return res.status(404).json({ error: "Care contact not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[archive-care-contact] Error:", error);
+      res.status(500).json({ error: "Failed to archive care contact" });
+    }
+  });
+
+  app.post("/api/care/contacts/:id/actions", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const [contact] = await db
+        .select()
+        .from(careContacts)
+        .where(and(eq(careContacts.id, req.params.id), eq(careContacts.userId, userId), eq(careContacts.isArchived, false)))
+        .limit(1);
+
+      if (!contact) {
+        return res.status(404).json({ error: "Care contact not found" });
+      }
+
+      const input = careActionBodySchema.parse(req.body);
+      const [action] = await db
+        .insert(careActions)
+        .values({
+          contactId: contact.id,
+          userId,
+          actionType: input.actionType,
+          note: input.note || null,
+        })
+        .returning();
+
+      if (careActionTypesThatUpdateLastCared.has(input.actionType)) {
+        await db
+          .update(careContacts)
+          .set({ lastCaredAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(careContacts.id, contact.id), eq(careContacts.userId, userId)));
+      }
+
+      res.status(201).json(action);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid care action", details: error.flatten() });
+      }
+      console.error("[create-care-action] Error:", error);
+      res.status(500).json({ error: "Failed to create care action" });
     }
   });
 
@@ -1905,8 +2871,13 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/potential-members", requireLeader, async (req, res) => {
     try {
-      const members = await storage.getPotentialMembers();
-      res.json(members);
+      const churchScope = await getChurchScope(req);
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const members = await storage.getPotentialMembers(churchScope);
+      res.json(filterPotentialMembersForCrmAccess(members, access));
     } catch (error) {
       res.status(500).json({ error: "Failed to get potential members" });
     }
@@ -1914,7 +2885,10 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/potential-members", async (req, res) => {
     try {
-      const member = await storage.upsertPotentialMember(req.body);
+      const member = await storage.upsertPotentialMember({
+        ...req.body,
+        church: normalizeChurch(typeof req.body?.church === "string" ? req.body.church : null),
+      });
       res.status(201).json(member);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create potential member" });
@@ -3540,7 +4514,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/users/:id/profile", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
+  app.get("/api/users/:id/profile", requireSelfOrRole("id", "admin", "senior_pastor", "pastor", "minister", "group_leader", "leader"), async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);
       if (!user) {
@@ -3552,14 +4526,14 @@ export async function registerRoutes(app: Express) {
         birthday: user.birthday,
         userGender: user.userGender,
         address: user.address,
-        church: user.church,
+        church: normalizeChurch(user.church),
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to get user profile" });
     }
   });
 
-  app.patch("/api/users/:id/profile", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
+  app.patch("/api/users/:id/profile", requireSelfOrRole("id", "admin", "senior_pastor", "pastor", "minister", "group_leader", "leader"), async (req, res) => {
     try {
       const { displayName, avatarUrl, birthday, userGender, address, church } = req.body;
 
@@ -3573,7 +4547,7 @@ export async function registerRoutes(app: Express) {
         birthday: birthday || null,
         userGender: userGender || null,
         address: address ? String(address).trim() : null,
-        church: church ? String(church).trim() : null,
+        church: normalizeChurch(church ? String(church) : null),
       });
       if (!updated) {
         return res.status(404).json({ error: "User not found" });
@@ -3632,8 +4606,13 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/users", requireLeader, async (req, res) => {
     try {
-      const users = await storage.getUsers();
-      res.json(users.map(sanitizeUserRecord));
+      const churchScope = await getChurchScope(req);
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const users = await storage.getUsers(churchScope);
+      res.json(filterUsersForCrmAccess(users, access).map(sanitizeUserRecord));
     } catch (error) {
       res.status(500).json({ error: "Failed to get users" });
     }
@@ -3641,18 +4620,36 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/user-roles", requireLeader, async (req, res) => {
     try {
-      const roles = await storage.getUserRoles();
-      res.json(roles);
+      const churchScope = await getChurchScope(req);
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const visibleUsers = filterUsersForCrmAccess(await storage.getUsers(churchScope), access);
+      const visibleUserIds = new Set(visibleUsers.map((user) => user.id));
+      const roles = await storage.getUserRoles(churchScope);
+      res.json(access.role === "admin" ? roles : roles.filter((role) => visibleUserIds.has(role.userId)));
     } catch (error) {
       res.status(500).json({ error: "Failed to get user roles" });
     }
   });
 
-  app.put("/api/user-roles/:userId", requireAdmin, async (req, res) => {
+  app.put("/api/user-roles/:userId", requireCrmDirector, async (req, res) => {
     try {
       const { role } = req.body;
-      if (!["member", "leader", "future_leader", "admin"].includes(role)) {
+      if (!["member", "leader", "future_leader", "admin", "senior_pastor", "pastor", "minister", "group_leader"].includes(role)) {
         return res.status(400).json({ error: "Invalid role" });
+      }
+      const directorUserId = (req as any).legacyUserId || await resolveUserId(req);
+      const directorRole = directorUserId ? await storage.getUserRole(directorUserId) : null;
+      if (directorRole === "senior_pastor") {
+        const [director, target] = await Promise.all([
+          directorUserId ? storage.getUser(directorUserId) : Promise.resolve(undefined),
+          storage.getUser(req.params.userId),
+        ]);
+        if (!target || normalizeChurch(target.church) !== normalizeChurch(director?.church)) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
       }
       await storage.upsertUserRole(req.params.userId, role);
       res.json({ success: true });
@@ -3663,7 +4660,30 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/potential-members/:id", requireLeader, async (req, res) => {
     try {
-      const updated = await storage.updatePotentialMember(req.params.id, req.body);
+      const churchScope = await getChurchScope(req);
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      if (churchScope) {
+        const existing = await pool.query("SELECT id, email, church FROM potential_members WHERE id = $1", [req.params.id]);
+        if (existing.rows.length === 0) {
+          return res.status(404).json({ error: "Potential member not found" });
+        }
+        const existingChurch = normalizeChurch(existing.rows[0].church);
+        const inScope = churchScope === UNASSIGNED_CHURCH_ID
+          ? !existingChurch
+          : existingChurch === churchScope;
+        const inCrmAccess = filterPotentialMembersForCrmAccess(existing.rows, access).length > 0;
+        if (!inScope || !inCrmAccess || (!access.canManageMembers && !access.canManageCare)) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+      const updates = { ...req.body };
+      if (typeof updates.church === "string") {
+        updates.church = normalizeChurch(updates.church);
+      }
+      const updated = await storage.updatePotentialMember(req.params.id, updates);
       if (!updated) {
         return res.status(404).json({ error: "Potential member not found" });
       }
@@ -3675,6 +4695,25 @@ export async function registerRoutes(app: Express) {
 
   app.delete("/api/potential-members/:id", requireLeader, async (req, res) => {
     try {
+      const churchScope = await getChurchScope(req);
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageMembers) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      if (churchScope) {
+        const existing = await pool.query("SELECT id, email, church FROM potential_members WHERE id = $1", [req.params.id]);
+        if (existing.rows.length === 0) {
+          return res.status(404).json({ error: "Potential member not found" });
+        }
+        const existingChurch = normalizeChurch(existing.rows[0].church);
+        const inScope = churchScope === UNASSIGNED_CHURCH_ID
+          ? !existingChurch
+          : existingChurch === churchScope;
+        const inCrmAccess = filterPotentialMembersForCrmAccess(existing.rows, access).length > 0;
+        if (!inScope || !inCrmAccess) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
       await storage.deletePotentialMember(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -3757,8 +4796,14 @@ export async function registerRoutes(app: Express) {
       }
 
       const { role, church } = req.query;
-      const allUsers = await storage.getUsers();
-      const allRoles = await storage.getUserRoles();
+      const churchScope = await getChurchScope(req);
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const allUsers = filterUsersForCrmAccess(await storage.getUsers(churchScope), access);
+      const visibleUserIds = new Set(allUsers.map((user) => user.id));
+      const allRoles = (await storage.getUserRoles(churchScope)).filter((role) => visibleUserIds.has(role.userId));
 
       const roleMap = new Map<string, string>();
       for (const r of allRoles) {
@@ -3771,21 +4816,289 @@ export async function registerRoutes(app: Express) {
           id: u.id,
           email: u.email,
           displayName: u.displayName || null,
-          church: (u as any).church || null,
+          church: normalizeChurch((u as any).church) || null,
           role: roleMap.get(u.id) || 'member',
         }));
 
       if (role && typeof role === 'string') {
         result = result.filter(u => u.role === role);
       }
-      if (church && typeof church === 'string') {
-        result = result.filter(u => u.church === church);
+      if (!churchScope && church && typeof church === 'string' && church !== 'all') {
+        result = result.filter(u => u.church === normalizeChurch(church));
       }
 
       res.json(result);
     } catch (error: any) {
       console.error('Error fetching users for email:', error);
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.get("/api/daily-follow-email/preview", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user?.email) {
+        return res.status(404).json({ error: "User email not found" });
+      }
+
+      const { buildDailyFollowEmail } = await import("./dailyFollowEmail");
+      const email = await buildDailyFollowEmail(user);
+      res.json(email);
+    } catch (error: any) {
+      console.error("Error building daily follow email preview:", error);
+      res.status(500).json({ error: "Failed to build daily follow email", message: error.message });
+    }
+  });
+
+  const defaultEmailPreferences = (userId: string) => ({
+    userId,
+    dailyFollowEnabled: false,
+    dailyFollowTime: "07:00",
+    timezone: "Asia/Taipei",
+    lastDailyFollowSentAt: null,
+    createdAt: null,
+    updatedAt: null,
+  });
+
+  app.get("/api/email-preferences", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const [preferences] = await db
+        .select()
+        .from(userEmailPreferences)
+        .where(eq(userEmailPreferences.userId, userId))
+        .limit(1);
+
+      res.json(preferences || defaultEmailPreferences(userId));
+    } catch (error: any) {
+      console.error("Error fetching email preferences:", error);
+      res.status(500).json({ error: "Failed to fetch email preferences", message: error.message });
+    }
+  });
+
+  app.get("/api/email-provider-status", async (_req, res) => {
+    const hasResendKey = Boolean(process.env.RESEND_API_KEY);
+    const hasReplitConnector = Boolean(
+      process.env.REPLIT_CONNECTORS_HOSTNAME &&
+      (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL)
+    );
+
+    res.json({
+      configured: hasResendKey || hasReplitConnector,
+      mode: hasResendKey ? "resend_api_key" : hasReplitConnector ? "replit_connector" : "preview_only",
+    });
+  });
+
+  app.patch("/api/email-preferences", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const preferenceSchema = z.object({
+        dailyFollowEnabled: z.boolean().optional(),
+        dailyFollowTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+        timezone: z.string().trim().min(1).max(80).optional(),
+      });
+      const parsed = preferenceSchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid email preferences", details: parsed.error.flatten() });
+      }
+
+      const now = new Date();
+      const [preferences] = await db
+        .insert(userEmailPreferences)
+        .values({
+          userId,
+          dailyFollowEnabled: parsed.data.dailyFollowEnabled ?? false,
+          dailyFollowTime: parsed.data.dailyFollowTime || "07:00",
+          timezone: parsed.data.timezone || "Asia/Taipei",
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: userEmailPreferences.userId,
+          set: {
+            ...parsed.data,
+            updatedAt: now,
+          },
+        })
+        .returning();
+
+      res.json(preferences);
+    } catch (error: any) {
+      console.error("Error updating email preferences:", error);
+      res.status(500).json({ error: "Failed to update email preferences", message: error.message });
+    }
+  });
+
+  app.post("/api/daily-follow-email/send-test", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user?.email) {
+        return res.status(404).json({ error: "User email not found" });
+      }
+
+      const { sendDailyFollowEmail } = await import("./dailyFollowEmail");
+      const context = await sendDailyFollowEmail(user);
+      res.json({ success: true, sent: 1, context });
+    } catch (error: any) {
+      if (error?.message === "EMAIL_PROVIDER_NOT_CONFIGURED" || error?.message?.includes("X_REPLIT_TOKEN")) {
+        try {
+          const userId = await resolveUserId(req);
+          const user = userId ? await storage.getUser(userId) : null;
+          if (!user?.email) {
+            return res.status(503).json({
+              error: "Email provider not configured",
+              message: "本機尚未連接寄信服務，也找不到使用者 email。",
+            });
+          }
+
+          const { buildDailyFollowEmail } = await import("./dailyFollowEmail");
+          const preview = await buildDailyFollowEmail(user);
+          return res.status(202).json({
+            success: false,
+            previewOnly: true,
+            message: "本機尚未連接 Resend 寄信服務，已改為產生測試信預覽。正式部署設定 Resend 後會真的寄出。",
+            subject: preview.subject,
+            html: preview.html,
+            text: preview.text,
+            context: preview.context,
+          });
+        } catch (previewError: any) {
+          console.error("Error building daily follow test email preview:", previewError);
+        }
+      }
+      console.error("Error sending daily follow test email:", error);
+      res.status(500).json({ error: "Failed to send daily follow test email", message: error.message });
+    }
+  });
+
+  app.post("/api/admin/daily-follow-email/send", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const userRole = await storage.getUserRole(userId);
+      if (!userRole || !["admin", "leader"].includes(userRole)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const bodySchema = z.object({
+        userIds: z.array(z.string().uuid()).optional(),
+        dryRun: z.boolean().optional().default(true),
+        limit: z.number().int().min(1).max(500).optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      }
+
+      const { userIds, dryRun, limit } = parsed.data;
+      const allUsers = await storage.getUsers();
+      const enabledPreferences = await db
+        .select()
+        .from(userEmailPreferences)
+        .where(eq(userEmailPreferences.dailyFollowEnabled, true));
+      const enabledUserIds = new Set(enabledPreferences.map((preference) => preference.userId));
+      const selectedUsers = allUsers
+        .filter((user) => user.email && (!userIds ? enabledUserIds.has(user.id) : userIds.includes(user.id)))
+        .slice(0, limit ?? allUsers.length);
+
+      const { buildDailyFollowEmail, sendDailyFollowEmail } = await import("./dailyFollowEmail");
+      const results = {
+        dryRun,
+        total: selectedUsers.length,
+        sent: 0,
+        failed: 0,
+        previews: [] as Array<{ userId: string; email: string; subject: string; context: any }>,
+        errors: [] as string[],
+      };
+
+      for (const user of selectedUsers) {
+        try {
+          if (dryRun) {
+            const email = await buildDailyFollowEmail(user);
+            results.previews.push({ userId: user.id, email: user.email, subject: email.subject, context: email.context });
+          } else {
+            const context = await sendDailyFollowEmail(user);
+            results.sent++;
+            results.previews.push({ userId: user.id, email: user.email, subject: "", context });
+          }
+        } catch (error: any) {
+          results.failed++;
+          results.errors.push(`${user.email}: ${error.message}`);
+        }
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error sending admin daily follow emails:", error);
+      res.status(500).json({ error: "Failed to send daily follow emails", message: error.message });
+    }
+  });
+
+  app.post("/api/cron/daily-follow-email", async (req, res) => {
+    try {
+      const secret = process.env.DAILY_FOLLOW_EMAIL_CRON_SECRET;
+      if (!secret || req.headers["x-cron-secret"] !== secret) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const bodySchema = z.object({
+        dryRun: z.boolean().optional().default(false),
+        limit: z.number().int().min(1).max(1000).optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body || {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      }
+
+      const allUsers = await storage.getUsers();
+      const enabledPreferences = await db
+        .select()
+        .from(userEmailPreferences)
+        .where(eq(userEmailPreferences.dailyFollowEnabled, true));
+      const enabledUserIds = new Set(enabledPreferences.map((preference) => preference.userId));
+      const selectedUsers = allUsers
+        .filter((user) => user.email && enabledUserIds.has(user.id))
+        .slice(0, parsed.data.limit ?? allUsers.length);
+      const { buildDailyFollowEmail, sendDailyFollowEmail } = await import("./dailyFollowEmail");
+      const results = { dryRun: parsed.data.dryRun, total: selectedUsers.length, sent: 0, failed: 0, errors: [] as string[] };
+
+      for (const user of selectedUsers) {
+        try {
+          if (parsed.data.dryRun) {
+            await buildDailyFollowEmail(user);
+          } else {
+            await sendDailyFollowEmail(user);
+            results.sent++;
+          }
+        } catch (error: any) {
+          results.failed++;
+          results.errors.push(`${user.email}: ${error.message}`);
+        }
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error running daily follow email cron:", error);
+      res.status(500).json({ error: "Failed to run daily follow email cron", message: error.message });
     }
   });
 
@@ -4111,6 +5424,894 @@ export async function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching daily content:', error);
       res.status(500).json({ error: "Failed to get daily content" });
+    }
+  });
+
+  app.get("/api/church-reading/today", async (req, res) => {
+    const date = typeof req.query.date === "string" ? req.query.date : undefined;
+    try {
+      const content = await fetchDailyDevotionBrief(date);
+      res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+      res.json(content);
+    } catch (error) {
+      console.error("Error fetching church daily devotion:", error);
+      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      res.json(buildFallbackDailyDevotionBrief(date));
+    }
+  });
+
+  // ============ Journey Templates API Routes ============
+  app.get("/api/journeys/love-journey-28/seed", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    res.json(buildLoveJourneyTemplateSeed());
+  });
+
+  app.get("/api/line-login/config", (req, res) => {
+    const config = getLineLoginConfig(req);
+    res.json({
+      configured: config.configured,
+      channelId: config.channelId || null,
+      liffId: config.liffId || null,
+      officialAccountId: config.officialAccountId || null,
+      callbackPath: config.callbackPath,
+      callbackUrl: config.callbackUrl,
+      loginUrlPath: "/api/line-login/url",
+    });
+  });
+
+  app.get("/api/line-login/url", (req: any, res) => {
+    const config = getLineLoginConfig(req);
+    if (!config.configured) {
+      return res.status(409).json({
+        configured: false,
+        error: "LINE Login is not configured",
+        requiredEnv: ["LINE_CHANNEL_ID", "LINE_CHANNEL_SECRET"],
+      });
+    }
+
+    const state = randomBytes(24).toString("hex");
+    const nonce = randomBytes(24).toString("hex");
+    const redirectPath = getSafeRedirectPath(req.query.redirect);
+    req.session.lineLogin = {
+      state,
+      nonce,
+      redirectPath,
+      createdAt: Date.now(),
+    };
+
+    const scopes = ["profile", "openid"];
+    if (process.env.LINE_REQUEST_EMAIL === "1") scopes.push("email");
+
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: config.channelId,
+      redirect_uri: config.callbackUrl,
+      state,
+      scope: scopes.join(" "),
+      nonce,
+    });
+    if (process.env.LINE_BOT_PROMPT) params.set("bot_prompt", process.env.LINE_BOT_PROMPT);
+
+    const url = `https://access.line.me/oauth2/v2.1/authorize?${params.toString().replace(/\+/g, "%20")}`;
+    req.session.save((error: unknown) => {
+      if (error) {
+        console.error("[LINE Login] Failed to save state:", error);
+        return res.status(500).json({ error: "Failed to initialize LINE Login" });
+      }
+      res.json({ configured: true, url, redirectPath });
+    });
+  });
+
+  app.get("/api/line-login/callback", async (req: any, res) => {
+    try {
+      const config = getLineLoginConfig(req);
+      if (!config.configured) return res.status(409).send("LINE Login is not configured.");
+
+      const code = typeof req.query.code === "string" ? req.query.code : "";
+      const state = typeof req.query.state === "string" ? req.query.state : "";
+      const savedState = req.session?.lineLogin;
+      if (!code || !state || !savedState || savedState.state !== state) {
+        return res.status(400).send("Invalid LINE Login state.");
+      }
+
+      const ageMs = Date.now() - Number(savedState.createdAt || 0);
+      if (ageMs > 10 * 60 * 1000) {
+        delete req.session.lineLogin;
+        return res.status(400).send("LINE Login state expired.");
+      }
+
+      const profile = await exchangeLineCodeForProfile({
+        code,
+        redirectUri: config.callbackUrl,
+        channelId: config.channelId,
+        channelSecret: config.channelSecret,
+        expectedNonce: savedState.nonce,
+      });
+      const linked = await ensureLineLinkedUser(profile);
+
+      const sessionUser: any = {
+        claims: {
+          sub: linked.authUserId,
+          email: linked.email,
+          first_name: linked.displayName,
+          profile_image_url: profile.pictureUrl ?? undefined,
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+      };
+
+      delete req.session.lineLogin;
+      req.login(sessionUser, (loginError: unknown) => {
+        if (loginError) {
+          console.error("[LINE Login] Session error:", loginError);
+          return res.status(500).send("LINE Login succeeded but session creation failed.");
+        }
+        req.session.save((saveError: unknown) => {
+          if (saveError) console.error("[LINE Login] Session save error:", saveError);
+          res.redirect(savedState.redirectPath || "/");
+        });
+      });
+    } catch (error) {
+      if (isLineSchemaMissingError(error)) {
+        return res.status(409).send("LINE schema is not ready. Run npm run db:push first.");
+      }
+      console.error("[LINE Login] Callback failed:", error);
+      res.status(500).send("LINE Login failed.");
+    }
+  });
+
+  app.post("/api/pastoral/journey-templates/love-journey-28/seed", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const result = await ensureLoveJourneyTemplate();
+      res.status(201).json({ schemaReady: true, templateId: result.templateId, seed: result.seed });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Pastoral schema is not ready",
+          action: "Run npm run db:push before seeding 愛的旅程",
+        });
+      }
+      console.error("Error seeding love journey template:", error);
+      res.status(500).json({ error: "Failed to seed love journey template" });
+    }
+  });
+
+  app.get("/api/serving/overview", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      const overview = await getServingScheduleOverview(churchScope);
+      res.json({ schemaReady: true, ...overview });
+    } catch (error) {
+      if (isServingSchemaMissingError(error)) {
+        return res.json({
+          schemaReady: false,
+          teams: [],
+          roles: [],
+          members: [],
+          events: [],
+          people: [],
+          message: "Serving schedule schema is not ready. Run npm run db:push to enable serving teams.",
+        });
+      }
+      console.error("Error fetching serving schedule overview:", error);
+      res.status(500).json({ error: "Failed to get serving schedule overview" });
+    }
+  });
+
+  app.post("/api/serving/seed-defaults", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const churchScope = await getChurchScope(req);
+      const result = await seedDefaultServingTeams(churchScope, userId);
+      const overview = await getServingScheduleOverview(churchScope);
+      res.status(201).json({ schemaReady: true, ...result, ...overview });
+    } catch (error) {
+      if (isServingSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Serving schedule schema is not ready",
+          action: "Run npm run db:push before seeding serving teams",
+        });
+      }
+      console.error("Error seeding serving teams:", error);
+      res.status(500).json({ error: "Failed to seed serving teams" });
+    }
+  });
+
+  app.post("/api/serving/teams", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = servingTeamBodySchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const team = await createServingTeam({
+        church: churchScope,
+        name: input.name,
+        category: input.category,
+        description: input.description,
+        leaderUserId: input.leaderUserId,
+        defaultLocation: input.defaultLocation,
+        defaultStartTime: input.defaultStartTime,
+      });
+      res.status(201).json(team);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid serving team", details: error.flatten() });
+      if (isServingSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Serving schedule schema is not ready" });
+      console.error("Error creating serving team:", error);
+      res.status(500).json({ error: "Failed to create serving team" });
+    }
+  });
+
+  app.post("/api/serving/teams/:teamId/roles", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = servingRoleBodySchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const role = await createServingRole({ teamId: req.params.teamId, ...input }, churchScope);
+      if (!role) return res.status(404).json({ error: "Serving team not found" });
+      res.status(201).json(role);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid serving role", details: error.flatten() });
+      if (isServingSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Serving schedule schema is not ready" });
+      console.error("Error creating serving role:", error);
+      res.status(500).json({ error: "Failed to create serving role" });
+    }
+  });
+
+  app.post("/api/serving/teams/:teamId/members", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = servingMemberBodySchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const member = await createServingTeamMember({ teamId: req.params.teamId, ...input }, churchScope);
+      if (!member) return res.status(404).json({ error: "Serving team or person not found" });
+      res.status(201).json(member);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid serving member", details: error.flatten() });
+      if (isServingSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Serving schedule schema is not ready" });
+      console.error("Error creating serving member:", error);
+      res.status(500).json({ error: "Failed to create serving member" });
+    }
+  });
+
+  app.post("/api/serving/teams/:teamId/events", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = servingEventBodySchema.parse(req.body);
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const churchScope = await getChurchScope(req);
+      const event = await createServingEvent({ teamId: req.params.teamId, ...input, createdByUserId: userId }, churchScope);
+      if (!event) return res.status(404).json({ error: "Serving team not found" });
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid serving event", details: error.flatten() });
+      if (isServingSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Serving schedule schema is not ready" });
+      console.error("Error creating serving event:", error);
+      res.status(500).json({ error: "Failed to create serving event" });
+    }
+  });
+
+  app.patch("/api/serving/events/:eventId/status", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = servingEventStatusSchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const event = await updateServingEventStatus(req.params.eventId, input.status, churchScope);
+      if (!event) return res.status(404).json({ error: "Serving event not found" });
+      res.json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid serving event status", details: error.flatten() });
+      if (isServingSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Serving schedule schema is not ready" });
+      console.error("Error updating serving event status:", error);
+      res.status(500).json({ error: "Failed to update serving event status" });
+    }
+  });
+
+  app.post("/api/serving/assignments", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = servingAssignmentBodySchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const assignment = await createServingAssignment(input, churchScope);
+      if (!assignment) return res.status(404).json({ error: "Serving event, role, or person not found" });
+      res.status(201).json(assignment);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid serving assignment", details: error.flatten() });
+      if (isServingSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Serving schedule schema is not ready" });
+      console.error("Error creating serving assignment:", error);
+      res.status(500).json({ error: "Failed to create serving assignment" });
+    }
+  });
+
+  app.patch("/api/serving/assignments/:assignmentId", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = servingAssignmentPatchSchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const assignment = await updateServingAssignment(req.params.assignmentId, input, churchScope);
+      if (!assignment) return res.status(404).json({ error: "Serving assignment not found" });
+      res.json(assignment);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid serving assignment", details: error.flatten() });
+      if (isServingSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Serving schedule schema is not ready" });
+      console.error("Error updating serving assignment:", error);
+      res.status(500).json({ error: "Failed to update serving assignment" });
+    }
+  });
+
+  app.get("/api/facilities/overview", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      const overview = await getFacilityBookingOverview(churchScope);
+      res.json({ schemaReady: true, ...overview });
+    } catch (error) {
+      if (isFacilitySchemaMissingError(error)) {
+        return res.json({
+          schemaReady: false,
+          rooms: [],
+          bookings: [],
+          message: "Facility booking schema is not ready. Run npm run db:push to enable room booking.",
+        });
+      }
+      console.error("Error fetching facility overview:", error);
+      res.status(500).json({ error: "Failed to get facility overview" });
+    }
+  });
+
+  app.post("/api/facilities/seed-defaults", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      const result = await seedDefaultFacilityRooms(churchScope);
+      const overview = await getFacilityBookingOverview(churchScope);
+      res.status(201).json({ schemaReady: true, ...result, ...overview });
+    } catch (error) {
+      if (isFacilitySchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Facility booking schema is not ready",
+          action: "Run npm run db:push before seeding rooms",
+        });
+      }
+      console.error("Error seeding facility rooms:", error);
+      res.status(500).json({ error: "Failed to seed facility rooms" });
+    }
+  });
+
+  app.post("/api/facilities/rooms", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = facilityRoomBodySchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const room = await createFacilityRoom({ church: churchScope, ...input });
+      res.status(201).json(room);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid facility room", details: error.flatten() });
+      if (isFacilitySchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Facility booking schema is not ready" });
+      console.error("Error creating facility room:", error);
+      res.status(500).json({ error: "Failed to create facility room" });
+    }
+  });
+
+  app.post("/api/facilities/bookings", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = facilityBookingBodySchema.parse(req.body);
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const churchScope = await getChurchScope(req);
+      const booking = await createFacilityBooking({ ...input, requesterUserId: userId, createdByUserId: userId }, churchScope);
+      if (!booking) return res.status(404).json({ error: "Facility room not found" });
+      res.status(201).json(booking);
+    } catch (error) {
+      if (error instanceof FacilityBookingConflictError) {
+        return res.status(409).json({
+          error: "Facility booking conflict",
+          conflicts: error.conflicts,
+        });
+      }
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid facility booking", details: error.flatten() });
+      if (isFacilitySchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Facility booking schema is not ready" });
+      console.error("Error creating facility booking:", error);
+      res.status(500).json({ error: "Failed to create facility booking" });
+    }
+  });
+
+  app.patch("/api/facilities/bookings/:bookingId/status", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = facilityBookingStatusSchema.parse(req.body);
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const churchScope = await getChurchScope(req);
+      const booking = await updateFacilityBookingStatus(req.params.bookingId, input.status, userId, churchScope);
+      if (!booking) return res.status(404).json({ error: "Facility booking not found" });
+      res.json(booking);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid facility booking status", details: error.flatten() });
+      if (isFacilitySchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Facility booking schema is not ready" });
+      console.error("Error updating facility booking:", error);
+      res.status(500).json({ error: "Failed to update facility booking" });
+    }
+  });
+
+  app.get("/api/pastoral/framework", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      const overview = await getPastoralFrameworkOverview(churchScope);
+      res.json({ schemaReady: true, ...overview });
+    } catch (error) {
+      if (isPastoralFrameworkSchemaMissingError(error)) {
+        return res.json({
+          schemaReady: false,
+          stages: [],
+          sources: [],
+          message: "Pastoral framework schema is not ready. Run npm run db:push to enable framework stages.",
+        });
+      }
+      console.error("Error fetching pastoral framework:", error);
+      res.status(500).json({ error: "Failed to get pastoral framework" });
+    }
+  });
+
+  app.post("/api/pastoral/framework/seed-153", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const result = await seedPastoralFramework153();
+      const churchScope = await getChurchScope(req);
+      const overview = await getPastoralFrameworkOverview(churchScope);
+      res.status(201).json({ schemaReady: true, ...result, ...overview });
+    } catch (error) {
+      if (isPastoralFrameworkSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Pastoral framework schema is not ready",
+          action: "Run npm run db:push before seeding the pastoral framework",
+        });
+      }
+      console.error("Error seeding pastoral framework:", error);
+      res.status(500).json({ error: "Failed to seed pastoral framework" });
+    }
+  });
+
+  app.patch("/api/pastoral/persons/:personId/stage", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = personStagePatchSchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const allowedPerson = await getPastoralPersonDetail(req.params.personId, churchScope, { canViewPersonal: false, access });
+      if (!allowedPerson) {
+        return res.status(404).json({ error: "Person or pastoral stage not found" });
+      }
+      const result = await updatePersonPastoralStage({ personId: req.params.personId, ...input }, churchScope);
+      if (!result) return res.status(404).json({ error: "Person or pastoral stage not found" });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid person stage", details: error.flatten() });
+      if (isPastoralFrameworkSchemaMissingError(error)) return res.status(409).json({ schemaReady: false, error: "Pastoral framework schema is not ready" });
+      console.error("Error updating person pastoral stage:", error);
+      res.status(500).json({ error: "Failed to update person pastoral stage" });
+    }
+  });
+
+  app.get("/api/pastoral/persons", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      const limit = Number.parseInt(String(req.query.limit || "120"), 10);
+      const offset = Number.parseInt(String(req.query.offset || "0"), 10);
+      const persons = await getPastoralPersons(churchScope, {
+        limit: Number.isFinite(limit) ? limit : 120,
+        offset: Number.isFinite(offset) ? offset : 0,
+        search: typeof req.query.search === "string" ? req.query.search : null,
+        filter: typeof req.query.filter === "string" ? req.query.filter : null,
+        access,
+      });
+      res.json({ schemaReady: true, persons, page: { limit, offset, hasMore: persons.length >= limit } });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.json({
+          schemaReady: false,
+          persons: [],
+          message: "Pastoral schema is not ready. Run npm run db:push to enable persons and journeys.",
+        });
+      }
+      console.error("Error fetching pastoral persons:", error);
+      res.status(500).json({ error: "Failed to get pastoral persons" });
+    }
+  });
+
+  app.post("/api/pastoral/reconcile", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const churchScope = await getChurchScope(req);
+      const result = await reconcilePastoralPersons({ churchScope, careOwnerUserId: userId });
+      const persons = await getPastoralPersons(churchScope, { access });
+      res.json({ schemaReady: true, ...result, persons });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Pastoral schema is not ready",
+          action: "Run npm run db:push before reconciling persons",
+        });
+      }
+      console.error("Error reconciling pastoral persons:", error);
+      res.status(500).json({ error: "Failed to reconcile pastoral persons" });
+    }
+  });
+
+  app.get("/api/pastoral/persons/:personId", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canEnterCrm) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      const detail = await getPastoralPersonDetail(req.params.personId, churchScope, { canViewPersonal: access.canViewPersonal, access });
+      if (!detail) {
+        return res.status(404).json({ error: "Pastoral person not found" });
+      }
+      res.json({ schemaReady: true, access: { canViewPersonal: access.canViewPersonal, canManageCare: access.canManageCare }, ...detail });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Pastoral schema is not ready",
+          action: "Run npm run db:push before viewing pastoral person detail",
+        });
+      }
+      console.error("Error fetching pastoral person detail:", error);
+      res.status(500).json({ error: "Failed to get pastoral person detail" });
+    }
+  });
+
+  app.post("/api/pastoral/persons/:personId/love-journey/start", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || (!access.canManageCare && !access.canManageMembers)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const churchScope = await getChurchScope(req);
+      const journeyId = await startLoveJourneyForPerson(req.params.personId, userId, churchScope, access);
+      if (!journeyId) {
+        return res.status(404).json({ error: "Pastoral person not found" });
+      }
+      const detail = await getPastoralPersonDetail(req.params.personId, churchScope, { canViewPersonal: access.canViewPersonal, access });
+      res.status(201).json({ schemaReady: true, journeyId, detail });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Pastoral schema is not ready",
+          action: "Run npm run db:push before starting 愛的旅程",
+        });
+      }
+      console.error("Error starting love journey:", error);
+      res.status(500).json({ error: "Failed to start love journey" });
+    }
+  });
+
+  app.patch("/api/pastoral/journey-progress/:progressId", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageCare) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = journeyProgressPatchSchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const progress = await updateJourneyProgress(req.params.progressId, input, churchScope, access);
+      if (!progress) {
+        return res.status(404).json({ error: "Journey progress not found" });
+      }
+      res.json(progress);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid journey progress", details: error.flatten() });
+      }
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Pastoral schema is not ready",
+          action: "Run npm run db:push before updating journey progress",
+        });
+      }
+      console.error("Error updating journey progress:", error);
+      res.status(500).json({ error: "Failed to update journey progress" });
+    }
+  });
+
+  app.patch("/api/pastoral/journey-milestones/:milestoneId", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageCare) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = journeyMilestonePatchSchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const milestone = await updateJourneyMilestone(req.params.milestoneId, input, churchScope, access);
+      if (!milestone) {
+        return res.status(404).json({ error: "Journey milestone not found" });
+      }
+      res.json(milestone);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid journey milestone", details: error.flatten() });
+      }
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({
+          schemaReady: false,
+          error: "Pastoral schema is not ready",
+          action: "Run npm run db:push before updating journey milestones",
+        });
+      }
+      console.error("Error updating journey milestone:", error);
+      res.status(500).json({ error: "Failed to update journey milestone" });
+    }
+  });
+
+  app.get("/api/pastoral/persons/:personId/tasks", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageCare) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      res.json({ schemaReady: true, tasks: await listPastoralTasks(req.params.personId, churchScope, access) });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error listing pastoral tasks:", error);
+      res.status(500).json({ error: "Failed to list pastoral tasks" });
+    }
+  });
+
+  app.post("/api/pastoral/persons/:personId/tasks", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageCare) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = pastoralTaskBodySchema.parse(req.body);
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const churchScope = await getChurchScope(req);
+      const task = await createPastoralTask({
+        personId: req.params.personId,
+        title: input.title,
+        description: input.description,
+        priority: input.priority,
+        dueAt: input.dueAt,
+        assignedToUserId: input.assignedToUserId ?? userId,
+        createdByUserId: userId,
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+        visibility: input.visibility,
+      }, churchScope, access);
+      if (!task) return res.status(404).json({ error: "Pastoral person not found" });
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid pastoral task", details: error.flatten() });
+      }
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error creating pastoral task:", error);
+      res.status(500).json({ error: "Failed to create pastoral task" });
+    }
+  });
+
+  app.post("/api/pastoral/persons/:personId/tasks/next-step", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageCare) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const userId = (req as any).legacyUserId || await resolveUserId(req);
+      const churchScope = await getChurchScope(req);
+      const task = await createNextStepTaskForPerson(req.params.personId, userId, churchScope, access);
+      if (!task) return res.status(404).json({ error: "Pastoral person not found" });
+      res.status(201).json(task);
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error creating next step pastoral task:", error);
+      res.status(500).json({ error: "Failed to create next step task" });
+    }
+  });
+
+  app.patch("/api/pastoral/tasks/:taskId", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageCare) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = pastoralTaskPatchSchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const task = await updatePastoralTask(req.params.taskId, input, churchScope, access);
+      if (!task) return res.status(404).json({ error: "Pastoral task not found" });
+      res.json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid pastoral task", details: error.flatten() });
+      }
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error updating pastoral task:", error);
+      res.status(500).json({ error: "Failed to update pastoral task" });
+    }
+  });
+
+  app.get("/api/pastoral/merge-suggestions", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageMembers) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const churchScope = await getChurchScope(req);
+      res.json({ schemaReady: true, suggestions: await listPersonMergeSuggestions(churchScope) });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error listing merge suggestions:", error);
+      res.status(500).json({ error: "Failed to list merge suggestions" });
+    }
+  });
+
+  app.post("/api/pastoral/merge-suggestions/dismiss", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageMembers) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = mergeSuggestionBodySchema.parse(req.body);
+      res.json(await dismissPersonMergeSuggestion(input.primaryPersonId, input.duplicatePersonId));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid merge suggestion", details: error.flatten() });
+      console.error("Error dismissing merge suggestion:", error);
+      res.status(500).json({ error: "Failed to dismiss merge suggestion" });
+    }
+  });
+
+  app.post("/api/pastoral/merge-suggestions/merge", requireLeader, async (req, res) => {
+    try {
+      const access = await getCrmAccessForRequest(req);
+      if (!access || !access.canManageMembers) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const input = mergeSuggestionBodySchema.parse(req.body);
+      const churchScope = await getChurchScope(req);
+      const result = await mergePastoralPersons(input.primaryPersonId, input.duplicatePersonId, churchScope);
+      if (!result) return res.status(404).json({ error: "Merge candidate not found" });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid merge suggestion", details: error.flatten() });
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error merging pastoral persons:", error);
+      res.status(500).json({ error: "Failed to merge pastoral persons" });
+    }
+  });
+
+  app.get("/api/me/love-journey", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const detail = await getSelfLoveJourney(userId);
+      if (!detail) return res.status(404).json({ error: "Love journey profile not found" });
+      res.json({ schemaReady: true, ...detail });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error getting self love journey:", error);
+      res.status(500).json({ error: "Failed to get love journey" });
+    }
+  });
+
+  app.post("/api/me/love-journey/start", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const detail = await startSelfLoveJourney(userId);
+      if (!detail) return res.status(404).json({ error: "Love journey profile not found" });
+      res.status(201).json({ schemaReady: true, ...detail });
+    } catch (error) {
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error starting self love journey:", error);
+      res.status(500).json({ error: "Failed to start love journey" });
+    }
+  });
+
+  app.patch("/api/me/love-journey/progress/:progressId", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const input = journeyProgressPatchSchema.pick({ status: true, responseText: true }).parse(req.body);
+      const progress = await updateSelfJourneyProgress(userId, req.params.progressId, input);
+      if (!progress) return res.status(404).json({ error: "Journey progress not found" });
+      res.json(progress);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid journey progress", details: error.flatten() });
+      if (isPastoralSchemaMissingError(error)) {
+        return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
+      }
+      console.error("Error updating self love journey:", error);
+      res.status(500).json({ error: "Failed to update love journey" });
     }
   });
 
@@ -4597,11 +6798,11 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/devotional-notes/:id", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const note = await storage.getDevotionalNote(req.params.id);
+      const note = await storage.getDevotionalNoteForUser(req.params.id, userId);
       if (!note) {
         return res.status(404).json({ error: "Devotional note not found" });
       }
@@ -4614,12 +6815,15 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/user-reading-plans/:planId/devotional/:dayNumber", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const dayNumber = parseInt(req.params.dayNumber);
-      const note = await storage.getDevotionalNoteByPlanDay(req.params.planId, dayNumber);
+      if (!Number.isFinite(dayNumber)) {
+        return res.status(400).json({ error: "Invalid day number" });
+      }
+      const note = await storage.getDevotionalNoteByPlanDayForUser(userId, req.params.planId, dayNumber);
       res.json(note || null);
     } catch (error) {
       console.error('Error fetching devotional note by plan day:', error);
@@ -4647,11 +6851,15 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/devotional-notes/:id", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const note = await storage.updateDevotionalNote(req.params.id, req.body);
+      const parsed = parseDevotionalNotePatch(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid devotional note data", details: parsed.error.flatten() });
+      }
+      const note = await storage.updateDevotionalNoteForUser(req.params.id, userId, parsed.data);
       if (!note) {
         return res.status(404).json({ error: "Devotional note not found" });
       }
@@ -4664,15 +6872,15 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/devotional-notes/:id/hidden", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const { hidden } = req.body;
       if (typeof hidden !== 'boolean') {
         return res.status(400).json({ error: "hidden must be a boolean" });
       }
-      const note = await storage.toggleDevotionalNoteHidden(req.params.id, hidden);
+      const note = await storage.toggleDevotionalNoteHiddenForUser(req.params.id, userId, hidden);
       if (!note) {
         return res.status(404).json({ error: "Note not found" });
       }

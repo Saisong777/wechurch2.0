@@ -23,6 +23,7 @@ import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { toast } from 'sonner';
 import { isShortCode } from '@/lib/url-helpers';
 import { FeatureGate } from '@/components/ui/feature-gate';
+import { fetchGroupMembers } from '@/lib/api-helpers';
 
 type UserStep = 'landing' | 'enter-session' | 'join' | 'waiting' | 'group-reveal' | 'verification' | 'icebreaker' | 'study' | 'review' | 'notebook';
 
@@ -54,6 +55,30 @@ const extractSessionIdentifier = (rawValue: string) => {
   return trimmed.toUpperCase();
 };
 
+const isParticipantGroupReady = async (sessionId: string, groupNumber?: number | null) => {
+  if (!groupNumber) return false;
+
+  try {
+    const members = await fetchGroupMembers(sessionId, groupNumber);
+    return members.length > 0 && members.every((member) => member.readyConfirmed);
+  } catch (error) {
+    console.warn('[UserPage] Failed to check group ready state:', error);
+    return false;
+  }
+};
+
+const fetchSessionByIdentifier = async (idOrCode: string) => {
+  const trimmedInput = extractSessionIdentifier(idOrCode);
+  if (!trimmedInput) return null;
+
+  const response = isShortCode(trimmedInput)
+    ? await fetch(`/api/sessions/by-code/${trimmedInput}`)
+    : await fetch(`/api/sessions/${trimmedInput}`);
+
+  if (!response.ok) return null;
+  return response.json();
+};
+
 export const UserPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { currentUser, currentSession, setCurrentSession, setCurrentUser } = useSession();
@@ -74,6 +99,7 @@ export const UserPage: React.FC = () => {
     localStorage.removeItem('bible_study_guest_email');
     localStorage.removeItem('bible_study_guest_gender');
     localStorage.removeItem('bible_study_guest_location');
+    localStorage.removeItem('user_email');
 
     setCurrentSession(null);
     setCurrentUser(null);
@@ -127,8 +153,12 @@ export const UserPage: React.FC = () => {
       }
       const sessionData = await sessionRes.json();
 
-      // Try to get the participant data by email using Express API
-      const participantRes = await fetch(`/api/sessions/${storedSessionId}/participants/by-email/${encodeURIComponent(storedEmail)}`);
+      // Prefer the exact participant id. Email is only a fallback for older
+      // browser sessions that were saved before participant id recovery existed.
+      let participantRes = await fetch(`/api/sessions/${storedSessionId}/participants/${storedParticipantId}`);
+      if (!participantRes.ok) {
+        participantRes = await fetch(`/api/sessions/${storedSessionId}/participants/by-email/${encodeURIComponent(storedEmail)}`);
+      }
 
       if (!participantRes.ok) {
         console.log('[UserPage] Participant not found for this email, may need to rejoin');
@@ -151,6 +181,8 @@ export const UserPage: React.FC = () => {
 
       const participant = await participantRes.json();
       console.log('[UserPage] Verified participant via API, restoring session');
+      localStorage.setItem(STORAGE_KEYS.PARTICIPANT_ID, participant.id);
+      localStorage.setItem('user_email', storedEmail);
 
       // Restore session state
       setCurrentSession({
@@ -191,7 +223,15 @@ export const UserPage: React.FC = () => {
         }
       } else if (sessionData.status === 'grouping') {
         if (participant.groupNumber) {
-          restoredStep = 'verification';
+          const groupReady = await isParticipantGroupReady(storedSessionId, participant.groupNumber);
+          if (groupReady && sessionData.icebreakerEnabled) {
+            const completedIcebreaker = localStorage.getItem(`icebreaker_completed_${storedSessionId}_${participant.id}`);
+            restoredStep = completedIcebreaker ? 'study' : 'icebreaker';
+          } else if (groupReady) {
+            restoredStep = 'study';
+          } else {
+            restoredStep = 'verification';
+          }
         } else {
           restoredStep = 'waiting';
         }
@@ -250,8 +290,21 @@ export const UserPage: React.FC = () => {
 
       // If URL has a session code/ID, use that (new session join)
       if (sessionFromUrl) {
-        setSessionId(sessionFromUrl);
-        await loadSessionAndCheckAuth(sessionFromUrl);
+        const incomingSession = await fetchSessionByIdentifier(sessionFromUrl);
+        const storedSessionId = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
+        const storedParticipantId = localStorage.getItem(STORAGE_KEYS.PARTICIPANT_ID);
+        const storedEmail = localStorage.getItem('bible_study_guest_email');
+
+        if (incomingSession?.id && storedSessionId === incomingSession.id && storedParticipantId && storedEmail) {
+          const restored = await restoreUserSession();
+          if (!restored) {
+            setSessionId(sessionFromUrl);
+            await loadSessionAndCheckAuth(sessionFromUrl);
+          }
+        } else {
+          setSessionId(sessionFromUrl);
+          await loadSessionAndCheckAuth(sessionFromUrl);
+        }
         setIsRestoring(false);
       } else if (!currentSession) {
         // Try to restore existing session
@@ -292,22 +345,13 @@ export const UserPage: React.FC = () => {
     const trimmedInput = extractSessionIdentifier(idOrCode);
 
     try {
-      // Try short code first, then UUID
-      let res;
-      if (isShortCode(trimmedInput)) {
-        res = await fetch(`/api/sessions/by-code/${trimmedInput}`);
-      } else {
-        res = await fetch(`/api/sessions/${trimmedInput}`);
-      }
-
-      if (!res.ok) {
+      const sessionData = await fetchSessionByIdentifier(trimmedInput);
+      if (!sessionData) {
         toast.error('找不到此課程，請確認代碼是否正確');
         setIsLoading(false);
         setStep('enter-session');
         return;
       }
-
-      const sessionData = await res.json();
 
       // Store the actual session UUID for internal use
       localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionData.id);

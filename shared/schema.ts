@@ -8,7 +8,17 @@ export const genderEnum = pgEnum("gender", ["male", "female"]);
 export const groupingMethodEnum = pgEnum("grouping_method", ["random", "gender-balanced"]);
 export const reportTypeEnum = pgEnum("report_type", ["group", "overall"]);
 export const reportStatusEnum = pgEnum("report_status", ["PENDING", "COMPLETED", "FAILED"]);
-export const appRoleEnum = pgEnum("app_role", ["member", "leader", "future_leader", "admin"]);
+export const appRoleEnum = pgEnum("app_role", [
+  "member",
+  "leader",
+  "future_leader",
+  "admin",
+  "senior_pastor",
+  "pastor",
+  "minister",
+  "group_leader",
+]);
+export const crmScopeTypeEnum = pgEnum("crm_scope_type", ["church", "group", "member"]);
 export const insightCategoryEnum = pgEnum("insight_category_type", ["PROMISE", "COMMAND", "WARNING", "GOD_ATTRIBUTE"]);
 export const prayerCategoryEnum = pgEnum("prayer_category", ["thanksgiving", "supplication", "praise", "other"]);
 export const cardLevelEnum = pgEnum("card_level", ["easy", "medium", "hard"]);
@@ -46,6 +56,55 @@ export const userRoles = pgTable("user_roles", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const userEmailPreferences = pgTable("user_email_preferences", {
+  userId: uuid("user_id").primaryKey().references(() => users.id).notNull(),
+  dailyFollowEnabled: boolean("daily_follow_enabled").default(false).notNull(),
+  dailyFollowTime: text("daily_follow_time").default("07:00").notNull(),
+  timezone: text("timezone").default("Asia/Taipei").notNull(),
+  lastDailyFollowSentAt: timestamp("last_daily_follow_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const persons = pgTable("persons", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  displayName: text("display_name").notNull(),
+  primaryEmail: text("primary_email"),
+  church: text("church"),
+  pastoralStage: text("pastoral_stage").default("unknown").notNull(),
+  pastoralStatus: text("pastoral_status").default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  emailUnique: uniqueIndex("persons_primary_email_unique").on(table.primaryEmail),
+  churchIdx: index("persons_church_idx").on(table.church),
+  statusIdx: index("persons_pastoral_status_idx").on(table.pastoralStatus),
+}));
+
+export const personIdentityLinks = pgTable("person_identity_links", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  participantId: uuid("participant_id").references(() => participants.id),
+  potentialMemberId: uuid("potential_member_id").references(() => potentialMembers.id),
+  careContactId: uuid("care_contact_id").references(() => careContacts.id),
+  sourceType: text("source_type").notNull(),
+  sourceLabel: text("source_label"),
+  matchMethod: text("match_method").default("manual").notNull(),
+  confidence: integer("confidence").default(100).notNull(),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  personIdx: index("person_identity_links_person_id_idx").on(table.personId),
+  userUnique: uniqueIndex("person_identity_links_user_id_unique").on(table.userId),
+  participantUnique: uniqueIndex("person_identity_links_participant_id_unique").on(table.participantId),
+  potentialUnique: uniqueIndex("person_identity_links_potential_member_id_unique").on(table.potentialMemberId),
+  careContactUnique: uniqueIndex("person_identity_links_care_contact_id_unique").on(table.careContactId),
+  sourceIdx: index("person_identity_links_source_type_idx").on(table.sourceType),
+}));
 
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -128,6 +187,7 @@ export const potentialMembers = pgTable("potential_members", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   gender: text("gender"),
+  church: text("church"),
   userId: uuid("user_id").references(() => users.id),
   status: text("status").default("pending").notNull(),
   subscribed: boolean("subscribed").default(true).notNull(),
@@ -137,6 +197,59 @@ export const potentialMembers = pgTable("potential_members", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const smallGroups = pgTable("small_groups", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  church: text("church").notNull(),
+  name: text("name").notNull(),
+  leaderUserId: uuid("leader_user_id").references(() => users.id),
+  pastorUserId: uuid("pastor_user_id").references(() => users.id),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  churchIdx: index("small_groups_church_idx").on(table.church),
+  leaderIdx: index("small_groups_leader_user_id_idx").on(table.leaderUserId),
+}));
+
+export const smallGroupMembers = pgTable("small_group_members", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: uuid("group_id").references(() => smallGroups.id).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  potentialMemberId: uuid("potential_member_id").references(() => potentialMembers.id),
+  memberEmail: text("member_email"),
+  isActive: boolean("is_active").default(true).notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  groupIdx: index("small_group_members_group_id_idx").on(table.groupId),
+  userIdx: index("small_group_members_user_id_idx").on(table.userId),
+  emailIdx: index("small_group_members_member_email_idx").on(table.memberEmail),
+}));
+
+export const crmScopeAssignments = pgTable("crm_scope_assignments", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  assigneeUserId: uuid("assignee_user_id").references(() => users.id).notNull(),
+  assignedByUserId: uuid("assigned_by_user_id").references(() => users.id),
+  scopeType: crmScopeTypeEnum("scope_type").notNull(),
+  church: text("church"),
+  groupId: uuid("group_id").references(() => smallGroups.id),
+  memberUserId: uuid("member_user_id").references(() => users.id),
+  potentialMemberId: uuid("potential_member_id").references(() => potentialMembers.id),
+  canViewPersonal: boolean("can_view_personal").default(false).notNull(),
+  canManageCare: boolean("can_manage_care").default(false).notNull(),
+  canManageMembers: boolean("can_manage_members").default(false).notNull(),
+  note: text("note"),
+  isActive: boolean("is_active").default(true).notNull(),
+  startsAt: timestamp("starts_at").defaultNow().notNull(),
+  endsAt: timestamp("ends_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  assigneeIdx: index("crm_scope_assignments_assignee_user_id_idx").on(table.assigneeUserId),
+  groupIdx: index("crm_scope_assignments_group_id_idx").on(table.groupId),
+  churchIdx: index("crm_scope_assignments_church_idx").on(table.church),
+}));
 
 export const featureToggles = pgTable("feature_toggles", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -185,6 +298,37 @@ export const prayerNotifications = pgTable("prayer_notifications", {
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const careContacts = pgTable("care_contacts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  relationship: text("relationship"),
+  need: text("need").default("").notNull(),
+  nextAction: text("next_action").default("").notNull(),
+  prayer: text("prayer").default("").notNull(),
+  source: text("source").default("personal").notNull(),
+  visibility: text("visibility").default("private").notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
+  lastCaredAt: timestamp("last_cared_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("care_contacts_user_id_idx").on(table.userId),
+  activeIdx: index("care_contacts_user_active_idx").on(table.userId, table.isArchived),
+}));
+
+export const careActions = pgTable("care_actions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: uuid("contact_id").references(() => careContacts.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  actionType: text("action_type").default("note").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  contactIdx: index("care_actions_contact_id_idx").on(table.contactId),
+  userIdx: index("care_actions_user_id_idx").on(table.userId),
+}));
 
 export const cardQuestions = pgTable("card_questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -521,6 +665,352 @@ export const userReadingProgress = pgTable("user_reading_progress", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const journeyTemplates = pgTable("journey_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").default("discipleship").notNull(),
+  durationDays: integer("duration_days").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const journeyDays = pgTable("journey_days", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: uuid("template_id").references(() => journeyTemplates.id).notNull(),
+  dayNumber: integer("day_number").notNull(),
+  title: text("title").notNull(),
+  scriptureReference: text("scripture_reference"),
+  bodyMarkdown: text("body_markdown"),
+  actionPrompt: text("action_prompt"),
+  reflectionPrompt: text("reflection_prompt"),
+  discussionPrompt: text("discussion_prompt"),
+  milestoneKey: text("milestone_key"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  templateDayUnique: uniqueIndex("journey_days_template_day_unique").on(table.templateId, table.dayNumber),
+  templateIdx: index("journey_days_template_id_idx").on(table.templateId),
+}));
+
+export const personJourneys = pgTable("person_journeys", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  templateId: uuid("template_id").references(() => journeyTemplates.id).notNull(),
+  mentorUserId: uuid("mentor_user_id").references(() => users.id),
+  mentorPersonId: uuid("mentor_person_id").references(() => persons.id),
+  status: text("status").default("active").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  nextFollowUpAt: timestamp("next_follow_up_at"),
+  privateNote: text("private_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  personIdx: index("person_journeys_person_id_idx").on(table.personId),
+  templateIdx: index("person_journeys_template_id_idx").on(table.templateId),
+  statusIdx: index("person_journeys_status_idx").on(table.status),
+}));
+
+export const journeyProgress = pgTable("journey_progress", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  personJourneyId: uuid("person_journey_id").references(() => personJourneys.id).notNull(),
+  journeyDayId: uuid("journey_day_id").references(() => journeyDays.id).notNull(),
+  dayNumber: integer("day_number").notNull(),
+  status: text("status").default("not_started").notNull(),
+  responseText: text("response_text"),
+  mentorNote: text("mentor_note"),
+  needsFollowUp: boolean("needs_follow_up").default(false).notNull(),
+  visibility: text("visibility").default("pastoral").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  journeyDayUnique: uniqueIndex("journey_progress_journey_day_unique").on(table.personJourneyId, table.journeyDayId),
+  journeyIdx: index("journey_progress_person_journey_id_idx").on(table.personJourneyId),
+  followUpIdx: index("journey_progress_needs_follow_up_idx").on(table.needsFollowUp),
+}));
+
+export const journeyMilestones = pgTable("journey_milestones", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  personJourneyId: uuid("person_journey_id").references(() => personJourneys.id).notNull(),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  milestoneKey: text("milestone_key").notNull(),
+  title: text("title").notNull(),
+  status: text("status").default("planned").notNull(),
+  scheduledAt: timestamp("scheduled_at"),
+  completedAt: timestamp("completed_at"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  journeyIdx: index("journey_milestones_person_journey_id_idx").on(table.personJourneyId),
+  personIdx: index("journey_milestones_person_id_idx").on(table.personId),
+  statusIdx: index("journey_milestones_status_idx").on(table.status),
+}));
+
+export const mentorAssignments = pgTable("mentor_assignments", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  mentorUserId: uuid("mentor_user_id").references(() => users.id),
+  mentorPersonId: uuid("mentor_person_id").references(() => persons.id),
+  scope: text("scope").default("journey").notNull(),
+  status: text("status").default("active").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  endedAt: timestamp("ended_at"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  personIdx: index("mentor_assignments_person_id_idx").on(table.personId),
+  mentorUserIdx: index("mentor_assignments_mentor_user_id_idx").on(table.mentorUserId),
+  statusIdx: index("mentor_assignments_status_idx").on(table.status),
+}));
+
+export const pastoralTasks = pgTable("pastoral_tasks", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").default("open").notNull(),
+  priority: text("priority").default("normal").notNull(),
+  dueAt: timestamp("due_at"),
+  assignedToUserId: uuid("assigned_to_user_id").references(() => users.id),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  sourceType: text("source_type"),
+  sourceId: text("source_id"),
+  visibility: text("visibility").default("pastoral").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  personIdx: index("pastoral_tasks_person_id_idx").on(table.personId),
+  statusIdx: index("pastoral_tasks_status_idx").on(table.status),
+  assigneeIdx: index("pastoral_tasks_assigned_to_user_id_idx").on(table.assignedToUserId),
+  dueIdx: index("pastoral_tasks_due_at_idx").on(table.dueAt),
+}));
+
+export const personMergeSuggestions = pgTable("person_merge_suggestions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  primaryPersonId: uuid("primary_person_id").references(() => persons.id).notNull(),
+  duplicatePersonId: uuid("duplicate_person_id").references(() => persons.id).notNull(),
+  reason: text("reason").notNull(),
+  confidence: integer("confidence").default(60).notNull(),
+  status: text("status").default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  primaryIdx: index("person_merge_suggestions_primary_person_id_idx").on(table.primaryPersonId),
+  duplicateIdx: index("person_merge_suggestions_duplicate_person_id_idx").on(table.duplicatePersonId),
+  statusIdx: index("person_merge_suggestions_status_idx").on(table.status),
+  pairUnique: uniqueIndex("person_merge_suggestions_pair_unique").on(table.primaryPersonId, table.duplicatePersonId),
+}));
+
+export const servingTeams = pgTable("serving_teams", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  church: text("church"),
+  name: text("name").notNull(),
+  category: text("category").default("service").notNull(),
+  description: text("description"),
+  leaderUserId: uuid("leader_user_id").references(() => users.id),
+  defaultLocation: text("default_location"),
+  defaultStartTime: text("default_start_time"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  churchIdx: index("serving_teams_church_idx").on(table.church),
+  leaderIdx: index("serving_teams_leader_user_id_idx").on(table.leaderUserId),
+  activeIdx: index("serving_teams_active_idx").on(table.isActive),
+}));
+
+export const servingTeamMembers = pgTable("serving_team_members", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: uuid("team_id").references(() => servingTeams.id).notNull(),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  roleLabel: text("role_label").default("同工").notNull(),
+  status: text("status").default("active").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  teamIdx: index("serving_team_members_team_id_idx").on(table.teamId),
+  personIdx: index("serving_team_members_person_id_idx").on(table.personId),
+  userIdx: index("serving_team_members_user_id_idx").on(table.userId),
+  teamPersonUnique: uniqueIndex("serving_team_members_team_person_unique").on(table.teamId, table.personId),
+}));
+
+export const servingRoles = pgTable("serving_roles", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: uuid("team_id").references(() => servingTeams.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  requiredCount: integer("required_count").default(1).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  teamIdx: index("serving_roles_team_id_idx").on(table.teamId),
+  teamNameUnique: uniqueIndex("serving_roles_team_name_unique").on(table.teamId, table.name),
+}));
+
+export const servingScheduleEvents = pgTable("serving_schedule_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: uuid("team_id").references(() => servingTeams.id).notNull(),
+  title: text("title").notNull(),
+  serviceDate: date("service_date").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  location: text("location"),
+  status: text("status").default("draft").notNull(),
+  note: text("note"),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  teamDateIdx: index("serving_schedule_events_team_date_idx").on(table.teamId, table.serviceDate),
+  statusIdx: index("serving_schedule_events_status_idx").on(table.status),
+}));
+
+export const servingAssignments = pgTable("serving_assignments", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: uuid("event_id").references(() => servingScheduleEvents.id).notNull(),
+  roleId: uuid("role_id").references(() => servingRoles.id).notNull(),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  status: text("status").default("pending").notNull(),
+  note: text("note"),
+  confirmedAt: timestamp("confirmed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("serving_assignments_event_id_idx").on(table.eventId),
+  roleIdx: index("serving_assignments_role_id_idx").on(table.roleId),
+  personIdx: index("serving_assignments_person_id_idx").on(table.personId),
+  eventRolePersonUnique: uniqueIndex("serving_assignments_event_role_person_unique").on(table.eventId, table.roleId, table.personId),
+}));
+
+export const facilityRooms = pgTable("facility_rooms", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  church: text("church"),
+  name: text("name").notNull(),
+  category: text("category").default("classroom").notNull(),
+  location: text("location"),
+  capacity: integer("capacity").default(12).notNull(),
+  description: text("description"),
+  priority: integer("priority").default(50).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  churchIdx: index("facility_rooms_church_idx").on(table.church),
+  activeIdx: index("facility_rooms_active_idx").on(table.isActive),
+  roomUnique: uniqueIndex("facility_rooms_church_name_unique").on(table.church, table.name),
+}));
+
+export const facilityBookings = pgTable("facility_bookings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: uuid("room_id").references(() => facilityRooms.id).notNull(),
+  church: text("church"),
+  title: text("title").notNull(),
+  purpose: text("purpose").default("small_group").notNull(),
+  requesterPersonId: uuid("requester_person_id").references(() => persons.id),
+  requesterUserId: uuid("requester_user_id").references(() => users.id),
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at").notNull(),
+  status: text("status").default("pending").notNull(),
+  priority: integer("priority").default(50).notNull(),
+  note: text("note"),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  approvedByUserId: uuid("approved_by_user_id").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  roomTimeIdx: index("facility_bookings_room_time_idx").on(table.roomId, table.startAt, table.endAt),
+  churchIdx: index("facility_bookings_church_idx").on(table.church),
+  statusIdx: index("facility_bookings_status_idx").on(table.status),
+  requesterPersonIdx: index("facility_bookings_requester_person_id_idx").on(table.requesterPersonId),
+}));
+
+export const pastoralFrameworkStages = pgTable("pastoral_framework_stages", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  sourceLabel: text("source_label"),
+  isActive: boolean("is_active").default(true).notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  activeIdx: index("pastoral_framework_stages_active_idx").on(table.isActive),
+  sortIdx: index("pastoral_framework_stages_sort_order_idx").on(table.sortOrder),
+}));
+
+export const pastoralStageRequirements = pgTable("pastoral_stage_requirements", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  stageId: uuid("stage_id").references(() => pastoralFrameworkStages.id).notNull(),
+  requirementType: text("requirement_type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  targetCount: integer("target_count").default(1).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  stageIdx: index("pastoral_stage_requirements_stage_id_idx").on(table.stageId),
+  typeIdx: index("pastoral_stage_requirements_type_idx").on(table.requirementType),
+  stageTitleUnique: uniqueIndex("pastoral_stage_requirements_stage_title_unique").on(table.stageId, table.title),
+}));
+
+export const personStageProgress = pgTable("person_stage_progress", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  personId: uuid("person_id").references(() => persons.id).notNull(),
+  stageId: uuid("stage_id").references(() => pastoralFrameworkStages.id).notNull(),
+  status: text("status").default("in_progress").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  personIdx: index("person_stage_progress_person_id_idx").on(table.personId),
+  stageIdx: index("person_stage_progress_stage_id_idx").on(table.stageId),
+  personStageUnique: uniqueIndex("person_stage_progress_person_stage_unique").on(table.personId, table.stageId),
+}));
+
+export const lineAccounts = pgTable("line_accounts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id),
+  personId: uuid("person_id").references(() => persons.id),
+  lineUserId: text("line_user_id").notNull().unique(),
+  displayName: text("display_name"),
+  pictureUrl: text("picture_url"),
+  email: text("email"),
+  channelId: text("channel_id"),
+  linkedAt: timestamp("linked_at").defaultNow().notNull(),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("line_accounts_user_id_idx").on(table.userId),
+  personIdx: index("line_accounts_person_id_idx").on(table.personId),
+  lineUserIdx: index("line_accounts_line_user_id_idx").on(table.lineUserId),
+}));
+
 export const groupingActivities = pgTable("grouping_activities", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   shortCode: text("short_code").notNull().unique(), // 4-digit code for joining
@@ -604,9 +1094,47 @@ export const insertParticipantSchema = createInsertSchema(participants).omit({ i
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, submittedAt: true });
 export const insertStudyResponseSchema = createInsertSchema(studyResponses).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPrayerSchema = createInsertSchema(prayers).omit({ id: true, createdAt: true });
+export const insertPersonSchema = createInsertSchema(persons).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPersonIdentityLinkSchema = createInsertSchema(personIdentityLinks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPastoralTaskSchema = createInsertSchema(pastoralTasks).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
+export const insertServingTeamSchema = createInsertSchema(servingTeams).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertServingTeamMemberSchema = createInsertSchema(servingTeamMembers).omit({ id: true, createdAt: true, updatedAt: true, joinedAt: true });
+export const insertServingRoleSchema = createInsertSchema(servingRoles).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertServingScheduleEventSchema = createInsertSchema(servingScheduleEvents).omit({ id: true, createdAt: true, updatedAt: true, publishedAt: true });
+export const insertServingAssignmentSchema = createInsertSchema(servingAssignments).omit({ id: true, createdAt: true, updatedAt: true, confirmedAt: true });
+export const insertFacilityRoomSchema = createInsertSchema(facilityRooms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFacilityBookingSchema = createInsertSchema(facilityBookings).omit({ id: true, createdAt: true, updatedAt: true, approvedAt: true });
+export const insertPastoralFrameworkStageSchema = createInsertSchema(pastoralFrameworkStages).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPastoralStageRequirementSchema = createInsertSchema(pastoralStageRequirements).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPersonStageProgressSchema = createInsertSchema(personStageProgress).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLineAccountSchema = createInsertSchema(lineAccounts).omit({ id: true, createdAt: true, updatedAt: true, linkedAt: true, lastLoginAt: true });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type PastoralTask = typeof pastoralTasks.$inferSelect;
+export type InsertPastoralTask = z.infer<typeof insertPastoralTaskSchema>;
+export type ServingTeam = typeof servingTeams.$inferSelect;
+export type InsertServingTeam = z.infer<typeof insertServingTeamSchema>;
+export type ServingTeamMember = typeof servingTeamMembers.$inferSelect;
+export type InsertServingTeamMember = z.infer<typeof insertServingTeamMemberSchema>;
+export type ServingRole = typeof servingRoles.$inferSelect;
+export type InsertServingRole = z.infer<typeof insertServingRoleSchema>;
+export type ServingScheduleEvent = typeof servingScheduleEvents.$inferSelect;
+export type InsertServingScheduleEvent = z.infer<typeof insertServingScheduleEventSchema>;
+export type ServingAssignment = typeof servingAssignments.$inferSelect;
+export type InsertServingAssignment = z.infer<typeof insertServingAssignmentSchema>;
+export type FacilityRoom = typeof facilityRooms.$inferSelect;
+export type InsertFacilityRoom = z.infer<typeof insertFacilityRoomSchema>;
+export type FacilityBooking = typeof facilityBookings.$inferSelect;
+export type InsertFacilityBooking = z.infer<typeof insertFacilityBookingSchema>;
+export type PastoralFrameworkStage = typeof pastoralFrameworkStages.$inferSelect;
+export type InsertPastoralFrameworkStage = z.infer<typeof insertPastoralFrameworkStageSchema>;
+export type PastoralStageRequirement = typeof pastoralStageRequirements.$inferSelect;
+export type InsertPastoralStageRequirement = z.infer<typeof insertPastoralStageRequirementSchema>;
+export type PersonStageProgress = typeof personStageProgress.$inferSelect;
+export type InsertPersonStageProgress = z.infer<typeof insertPersonStageProgressSchema>;
+export type LineAccount = typeof lineAccounts.$inferSelect;
+export type InsertLineAccount = z.infer<typeof insertLineAccountSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Participant = typeof participants.$inferSelect;
@@ -617,6 +1145,13 @@ export type StudyResponse = typeof studyResponses.$inferSelect;
 export type InsertStudyResponse = z.infer<typeof insertStudyResponseSchema>;
 export type Prayer = typeof prayers.$inferSelect;
 export type InsertPrayer = z.infer<typeof insertPrayerSchema>;
+export type UserEmailPreference = typeof userEmailPreferences.$inferSelect;
+export type Person = typeof persons.$inferSelect;
+export type InsertPerson = z.infer<typeof insertPersonSchema>;
+export type PersonIdentityLink = typeof personIdentityLinks.$inferSelect;
+export type InsertPersonIdentityLink = z.infer<typeof insertPersonIdentityLinkSchema>;
+export type CareContact = typeof careContacts.$inferSelect;
+export type CareAction = typeof careActions.$inferSelect;
 export type AiReport = typeof aiReports.$inferSelect;
 export type FeatureToggle = typeof featureToggles.$inferSelect;
 export type PotentialMember = typeof potentialMembers.$inferSelect;
@@ -639,6 +1174,12 @@ export type ReadingPlanTemplate = typeof readingPlanTemplates.$inferSelect;
 export type ReadingPlanTemplateItem = typeof readingPlanTemplateItems.$inferSelect;
 export type UserReadingPlan = typeof userReadingPlans.$inferSelect;
 export type UserReadingProgress = typeof userReadingProgress.$inferSelect;
+export type JourneyTemplate = typeof journeyTemplates.$inferSelect;
+export type JourneyDay = typeof journeyDays.$inferSelect;
+export type PersonJourney = typeof personJourneys.$inferSelect;
+export type JourneyProgress = typeof journeyProgress.$inferSelect;
+export type JourneyMilestone = typeof journeyMilestones.$inferSelect;
+export type MentorAssignment = typeof mentorAssignments.$inferSelect;
 
 export const inboxEmails = pgTable("inbox_emails", {
   id: serial("id").primaryKey(),
@@ -663,11 +1204,23 @@ export const insertSavedVerseSchema = createInsertSchema(savedVerses).omit({ id:
 export const insertReadingPlanTemplateSchema = createInsertSchema(readingPlanTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserReadingPlanSchema = createInsertSchema(userReadingPlans).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserReadingProgressSchema = createInsertSchema(userReadingProgress).omit({ id: true, createdAt: true });
+export const insertJourneyTemplateSchema = createInsertSchema(journeyTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertJourneyDaySchema = createInsertSchema(journeyDays).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPersonJourneySchema = createInsertSchema(personJourneys).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertJourneyProgressSchema = createInsertSchema(journeyProgress).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertJourneyMilestoneSchema = createInsertSchema(journeyMilestones).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMentorAssignmentSchema = createInsertSchema(mentorAssignments).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type InsertDevotionalNote = z.infer<typeof insertDevotionalNoteSchema>;
 export type InsertSavedVerse = z.infer<typeof insertSavedVerseSchema>;
 export type InsertReadingPlanTemplate = z.infer<typeof insertReadingPlanTemplateSchema>;
 export type InsertUserReadingPlan = z.infer<typeof insertUserReadingPlanSchema>;
 export type InsertUserReadingProgress = z.infer<typeof insertUserReadingProgressSchema>;
+export type InsertJourneyTemplate = z.infer<typeof insertJourneyTemplateSchema>;
+export type InsertJourneyDay = z.infer<typeof insertJourneyDaySchema>;
+export type InsertPersonJourney = z.infer<typeof insertPersonJourneySchema>;
+export type InsertJourneyProgress = z.infer<typeof insertJourneyProgressSchema>;
+export type InsertJourneyMilestone = z.infer<typeof insertJourneyMilestoneSchema>;
+export type InsertMentorAssignment = z.infer<typeof insertMentorAssignmentSchema>;
 
 export * from "./models/auth";

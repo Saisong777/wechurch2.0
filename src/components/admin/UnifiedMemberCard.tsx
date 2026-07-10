@@ -29,10 +29,14 @@ interface UnifiedMemberCardProps {
 }
 
 const roleConfig: Record<AppRole, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode }> = {
-  admin: { label: '管理員', variant: 'destructive', icon: <Shield className="w-3 h-3" /> },
+  admin: { label: '系統管理員', variant: 'destructive', icon: <Shield className="w-3 h-3" /> },
+  senior_pastor: { label: '主任牧師', variant: 'destructive', icon: <Crown className="w-3 h-3" /> },
+  pastor: { label: '牧師', variant: 'default', icon: <UserCheck className="w-3 h-3" /> },
+  minister: { label: '傳道人', variant: 'secondary', icon: <Star className="w-3 h-3" /> },
+  group_leader: { label: '小組長', variant: 'default', icon: <Crown className="w-3 h-3" /> },
   leader: { label: '小組長', variant: 'default', icon: <Crown className="w-3 h-3" /> },
-  future_leader: { label: '儲備', variant: 'secondary', icon: <Star className="w-3 h-3" /> },
-  member: { label: '成員', variant: 'outline', icon: <Users className="w-3 h-3" /> },
+  future_leader: { label: '儲備領袖', variant: 'secondary', icon: <Star className="w-3 h-3" /> },
+  member: { label: '會友', variant: 'outline', icon: <Users className="w-3 h-3" /> },
 };
 
 const statusConfig = {
@@ -116,11 +120,32 @@ export const UnifiedMemberCard = ({
                     disabled={member.role === 'admin'}
                   >
                     <Shield className="h-4 w-4 mr-2" />
-                    設為管理員
+                    設為系統管理員
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onUpdateRole(member.user_id!, 'senior_pastor')}
+                    disabled={member.role === 'senior_pastor'}
+                  >
+                    <Crown className="h-4 w-4 mr-2" />
+                    設為主任牧師
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onUpdateRole(member.user_id!, 'pastor')}
+                    disabled={member.role === 'pastor'}
+                  >
+                    <UserCheck className="h-4 w-4 mr-2" />
+                    設為牧師
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onUpdateRole(member.user_id!, 'minister')}
+                    disabled={member.role === 'minister'}
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    設為傳道人
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => onUpdateRole(member.user_id!, 'leader')}
-                    disabled={member.role === 'leader'}
+                    onClick={() => onUpdateRole(member.user_id!, 'group_leader')}
+                    disabled={member.role === 'group_leader' || member.role === 'leader'}
                   >
                     <Crown className="h-4 w-4 mr-2" />
                     設為小組長

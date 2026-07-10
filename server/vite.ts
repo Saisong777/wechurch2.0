@@ -77,6 +77,7 @@ export function serveStatic(app: Express) {
   // Serve other static files with short cache
   app.use(express.static(distPath, {
     maxAge: '1h',
+    index: false,
   }));
 
   // SPA fallback - always return fresh index.html

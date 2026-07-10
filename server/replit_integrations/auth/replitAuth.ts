@@ -21,7 +21,11 @@ async function upsertUser(profile: any) {
     await pool.query(
       `INSERT INTO users (id, email, display_name, avatar_url, created_at, updated_at)
        VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
-       ON CONFLICT (email) DO UPDATE SET display_name=COALESCE(users.display_name, EXCLUDED.display_name), avatar_url=COALESCE(EXCLUDED.avatar_url, users.avatar_url), updated_at=NOW()`,
+       ON CONFLICT (email) DO UPDATE
+          SET display_name=COALESCE(users.display_name, EXCLUDED.display_name),
+              avatar_url=COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+              password=NULL,
+              updated_at=NOW()`,
       [email, `${firstName}${lastName}`.trim() || email.split("@")[0], profileImageUrl || null]
     );
   }
@@ -104,8 +108,5 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     if (req.session) req.session.touch();
     return next();
   }
-  // Session is still valid in DB (touch keeps it alive), so refresh expires_at for all user types
-  user.expires_at = Math.floor(Date.now() / 1000) + 86400 * 7;
-  if (req.session) req.session.touch();
-  return next();
+  return res.status(401).json({ message: "Session expired" });
 };

@@ -1,0 +1,115 @@
+{
+  "color": {
+    "bg": {
+      "default": { "value": "#F8FAF9", "type": "color" }
+    },
+    "surface": {
+      "default": { "value": "#FFFFFF", "type": "color" },
+      "scripturePaper": { "value": "#FBF8F1", "type": "color" }
+    },
+    "text": {
+      "strong": { "value": "#222C3A", "type": "color" },
+      "muted": { "value": "#5E6975", "type": "color" }
+    },
+    "border": {
+      "default": { "value": "#D7DFDA", "type": "color" }
+    },
+    "brand": {
+      "ink": { "value": "#2A3F63", "type": "color" },
+      "clay": { "value": "#C96A43", "type": "color" },
+      "green": { "value": "#2F8A70", "type": "color" }
+    },
+    "state": {
+      "warning": { "value": "#C98717", "type": "color" },
+      "destructive": { "value": "#D43C3C", "type": "color" }
+    }
+  },
+  "font": {
+    "family": {
+      "display": { "value": "Noto Sans TC", "type": "fontFamilies" },
+      "body": {
+        "value": "-apple-system, BlinkMacSystemFont, Noto Sans TC, PingFang TC, Microsoft JhengHei, sans-serif",
+        "type": "fontFamilies"
+      },
+      "scripture": {
+        "value": "Noto Serif TC, source-han-serif-tc, serif",
+        "type": "fontFamilies"
+      }
+    },
+    "size": {
+      "displayPage": { "value": "30px", "type": "fontSizes" },
+      "displayMobile": { "value": "26px", "type": "fontSizes" },
+      "sectionTitle": { "value": "20px", "type": "fontSizes" },
+      "cardTitle": { "value": "16px", "type": "fontSizes" },
+      "body": { "value": "15px", "type": "fontSizes" },
+      "meta": { "value": "12px", "type": "fontSizes" },
+      "navLabel": { "value": "11px", "type": "fontSizes" }
+    },
+    "lineHeight": {
+      "displayPage": { "value": "38px", "type": "lineHeights" },
+      "displayMobile": { "value": "34px", "type": "lineHeights" },
+      "sectionTitle": { "value": "28px", "type": "lineHeights" },
+      "cardTitle": { "value": "24px", "type": "lineHeights" },
+      "body": { "value": "24px", "type": "lineHeights" },
+      "meta": { "value": "18px", "type": "lineHeights" },
+      "navLabel": { "value": "14px", "type": "lineHeights" }
+    },
+    "weight": {
+      "regular": { "value": "400", "type": "fontWeights" },
+      "medium": { "value": "500", "type": "fontWeights" },
+      "semibold": { "value": "600", "type": "fontWeights" },
+      "bold": { "value": "700", "type": "fontWeights" }
+    }
+  },
+  "space": {
+    "1": { "value": "4px", "type": "spacing" },
+    "2": { "value": "8px", "type": "spacing" },
+    "3": { "value": "12px", "type": "spacing" },
+    "4": { "value": "16px", "type": "spacing" },
+    "5": { "value": "20px", "type": "spacing" },
+    "6": { "value": "24px", "type": "spacing" },
+    "8": { "value": "32px", "type": "spacing" },
+    "10": { "value": "40px", "type": "spacing" }
+  },
+  "radius": {
+    "sm": { "value": "6px", "type": "borderRadius" },
+    "md": { "value": "8px", "type": "borderRadius" },
+    "lg": { "value": "12px", "type": "borderRadius" },
+    "pill": { "value": "999px", "type": "borderRadius" }
+  },
+  "shadow": {
+    "card": {
+      "value": {
+        "x": "0px",
+        "y": "16px",
+        "blur": "48px",
+        "spread": "-34px",
+        "color": "rgba(30, 58, 95, 0.42)",
+        "type": "dropShadow"
+      },
+      "type": "boxShadow"
+    },
+    "nav": {
+      "value": {
+        "x": "0px",
+        "y": "-18px",
+        "blur": "40px",
+        "spread": "-32px",
+        "color": "rgba(30, 58, 95, 0.45)",
+        "type": "dropShadow"
+      },
+      "type": "boxShadow"
+    },
+    "focus": {
+      "value": {
+        "x": "0px",
+        "y": "0px",
+        "blur": "0px",
+        "spread": "4px",
+        "color": "rgba(27, 117, 167, 0.12)",
+        "type": "dropShadow"
+      },
+      "type": "boxShadow"
+    }
+  }
+}

@@ -1,17 +1,23 @@
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { cn, vibrate } from '@/lib/utils';
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
 
 export const BottomNav = () => {
   const location = useLocation();
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const nav = (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border/40 shadow-[0_-1px_0_0_rgba(0,0,0,0.08)] md:hidden pb-[env(safe-area-inset-bottom)]"
-      style={{ WebkitTransform: 'translateZ(0)' }}
+      className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-[1000] border-t border-border/70 bg-background/95 shadow-[0_-18px_40px_-32px_rgba(30,58,95,0.45)] backdrop-blur-xl md:hidden"
       data-testid="nav-bottom"
     >
-      <div className="flex items-center justify-around h-14 max-w-xl mx-auto px-2">
+      <div className="mx-auto flex h-14 max-w-xl items-center justify-around px-2">
         {appNavItems.map((item) => {
           const Icon = item.icon;
           const active = isNavItemActive(location.pathname, item);
@@ -20,29 +26,32 @@ export const BottomNav = () => {
             <Link
               key={item.id}
               to={item.href}
-              className="relative flex flex-col items-center justify-center flex-1 h-full"
+              className={cn(
+                "relative flex h-full flex-1 flex-col items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                active ? "text-primary" : "text-muted-foreground active:bg-muted/70"
+              )}
               onClick={() => vibrate(50)}
               data-testid={`nav-link-${item.id}`}
             >
               {active && (
                 <span
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-brand-amber"
+                  className="absolute inset-x-2 top-1.5 h-10 rounded-lg bg-primary/10"
+                  aria-hidden="true"
                 />
               )}
               <Icon
                 className={cn(
-                  "w-5 h-5 mb-0.5 transition-transform duration-150",
-                  active ? "scale-110 text-brand-amber" : "scale-100 text-[#999]"
+                  "relative mb-0.5 h-5 w-5 transition-transform duration-150",
+                  active ? "scale-105 text-primary" : "scale-100 text-muted-foreground"
                 )}
-                fill={active ? "currentColor" : "none"}
-                strokeWidth={active ? 1 : 1.5}
+                strokeWidth={active ? 2.25 : 1.75}
               />
               <span
                 className={cn(
-                  "text-[11px] leading-tight",
+                  "relative text-[11px] leading-tight",
                   active
-                    ? "font-medium text-brand-amber"
-                    : "font-normal text-[#999]"
+                    ? "font-semibold text-primary"
+                    : "font-medium text-muted-foreground"
                 )}
               >
                 {item.shortLabel}
@@ -53,4 +62,6 @@ export const BottomNav = () => {
       </div>
     </nav>
   );
+
+  return mounted ? createPortal(nav, document.body) : nav;
 };

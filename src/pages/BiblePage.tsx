@@ -16,6 +16,12 @@ import { FeatureGate } from '@/components/ui/feature-gate';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { vibrate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  getLocalBibleBooks,
+  getLocalBibleChapters,
+  getLocalBibleVerses,
+  searchLocalBibleVerses,
+} from '@/lib/localBible';
 
 interface BibleBook {
   bookName: string;
@@ -64,6 +70,17 @@ const NEW_TESTAMENT_CATEGORIES: BookCategory[] = [
   { name: '新約先知書', books: [66], colorDot: 'bg-orange-500' },
 ];
 
+async function fetchJsonWithLocalFallback<T>(url: string, fallback: () => Promise<T>): Promise<T> {
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (res.ok) return res.json();
+  } catch {
+    // The local preview can run without the Express API; fall through to bundled Bible data.
+  }
+
+  return fallback();
+}
+
 const BiblePage = () => {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
@@ -102,14 +119,17 @@ const BiblePage = () => {
 
   const { data: books = [], isError: booksError } = useQuery<BibleBook[]>({
     queryKey: ['/api/bible/books'],
+    queryFn: () => fetchJsonWithLocalFallback('/api/bible/books', getLocalBibleBooks),
   });
 
   const { data: chapters = [], isError: chaptersError } = useQuery<BibleChapter[]>({
     queryKey: ['/api/bible/chapters', selectedBook],
     queryFn: async () => {
-      const res = await fetch(`/api/bible/chapters/${encodeURIComponent(selectedBook!)}`);
-      if (!res.ok) throw new Error('Failed to fetch chapters');
-      return res.json();
+      const bookName = selectedBook!;
+      return fetchJsonWithLocalFallback(
+        `/api/bible/chapters/${encodeURIComponent(bookName)}`,
+        () => getLocalBibleChapters(bookName),
+      );
     },
     enabled: !!selectedBook,
   });
@@ -117,9 +137,12 @@ const BiblePage = () => {
   const { data: verses = [], isLoading: versesLoading, isError: versesError } = useQuery<BibleVerse[]>({
     queryKey: ['/api/bible/verses', selectedBook, selectedChapter],
     queryFn: async () => {
-      const res = await fetch(`/api/bible/verses/${encodeURIComponent(selectedBook!)}/${selectedChapter}`);
-      if (!res.ok) throw new Error('Failed to fetch verses');
-      return res.json();
+      const bookName = selectedBook!;
+      const chapter = selectedChapter!;
+      return fetchJsonWithLocalFallback(
+        `/api/bible/verses/${encodeURIComponent(bookName)}/${chapter}`,
+        () => getLocalBibleVerses(bookName, chapter),
+      );
     },
     enabled: !!selectedBook && !!selectedChapter,
   });
@@ -127,9 +150,10 @@ const BiblePage = () => {
   const { data: searchResults = [], isLoading: searchLoading, isError: searchError } = useQuery<BibleVerse[]>({
     queryKey: ['/api/bible/search', searchQuery],
     queryFn: async () => {
-      const res = await fetch(`/api/bible/search?q=${encodeURIComponent(searchQuery)}`);
-      if (!res.ok) throw new Error('Failed to search');
-      return res.json();
+      return fetchJsonWithLocalFallback(
+        `/api/bible/search?q=${encodeURIComponent(searchQuery)}`,
+        () => searchLocalBibleVerses(searchQuery),
+      );
     },
     enabled: isSearching && searchQuery.length >= 2,
   });

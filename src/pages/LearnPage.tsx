@@ -17,6 +17,18 @@ const features: Array<FeaturePortalAction & { featureKey: string }> = [
     testId: 'link-feature-bible',
   },
   {
+    id: 'church-reading',
+    featureKey: 'we_learn',
+    title: '每日靈修',
+    subtitle: '今日經文、愛神愛人、行動提醒',
+    icon: BookOpen,
+    href: '/learn/church-reading',
+    tone: 'bg-primary/15',
+    iconTone: 'text-primary',
+    badge: '今天',
+    testId: 'link-feature-church-reading',
+  },
+  {
     id: 'reading-plans',
     featureKey: 'reading_plans',
     title: '接續讀經',

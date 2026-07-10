@@ -21,15 +21,16 @@ import {
   GroupingActivity, GroupingParticipant, InsertGroupingActivity, InsertGroupingParticipant,
   inboxEmails, InboxEmail, InsertInboxEmail
 } from "@shared/schema";
+import { getChurchAliases, normalizeChurch, UNASSIGNED_CHURCH_ID } from "./churches";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  getUsers(): Promise<User[]>;
+  getUsers(church?: string | null): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
 
-  getUserRoles(): Promise<{ userId: string; role: string }[]>;
+  getUserRoles(church?: string | null): Promise<{ userId: string; role: string }[]>;
   getUserRole(userId: string): Promise<string | undefined>;
   upsertUserRole(userId: string, role: string): Promise<void>;
 
@@ -80,8 +81,8 @@ export interface IStorage {
   getFeatureToggle(key: string): Promise<FeatureToggle | undefined>;
   updateFeatureToggle(id: string, data: Partial<FeatureToggle>): Promise<FeatureToggle | undefined>;
 
-  getPotentialMembers(): Promise<PotentialMember[]>;
-  upsertPotentialMember(data: { email: string; name: string; gender?: string }): Promise<PotentialMember>;
+  getPotentialMembers(church?: string | null): Promise<PotentialMember[]>;
+  upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<PotentialMember>;
   updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined>;
   deletePotentialMember(id: string): Promise<void>;
 
@@ -177,10 +178,14 @@ export interface IStorage {
   createReadingProgress(progress: InsertUserReadingProgress): Promise<UserReadingProgress>;
 
   getDevotionalNote(id: string): Promise<DevotionalNote | undefined>;
+  getDevotionalNoteForUser(id: string, userId: string): Promise<DevotionalNote | undefined>;
   getDevotionalNotes(userId: string): Promise<DevotionalNote[]>;
   getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
+  getDevotionalNoteByPlanDayForUser(userId: string, planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
   createDevotionalNote(note: InsertDevotionalNote): Promise<DevotionalNote>;
   updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined>;
+  updateDevotionalNoteForUser(id: string, userId: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined>;
+  toggleDevotionalNoteHiddenForUser(id: string, userId: string, hidden: boolean): Promise<DevotionalNote | undefined>;
   getDevotionalNoteByVerseReference(userId: string, verseReference: string): Promise<DevotionalNote | undefined>;
 
   createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate>;
@@ -205,7 +210,14 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getUsers(): Promise<User[]> {
+  async getUsers(church?: string | null): Promise<User[]> {
+    if (church === UNASSIGNED_CHURCH_ID) {
+      return db.select().from(users).where(or(isNull(users.church), sql`trim(${users.church}) = ''`));
+    }
+    if (church) {
+      const aliases = getChurchAliases(church);
+      return db.select().from(users).where(or(...aliases.map((alias) => eq(users.church, alias))));
+    }
     return db.select().from(users);
   }
 
@@ -219,7 +231,22 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getUserRoles(): Promise<{ userId: string; role: string }[]> {
+  async getUserRoles(church?: string | null): Promise<{ userId: string; role: string }[]> {
+    if (church === UNASSIGNED_CHURCH_ID) {
+      return db
+        .select({ userId: userRoles.userId, role: userRoles.role })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.userId, users.id))
+        .where(or(isNull(users.church), sql`trim(${users.church}) = ''`));
+    }
+    if (church) {
+      const aliases = getChurchAliases(church);
+      return db
+        .select({ userId: userRoles.userId, role: userRoles.role })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.userId, users.id))
+        .where(or(...aliases.map((alias) => eq(users.church, alias))));
+    }
     return db.select({ userId: userRoles.userId, role: userRoles.role }).from(userRoles);
   }
 
@@ -301,7 +328,17 @@ export class DatabaseStorage implements IStorage {
 
   async createParticipant(participant: InsertParticipant): Promise<Participant> {
     const [newParticipant] = await db.insert(participants).values(participant).returning();
-    await this.upsertPotentialMember({ email: participant.email, name: participant.name, gender: participant.gender });
+    const [session] = await db
+      .select({ churchUnit: sessions.churchUnit })
+      .from(sessions)
+      .where(eq(sessions.id, participant.sessionId))
+      .limit(1);
+    await this.upsertPotentialMember({
+      email: participant.email,
+      name: participant.name,
+      gender: participant.gender,
+      church: normalizeChurch(session?.churchUnit),
+    });
     return newParticipant;
   }
 
@@ -603,20 +640,34 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getPotentialMembers(): Promise<PotentialMember[]> {
+  async getPotentialMembers(church?: string | null): Promise<PotentialMember[]> {
+    if (church === UNASSIGNED_CHURCH_ID) {
+      return db.select().from(potentialMembers).where(or(isNull(potentialMembers.church), sql`trim(${potentialMembers.church}) = ''`));
+    }
+    if (church) {
+      const aliases = getChurchAliases(church);
+      return db.select().from(potentialMembers).where(or(...aliases.map((alias) => eq(potentialMembers.church, alias))));
+    }
     return db.select().from(potentialMembers);
   }
 
-  async upsertPotentialMember(data: { email: string; name: string; gender?: string }): Promise<PotentialMember> {
+  async upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<PotentialMember> {
+    const church = normalizeChurch(data.church);
     const existing = await db.select().from(potentialMembers).where(eq(potentialMembers.email, data.email)).limit(1);
     if (existing.length > 0) {
       const [updated] = await db.update(potentialMembers)
-        .set({ name: data.name, gender: data.gender, lastSessionAt: new Date(), sessionsCount: sql`${potentialMembers.sessionsCount} + 1` })
+        .set({
+          name: data.name,
+          gender: data.gender,
+          church: church ?? existing[0].church,
+          lastSessionAt: new Date(),
+          sessionsCount: sql`${potentialMembers.sessionsCount} + 1`,
+        })
         .where(eq(potentialMembers.email, data.email))
         .returning();
       return updated;
     }
-    const [newMember] = await db.insert(potentialMembers).values(data).returning();
+    const [newMember] = await db.insert(potentialMembers).values({ ...data, church }).returning();
     return newMember;
   }
 
@@ -1212,6 +1263,15 @@ export class DatabaseStorage implements IStorage {
     return note;
   }
 
+  async getDevotionalNoteForUser(id: string, userId: string): Promise<DevotionalNote | undefined> {
+    const [note] = await db
+      .select()
+      .from(devotionalNotes)
+      .where(and(eq(devotionalNotes.id, id), eq(devotionalNotes.userId, userId)))
+      .limit(1);
+    return note;
+  }
+
   async getDevotionalNotes(userId: string): Promise<DevotionalNote[]> {
     return db.select().from(devotionalNotes).where(and(eq(devotionalNotes.userId, userId), eq(devotionalNotes.hidden, false))).orderBy(desc(devotionalNotes.createdAt));
   }
@@ -1221,9 +1281,29 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async toggleDevotionalNoteHiddenForUser(id: string, userId: string, hidden: boolean): Promise<DevotionalNote | undefined> {
+    const [updated] = await db
+      .update(devotionalNotes)
+      .set({ hidden, updatedAt: new Date() })
+      .where(and(eq(devotionalNotes.id, id), eq(devotionalNotes.userId, userId)))
+      .returning();
+    return updated;
+  }
+
   async getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined> {
     const [note] = await db.select().from(devotionalNotes).where(
       and(
+        eq(devotionalNotes.readingPlanId, planId),
+        eq(devotionalNotes.dayNumber, dayNumber)
+      )
+    ).limit(1);
+    return note;
+  }
+
+  async getDevotionalNoteByPlanDayForUser(userId: string, planId: string, dayNumber: number): Promise<DevotionalNote | undefined> {
+    const [note] = await db.select().from(devotionalNotes).where(
+      and(
+        eq(devotionalNotes.userId, userId),
         eq(devotionalNotes.readingPlanId, planId),
         eq(devotionalNotes.dayNumber, dayNumber)
       )
@@ -1238,6 +1318,17 @@ export class DatabaseStorage implements IStorage {
 
   async updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined> {
     const [updated] = await db.update(devotionalNotes).set({ ...updates, updatedAt: new Date() }).where(eq(devotionalNotes.id, id)).returning();
+    return updated;
+  }
+
+  async updateDevotionalNoteForUser(id: string, userId: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined> {
+    const safeUpdates = { ...updates };
+    delete (safeUpdates as { userId?: unknown }).userId;
+    const [updated] = await db
+      .update(devotionalNotes)
+      .set({ ...safeUpdates, updatedAt: new Date() })
+      .where(and(eq(devotionalNotes.id, id), eq(devotionalNotes.userId, userId)))
+      .returning();
     return updated;
   }
 

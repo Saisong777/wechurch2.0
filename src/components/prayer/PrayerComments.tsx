@@ -8,7 +8,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { usePrayerComments, useCreateComment, useDeleteComment } from '@/hooks/usePrayerComments';
 import { useUserRole } from '@/hooks/useUserRole';
-import { cn } from '@/lib/utils';
 
 interface PrayerCommentsProps {
   prayerId: string;
@@ -42,12 +41,12 @@ export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
         variant="ghost"
         size="sm"
         onClick={() => setIsExpanded(true)}
-        className="gap-2 text-muted-foreground hover:text-foreground"
+        className="h-10 gap-2 rounded-lg px-3 text-muted-foreground hover:text-foreground"
       >
         <MessageCircle className="h-4 w-4" />
-        <span>留言</span>
+        <span>{commentCount > 0 ? '查看鼓勵' : '留下鼓勵'}</span>
         {commentCount > 0 && (
-          <span className="bg-muted px-1.5 py-0.5 rounded-full text-xs font-medium">
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
             {commentCount}
           </span>
         )}
@@ -56,7 +55,7 @@ export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
   }
 
   return (
-    <div className="mt-4 pt-4 border-t space-y-4">
+    <div className="rounded-lg border bg-muted/30 p-3 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium flex items-center gap-2">
@@ -66,8 +65,9 @@ export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-7 w-7 rounded-full"
           onClick={() => setIsExpanded(false)}
+          aria-label="收合留言"
         >
           <X className="h-4 w-4" />
         </Button>
@@ -87,7 +87,7 @@ export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
           ))}
         </div>
       ) : comments && comments.length > 0 ? (
-        <div className="space-y-3 max-h-64 overflow-y-auto">
+        <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
           {comments.map((comment) => (
             <div key={comment.id} className="flex gap-2 group">
               <Avatar className="h-8 w-8 flex-shrink-0">
@@ -113,6 +113,7 @@ export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
                       size="icon"
                       className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                       onClick={() => handleDelete(comment.id)}
+                      aria-label="刪除留言"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -134,15 +135,16 @@ export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
         <Input
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          placeholder="寫下你的鼓勵..."
+          placeholder="寫下一句鼓勵或禱告..."
           maxLength={200}
-          className="flex-1 h-9"
+          className="h-10 flex-1 rounded-lg"
         />
         <Button
           type="submit"
           size="icon"
-          className="h-9 w-9"
+          className="h-10 w-10 rounded-lg"
           disabled={!newComment.trim() || createMutation.isPending}
+          aria-label="送出留言"
         >
           <Send className="h-4 w-4" />
         </Button>
