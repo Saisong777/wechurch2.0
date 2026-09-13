@@ -38,7 +38,7 @@ export function DailyHome({
         <p>愛神・愛人・門徒生活</p>
         <p>{date}</p>
       </div>
-      <div className="mb-4 flex flex-wrap gap-x-6"><Link to="/groups" className={quietLink}><Users className="h-4 w-4" />我的小組<ArrowRight className="h-4 w-4" /></Link>{signedIn && <Link to="/me/activity" className={quietLink}>待回應<ArrowRight className="h-4 w-4" /></Link>}</div>
+      <div className="mb-4 flex flex-wrap gap-x-6"><Link to="/groups" className={quietLink}><Users className="h-4 w-4" />我的小組<ArrowRight className="h-4 w-4" /></Link><Link to="/walls" className={quietLink}>分享牆<ArrowRight className="h-4 w-4" /></Link>{signedIn && <Link to="/me/activity" className={quietLink}>待回應<ArrowRight className="h-4 w-4" /></Link>}</div>
 
       <section aria-labelledby="daily-devotion-title" className="border-b border-border pb-6">
         <h2 id="daily-devotion-title" className="flex items-center gap-2 text-xl font-semibold">
@@ -100,7 +100,6 @@ export function DailyHome({
         ) : <p className="mt-3 text-sm text-muted-foreground">目前沒有正在等候的禱告。</p>}
         <div className="mt-2 flex flex-wrap gap-x-5">
           <Link to="/grace-record" className={quietLink}>禱告與恩典紀錄</Link>
-          <Link to="/walls" className={quietLink}>分享牆</Link>
         </div>
       </section>
 

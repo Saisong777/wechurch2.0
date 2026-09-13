@@ -1,4 +1,4 @@
-import { BookOpen, HandHeart, Home, Share2, type LucideIcon } from 'lucide-react';
+import { BookOpen, Heart, Home, PanelsTopLeft, Users, type LucideIcon } from 'lucide-react';
 
 export interface AppNavItem {
   id: string;
@@ -12,8 +12,8 @@ export interface AppNavItem {
 export const appNavItems: AppNavItem[] = [
   {
     id: 'home',
-    label: '首頁',
-    shortLabel: '首頁',
+    label: '今日',
+    shortLabel: '今日',
     href: '/',
     icon: Home,
     match: ['/'],
@@ -31,16 +31,24 @@ export const appNavItems: AppNavItem[] = [
     label: '禱告',
     shortLabel: '禱告',
     href: '/share',
-    icon: Share2,
-    match: ['/share', '/grace-record', '/walls', '/devotion-wall', '/prayer-wall', '/prayer-meeting'],
+    icon: Heart,
+    match: ['/share', '/grace-record'],
   },
   {
-    id: 'care',
-    label: '關懷',
-    shortLabel: '關懷',
-    href: '/care',
-    icon: HandHeart,
-    match: ['/care'],
+    id: 'walls',
+    label: '分享牆',
+    shortLabel: '分享牆',
+    href: '/walls',
+    icon: PanelsTopLeft,
+    match: ['/walls', '/devotion-wall', '/prayer-wall'],
+  },
+  {
+    id: 'groups',
+    label: '小組',
+    shortLabel: '小組',
+    href: '/groups',
+    icon: Users,
+    match: ['/groups'],
   },
 ];
 

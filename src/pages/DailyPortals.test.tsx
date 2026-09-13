@@ -21,17 +21,21 @@ it('keeps only Bible, daily devotion and notes in learning', () => {
   expect(screen.queryByText('看耶穌四季')).toBeNull();
 });
 
-it('separates private prayer from a single public walls entry', () => {
-  render(<MemoryRouter><SharePage /></MemoryRouter>);
-  expect(screen.getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(['/grace-record', '/walls']);
+it('opens personal prayer directly without another portal', () => {
+  render(<MemoryRouter initialEntries={['/share']}><Routes>
+    <Route path="/share" element={<SharePage />} />
+    <Route path="/grace-record" element={<h1>我的個人禱告</h1>} />
+  </Routes></MemoryRouter>);
+  expect(screen.getByRole('heading', { name: '我的個人禱告' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '分享牆' })).toBeNull();
   expect(screen.queryByText('下載信息圖卡')).toBeNull();
   expect(screen.queryByText('禱告會與緊急代禱')).toBeNull();
 });
 
-it('does not advertise walls when both children are disabled', () => {
-  state.disabled = ['we_learn', 'prayer_wall'];
+it('preserves the disabled prayer entry state', () => {
+  state.disabled = ['we_share'];
   render(<MemoryRouter><SharePage /></MemoryRouter>);
-  expect(screen.queryByRole('link', { name: '分享牆' })).toBeNull();
+  expect(screen.getByText('禱告功能維護中')).toBeInTheDocument();
 });
 
 it('keeps wall tabs linked and marks the current wall', () => {

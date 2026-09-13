@@ -7,7 +7,7 @@ export function MobileNavLinks({ onNavigate, placement = 'footer' }: {
   placement?: 'header' | 'footer';
 }) {
   const { pathname, search, hash } = useLocation();
-  return <div className={cn('mx-auto grid max-w-xl gap-1 p-2', placement === 'header' ? 'grid-cols-2' : 'grid-cols-4')}>
+  return <div className={cn('mx-auto grid max-w-xl gap-1 p-2', placement === 'header' ? 'grid-cols-2' : 'grid-cols-5')}>
     {appNavItems.map(item => {
       const Icon = item.icon;
       const active = isNavItemActive(pathname, item);

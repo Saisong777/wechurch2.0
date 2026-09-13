@@ -210,6 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <Link
                   key={item.id}
                   to={item.href}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
                     "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     active

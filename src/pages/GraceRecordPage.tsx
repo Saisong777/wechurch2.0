@@ -137,7 +137,7 @@ const GraceRecordPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-emerald-50/40">
       <UnsavedChangesGuard dirty={!!user && (!!title.trim() || !!prayer.trim() || Object.entries(responseDrafts).some(([id, value]) => value !== (records.find(record => record.id === id)?.response || '')))} />
-      <Header title="個人禱告" subtitle="禱告清單與恩典紀錄簿" variant="compact" backTo="/share" />
+      <Header title="個人禱告" subtitle="禱告清單與恩典紀錄簿" variant="compact" backTo="/" />
 
       <main className="container mx-auto px-3 py-4 sm:px-4 md:px-6 md:py-8">
         <div className="mx-auto max-w-5xl space-y-4">

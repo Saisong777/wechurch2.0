@@ -19,7 +19,7 @@ it('renders an in-flow footer without a portal or viewport height', () => {
   expect(nav).not.toHaveClass('fixed', 'absolute', 'sticky');
   expect(nav.style.height).toBe('');
   expect(screen.queryByTestId('nav-bottom-dock')).toBeNull();
-  expect(within(nav).getAllByRole('link')).toHaveLength(4);
+  expect(within(nav).getAllByRole('link')).toHaveLength(5);
 });
 
 it('returns to the top when the current footer destination is selected', () => {
@@ -35,7 +35,7 @@ it('keeps the menu collapsed until requested, with explicit expanded state', () 
   expect(screen.queryByRole('navigation')).toBeNull();
   fireEvent.click(button);
   expect(button).toHaveAttribute('aria-expanded', 'true');
-  expect(within(screen.getByRole('navigation', { name: '行動導覽選單' })).getAllByRole('link')).toHaveLength(7);
+  expect(within(screen.getByRole('navigation', { name: '行動導覽選單' })).getAllByRole('link')).toHaveLength(8);
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(button).toHaveFocus();
   expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -44,7 +44,7 @@ it('keeps the menu collapsed until requested, with explicit expanded state', () 
 it('dismisses on outside interaction and keeps the existing destination order', () => {
   render(<MemoryRouter><MobileNavigation /><main>內容</main></MemoryRouter>);
   fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
-  expect(screen.getAllByRole('link').slice(1).map(el => el.getAttribute('href'))).toEqual(['/', '/learn', '/share', '/care', '/groups', '/me', '/play']);
+  expect(screen.getAllByRole('link').slice(1).map(el => el.getAttribute('href'))).toEqual(['/', '/learn', '/share', '/walls', '/groups', '/care', '/me', '/play']);
   fireEvent.pointerDown(screen.getByRole('main'));
   expect(screen.queryByRole('navigation')).toBeNull();
 });

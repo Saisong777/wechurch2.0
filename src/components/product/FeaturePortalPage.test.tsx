@@ -15,8 +15,16 @@ it('keeps all feature actions once, without explanatory cards', () => {
   for (const action of actions) expect(screen.getByTestId(action.testId)).toHaveAttribute('href', action.href);
   expect(screen.queryByText('Unnecessary explanation')).toBeNull();
 });
-it('main navigation only includes four daily destinations', () => {
-  expect(appNavItems.map(item => item.href)).toEqual(['/', '/learn', '/share', '/care']);
+it('separates personal prayer, public walls and groups in the main navigation', () => {
+  expect(appNavItems.map(item => item.href)).toEqual(['/', '/learn', '/share', '/walls', '/groups']);
   expect(appNavItems.some(item => isNavItemActive('/user', item))).toBe(false);
   expect(isNavItemActive('/learn/bible', appNavItems[1])).toBe(true);
+});
+
+it.each(['/walls', '/prayer-wall', '/devotion-wall'])('marks only the walls unit active for %s', path => {
+  expect(appNavItems.filter(item => isNavItemActive(path, item)).map(item => item.id)).toEqual(['walls']);
+});
+
+it.each(['/share', '/grace-record'])('marks personal prayer active for %s', path => {
+  expect(appNavItems.filter(item => isNavItemActive(path, item)).map(item => item.id)).toEqual(['share']);
 });
