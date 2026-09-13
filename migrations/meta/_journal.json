@@ -8,6 +8,59 @@
       "when": 1772698849160,
       "tag": "0000_icy_daredevil",
       "breakpoints": true
-    }
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783674732366,
+      "tag": "0001_pastoral_beta",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789128000000,
+      "tag": "0002_personal_prayers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789129800000,
+      "tag": "0003_church_devotions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789131600000,
+      "tag": "0004_life_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789133400000,
+      "tag": "0005_prayer_sharing",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789135200000,
+      "tag": "0006_prayer_interactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789137000000,
+      "tag": "0007_daily_walls",
+      "breakpoints": true
+    },
+    { "idx": 8, "version": "7", "when": 1789228800000, "tag": "0008_identity_integrity", "breakpoints": true },
+    { "idx": 9, "version": "7", "when": 1789286400000, "tag": "0009_support_requests", "breakpoints": true },
+    { "idx": 10, "version": "7", "when": 1789290000000, "tag": "0010_mentoring_contracts", "breakpoints": true },
+    { "idx": 11, "version": "7", "when": 1789308000000, "tag": "0011_devotional_note_versions", "breakpoints": true }
   ]
 }

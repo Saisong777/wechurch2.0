@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { MobileHeaderContext } from './MobileHeaderContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { cn } from '@/lib/utils';
@@ -13,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, BookMarked, User, Settings, Shield, ChevronLeft } from 'lucide-react';
+import { LogOut, User, Settings, Shield, ChevronLeft } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -39,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
   backTo,
 }) => {
   const { user, loading, signOut } = useAuth();
+  const mobileHeader = useContext(MobileHeaderContext);
   const { profile } = useUserProfile();
   const { isAdmin, isLeader } = useUserRole();
   const navigate = useNavigate();
@@ -50,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
     navigate('/');
   };
 
-  const getInitials = (email: string | undefined) => {
+  const getInitials = (email: string | null | undefined) => {
     if (!email) return 'U';
     return email.charAt(0).toUpperCase();
   };
@@ -94,9 +97,9 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/learn/my-notes" className="flex items-center gap-2 cursor-pointer">
-                <BookMarked className="w-4 h-4" />
-                我的筆記
+              <Link to="/me" className="flex items-center gap-2 cursor-pointer">
+                <User className="w-4 h-4" />
+                個人管理
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShowProfileSettings(true)} className="cursor-pointer">
@@ -138,14 +141,20 @@ export const Header: React.FC<HeaderProps> = ({
   );
 
   return (
+    <>
+    {mobileHeader?.actionsTarget && rightContent && createPortal(
+      <div className="flex justify-center border-b border-border p-2 md:hidden">{rightContent}</div>,
+      mobileHeader.actionsTarget,
+    )}
     <header className={cn(
-      'w-full sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40',
+      'sticky top-0 z-40 w-full border-b border-border/70 bg-background/90 shadow-[0_10px_30px_-28px_rgba(30,58,95,0.45)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80',
       variant === 'default' ? 'py-3 sm:py-5 md:py-3' : 'py-2 sm:py-3',
+      mobileHeader && 'hidden md:block',
       className
-    )}>
+    )} data-testid="page-header">
       <div className="container mx-auto px-3 sm:px-4 md:px-6">
         <div className="flex items-center justify-between">
-          <div className={cn("md:hidden flex items-center", backTo ? "w-20 sm:w-24" : rightContent ? "w-[5.25rem] sm:w-24" : "w-10 sm:w-12")}>
+          <div className={cn("md:hidden flex shrink-0 items-center", backTo ? "w-20 sm:w-24" : rightContent ? "w-[5.25rem] sm:w-24" : "w-10 sm:w-12")}>
             {backTo && (
               <button
                 onClick={() => navigate(backTo)}
@@ -162,7 +171,6 @@ export const Header: React.FC<HeaderProps> = ({
           <Link to="/" className="hidden md:flex items-center gap-2 hover:opacity-80 transition-opacity group shrink-0">
             {showLogo && (
               <div className="relative">
-                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse-soft" />
                 <WeChurchLogo size={32} className="relative group-hover:scale-105 transition-transform" />
               </div>
             )}
@@ -172,16 +180,15 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
 
           {/* Mobile: Center logo */}
-          <Link to="/" className="flex md:hidden items-center justify-center gap-1.5 sm:gap-3 hover:opacity-80 transition-opacity group">
+          <Link to="/" className="flex min-w-0 flex-1 items-center justify-center gap-1.5 sm:gap-3 hover:opacity-80 transition-opacity group md:hidden">
             {showLogo && (
               <div className="relative">
-                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse-soft" />
                 <WeChurchLogo size={variant === 'default' ? 36 : 32} className="relative group-hover:scale-105 transition-transform" />
               </div>
             )}
-            <div className="text-center">
+            <div className="min-w-0 text-center">
               <h1 className={cn(
-                'font-bold text-foreground',
+                'truncate font-bold text-foreground',
                 variant === 'default' ? 'text-lg sm:text-2xl' : 'text-base sm:text-xl'
               )}>
                 {title}
@@ -203,11 +210,12 @@ export const Header: React.FC<HeaderProps> = ({
                 <Link
                   key={item.id}
                   to={item.href}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     active
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                   )}
                   data-testid={`nav-top-link-${item.id}`}
                 >
@@ -218,7 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </nav>
 
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {backTo && (
               <button
                 onClick={() => navigate(backTo)}
@@ -240,5 +248,6 @@ export const Header: React.FC<HeaderProps> = ({
         onOpenChange={setShowProfileSettings}
       />
     </header>
+    </>
   );
 };

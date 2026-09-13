@@ -1,38 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useAuth } from '@/contexts/AuthContext';
+import { saveDevotionalNote, noteSaveMessage } from '@/lib/saveDevotionalNote';
+import {
+  createLocalDevotionalNoteId,
+  findLocalDevotionalNoteById,
+  findLocalDevotionalNoteByReference,
+  type LocalDevotionalNote,
+} from '@/lib/localDevotionalNotes';
 import {
   Eye,
   Heart,
-  Film,
-  Dumbbell,
   Target,
-  BookOpen,
   Sparkles,
-  MessageSquare,
   Loader2,
   Check,
   BookMarked,
-  Star,
-  Megaphone,
-  ShieldAlert,
-  Crown,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { INSIGHT_CATEGORIES, parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
+import { parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
 import type { InsightCategory } from '@/types/spiritual-fitness';
-
-const CATEGORY_ICONS: Record<string, typeof Star> = {
-  PROMISE: Star,
-  COMMAND: Megaphone,
-  WARNING: ShieldAlert,
-  GOD_ATTRIBUTE: Crown,
-};
+import { DevotionWallShareDialog } from './DevotionWallShareDialog';
+import type { DevotionShareDraft } from '@shared/devotionWall';
+import { createDevotionShareDraft } from '@/lib/devotionShareDraft';
+import { LeaveConfirmation, UnsavedChangesGuard } from '@/components/layout/UnsavedChangesGuard';
+import { DeviceDraft } from '@/components/layout/DeviceDraft';
+import { clearDeviceDraft } from '@/lib/deviceDraft';
+import { z } from 'zod';
+import { NoteConflictReview } from './NoteConflictReview';
 
 interface DevotionalNoteDialogProps {
   open: boolean;
@@ -64,6 +63,36 @@ const emptyForm: FormFields = {
   coolDownNote: '',
 };
 
+const RECEIVE_KEY: InsightCategory = 'GOD_ATTRIBUTE';
+const formSchema = z.object({
+  titlePhrase:z.string(),heartbeatVerse:z.string(),observation:z.string(),
+  coreInsightCategory:z.array(z.enum(['PROMISE','COMMAND','WARNING','GOD_ATTRIBUTE'])),
+  coreInsightNote:z.record(z.string()),scholarsNote:z.string(),actionPlan:z.string(),coolDownNote:z.string(),
+});
+
+const applyNoteToForm = (
+  note: LocalDevotionalNote,
+  setExistingId: (id: string) => void,
+  setDisplayReference: (reference: string) => void,
+  setDisplayText: (text: string) => void,
+  setForm: (form: FormFields) => void,
+) => {
+  setExistingId(note.id);
+  if (note.verseReference) setDisplayReference(note.verseReference);
+  if (note.verseText) setDisplayText(note.verseText);
+  const parsedCategories = parseCategories(note.coreInsightCategory);
+  setForm({
+    titlePhrase: note.titlePhrase ?? '',
+    heartbeatVerse: note.heartbeatVerse ?? '',
+    observation: note.observation ?? '',
+    coreInsightCategory: parsedCategories,
+    coreInsightNote: parseNotes(note.coreInsightNote, parsedCategories),
+    scholarsNote: note.scholarsNote ?? '',
+    actionPlan: note.actionPlan ?? '',
+    coolDownNote: note.coolDownNote ?? '',
+  });
+};
+
 export function DevotionalNoteDialog({
   open,
   onOpenChange,
@@ -72,27 +101,32 @@ export function DevotionalNoteDialog({
   noteId,
 }: DevotionalNoteDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const userId = user?.id || '';
+  const draftScope = `devotional:${noteId || verseReference}`;
+  const discardDraft = () => { try { clearDeviceDraft(userId,draftScope); } catch { /* Keep the current form recoverable. */ } };
   const [form, setForm] = useState<FormFields>(emptyForm);
+  const [baseline, setBaseline] = useState<FormFields>(emptyForm);
+  const [confirmClose, setConfirmClose] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
+  const [loadedNote, setLoadedNote] = useState<LocalDevotionalNote | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [displayReference, setDisplayReference] = useState(verseReference);
   const [displayText, setDisplayText] = useState(verseText);
+  const [shareDraft,setShareDraft] = useState<DevotionShareDraft|null>(null);
+  const dirty = open && JSON.stringify(form) !== JSON.stringify(baseline);
+  const loadForm = useCallback((value: FormFields) => { setForm(value); setBaseline(value); }, []);
+  const requestOpenChange = (next: boolean) => {
+    if (!next && isSaving) { toast({ title: '正在儲存，請稍候' }); return; }
+    if (!next && dirty) { setConfirmClose(true); return; }
+    onOpenChange(next);
+  };
 
   const updateField = useCallback(<K extends keyof FormFields>(key: K, value: FormFields[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-  }, []);
-
-  const toggleCategory = useCallback((catValue: InsightCategory) => {
-    setForm((prev) => {
-      const current = prev.coreInsightCategory;
-      const updated = current.includes(catValue)
-        ? current.filter(c => c !== catValue)
-        : [...current, catValue];
-      return { ...prev, coreInsightCategory: updated };
-    });
   }, []);
 
   useEffect(() => {
@@ -101,9 +135,12 @@ export function DevotionalNoteDialog({
   }, [verseReference, verseText]);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || !userId) {
       setForm(emptyForm);
+      setBaseline(emptyForm);
+      setConfirmClose(false);
       setExistingId(null);
+      setLoadedNote(null);
       return;
     }
 
@@ -111,10 +148,26 @@ export function DevotionalNoteDialog({
 
     let cancelled = false;
     setIsLoading(true);
+    setForm(emptyForm);
+    setBaseline(emptyForm);
+    setExistingId(null);
+    setLoadedNote(null);
 
     const url = noteId
       ? `/api/devotional-notes/${noteId}`
       : `/api/devotional-notes/by-reference?ref=${encodeURIComponent(verseReference)}`;
+
+    const localNote = noteId
+      ? findLocalDevotionalNoteById(noteId, userId)
+      : findLocalDevotionalNoteByReference(verseReference, userId);
+    if (localNote) {
+      setLoadedNote(localNote);
+      applyNoteToForm(localNote, setExistingId, setDisplayReference, setDisplayText, loadForm);
+    }
+    if (noteId?.startsWith('local-devotional-')) {
+      setIsLoading(false);
+      return;
+    }
 
     fetch(url, { credentials: 'include' })
       .then((res) => {
@@ -122,21 +175,9 @@ export function DevotionalNoteDialog({
         return res.json();
       })
       .then((data) => {
-        if (cancelled || !data) return;
-        setExistingId(data.id);
-        if (data.verseReference) setDisplayReference(data.verseReference);
-        if (data.verseText) setDisplayText(data.verseText);
-        const parsedCategories = parseCategories(data.coreInsightCategory);
-        setForm({
-          titlePhrase: data.titlePhrase ?? '',
-          heartbeatVerse: data.heartbeatVerse ?? '',
-          observation: data.observation ?? '',
-          coreInsightCategory: parsedCategories,
-          coreInsightNote: parseNotes(data.coreInsightNote, parsedCategories),
-          scholarsNote: data.scholarsNote ?? '',
-          actionPlan: data.actionPlan ?? '',
-          coolDownNote: data.coolDownNote ?? '',
-        });
+        if (cancelled || !data || data.userId !== userId || (localNote && localNote.syncStatus !== 'synced')) return;
+        setLoadedNote(data);
+        applyNoteToForm(data, setExistingId, setDisplayReference, setDisplayText, loadForm);
       })
       .catch(() => {})
       .finally(() => {
@@ -146,9 +187,13 @@ export function DevotionalNoteDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, verseReference, noteId]);
+  }, [open, verseReference, noteId, userId, loadForm]);
 
-  const handleSave = async () => {
+  const handleSave = async (share = false) => {
+    if (!userId) {
+      toast({ title: '請先登入', variant: 'destructive' });
+      return;
+    }
     setIsSaving(true);
     try {
       const { coreInsightCategory, coreInsightNote, ...rest } = form;
@@ -158,19 +203,34 @@ export function DevotionalNoteDialog({
         coreInsightNote: serializeNotes(coreInsightNote),
       };
 
-      if (existingId) {
-        await apiRequest('PATCH', `/api/devotional-notes/${existingId}`, payload);
-      } else {
-        await apiRequest('POST', '/api/devotional-notes', {
-          verseReference: displayReference,
-          verseText: displayText,
-          ...payload,
-        });
-      }
-
+      const now = new Date().toISOString();
+      const previous = loadedNote || (existingId ? findLocalDevotionalNoteById(existingId, userId) : null);
+      const result = await saveDevotionalNote(userId, {
+        ...previous,
+        id: existingId || createLocalDevotionalNoteId(),
+        verseReference: displayReference,
+        verseText: displayText,
+        readingPlanId: previous?.readingPlanId || null,
+        dayNumber: previous?.dayNumber ?? null,
+        createdAt: previous?.createdAt || now,
+        updatedAt: now,
+        ...payload,
+      });
+      const savedNote = result.note;
+      setBaseline(form);
+      setExistingId(savedNote.id);
+      setLoadedNote(savedNote);
+      queryClient.setQueryData<LocalDevotionalNote[]>(['/api/devotional-notes', userId], (current = []) => [
+        savedNote,
+        ...current.filter((note) => note.id !== savedNote.id),
+      ]);
       queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
-      toast({ title: '已儲存', description: '靈修筆記已成功儲存' });
-      onOpenChange(false);
+      toast({ title: noteSaveMessage(result.status), variant: result.status === 'blocked' ? 'destructive' : 'default' });
+      if (result.status === 'synced') {
+        discardDraft();
+        if(share)setShareDraft(createDevotionShareDraft(savedNote));
+        else onOpenChange(false);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '儲存失敗';
       toast({ title: '儲存失敗', description: message, variant: 'destructive' });
@@ -198,21 +258,31 @@ export function DevotionalNoteDialog({
     }
   };
 
-  const coreInsightComplete = form.coreInsightCategory.length > 0 && Object.values(form.coreInsightNote).some(v => v.trim());
+  const receivingValue =
+    form.coreInsightNote[RECEIVE_KEY] ||
+    Object.values(form.coreInsightNote).filter(Boolean).join('\n') ||
+    form.heartbeatVerse;
+
+  const handleReceivingChange = useCallback((value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      heartbeatVerse: value,
+      coreInsightCategory: [RECEIVE_KEY],
+      coreInsightNote: { [RECEIVE_KEY]: value },
+    }));
+  }, []);
 
   const filledFields = [
-    form.titlePhrase,
-    form.heartbeatVerse,
     form.observation,
-    coreInsightComplete,
-    coreInsightComplete,
-    form.scholarsNote,
+    receivingValue,
     form.actionPlan,
-    form.coolDownNote,
   ].filter(Boolean).length;
+  const progressPercent = Math.round((filledFields / 3) * 100);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <><UnsavedChangesGuard dirty={dirty || (open && isSaving)} onDiscard={discardDraft} />
+    <LeaveConfirmation open={confirmClose} onStay={() => setConfirmClose(false)} onLeave={() => { discardDraft(); setConfirmClose(false); onOpenChange(false); }} />
+    <Sheet open={open && !shareDraft} onOpenChange={requestOpenChange}>
       <SheetContent
         side="right"
         className="w-full sm:w-[500px] sm:max-w-[500px] overflow-y-auto"
@@ -223,6 +293,7 @@ export function DevotionalNoteDialog({
             <BookMarked className="w-5 h-5 text-primary shrink-0" />
             靈修筆記
           </SheetTitle>
+          <SheetDescription className="sr-only">個人靈修筆記；只有確認分享的內容才會公開。</SheetDescription>
         </SheetHeader>
 
         {isLoading ? (
@@ -231,6 +302,13 @@ export function DevotionalNoteDialog({
           </div>
         ) : (
           <div className="space-y-4 pb-24">
+            {loadedNote && <NoteConflictReview key={`${userId}:${loadedNote.id}`} note={loadedNote} owner={userId} busy={isSaving} onRebase={cloud => {
+              setLoadedNote({ ...cloud, syncStatus: 'synced' });
+              setExistingId(cloud.id);
+              setBaseline(emptyForm);
+              toast({ title: '目前輸入已保留，請再次儲存以同步' });
+            }} />}
+            <DeviceDraft<FormFields> key={`${userId}:${draftScope}`} owner={userId} scope={draftScope} revision={loadedNote?.version ?? null} value={form} dirty={dirty} busy={isSaving} schema={formSchema} restore={value=>setForm(value)} preview={value => <>{value.observation}{'\n\n'}{Object.values(value.coreInsightNote).join('\n')}{'\n\n'}{value.actionPlan}</>} />
             <div className="rounded-md bg-muted/50 p-3 space-y-1">
               <p className="text-xs font-medium text-muted-foreground">經文</p>
               <p className="font-serif font-semibold text-sm" data-testid="text-verse-reference">
@@ -242,204 +320,81 @@ export function DevotionalNoteDialog({
             </div>
 
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>進度</span>
-              <span>{filledFields}/8</span>
+              <span>三步驟筆記</span>
+              <span>{filledFields}/3</span>
             </div>
             <div className="h-1.5 bg-muted rounded-full overflow-hidden -mt-2">
               <div
-                className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-blue-500 transition-all duration-300"
-                style={{ width: `${Math.round((filledFields / 8) * 100)}%` }}
+                className="h-full bg-gradient-to-r from-emerald-500 via-sky-500 to-amber-500 transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            <section className="pl-3 border-l-4 border-l-green-500 space-y-3">
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-green-700 dark:text-green-400">
+            <section className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3 space-y-2 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                 <Eye className="w-4 h-4 shrink-0" />
-                暖身 Warm-up
+                1. 看見
+                {form.observation && <Check className="w-3.5 h-3.5 text-green-500" />}
               </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="dn-titlePhrase" className="flex items-center gap-1.5 text-xs font-medium">
-                  <Film className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                  1. 標題分段
-                  {form.titlePhrase && <Check className="w-3 h-3 text-green-500" />}
-                </Label>
-                <Input
-                  id="dn-titlePhrase"
-                  data-testid="input-title-phrase"
-                  value={form.titlePhrase}
-                  onChange={(e) => updateField('titlePhrase', e.target.value)}
-                  placeholder="幫這段經文下一個標題"
-                  className="text-base md:text-sm"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="dn-heartbeatVerse" className="flex items-center gap-1.5 text-xs font-medium">
-                  <Heart className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                  2. 最感動的經文
-                  {form.heartbeatVerse && <Check className="w-3 h-3 text-green-500" />}
-                </Label>
-                <AutoResizeTextarea
-                  id="dn-heartbeatVerse"
-                  data-testid="textarea-heartbeat-verse"
-                  value={form.heartbeatVerse}
-                  onChange={(e) => updateField('heartbeatVerse', e.target.value)}
-                  placeholder="哪一句話讓你感動"
-                  minRows={2}
-                  maxRows={5}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="dn-observation" className="flex items-center gap-1.5 text-xs font-medium">
-                  <Eye className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                  3. 經文上的資訊
-                  {form.observation && <Check className="w-3 h-3 text-green-500" />}
-                </Label>
-                <AutoResizeTextarea
-                  id="dn-observation"
-                  data-testid="textarea-observation"
-                  value={form.observation}
-                  onChange={(e) => updateField('observation', e.target.value)}
-                  placeholder="有什麼人事時地物或有趣的事"
-                  minRows={2}
-                  maxRows={5}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground">這段經文中，我觀察到什麼？</p>
+              <Label htmlFor="dn-observation" className="sr-only">看見</Label>
+              <AutoResizeTextarea
+                id="dn-observation"
+                disabled={isSaving}
+                data-testid="textarea-observation"
+                value={form.observation}
+                onChange={(e) => updateField('observation', e.target.value)}
+                placeholder="例如：人物、場景、重複的詞、讓你注意到的細節..."
+                minRows={4}
+                maxRows={8}
+                className="text-base md:text-sm"
+              />
             </section>
 
-            <section className="pl-3 border-l-4 border-l-yellow-500 space-y-3">
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-yellow-700 dark:text-yellow-400">
-                <Dumbbell className="w-4 h-4 shrink-0" />
-                重訓 Core Training
+            <section className="rounded-2xl border border-sky-100 bg-sky-50/40 p-3 space-y-2 dark:border-sky-900/50 dark:bg-sky-950/20">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-sky-700 dark:text-sky-400">
+                <Heart className="w-4 h-4 shrink-0" />
+                2. 領受
+                {receivingValue && <Check className="w-3.5 h-3.5 text-green-500" />}
               </div>
-
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5 text-xs font-medium">
-                  <Target className="w-3.5 h-3.5 text-yellow-600 shrink-0" />
-                  4. 思想神的話
-                  {coreInsightComplete && <Check className="w-3 h-3 text-green-500" />}
-                </Label>
-
-                <div className="grid grid-cols-2 gap-1.5">
-                  {INSIGHT_CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.value}
-                      type="button"
-                      data-testid={`button-category-${cat.value}`}
-                      onClick={() => toggleCategory(cat.value)}
-                      className={cn(
-                        'px-2 py-2 rounded-lg text-xs font-medium transition-all',
-                        'border-2 flex items-center justify-center gap-1',
-                        'active:scale-95 touch-manipulation',
-                        form.coreInsightCategory.includes(cat.value)
-                          ? 'border-yellow-500 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 shadow-sm'
-                          : 'border-muted bg-background hover:border-yellow-300 hover:bg-yellow-50/50 dark:hover:bg-yellow-950/30'
-                      )}
-                    >
-                      {(() => {
-                        const IconComp = CATEGORY_ICONS[cat.value];
-                        return IconComp ? <IconComp className="w-3.5 h-3.5 shrink-0" /> : null;
-                      })()}
-                      <span>{cat.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {form.coreInsightCategory.length > 0 ? (
-                  <div className="space-y-3">
-                    {INSIGHT_CATEGORIES.filter(cat => form.coreInsightCategory.includes(cat.value)).map(cat => {
-                      const IconComp = CATEGORY_ICONS[cat.value];
-                      return (
-                        <div key={cat.value} className="space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
-                            {IconComp && <IconComp className="w-3 h-3 shrink-0" />}
-                            <span>{cat.label} {cat.description}</span>
-                          </div>
-                          <AutoResizeTextarea
-                            data-testid={`textarea-core-insight-note-${cat.value}`}
-                            value={form.coreInsightNote[cat.value] || ''}
-                            onChange={(e) => {
-                              const updated = { ...form.coreInsightNote, [cat.value]: e.target.value };
-                              updateField('coreInsightNote', updated);
-                            }}
-                            placeholder={`從這段經文中，${cat.label}是什麼？`}
-                            minRows={2}
-                            maxRows={6}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic py-2">
-                    先選一個或多個類別，再寫下你的發現...
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="dn-scholarsNote" className="flex items-center gap-1.5 text-xs font-medium">
-                  <BookOpen className="w-3.5 h-3.5 text-yellow-600 shrink-0" />
-                  5. 注釋書或其他的參考資料
-                  {form.scholarsNote && <Check className="w-3 h-3 text-green-500" />}
-                </Label>
-                <AutoResizeTextarea
-                  id="dn-scholarsNote"
-                  data-testid="textarea-scholars-note"
-                  value={form.scholarsNote}
-                  onChange={(e) => updateField('scholarsNote', e.target.value)}
-                  placeholder="查看相關資料或註釋"
-                  minRows={2}
-                  maxRows={5}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground">神透過這段經文對我說什麼？</p>
+              <Label htmlFor="dn-receiving" className="sr-only">領受</Label>
+              <AutoResizeTextarea
+                id="dn-receiving"
+                disabled={isSaving}
+                data-testid="textarea-core-insight-note-GOD_ATTRIBUTE"
+                value={receivingValue}
+                onChange={(e) => handleReceivingChange(e.target.value)}
+                placeholder="例如：我對神有什麼新的認識？哪句話觸動我？我被提醒、安慰或光照的是什麼？"
+                minRows={4}
+                maxRows={8}
+                className="text-base md:text-sm"
+              />
             </section>
 
-            <section className="pl-3 border-l-4 border-l-blue-500 space-y-3">
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-blue-700 dark:text-blue-400">
-                <Sparkles className="w-4 h-4 shrink-0" />
-                伸展 Stretch
+            <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-3 space-y-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400">
+                <Target className="w-4 h-4 shrink-0" />
+                3. 回應
+                {form.actionPlan && <Check className="w-3.5 h-3.5 text-green-500" />}
               </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="dn-actionPlan" className="flex items-center gap-1.5 text-xs font-medium">
-                  <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  6. 與神同行的行動
-                  {form.actionPlan && <Check className="w-3 h-3 text-green-500" />}
-                </Label>
-                <AutoResizeTextarea
-                  id="dn-actionPlan"
-                  data-testid="textarea-action-plan"
-                  value={form.actionPlan}
-                  onChange={(e) => updateField('actionPlan', e.target.value)}
-                  placeholder="具體的行動計畫"
-                  minRows={2}
-                  maxRows={5}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="dn-coolDownNote" className="flex items-center gap-1.5 text-xs font-medium">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  7. 其他
-                  {form.coolDownNote && <Check className="w-3 h-3 text-green-500" />}
-                </Label>
-                <AutoResizeTextarea
-                  id="dn-coolDownNote"
-                  data-testid="textarea-cool-down-note"
-                  value={form.coolDownNote}
-                  onChange={(e) => updateField('coolDownNote', e.target.value)}
-                  placeholder="禱告、感想、或任何想寫的..."
-                  minRows={2}
-                  maxRows={5}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground">我接下來要怎麼實踐？</p>
+              <Label htmlFor="dn-actionPlan" className="sr-only">回應</Label>
+              <AutoResizeTextarea
+                id="dn-actionPlan"
+                disabled={isSaving}
+                data-testid="textarea-action-plan"
+                value={form.actionPlan}
+                onChange={(e) => updateField('actionPlan', e.target.value)}
+                placeholder="例如：今天或這週的一個具體行動、我要如何禱告或調整生活..."
+                minRows={4}
+                maxRows={8}
+                className="text-base md:text-sm"
+              />
             </section>
 
             <Button
-              onClick={handleSave}
+              onClick={()=>handleSave()}
               disabled={isSaving}
               className="w-full"
               data-testid="button-save-devotional-note"
@@ -453,6 +408,8 @@ export function DevotionalNoteDialog({
                 '儲存'
               )}
             </Button>
+
+            <Button variant="outline" className="w-full" disabled={isSaving} onClick={()=>handleSave(true)}>儲存並預覽公開分享</Button>
 
             {existingId && (
               <Button
@@ -491,5 +448,6 @@ export function DevotionalNoteDialog({
         )}
       </SheetContent>
     </Sheet>
+    {shareDraft && <DevotionWallShareDialog draft={shareDraft} close={()=>setShareDraft(null)} />}</>
   );
 }

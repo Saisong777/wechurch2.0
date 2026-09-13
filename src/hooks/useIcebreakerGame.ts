@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { withRetry, staggeredStart, getPollingInterval } from '@/lib/retry-utils';
+import { apiRequest } from '@/lib/queryClient';
 
 type CardLevel = 'L1' | 'L2' | 'L3';
 type GameMode = 'standalone' | 'session';
@@ -127,20 +128,13 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     try {
       await staggeredStart(1000);
       
-      const data = await withRetry(async () => {
-        const response = await fetch('/api/icebreaker/games', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mode,
-            currentLevel: 'L1',
-            bibleStudySessionId: options.sessionId || null,
-            groupNumber: options.groupNumber || null,
-          }),
-        });
-        if (!response.ok) throw new Error('Failed to create game');
-        return response.json();
-      }, { maxRetries: 2, baseDelayMs: 500 });
+      const response = await apiRequest('POST', '/api/icebreaker/games', {
+        mode,
+        currentLevel: 'L1',
+        bibleStudySessionId: options.sessionId || null,
+        groupNumber: options.groupNumber || null,
+      });
+      const data = await response.json();
 
       setState(prev => ({
         ...prev,
@@ -178,7 +172,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
 
       const data = await response.json();
 
-      let currentCard = null;
+      let currentCard: GameState['currentCard'] = null;
       if (data.currentCardId) {
         const cardData = await fetchCardContent(data.currentCardId);
         if (cardData) {
@@ -234,7 +228,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
       }, { maxRetries: 2, baseDelayMs: 500 });
 
       if (data) {
-        let currentCard = null;
+        let currentCard: GameState['currentCard'] = null;
         if (data.currentCardId) {
           const cardData = await fetchCardContent(data.currentCardId);
           if (cardData) {
@@ -283,15 +277,10 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
-      const result = await withRetry(async () => {
-        const response = await fetch(`/api/icebreaker/games/${state.gameId}/draw-card`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ level: level || state.currentLevel }),
-        });
-        if (!response.ok) throw new Error('Failed to draw card');
-        return response.json();
-      }, { maxRetries: 2, baseDelayMs: 300 });
+      const response = await apiRequest('POST', `/api/icebreaker/games/${state.gameId}/draw-card`, {
+        level: level || state.currentLevel,
+      });
+      const result = await response.json();
       
       if (!result?.cardId) {
         toast.info(result?.cardContent || '這個等級的牌已經抽完了！');
