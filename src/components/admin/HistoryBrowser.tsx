@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { queryClient } from '@/lib/queryClient';
+import { RestoreParticipantAccess } from './RestoreParticipantAccess';
 import { 
   Search, 
   Calendar, 
@@ -92,6 +93,7 @@ interface SessionWithResponses extends SessionMetadata {
 
 interface StudyResponseWithParticipant {
   id: string;
+  participantId?: string;
   participantName: string;
   groupNumber: number | null;
   titlePhrase: string | null;
@@ -173,6 +175,7 @@ export const HistoryBrowser: React.FC = () => {
         ...sessionMeta,
         responses: (responses || []).map((r: any) => ({
           id: r.id || '',
+          participantId: r.userId,
           participantName: r.participantName || 'Unknown',
           groupNumber: r.groupNumber,
           titlePhrase: r.titlePhrase,
@@ -1242,6 +1245,7 @@ const ResponseCard: React.FC<{
             <User className="w-4 h-4 text-secondary" />
           </div>
           <span className="font-medium">{response.participantName}</span>
+          {response.participantId && <RestoreParticipantAccess participantId={response.participantId} name={response.participantName} />}
           {response.groupNumber && (
             <Badge variant="outline" className="text-xs">
               第 {response.groupNumber} 組

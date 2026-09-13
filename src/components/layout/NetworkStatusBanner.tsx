@@ -38,7 +38,7 @@ export const NetworkStatusBanner = () => {
 
   return (
     <div
-      className="fixed inset-x-3 top-3 z-[70] mx-auto max-w-md rounded-full border border-white/70 bg-background/95 px-4 py-2 text-sm font-medium text-foreground shadow-lg shadow-black/10 backdrop-blur md:top-4"
+      className="shrink-0 border-b border-border bg-background px-4 py-2 text-sm font-medium text-foreground"
       role="status"
       aria-live="polite"
     >

@@ -184,7 +184,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
     if (
       !allReadyFiredRef.current &&
       allGroupMembersReady &&
-      currentSession?.status === 'studying'
+      (currentSession?.status === 'grouping' || currentSession?.status === 'studying')
     ) {
       allReadyFiredRef.current = true;
       onAllReady();
@@ -250,7 +250,7 @@ export const GroupVerification: React.FC<GroupVerificationProps> = ({ onAllReady
         setHasConfirmed(true);
         setCurrentUser({ ...currentUser, readyConfirmed: true });
         toast.success('已確認準備完成！', {
-          description: otherMembers.length === 0 ? '等待帶領者開始下一步。' : '等待其他組員與帶領者開始下一步。',
+          description: otherMembers.length === 0 ? '你的小組可以進入下一步。' : '等你的小組都確認後，就會進入下一步。',
         });
         await fetchMembers(); // Refresh to check if all ready
       } else {

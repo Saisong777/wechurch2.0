@@ -218,7 +218,57 @@ export const AdminPage: React.FC = () => {
               </Button>
             </div>
 
-            <section className="rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4 sm:p-5 shadow-sm">
+
+            <div className="pt-2">
+              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                後台管理
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {([
+                ...(isAdmin ? [{ icon: BookOpen, label: '每日靈修課表', desc: '課表、短文與發佈', action: () => navigate('/admin/church-devotions'), testId: 'button-church-devotions' }] : []),
+                { icon: History, label: '歷史資料', desc: '查看過往活動', action: () => setStep('history'), testId: 'button-history' },
+                { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
+                { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
+                { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
+                { icon: Crown, label: '禱告會管理', desc: '建立與管理禱告會', action: () => setStep('prayer-meeting'), testId: 'button-prayer-meeting-admin' },
+                { icon: Sparkles, label: '真心話題庫', desc: '管理破冰遊戲題目', action: () => setStep('cards'), testId: 'button-cards' },
+                { icon: Image, label: '信息卡片', desc: '上傳管理信息卡片', action: () => setStep('message-cards'), testId: 'button-message-cards' },
+                { icon: ToggleLeft, label: '功能開關', desc: '啟用或停用系統功能', action: () => setStep('feature-toggles'), testId: 'button-feature-toggles' },
+              ] as Array<{ icon: any; label: string; desc: string; action: () => void; testId: string; badge?: number }>).map(({ icon: Icon, label, desc, action, testId, badge }) => (
+                <button
+                  key={testId}
+                  onClick={action}
+                  className="relative flex min-h-20 items-center gap-3 p-3 rounded-lg border bg-card text-card-foreground hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-colors cursor-pointer group"
+                  data-testid={testId}
+                >
+                  {badge && badge > 0 ? (
+                    <span className="absolute top-2 right-2 bg-destructive text-destructive-foreground text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                      {badge}
+                    </span>
+                  ) : null}
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <Icon className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-primary" />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 hidden sm:block">{desc}</div>
+                  </div>
+                </button>
+              ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                今日 SoulGym
+              </h3>
+              <SessionHistory
+                onCreateNew={() => setStep('create')}
+                onSelectSession={handleSelectSession}
+              />
+            </div>
+            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">查經主持流程</summary>            <section className="space-y-4 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-primary">今晚主持台</p>
@@ -253,7 +303,7 @@ export const AdminPage: React.FC = () => {
                           description: '下方選擇一場活動後，就能進入等候室或主持台。',
                         });
                       }}
-                      className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}
+                      className={`rounded-lg border p-4 text-left transition-colors hover:bg-muted ${card.tone}`}
                       data-testid={`button-host-card-${card.step}`}
                     >
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -272,58 +322,8 @@ export const AdminPage: React.FC = () => {
               </div>
             </section>
 
-            <ProductGrowthPanel />
-            <PlatformMaturityPanel />
-
-            <div>
-              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                <BookOpen className="w-4 h-4" />
-                今日 SoulGym
-              </h3>
-              <SessionHistory
-                onCreateNew={() => setStep('create')}
-                onSelectSession={handleSelectSession}
-              />
-            </div>
-
-            <div className="pt-2">
-              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                後台管理
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              {([
-                { icon: History, label: '歷史資料', desc: '查看過往活動', action: () => setStep('history'), testId: 'button-history' },
-                { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
-                { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
-                { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
-                { icon: Crown, label: '禱告會管理', desc: '建立與管理禱告會', action: () => setStep('prayer-meeting'), testId: 'button-prayer-meeting-admin' },
-                { icon: Sparkles, label: '真心話題庫', desc: '管理破冰遊戲題目', action: () => setStep('cards'), testId: 'button-cards' },
-                { icon: Image, label: '信息卡片', desc: '上傳管理信息卡片', action: () => setStep('message-cards'), testId: 'button-message-cards' },
-                { icon: ToggleLeft, label: '功能開關', desc: '啟用或停用系統功能', action: () => setStep('feature-toggles'), testId: 'button-feature-toggles' },
-              ] as Array<{ icon: any; label: string; desc: string; action: () => void; testId: string; badge?: number }>).map(({ icon: Icon, label, desc, action, testId, badge }) => (
-                <button
-                  key={testId}
-                  onClick={action}
-                  className="relative flex flex-col items-center gap-2 p-4 sm:p-5 rounded-xl border bg-card text-card-foreground hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all duration-200 cursor-pointer group"
-                  data-testid={testId}
-                >
-                  {badge && badge > 0 ? (
-                    <span className="absolute top-2 right-2 bg-destructive text-destructive-foreground text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                      {badge}
-                    </span>
-                  ) : null}
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                    <Icon className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-primary" />
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium">{label}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 hidden sm:block">{desc}</div>
-                  </div>
-                </button>
-              ))}
-              </div>
-            </div>
+</details>
+            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">平台營運與發展</summary><div className="space-y-5 py-4"><ProductGrowthPanel /><PlatformMaturityPanel /></div></details>
           </div>
         );
       case 'history':
@@ -436,7 +436,17 @@ export const AdminPage: React.FC = () => {
               <>
                 {role && (
                   <span className="text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden md:inline">
-                    {role === 'admin' ? '管理員' : role === 'leader' ? '小組長' : '儲備'}
+                    {role === 'admin'
+                      ? '系統管理員'
+                      : role === 'senior_pastor'
+                        ? '主任牧師'
+                        : role === 'pastor'
+                          ? '牧師'
+                          : role === 'minister'
+                            ? '傳道人'
+                            : role === 'group_leader' || role === 'leader'
+                              ? '小組長'
+                              : '儲備'}
                   </span>
                 )}
                 <span className="text-xs sm:text-sm opacity-90 hidden lg:inline truncate max-w-32">
