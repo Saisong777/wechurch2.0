@@ -185,8 +185,8 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
         }
       }
 
-      let cardContent = null;
-      let cardContentEn = null;
+      let cardContent: string | null = null;
+      let cardContentEn: string | null = null;
       if (existingGame.currentDrawerCardId) {
         const cardData = await fetchCardContent(existingGame.currentDrawerCardId);
         if (cardData) {

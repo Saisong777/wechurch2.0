@@ -4,7 +4,12 @@ import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
+import { drainServer } from './shutdown';
+import { permissionsPolicy, publicError } from './httpSafety';
 import { recordErrorEvent, requestContext } from "./observability";
+import { assertDeploymentSafety, isTestDeployment, stagingAccessGate } from './deploymentSafety';
+
+assertDeploymentSafety();
 
 // Catch any uncaught errors so they show in Railway App Logs
 process.on("uncaughtException", (err) => {
@@ -22,7 +27,7 @@ app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Permissions-Policy", permissionsPolicy);
   res.setHeader(
     "Content-Security-Policy",
     [
@@ -44,6 +49,8 @@ app.use((_req, res, next) => {
 });
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '5mb' }));
 app.use(express.urlencoded({ extended: false }));
+app.use(stagingAccessGate());
+app.get('/api/deployment', (_req, res) => res.set('Cache-Control', 'no-store').json({ staging: isTestDeployment() }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -78,7 +85,6 @@ app.use((req, res, next) => {
         statusCode: res.statusCode,
         sessionId: context.sessionId,
         participantId: context.participantId,
-        metadata: { response: capturedJsonResponse || null },
         userAgent: context.userAgent,
         ipHash: context.ipHash,
       });
@@ -103,10 +109,10 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const context = requestContext(_req);
-    const status = err.status || err.statusCode || 500;
+    const { status, message: responseMessage } = publicError(err);
     const message = err.message || "Internal Server Error";
     if (!res.headersSent) {
-      res.status(status).json({ message });
+      res.status(status).json({ message: responseMessage });
     }
     void recordErrorEvent({
       source: "server",
@@ -145,17 +151,18 @@ app.use((req, res, next) => {
     if (isShuttingDown) return;
     isShuttingDown = true;
     log(`${signal} received, shutting down gracefully...`);
-    server.close(() => {
-      log('HTTP server closed');
-    });
+    const deadline = setTimeout(() => process.exit(1), 10000);
+    deadline.unref();
     try {
-      await pool.end();
-      log('DB pool closed');
+      await drainServer(server, pool);
+      clearTimeout(deadline);
+      log('HTTP server and DB pool closed');
+      process.exit(0);
     } catch (e) {
       console.error('[Shutdown] Error closing DB pool:', e);
+      clearTimeout(deadline);
+      process.exit(1);
     }
-    // Force exit after 10s if something hangs
-    setTimeout(() => process.exit(0), 10000).unref();
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));

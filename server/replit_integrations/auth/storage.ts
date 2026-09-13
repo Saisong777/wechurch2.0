@@ -2,12 +2,14 @@ import { authUsers, type User, type UpsertUser } from "@shared/models/auth";
 import { users as legacyUsers, userRoles } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
+import { normalizeChurch } from "../../churches";
 
 // Extended user type that includes legacy data
 export interface ExtendedUser extends User {
   legacyUserId?: string;
   displayName?: string;
   role?: string;
+  church?: string | null;
 }
 
 // Interface for auth storage operations
@@ -36,6 +38,7 @@ class AuthStorage implements IAuthStorage {
           legacyUserId: legacyUser.id,
           displayName: legacyUser.displayName || undefined,
           role: roleRecord?.role || 'member',
+          church: normalizeChurch(legacyUser.church),
         };
       }
     }
