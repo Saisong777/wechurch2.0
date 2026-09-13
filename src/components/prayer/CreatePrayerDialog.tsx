@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LeaveConfirmation, UnsavedChangesGuard } from '@/components/layout/UnsavedChangesGuard';
 import {
   Dialog,
   DialogContent,
@@ -46,16 +47,26 @@ export const CreatePrayerDialog: React.FC<CreatePrayerDialogProps> = ({ onCreate
   const [content, setContent] = useState('');
   const [scriptureReference, setScriptureReference] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isUrgent, setIsUrgent] = useState(false);
   const [category, setCategory] = useState<PrayerCategory>('supplication');
   const createMutation = useCreatePrayer();
+  const [confirmClose, setConfirmClose] = useState(false);
+  const dirty = open && !!(content || scriptureReference || isAnonymous || isUrgent || category !== 'supplication');
+  const changeOpen = (next: boolean) => {
+    if (createMutation.isPending) return;
+    if (!next && dirty) setConfirmClose(true);
+    else setOpen(next);
+  };
 
   const handleSubmit = async () => {
     if (!content.trim()) return;
     vibrate(50);
 
+    try {
     const createdPrayer = await createMutation.mutateAsync({
       content: content.trim(),
       isAnonymous,
+      isUrgent,
       category,
       scriptureReference: scriptureReference.trim() || undefined,
     });
@@ -63,9 +74,11 @@ export const CreatePrayerDialog: React.FC<CreatePrayerDialogProps> = ({ onCreate
     setContent('');
     setScriptureReference('');
     setIsAnonymous(false);
+    setIsUrgent(false);
     setCategory('supplication');
     setOpen(false);
     onCreated?.(createdPrayer);
+    } catch { /* Preserve the form when publishing fails. */ }
   };
 
   const isValid = content.trim().length > 0;
@@ -76,7 +89,11 @@ export const CreatePrayerDialog: React.FC<CreatePrayerDialogProps> = ({ onCreate
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={changeOpen}>
+      <UnsavedChangesGuard dirty={dirty} />
+      <LeaveConfirmation open={confirmClose} onStay={() => setConfirmClose(false)} onLeave={() => {
+        setConfirmClose(false); setContent(''); setScriptureReference(''); setIsAnonymous(false); setIsUrgent(false); setCategory('supplication'); setOpen(false);
+      }} />
       <DialogTrigger asChild>
         <Button size="lg" className="h-11 gap-2 rounded-lg px-5 text-sm shadow-sm sm:h-12 sm:text-base">
           <Plus className="h-5 w-5" />
@@ -94,7 +111,7 @@ export const CreatePrayerDialog: React.FC<CreatePrayerDialogProps> = ({ onCreate
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-4">
+        <fieldset disabled={createMutation.isPending} className="min-w-0 space-y-5 py-4">
           {/* Category Selector */}
           <div className="space-y-2">
             <Label htmlFor="prayer-category">禱告分類</Label>
@@ -167,6 +184,7 @@ export const CreatePrayerDialog: React.FC<CreatePrayerDialogProps> = ({ onCreate
             </p>
           </div>
 
+          <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={isUrgent} onChange={e=>setIsUrgent(e.target.checked)} />緊急代禱</label>
           <div className="flex items-center justify-between rounded-lg border bg-muted/40 p-4">
             <div className="flex items-center gap-3">
               {isAnonymous ? (
@@ -189,10 +207,10 @@ export const CreatePrayerDialog: React.FC<CreatePrayerDialogProps> = ({ onCreate
               onCheckedChange={setIsAnonymous}
             />
           </div>
-        </div>
+        </fieldset>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => setOpen(false)} className="rounded-lg">
+          <Button variant="outline" disabled={createMutation.isPending} onClick={() => changeOpen(false)} className="rounded-lg">
             取消
           </Button>
           <Button

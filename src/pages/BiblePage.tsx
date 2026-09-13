@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -81,11 +81,20 @@ async function fetchJsonWithLocalFallback<T>(url: string, fallback: () => Promis
   return fallback();
 }
 
+type BibleView = { book: string | null; chapter: number | null; search: string; searching: boolean };
+// Keep only this tab's navigation state, never private notes or durable search history.
+const bibleViews = new Map<string, BibleView>();
 const BiblePage = () => {
-  const [selectedBook, setSelectedBook] = useState<string | null>(null);
-  const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const location = useLocation();
+  return <BibleReader key={location.key} entryKey={location.key} />;
+};
+
+const BibleReader = ({ entryKey }: { entryKey: string }) => {
+  const initialView = useRef(bibleViews.get(entryKey));
+  const [selectedBook, setSelectedBook] = useState<string | null>(initialView.current?.book ?? null);
+  const [selectedChapter, setSelectedChapter] = useState<number | null>(initialView.current?.chapter ?? null);
+  const [searchQuery, setSearchQuery] = useState(initialView.current?.search ?? '');
+  const [isSearching, setIsSearching] = useState(initialView.current?.searching ?? false);
   const [selectedVerseNums, setSelectedVerseNums] = useState<Set<number>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
   const [showNoteDialog, setShowNoteDialog] = useState(false);
@@ -113,9 +122,14 @@ const BiblePage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const previousSelection = useRef([selectedBook, selectedChapter, isSearching]);
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [selectedBook, selectedChapter, isSearching]);
+    const next = [selectedBook, selectedChapter, isSearching];
+    if (next.some((value, index) => value !== previousSelection.current[index])) window.scrollTo(0, 0);
+    previousSelection.current = next;
+    bibleViews.set(entryKey, { book: selectedBook, chapter: selectedChapter, search: searchQuery, searching: isSearching });
+    if (bibleViews.size > 100) bibleViews.delete(bibleViews.keys().next().value!);
+  }, [entryKey, selectedBook, selectedChapter, isSearching, searchQuery]);
 
   const { data: books = [], isError: booksError } = useQuery<BibleBook[]>({
     queryKey: ['/api/bible/books'],
@@ -1096,7 +1110,7 @@ const BiblePage = () => {
 
         {selectedBook && selectedChapter && (
           <FloatingToolbar
-            visible={selectedVerseNums.size > 0 && !showCardModal && !searchCardVerse && !searchExpanded}
+            visible={selectedVerseNums.size > 0 && !showCardModal && !showNoteDialog && !searchCardVerse && !searchNoteVerse && !searchExpanded}
             getAnchorRect={getAnchorRect}
             selectedCount={selectedVerseNums.size}
             onCopy={async () => {

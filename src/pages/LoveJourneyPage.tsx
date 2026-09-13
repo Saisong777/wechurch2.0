@@ -8,6 +8,8 @@ import {
   Circle,
   Flag,
   Loader2,
+  Pause,
+  Play,
   Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,6 +20,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { Header } from '@/components/layout/Header';
+import { UnsavedChangesGuard } from '@/components/layout/UnsavedChangesGuard';
+import { useJourneyMentoring } from '@/components/support/MentoringPanel';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -71,20 +75,23 @@ export default function LoveJourneyPage() {
   const queryClient = useQueryClient();
   const [selectedWeek, setSelectedWeek] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [sharing, setSharing] = useState<Record<string, { scope:LoveJourneyProgressDay['visibility']; contractId?:string|null }>>({});
 
   const journeyQuery = useQuery<SelfLoveJourneyResponse>({
-    queryKey: ['/api/me/love-journey'],
+    queryKey: ['/api/me/love-journey', user?.id],
     queryFn: async () => {
       const response = await fetch('/api/me/love-journey', { credentials: 'include' });
       if (response.status === 401) throw new Error('請先登入');
       if (!response.ok) throw new Error('無法取得愛的旅程');
       return response.json();
     },
-    enabled: !!user,
+    enabled: !!user, staleTime: 0, refetchOnWindowFocus: false,
   });
 
   const detail = isDetail(journeyQuery.data) ? journeyQuery.data : null;
   const loveJourney = detail?.loveJourney ?? null;
+  const mentoring = useJourneyMentoring(loveJourney?.id);
+  const activeMentor = mentoring.data?.contracts?.find(c => c.status === 'active');
   const days = loveJourney?.progress ?? [];
   const weeks = useMemo(() => splitWeeks(days), [days]);
   const selectedDays = weeks[selectedWeek] ?? [];
@@ -94,10 +101,10 @@ export default function LoveJourneyPage() {
 
   useEffect(() => {
     if (!loveJourney?.id) return;
-    setDrafts(Object.fromEntries(days.map((day) => [day.id, day.responseText || ''])));
+    setDrafts({}); setSharing({});
     const focusDay = days.find((day) => day.status !== 'completed' && day.status !== 'skipped');
     if (focusDay) setSelectedWeek(Math.min(3, Math.floor((focusDay.dayNumber - 1) / 7)));
-  }, [loveJourney?.id]);
+  }, [user?.id, loveJourney?.id]);
 
   const startJourney = useMutation({
     mutationFn: async () => {
@@ -112,17 +119,37 @@ export default function LoveJourneyPage() {
   });
 
   const updateProgress = useMutation({
-    mutationFn: async ({ day, status, responseText }: { day: LoveJourneyProgressDay; status?: string; responseText?: string }) => {
+    mutationFn: async ({ day, status, responseText, visibility }: { day: LoveJourneyProgressDay; status?: string; responseText?: string; visibility?: 'private' | 'pastoral' | 'mentor' }) => {
+      const scope = visibility ?? sharing[day.id]?.scope ?? day.visibility ?? 'private';
+      const contractId = sharing[day.id] ? sharing[day.id].contractId : day.mentorContractId;
+      if(scope==='mentor'&&(!contractId||contractId!==activeMentor?.id))throw new Error('陪伴者已變更，請重新選擇分享範圍');
       const response = await apiRequest('PATCH', `/api/me/love-journey/progress/${day.id}`, {
         status,
         responseText,
+        version: day.version,
+        visibility: scope,
+        ...(scope === 'mentor' ? { mentorContractId:contractId } : {}),
       });
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/me/love-journey'] });
+    onSuccess: (_data, variables) => {
+      setDrafts(current => { if (current[variables.day.id] !== variables.responseText) return current; const next = { ...current }; delete next[variables.day.id]; return next; });
+      setSharing(current => { const next = { ...current }; delete next[variables.day.id]; return next; });
+      void queryClient.invalidateQueries({ queryKey: ['/api/me/love-journey'] });
+      toast.success('回應已保存');
     },
-    onError: () => toast.error('更新失敗，請稍後再試'),
+    onError: () => toast.error('未儲存，內容仍保留。請重新載入最新進度後再確認儲存。'),
+  });
+
+  const changeStatus = useMutation({
+    mutationFn: async () => {
+      if (!loveJourney) throw new Error('Journey unavailable');
+      return apiRequest('PATCH', `/api/me/love-journey/${loveJourney.id}/status`, {
+        expectedStatus: loveJourney.status, status: loveJourney.status === 'paused' ? 'active' : 'paused',
+      });
+    },
+    onSuccess: () => { void journeyQuery.refetch(); toast.success('旅程狀態已更新'); },
+    onError: () => toast.error('狀態未更新，請重新載入後再試'),
   });
 
   const toggleDay = (day: LoveJourneyProgressDay, checked: boolean) => {
@@ -130,14 +157,14 @@ export default function LoveJourneyPage() {
   };
 
   const saveResponse = (day: LoveJourneyProgressDay) => {
-    updateProgress.mutate({ day, status: day.status === 'not_started' ? 'in_progress' : day.status, responseText: drafts[day.id] ?? '' });
-    toast.success('回應已保存');
+    updateProgress.mutate({ day, status: day.status === 'not_started' ? 'in_progress' : day.status, responseText: drafts[day.id] ?? day.responseText ?? '' });
   };
 
   return (
     <FeatureGate featureKey="pastoral_beta" title="愛的旅程 beta 測試中" description="愛的旅程目前只開放給 beta 同工">
       <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
       <Header title="愛的旅程" subtitle="28 天同行與操練" variant="compact" />
+      <UnsavedChangesGuard dirty={days.some(day => (drafts[day.id] !== undefined && drafts[day.id] !== (day.responseText || '')) || (sharing[day.id] !== undefined && (sharing[day.id].scope !== day.visibility || (sharing[day.id].contractId ?? null) !== (day.mentorContractId ?? null))))} />
 
       <main className="container mx-auto px-3 py-4 sm:px-4 md:px-6 md:py-8">
         <div className="mx-auto max-w-4xl space-y-4">
@@ -162,7 +189,7 @@ export default function LoveJourneyPage() {
               <Skeleton className="h-36 rounded-lg" />
               <Skeleton className="h-72 rounded-lg" />
             </div>
-          ) : journeyQuery.data?.schemaReady === false ? (
+          ) : journeyQuery.isError ? (<div role="alert" className="space-y-3"><p>目前無法讀取旅程。</p><Button variant="outline" onClick={() => void journeyQuery.refetch()}>重新載入</Button></div>) : journeyQuery.data?.schemaReady === false ? (
             <Card className="border-amber-200 bg-amber-50/70">
               <CardContent className="py-8 text-center text-amber-900">
                 牧養資料表尚未啟用，請先完成資料庫同步。
@@ -199,9 +226,16 @@ export default function LoveJourneyPage() {
                       {nextDay ? `下一步：Day ${nextDay.dayNumber} ・ ${nextDay.title}` : '這段旅程已完成'}
                     </p>
                   </div>
-                  <Badge variant={completion >= 100 ? 'default' : 'secondary'}>{completion}%</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={completion >= 100 ? 'default' : 'secondary'}>{completion}%</Badge>
+                    {['active','paused'].includes(loveJourney.status) && <Button variant="outline" disabled={changeStatus.isPending || updateProgress.isPending} onClick={() => changeStatus.mutate()}>
+                      {loveJourney.status === 'paused' ? <Play className="mr-2 h-4 w-4" /> : <Pause className="mr-2 h-4 w-4" />}
+                      {loveJourney.status === 'paused' ? '繼續旅程' : '暫停旅程'}
+                    </Button>}
+                  </div>
                 </div>
                 <div className="mt-4 space-y-2">
+                  <Button asChild variant="outline"><Link to={`/me/mentoring?journey=${loveJourney.id}`}>{activeMentor ? `與 ${activeMentor.mentorName} 同行` : '邀請或查看陪伴者'}</Link></Button>
                   <div className="flex items-center justify-between text-sm">
                     <span>{completedDays}/{days.length} 天完成</span>
                     <span className="text-muted-foreground">第 {selectedWeek + 1} 週</span>
@@ -241,6 +275,7 @@ export default function LoveJourneyPage() {
                         <div className="flex flex-col gap-4">
                           <div className="flex items-start gap-3">
                             <Checkbox
+                              disabled={updateProgress.isPending || changeStatus.isPending || loveJourney.status !== 'active'}
                               checked={completed}
                               onCheckedChange={(checked) => toggleDay(day, checked === true)}
                               aria-label={`完成 Day ${day.dayNumber}`}
@@ -280,17 +315,22 @@ export default function LoveJourneyPage() {
                           </div>
                           <div className="space-y-2">
                             <Textarea
-                              value={drafts[day.id] ?? ''}
+                              readOnly={loveJourney.status !== 'active'}
+                              value={drafts[day.id] ?? day.responseText ?? ''}
                               onChange={(event) => setDrafts((current) => ({ ...current, [day.id]: event.target.value }))}
                               placeholder="寫下今天的回應"
                               className="min-h-24 resize-y bg-white/80"
                             />
-                            <div className="flex justify-end">
+                            <label className="block space-y-2 py-2 text-sm"><span>回答分享範圍 · 第 {day.dayNumber} 天</span><select className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3" disabled={updateProgress.isPending || loveJourney.status !== 'active'} value={sharing[day.id]?.scope ?? day.visibility ?? 'private'} onChange={e => setSharing(current => ({ ...current, [day.id]: {scope:e.target.value as LoveJourneyProgressDay['visibility'],contractId:e.target.value==='mentor'?activeMentor?.id:null} }))}><option value="private">只有自己</option><option value="mentor" disabled={!activeMentor}>目前已確認的陪伴者{activeMentor ? `：${activeMentor.mentorName}` : '（尚未安排）'}</option>{day.visibility === 'pastoral' && <option value="pastoral">原先分享的被授權牧養同工</option>}</select></label>
+                            {sharing[day.id]?.scope==='mentor'&&sharing[day.id].contractId!==activeMentor?.id&&<p role="alert" className="text-sm text-destructive">陪伴者已變更，請先選「只有自己」，再確認新的分享對象。</p>}
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {day.visibility !== 'private' && <Button variant="ghost" disabled={updateProgress.isPending} onClick={() => updateProgress.mutate({ day, visibility: 'private' })}>撤回回答分享</Button>}
+                              {updateProgress.isError && <Button variant="outline" onClick={() => void journeyQuery.refetch()}>讀取最新進度，保留輸入</Button>}
                               <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => saveResponse(day)}
-                                disabled={updateProgress.isPending}
+                                disabled={updateProgress.isPending || changeStatus.isPending || loveJourney.status !== 'active'}
                               >
                                 保存回應
                               </Button>

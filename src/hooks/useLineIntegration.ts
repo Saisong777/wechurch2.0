@@ -24,7 +24,7 @@ export function useLineLoginConfig() {
 
 export function useLineLoginUrl() {
   return useMutation({
-    mutationFn: async (redirectPath = '/admin/crm') => {
+    mutationFn: async (redirectPath: string = '/admin/crm') => {
       const params = new URLSearchParams({ redirect: redirectPath });
       const response = await fetch(`/api/line-login/url?${params.toString()}`, { credentials: 'include' });
       if (!response.ok) throw new Error(await response.text());

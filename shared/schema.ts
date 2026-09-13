@@ -1,6 +1,6 @@
-import { pgTable, text, serial, integer, boolean, timestamp, uuid, pgEnum, date, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, uuid, pgEnum, date, jsonb, uniqueIndex, unique, index, primaryKey, check, foreignKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import type { z } from "zod/v4";
 import { sql } from "drizzle-orm";
 
 export const sessionStatusEnum = pgEnum("session_status", ["waiting", "grouping", "studying", "verification", "completed"]);
@@ -74,6 +74,7 @@ export const persons = pgTable("persons", {
   church: text("church"),
   pastoralStage: text("pastoral_stage").default("unknown").notNull(),
   pastoralStatus: text("pastoral_status").default("active").notNull(),
+  mergedIntoPersonId: uuid("merged_into_person_id").references((): AnyPgColumn => persons.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -133,6 +134,24 @@ export const participants = pgTable("participants", {
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const participantAccess = pgTable('participant_access', {
+  participantId: uuid('participant_id').primaryKey().references(() => participants.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id),
+  browserHash: text('browser_hash').notNull(),
+  recoveredBy: uuid('recovered_by').references(() => users.id),
+  recoveryReason: text('recovery_reason'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, table => ({ userIdx: index('participant_access_user_idx').on(table.userId) }));
+
+export const personMergeAudit = pgTable('person_merge_audit', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  primaryPersonId: uuid('primary_person_id').notNull().references(() => persons.id),
+  duplicatePersonId: uuid('duplicate_person_id').notNull().references(() => persons.id),
+  actorUserId: uuid('actor_user_id').references(() => users.id),
+  snapshot: jsonb('snapshot').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, table => ({ distinctPersons: check('person_merge_audit_check', sql`${table.primaryPersonId} <> ${table.duplicatePersonId}`) }));
 
 export const submissions = pgTable("submissions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -262,6 +281,20 @@ export const featureToggles = pgTable("feature_toggles", {
   updatedBy: uuid("updated_by").references(() => users.id),
 });
 
+export const personalPrayers = pgTable("personal_prayers", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  prayer: text("prayer").notNull(),
+  response: text("response").default("").notNull(),
+  status: text("status").default("waiting").notNull(),
+  responseType: text("response_type"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userCreatedIdx: index("personal_prayers_user_created_idx").on(table.userId, table.createdAt),
+}));
+
 export const prayers = pgTable("prayers", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid("user_id").references(() => users.id).notNull(),
@@ -269,6 +302,8 @@ export const prayers = pgTable("prayers", {
   category: text("category").default("other").notNull(),
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   isPinned: boolean("is_pinned").default(false).notNull(),
+  isUrgent: boolean("is_urgent").default(false).notNull(),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
   isAnswered: boolean("is_answered").default(false).notNull(),
   answeredAt: timestamp("answered_at"),
   scriptureReference: text("scripture_reference"),
@@ -286,8 +321,21 @@ export const prayerComments = pgTable("prayer_comments", {
   prayerId: uuid("prayer_id").references(() => prayers.id).notNull(),
   userId: uuid("user_id").references(() => users.id).notNull(),
   content: text("content").notNull(),
+  kind: text("kind").default("encouragement").notNull(),
+  sticker: text("sticker"),
+  requestId: uuid("request_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, t => [
+  uniqueIndex('prayer_comment_request_unique').on(t.userId,t.requestId).where(sql`${t.requestId} IS NOT NULL`),
+  index('prayer_comments_prayer_idx').on(t.prayerId,t.createdAt),
+]);
+
+export const prayerReactions = pgTable("prayer_reactions", {
+  prayerId: uuid("prayer_id").references(() => prayers.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  kind: text("kind").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [primaryKey({ columns: [t.prayerId, t.userId, t.kind] }), check('prayer_reactions_kind_check',sql`${t.kind} IN ('heart','support','strength')`)]);
 
 export const prayerNotifications = pgTable("prayer_notifications", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -567,6 +615,7 @@ export const jesusDailyContent = pgTable("jesus_daily_content", {
 // Devotional Notes
 export const devotionalNotes = pgTable("devotional_notes", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  version: integer('version').notNull().default(1),
   userId: uuid("user_id").references(() => users.id).notNull(),
   verseReference: text("verse_reference").notNull(),
   verseText: text("verse_text").notNull(),
@@ -589,6 +638,21 @@ export const devotionalNotes = pgTable("devotional_notes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const devotionWallPosts = pgTable('devotion_wall_posts', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  sourceNoteId: uuid('source_note_id').references(() => devotionalNotes.id, { onDelete: 'set null' }),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  publishedDay: date('published_day').notNull(),
+  title: text('title').notNull(), body: text('body').notNull(), reference: text('reference').notNull(),
+  isAnonymous: boolean('is_anonymous').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
+}, t => [
+  uniqueIndex('devotion_wall_source_day_unique').on(t.sourceNoteId,t.publishedDay).where(sql`${t.withdrawnAt} IS NULL`),
+  index('devotion_wall_active_idx').on(t.publishedDay,t.expiresAt).where(sql`${t.withdrawnAt} IS NULL`),
+]);
 
 // Saved Verses
 export const savedVerses = pgTable("saved_verses", {
@@ -699,6 +763,7 @@ export const journeyDays = pgTable("journey_days", {
 
 export const personJourneys = pgTable("person_journeys", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerUserId:uuid('owner_user_id').references(()=>users.id),
   personId: uuid("person_id").references(() => persons.id).notNull(),
   templateId: uuid("template_id").references(() => journeyTemplates.id).notNull(),
   mentorUserId: uuid("mentor_user_id").references(() => users.id),
@@ -725,7 +790,10 @@ export const journeyProgress = pgTable("journey_progress", {
   responseText: text("response_text"),
   mentorNote: text("mentor_note"),
   needsFollowUp: boolean("needs_follow_up").default(false).notNull(),
-  visibility: text("visibility").default("pastoral").notNull(),
+  visibility: text("visibility").default("private").notNull(),
+  version: integer("version").default(1).notNull(),
+  contentSnapshot: jsonb("content_snapshot"),
+  mentorContractId: uuid("mentor_contract_id"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -733,6 +801,8 @@ export const journeyProgress = pgTable("journey_progress", {
   journeyDayUnique: uniqueIndex("journey_progress_journey_day_unique").on(table.personJourneyId, table.journeyDayId),
   journeyIdx: index("journey_progress_person_journey_id_idx").on(table.personJourneyId),
   followUpIdx: index("journey_progress_needs_follow_up_idx").on(table.needsFollowUp),
+  mentorJourney:foreignKey({columns:[table.mentorContractId,table.personJourneyId],foreignColumns:[mentoringContracts.id,mentoringContracts.journeyId],name:'journey_progress_mentor_journey_fk'}),
+  mentorBinding:check('journey_progress_mentor_binding',sql`(${table.visibility}='mentor')=(${table.mentorContractId} IS NOT NULL)`),
 }));
 
 export const journeyMilestones = pgTable("journey_milestones", {
@@ -770,6 +840,32 @@ export const mentorAssignments = pgTable("mentor_assignments", {
   mentorUserIdx: index("mentor_assignments_mentor_user_id_idx").on(table.mentorUserId),
   statusIdx: index("mentor_assignments_status_idx").on(table.status),
 }));
+
+export const mentoringContracts = pgTable('mentoring_contracts', {
+  id:uuid('id').primaryKey(),journeyId:uuid('journey_id').references(()=>personJourneys.id).notNull(),
+  learnerId:uuid('learner_id').references(()=>users.id).notNull(),mentorId:uuid('mentor_id').references(()=>users.id).notNull(),
+  groupId:uuid('group_id').references(()=>smallGroups.id).notNull(),courseName:text('course_name').notNull(),
+  cadenceDays:integer('cadence_days').notNull(),agreement:text('agreement').notNull(),status:text('status').default('pending').notNull(),
+  version:integer('version').default(1).notNull(),learnerConsentedAt:timestamp('learner_consented_at',{withTimezone:true}).defaultNow().notNull(),
+  acceptedAt:timestamp('accepted_at',{withTimezone:true}),endedAt:timestamp('ended_at',{withTimezone:true}),
+  createdAt:timestamp('created_at',{withTimezone:true}).defaultNow().notNull(),updatedAt:timestamp('updated_at',{withTimezone:true}).defaultNow().notNull(),
+},t=>({
+  current:uniqueIndex('mentoring_one_current_journey').on(t.journeyId).where(sql`${t.status} IN ('pending','active')`),
+  journeyIdentity:unique('mentoring_contracts_id_journey_id_key').on(t.id,t.journeyId),
+  learner:index('mentoring_learner_idx').on(t.learnerId,t.createdAt.desc()),mentor:index('mentoring_mentor_idx').on(t.mentorId,t.status,t.createdAt.desc()),
+  cadence:check('mentoring_contracts_cadence_days_check',sql`${t.cadenceDays} IN (7,14,30)`),
+  status:check('mentoring_contracts_status_check',sql`${t.status} IN ('pending','active','declined','ended')`),
+  version:check('mentoring_contracts_version_check',sql`${t.version}>0`),
+  distinctPeople:check('mentoring_contracts_check',sql`${t.learnerId}<>${t.mentorId}`),
+}));
+export const mentoringEvents=pgTable('mentoring_events',{
+  id:uuid('id').primaryKey().defaultRandom(),contractId:uuid('contract_id').references(()=>mentoringContracts.id).notNull(),
+  actorId:uuid('actor_id').references(()=>users.id).notNull(),action:text('action').notNull(),createdAt:timestamp('created_at',{withTimezone:true}).defaultNow().notNull(),
+});
+export const mentoringFeedbackRecords=pgTable('mentoring_feedback',{
+  id:uuid('id').primaryKey(),contractId:uuid('contract_id').references(()=>mentoringContracts.id).notNull(),
+  authorId:uuid('author_id').references(()=>users.id).notNull(),kind:text('kind').notNull(),body:text('body').notNull(),createdAt:timestamp('created_at',{withTimezone:true}).defaultNow().notNull(),
+},t=>({contract:index('mentoring_feedback_contract_idx').on(t.contractId,t.createdAt),kind:check('mentoring_feedback_kind_check',sql`${t.kind} IN ('reflection','practice','feedback')`)}));
 
 export const pastoralTasks = pgTable("pastoral_tasks", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1159,6 +1255,8 @@ export type IcebreakerGame = typeof icebreakerGames.$inferSelect;
 export type IcebreakerPlayer = typeof icebreakerPlayers.$inferSelect;
 export type CardQuestion = typeof cardQuestions.$inferSelect;
 export type MessageCard = typeof messageCards.$inferSelect;
+export type MessageCardDownload = typeof messageCardDownloads.$inferSelect;
+export type AppRole = (typeof appRoleEnum.enumValues)[number];
 export type AppEvent = typeof appEvents.$inferSelect;
 export type AppErrorEvent = typeof appErrorEvents.$inferSelect;
 export type AiUsageEvent = typeof aiUsageEvents.$inferSelect;
@@ -1199,7 +1297,7 @@ export type InboxEmail = typeof inboxEmails.$inferSelect;
 export type InsertInboxEmail = z.infer<typeof insertInboxEmailSchema>;
 export const insertInboxEmailSchema = createInsertSchema(inboxEmails).omit({ id: true, receivedAt: true });
 
-export const insertDevotionalNoteSchema = createInsertSchema(devotionalNotes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDevotionalNoteSchema = createInsertSchema(devotionalNotes).omit({ id: true, createdAt: true, updatedAt: true, version: true });
 export const insertSavedVerseSchema = createInsertSchema(savedVerses).omit({ id: true, createdAt: true });
 export const insertReadingPlanTemplateSchema = createInsertSchema(readingPlanTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserReadingPlanSchema = createInsertSchema(userReadingPlans).omit({ id: true, createdAt: true, updatedAt: true });
@@ -1224,3 +1322,95 @@ export type InsertJourneyMilestone = z.infer<typeof insertJourneyMilestoneSchema
 export type InsertMentorAssignment = z.infer<typeof insertMentorAssignmentSchema>;
 
 export * from "./models/auth";
+
+// Use migration 0003 for the deferrable date uniqueness used by date swaps.
+export const churchDevotions = pgTable('church_devotions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  date: date('date').notNull().unique('church_devotions_date_unique'),
+  planName: text('plan_name').notNull(),
+  dayNumber: integer('day_number').notNull(),
+  scriptureReference: text('scripture_reference').notNull(),
+  scriptureText: text('scripture_text').notNull().default(''),
+  devotionalTitle: text('devotional_title').notNull(),
+  devotionalText: text('devotional_text').notNull(),
+  prayer: text('prayer').notNull().default(''),
+  loveAction: text('love_action').notNull().default(''),
+  status: text('status').notNull().default('draft'),
+  version: integer('version').notNull().default(1),
+  updatedBy: uuid('updated_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+export const churchDevotionImports = pgTable('church_devotion_imports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  preview: jsonb('preview').notNull(),
+  result: jsonb('result'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull().default(sql`now() + interval '30 minutes'`),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+export const churchDevotionHistory = pgTable('church_devotion_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  devotionId: uuid('devotion_id').notNull().references(() => churchDevotions.id),
+  actorId: uuid('actor_id').notNull().references(() => users.id),
+  action: text('action').notNull(),
+  beforeData: jsonb('before_data'),
+  afterData: jsonb('after_data').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ entryIdx: index('church_devotion_history_entry_idx').on(table.devotionId, table.createdAt) }));
+
+// Member-facing small group life; private notes/prayers remain in their own tables.
+export const lifeGroupInvites = pgTable('life_group_invites', {
+  groupId: uuid('group_id').primaryKey().references(() => smallGroups.id),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+});
+export const lifeGroupRequests = pgTable('life_group_requests', {
+  groupId: uuid('group_id').notNull().references(() => smallGroups.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  status: text('status').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ pk: primaryKey({ columns: [t.groupId,t.userId] }), status: check('life_group_requests_status_check', sql`${t.status} IN ('pending','approved','rejected')`) }));
+export const lifeGroupReading = pgTable('life_group_reading', {
+  groupId: uuid('group_id').notNull().references(() => smallGroups.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  devotionId: uuid('devotion_id').notNull().references(() => churchDevotions.id),
+  devotionVersion: integer('devotion_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ pk: primaryKey({ columns: [t.groupId,t.userId,t.devotionId] }) }));
+export const lifeGroupShares = pgTable('life_group_shares', {
+  id: uuid('id').primaryKey(), groupId: uuid('group_id').notNull().references(() => smallGroups.id),
+  authorId: uuid('author_id').notNull().references(() => users.id), kind: text('kind').notNull(),
+  isAnonymous: boolean('is_anonymous').notNull().default(false),
+  title: text('title').notNull(), body: text('body').notNull(), reference: text('reference').notNull().default(''), sourceId: uuid('source_id'),
+  answered: boolean('answered').notNull().default(false), version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(), withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
+}, t => ({ feed: index('life_group_shares_feed').on(t.groupId,t.kind,t.createdAt.desc(),t.id.desc()), kind: check('life_group_shares_kind_check', sql`${t.kind} IN ('note','prayer')`) }));
+export const lifeGroupComments = pgTable('life_group_comments', {
+  id: uuid('id').primaryKey(), shareId: uuid('share_id').notNull().references(() => lifeGroupShares.id), authorId: uuid('author_id').notNull().references(() => users.id),
+  body: text('body').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
+}, t => ({ share: index('life_group_comments_share').on(t.shareId,t.createdAt) }));
+
+export const personalPrayerShares = pgTable('personal_prayer_shares', {
+  prayerId: uuid('prayer_id').notNull().references(() => personalPrayers.id), destination: text('destination').notNull(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id), groupId: uuid('group_id').references(() => smallGroups.id),
+  postId: uuid('post_id').notNull(), isAnonymous: boolean('is_anonymous').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ pk: primaryKey({ columns: [t.prayerId,t.destination] }), owner: index('personal_prayer_shares_owner_idx').on(t.ownerId), destination: check('personal_prayer_shares_check', sql`(${t.groupId} IS NULL AND ${t.destination}='public') OR (${t.groupId} IS NOT NULL AND ${t.destination}=${t.groupId}::text)`) }));
+export const lifeGroupPrayed = pgTable('life_group_prayed', {
+  shareId: uuid('share_id').notNull().references(() => lifeGroupShares.id), userId: uuid('user_id').notNull().references(() => users.id), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ pk: primaryKey({ columns: [t.shareId,t.userId] }) }));
+export const lifeGroupCare = pgTable('life_group_care', {
+  id: uuid('id').primaryKey(), groupId: uuid('group_id').notNull().references(() => smallGroups.id), creatorId: uuid('creator_id').notNull().references(() => users.id),
+  name: text('name').notNull(), need: text('need').notNull(), status: text('status').notNull().default('new'), responsibleId: uuid('responsible_id').references(() => users.id),
+  nextAction: text('next_action').notNull().default(''), dueDate: date('due_date'), consentConfirmedAt: timestamp('consent_confirmed_at', { withTimezone: true }).notNull().defaultNow(),
+  version: integer('version').notNull().default(1), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(), withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
+}, t => ({ group: index('life_group_care_group').on(t.groupId,t.updatedAt.desc()), status: check('life_group_care_status_check', sql`${t.status} IN ('new','following','paused','completed')`) }));
+export const lifeGroupCareUpdates = pgTable('life_group_care_updates', {
+  id: uuid('id').primaryKey(), careId: uuid('care_id').notNull().references(() => lifeGroupCare.id), authorId: uuid('author_id').notNull().references(() => users.id),
+  body: text('body').notNull(), status: text('status').notNull(), nextAction: text('next_action').notNull(), dueDate: date('due_date'), responsibleId: uuid('responsible_id').references(() => users.id), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ care: index('life_group_care_updates_case').on(t.careId,t.createdAt.desc()) }));
+export const lifeGroupCareWatches = pgTable('life_group_care_watches', {
+  careId: uuid('care_id').notNull().references(() => lifeGroupCare.id), userId: uuid('user_id').notNull().references(() => users.id),
+}, t => ({ pk: primaryKey({ columns: [t.careId,t.userId] }) }));

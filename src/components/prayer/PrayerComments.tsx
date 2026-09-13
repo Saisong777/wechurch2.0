@@ -1,154 +1,53 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MessageCircle, Send, Trash2, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { MessageCircle, Send, Trash2, X, HandHeart, HeartHandshake, Sun, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { usePrayerComments, useCreateComment, useDeleteComment } from '@/hooks/usePrayerComments';
 import { useUserRole } from '@/hooks/useUserRole';
+import { COMMENT_LABELS, STICKER_LABELS, type PrayerSticker } from '@shared/prayerInteraction';
 
-interface PrayerCommentsProps {
-  prayerId: string;
+const stickerIcons = { praying: HandHeart, together: HeartHandshake, peace: Sun };
+const stickerColors = { praying: 'text-teal-700 bg-teal-50', together: 'text-rose-700 bg-rose-50', peace: 'text-amber-800 bg-amber-50' };
+function Sticker({value}:{value:PrayerSticker}) {
+  const Icon = stickerIcons[value];
+  return <span className={`inline-flex h-24 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-lg ${stickerColors[value]}`}><Icon className="h-9 w-9" strokeWidth={1.7} /><span className="text-sm font-semibold">{STICKER_LABELS[value]}</span></span>;
 }
 
-export const PrayerComments: React.FC<PrayerCommentsProps> = ({ prayerId }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [newComment, setNewComment] = useState('');
-  const { data: comments, isLoading } = usePrayerComments(prayerId);
-  const createMutation = useCreateComment();
-  const deleteMutation = useDeleteComment();
-  const { isAdmin } = useUserRole();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-
-    await createMutation.mutateAsync({ prayerId, content: newComment.trim() });
-    setNewComment('');
-  };
-
-  const handleDelete = (commentId: string) => {
-    deleteMutation.mutate({ commentId, prayerId });
-  };
-
-  const commentCount = comments?.length || 0;
-
-  if (!isExpanded) {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsExpanded(true)}
-        className="h-10 gap-2 rounded-lg px-3 text-muted-foreground hover:text-foreground"
-      >
-        <MessageCircle className="h-4 w-4" />
-        <span>{commentCount > 0 ? '查看鼓勵' : '留下鼓勵'}</span>
-        {commentCount > 0 && (
-          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
-            {commentCount}
-          </span>
-        )}
-      </Button>
-    );
+export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=false}:{prayerId:string;count?:number;anonymousOwner?:boolean;readOnly?:boolean}) {
+  const [expanded,setExpanded] = useState(false);
+  const [content,setContent] = useState('');
+  const [kind,setKind] = useState<keyof typeof COMMENT_LABELS>('encouragement');
+  const [sticker,setSticker] = useState<PrayerSticker>('praying');
+  const request = useRef<{signature:string;id:string}>();
+  const comments = usePrayerComments(prayerId,expanded);
+  const create = useCreateComment(); const remove = useDeleteComment(); const {isAdmin} = useUserRole();
+  async function send() {
+    if (create.isPending || (kind !== 'sticker' && !content.trim())) return;
+    const input = {content:kind === 'sticker' ? '' : content.trim(),kind,...(kind === 'sticker' ? {sticker} : {})};
+    const signature = JSON.stringify(input);
+    // Reuse the receipt key after a network failure, but not after editing the draft.
+    if (request.current?.signature !== signature) request.current = {signature,id:crypto.randomUUID()};
+    try { await create.mutateAsync({prayerId,...input,requestId:request.current.id}); setContent(''); request.current = undefined; }
+    catch { /* Keep the draft and receipt key for an explicit retry. */ }
   }
-
-  return (
-    <div className="rounded-lg border bg-muted/30 p-3 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium flex items-center gap-2">
-          <MessageCircle className="h-4 w-4" />
-          留言 ({commentCount})
-        </h4>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-full"
-          onClick={() => setIsExpanded(false)}
-          aria-label="收合留言"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+  if (!expanded) return <Button variant="ghost" size="sm" className="gap-2" onClick={()=>setExpanded(true)}><MessageCircle className="h-4 w-4" />鼓勵與禱告{count > 0 ? ` · ${count}` : ''}</Button>;
+  return <section className="min-w-0 space-y-4 py-2" aria-label="鼓勵與禱告">
+    <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">鼓勵與禱告 · {comments.data?.length ?? count}</h3><Button variant="ghost" size="icon" title="收起回應" aria-label="收起回應" onClick={()=>setExpanded(false)}><X className="h-4 w-4" /></Button></div>
+    {comments.isPending && <p role="status" className="text-sm text-muted-foreground">載入回應中…</p>}
+    {comments.isError && <p role="alert" className="text-sm text-destructive">回應載入失敗。<button className="ml-2 underline" onClick={()=>comments.refetch()}>重新載入</button></p>}
+    {!comments.isError && <div className="max-h-96 space-y-4 overflow-y-auto [overflow-wrap:anywhere]">{comments.data?.map(comment=><article key={comment.id} className="border-b pb-3 last:border-0">
+      <div className="mb-2 flex items-start justify-between gap-2"><div className="min-w-0 text-xs"><span className="font-semibold">{comment.authorName}</span><span className="ml-2 text-muted-foreground">{COMMENT_LABELS[comment.kind]} · {formatDistanceToNow(new Date(comment.createdAt),{addSuffix:true,locale:zhTW})}</span></div>
+        {(comment.isOwner || isAdmin) && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" disabled={remove.isPending} title="撤回回應" aria-label="撤回回應" onClick={()=>{if(window.confirm('確定撤回這則回應？')) remove.mutate({prayerId,commentId:comment.id});}}><Trash2 className="h-4 w-4" /></Button>}
       </div>
-
-      {/* Comments List */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2].map((i) => (
-            <div key={i} className="flex gap-2">
-              <Skeleton className="h-8 w-8 rounded-full" />
-              <div className="flex-1 space-y-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-4 w-full" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : comments && comments.length > 0 ? (
-        <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
-          {comments.map((comment) => (
-            <div key={comment.id} className="flex gap-2 group">
-              <Avatar className="h-8 w-8 flex-shrink-0">
-                {comment.authorAvatar && (
-                  <AvatarImage src={comment.authorAvatar} alt={comment.authorName} />
-                )}
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  {comment.authorName?.charAt(0).toUpperCase() || '?'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">{comment.authorName}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(comment.createdAt), {
-                      addSuffix: true,
-                      locale: zhTW,
-                    })}
-                  </span>
-                  {(comment.isOwner || isAdmin) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(comment.id)}
-                      aria-label="刪除留言"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-                <p className="text-sm text-foreground break-words">{comment.content}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground text-center py-2">
-          還沒有留言，成為第一個留言的人吧！
-        </p>
-      )}
-
-      {/* Comment Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <Input
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="寫下一句鼓勵或禱告..."
-          maxLength={200}
-          className="h-10 flex-1 rounded-lg"
-        />
-        <Button
-          type="submit"
-          size="icon"
-          className="h-10 w-10 rounded-lg"
-          disabled={!newComment.trim() || createMutation.isPending}
-          aria-label="送出留言"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
-    </div>
-  );
-};
+      {comment.kind === 'sticker' && comment.sticker && comment.sticker in STICKER_LABELS ? <Sticker value={comment.sticker} /> : <p className="whitespace-pre-wrap text-sm leading-6">{comment.content}</p>}
+    </article>)}</div>}
+    {!readOnly && <form onSubmit={e=>{e.preventDefault();void send();}} className="border-t pt-3"><fieldset disabled={create.isPending} className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-sm">回應類型<select aria-label="回應類型" className="h-10 rounded-md border bg-background px-2" value={kind} onChange={e=>setKind(e.target.value as typeof kind)}>{Object.entries(COMMENT_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><span className="text-xs text-muted-foreground">{anonymousOwner ? '以匿名發文者回應' : '以你的名字回應'}</span></div>
+      {kind === 'sticker' ? <div role="radiogroup" aria-label="禱告貼圖" className="flex flex-wrap gap-2">{(Object.keys(STICKER_LABELS) as PrayerSticker[]).map(value=><button key={value} type="button" role="radio" aria-checked={sticker===value} aria-label={STICKER_LABELS[value]} className={`rounded-lg border-2 p-1 ${sticker===value?'border-primary':'border-transparent'}`} onClick={()=>setSticker(value)}><Sticker value={value} /></button>)}</div> : <Textarea aria-label="回應內容" placeholder={kind==='scripture'?'寫下想分享的話語與經文出處…':kind==='prayer'?'寫下為對方的禱告…':'寫下一句鼓勵…'} rows={3} maxLength={1000} value={content} onChange={e=>setContent(e.target.value)} />}
+      {create.isError && <p role="alert" className="text-sm text-destructive">尚未送出，你的內容仍保留在這裡。</p>}
+      <div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{kind!=='sticker' && `${content.length} / 1000`}</span><Button type="submit" disabled={create.isPending || (kind!=='sticker' && !content.trim())} className="gap-2">{create.isPending?<Loader2 className="h-4 w-4 animate-spin" />:<Send className="h-4 w-4" />}送出回應</Button></div>
+    </fieldset></form>}
+  </section>;
+}

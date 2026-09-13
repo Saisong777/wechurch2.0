@@ -192,6 +192,7 @@ export function registerAuthRoutes(app: Express): void {
         req.session.save((saveErr: any) => {
           if (saveErr) {
             console.error("[Auth] Login session save error:", saveErr);
+            return res.status(503).json({ message: '登入狀態暫時無法儲存，請稍後再試' });
           }
           console.log("[Auth] Email login successful for:", normalizedEmail);
           res.json({ message: "登入成功", user: { id: authUserId, email: normalizedEmail, displayName: dbUser.display_name } });

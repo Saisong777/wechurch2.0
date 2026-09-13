@@ -4,6 +4,7 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import { pool } from "../../db";
+import { isTestDeployment } from '../../deploymentSafety';
 
 async function upsertUser(profile: any) {
   const googleId = profile.id;
@@ -47,7 +48,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.session());
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === "development" && !process.env.RAILWAY_ENVIRONMENT_NAME) {
     app.get("/api/dev-login", async (req, res) => {
       const devEmail = "saisong@gmail.com";
       try {
@@ -75,7 +76,7 @@ export async function setupAuth(app: Express) {
     });
   }
   app.get("/api/logout", (req, res) => { req.logout(() => res.redirect("/")); });
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  if (!isTestDeployment() && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,

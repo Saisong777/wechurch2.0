@@ -22,6 +22,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
+import { LineAccountLink } from '@/components/user/LineAccountLink';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mergeLocalDevotionalNotes, type LocalDevotionalNote } from '@/lib/localDevotionalNotes';
 import { apiRequest } from '@/lib/queryClient';
@@ -41,6 +42,13 @@ interface EmailProviderStatus {
 }
 
 const recordActions = [
+  { id:'activity',title:'待回應',subtitle:'',href:'/me/activity',icon:MailCheck,tone:'border-border bg-card',iconTone:'bg-primary/10 text-primary',featureKeys:[] },
+  { id:'sharing',title:'我的分享',subtitle:'',href:'/me/sharing',icon:Send,tone:'border-border bg-card',iconTone:'bg-primary/10 text-primary',featureKeys:[] },
+  { id: 'support', title: '尋求陪伴', subtitle: '', href: '/support', icon: HeartHandshake, tone: 'border-border bg-card', iconTone: 'bg-primary/10 text-primary', featureKeys: [] },
+  {
+    id: 'soulgym', title: 'SoulGym 查經', subtitle: '', href: '/user',
+    icon: NotebookTabs, tone: 'border-border bg-card', iconTone: 'bg-primary/10 text-primary', featureKeys: ['we_live'],
+  },
   {
     id: 'devotional-notes',
     title: '讀經與靈修筆記',
@@ -101,14 +109,14 @@ const MePage = () => {
   const [emailPreview, setEmailPreview] = useState<{ subject: string; text: string } | null>(null);
   const queryClient = useQueryClient();
   const { data: devotionalNotes = [] } = useQuery<LocalDevotionalNote[]>({
-    queryKey: ['/api/devotional-notes'],
+    queryKey: ['/api/devotional-notes', user?.id],
     queryFn: async () => {
       try {
         const res = await fetch('/api/devotional-notes', { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch devotional notes');
-        return mergeLocalDevotionalNotes((await res.json()) as LocalDevotionalNote[]);
+        return mergeLocalDevotionalNotes((await res.json()) as LocalDevotionalNote[], user?.id || '');
       } catch {
-        return mergeLocalDevotionalNotes<LocalDevotionalNote>([]);
+        return mergeLocalDevotionalNotes<LocalDevotionalNote>([], user?.id || '', true);
       }
     },
     enabled: !!user,
@@ -188,12 +196,10 @@ const MePage = () => {
                 <h1 className="truncate text-2xl font-bold text-foreground">{displayName}</h1>
               </div>
             </div>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">
-              這裡集中放你的個人紀錄；首頁只保留今天要面對的經文、禱告與關懷。
-            </p>
           </section>
 
           <section aria-labelledby="my-records-title">
+            <LineAccountLink />
             <div className="mb-3 px-1">
               <h2 id="my-records-title" className="text-lg font-bold text-foreground">我的紀錄</h2>
             </div>
@@ -212,7 +218,7 @@ const MePage = () => {
                     <Link
                       key={action.id}
                       to={action.href}
-                      className={`group flex min-h-28 gap-3 rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${action.tone}`}
+                      className={`group flex min-h-16 items-center gap-3 border-b border-border py-3 transition-colors hover:bg-muted/40`}
                       data-testid={`link-me-${action.id}`}
                     >
                       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${action.iconTone}`}>
@@ -220,13 +226,9 @@ const MePage = () => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="text-base font-bold text-foreground">{action.title}</h3>
-                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          {action.id === 'devotional-notes' && devotionalNotes.length > 0
-                            ? `已保存 ${devotionalNotes.length} 則讀經與靈修筆記。`
-                            : action.subtitle}
-                        </p>
+                        {action.id === 'devotional-notes' && devotionalNotes.length > 0 && <p className="mt-1 text-sm text-muted-foreground">{devotionalNotes.length} 則筆記</p>}
                       </div>
-                      <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-primary" />
                     </Link>
                   );
                 })}

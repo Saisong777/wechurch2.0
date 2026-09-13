@@ -20,7 +20,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, UserCheck, Bell, BellOff, Link2, Trash2, Shield, Crown, Star, Users, Church } from 'lucide-react';
+import { MoreHorizontal, UserCheck, Bell, BellOff, Link2, Trash2, Shield, Crown, Star, Users, Church, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import type { UnifiedMember, PotentialMember } from '@/hooks/useUnifiedMembers';
@@ -38,6 +38,7 @@ interface UnifiedMemberTableProps {
   onUpdateChurch?: (member: UnifiedMember, church: string) => void;
   onLinkUser: (id: string) => void;
   onDelete: (id: string) => void;
+  onCopyEmail?: (member: UnifiedMember) => void;
   isAdmin: boolean;
   groups?: Array<{ id: string; name: string; church: string; memberCount?: number }>;
   churches?: Array<{ id: string; name: string }>;
@@ -73,6 +74,7 @@ export const UnifiedMemberTable = ({
   onUpdateChurch,
   onLinkUser,
   onDelete,
+  onCopyEmail,
   isAdmin,
   groups = [],
   churches = [],
@@ -83,7 +85,7 @@ export const UnifiedMemberTable = ({
   const someSelected = selectableMembers.some(m => selectedIds.has(m.id)) && !allSelected;
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
@@ -91,12 +93,12 @@ export const UnifiedMemberTable = ({
               <Checkbox
                 checked={someSelected ? "indeterminate" : allSelected}
                 onCheckedChange={onToggleSelectAll}
-                aria-label="Select all"
+                disabled={!selectableMembers.length}
+                aria-label="選取本頁潛在會員"
               />
             </TableHead>
             <TableHead>類型</TableHead>
-            <TableHead>姓名</TableHead>
-            <TableHead>Email</TableHead>
+            <TableHead>會員 / Email</TableHead>
             <TableHead>角色/狀態</TableHead>
             <TableHead className="text-center">出席</TableHead>
             <TableHead>最後活動</TableHead>
@@ -112,13 +114,14 @@ export const UnifiedMemberTable = ({
               <TableRow 
                 key={member.id} 
                 className={isSelected ? 'bg-muted/50' : ''}
+                data-state={isSelected ? 'selected' : undefined}
               >
                 <TableCell>
                   {!isRegistered && (
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => onToggleSelect(member.id)}
-                      aria-label={`Select ${member.name}`}
+                      aria-label={`選取 ${member.name}`}
                     />
                   )}
                 </TableCell>
@@ -127,16 +130,14 @@ export const UnifiedMemberTable = ({
                     {isRegistered ? '會員' : '潛在'}
                   </Badge>
                 </TableCell>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
+                <TableCell className="max-w-[360px]">
+                  <div className="flex items-center gap-2 break-words font-medium">
                     {member.name}
                     {!member.subscribed && (
                       <BellOff className="h-3 w-3 text-muted-foreground" />
                     )}
                   </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {member.email}
+                  <p className="mt-1 break-all text-xs text-muted-foreground">{member.email || '未提供 Email'}</p>
                 </TableCell>
                 <TableCell>
                   {isRegistered && member.role ? (
@@ -160,14 +161,18 @@ export const UnifiedMemberTable = ({
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" aria-label={`${member.name} 的操作`} title="會員操作">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem disabled={!member.email} onClick={() => onCopyEmail?.(member)}>
+                        <Copy className="mr-2 h-4 w-4" />複製 Email
+                      </DropdownMenuItem>
                       {isRegistered && member.userId && isAdmin && (
-                        <>
-                          <DropdownMenuLabel>變更角色</DropdownMenuLabel>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger><Shield className="mr-2 h-4 w-4" />變更角色</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
                           <DropdownMenuItem 
                             onClick={() => onUpdateRole(member.userId!, 'admin')}
                             disabled={member.role === 'admin'}
@@ -217,8 +222,8 @@ export const UnifiedMemberTable = ({
                             <Users className="h-4 w-4 mr-2" />
                             設為一般成員
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                        </>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
                       )}
                       
                       {!isRegistered && (
@@ -308,9 +313,9 @@ export const UnifiedMemberTable = ({
                       {!isRegistered && !member.userId && (
                         <>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => onLinkUser(member.potentialMemberId!)}>
+                          <DropdownMenuItem disabled onClick={() => onLinkUser(member.potentialMemberId!)}>
                             <Link2 className="h-4 w-4 mr-2" />
-                            手動連結用戶
+                            手動連結用戶（尚未開放）
                           </DropdownMenuItem>
                         </>
                       )}
@@ -320,6 +325,7 @@ export const UnifiedMemberTable = ({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onClick={() => onDelete(member.potentialMemberId!)}
+                            disabled={!isAdmin}
                             className="text-destructive focus:text-destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />

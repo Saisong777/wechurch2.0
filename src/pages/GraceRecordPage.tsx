@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { BookHeart, CalendarCheck2, CheckCircle2, PartyPopper, Plus, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { UnsavedChangesGuard } from '@/components/layout/UnsavedChangesGuard';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BookHeart, CalendarCheck2, CheckCircle2, PartyPopper, Plus, Sparkles, Share2 } from 'lucide-react';
+import { PersonalPrayerShareDialog, PrayerDeliveries, usePrayerSharing } from '@/components/prayer/PersonalPrayerSharing';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,23 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
-import { usePrayerWall } from '@/hooks/usePrayerWall';
+import { usePersonalPrayers } from '@/hooks/usePersonalPrayers';
+import { useAuth } from '@/contexts/AuthContext';
+import type { PersonalPrayer as GraceRecord } from '@shared/personalPrayer';
 import { toast } from 'sonner';
 
-type GraceStatus = 'waiting' | 'answered' | 'grace_response';
 type GraceResponseType = 'ended' | 'blocked' | 'grace' | 'keep_waiting' | 'other';
-
-interface GraceRecord {
-  id: string;
-  title: string;
-  prayer: string;
-  response?: string;
-  status?: GraceStatus;
-  responseType?: GraceResponseType;
-  createdAt: string;
-}
-
-const STORAGE_KEY = 'wechurch_grace_records_v1';
 const GRACE_RESPONSE_OPTIONS: Array<{ value: GraceResponseType; label: string }> = [
   { value: 'grace', label: '有恩典' },
   { value: 'ended', label: '已結束' },
@@ -41,49 +32,33 @@ function getDateLabel(date: string) {
   });
 }
 
-function createId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `grace-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function hasGraceResponse(record: GraceRecord) {
-  return !!record.response?.trim();
+  return record.status !== 'waiting';
 }
 
-function getResponseTypeLabel(type?: GraceResponseType) {
+function getResponseTypeLabel(type?: GraceResponseType | null) {
   return GRACE_RESPONSE_OPTIONS.find((option) => option.value === type)?.label || '恩典回應';
 }
 
 const GraceRecordPage = () => {
-  const { data: prayers = [] } = usePrayerWall();
-  const [records, setRecords] = useState<GraceRecord[]>([]);
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const { data: records = [], save, isPending, isError, refetch } = usePersonalPrayers();
+  const createId = useRef<string | null>(null);
   const [title, setTitle] = useState('');
+  const [composerOpen, setComposerOpen] = useState(() => searchParams.get('new') === '1');
   const [prayer, setPrayer] = useState('');
+  const [selected,setSelected] = useState<string[]>([]);
+  const [sharing,setSharing] = useState(false);
+  const deliveries = usePrayerSharing();
+  useEffect(() => { setSelected([]); setSharing(false); }, [user?.id]);
+  const selectPrayer = (id:string, checked:boolean) => {
+    if (checked && selected.length >= 20) { toast.error('每次最多分享 20 筆'); return; }
+    setSelected(current => checked ? [...current,id] : current.filter(v=>v!==id));
+  };
   const [respondingRecordId, setRespondingRecordId] = useState<string | null>(null);
   const [responseDrafts, setResponseDrafts] = useState<Record<string, string>>({});
   const [responseTypeDrafts, setResponseTypeDrafts] = useState<Record<string, GraceResponseType>>({});
-
-  useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) setRecords(parsed);
-    } catch {
-      setRecords([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-    window.dispatchEvent(new Event('wechurch:grace-records-updated'));
-  }, [records]);
-
-  const answeredMine = useMemo(
-    () => prayers.filter((item) => item.isOwner && item.isAnswered),
-    [prayers]
-  );
 
   const waitingRecords = useMemo(
     () =>
@@ -100,21 +75,22 @@ const GraceRecordPage = () => {
     [records]
   );
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!title.trim() && !prayer.trim()) return;
-
-    const nextRecord: GraceRecord = {
-      id: createId(),
-      title: title.trim() || '今天的禱告',
-      prayer: prayer.trim(),
-      status: 'waiting',
-      createdAt: new Date().toISOString(),
-    };
-
-    setRecords((current) => [nextRecord, ...current]);
-    setTitle('');
-    setPrayer('');
-    toast.success('已加入禱告清單，也會出現在首頁個人禱告');
+    createId.current ||= crypto.randomUUID();
+    try {
+      await save.mutateAsync({ id: createId.current, create: true, input: {
+        title: title.trim() || '今天的禱告', prayer: prayer.trim(),
+        status: 'waiting', response: '', responseType: null,
+      } });
+      createId.current = null;
+      setTitle('');
+      setPrayer('');
+      setComposerOpen(false);
+      toast.success('已儲存個人禱告');
+    } catch {
+      toast.error('尚未儲存，文字仍保留在此頁。請確認連線與登入狀態後重試。');
+    }
   };
 
   const openResponseForm = (record: GraceRecord) => {
@@ -129,88 +105,72 @@ const GraceRecordPage = () => {
     }));
   };
 
-  const saveGraceResponse = (record: GraceRecord) => {
+  const saveGraceResponse = async (record: GraceRecord) => {
     const response = responseDrafts[record.id]?.trim() || '';
     if (!response) {
       toast.error('請先寫下神如何回應或帶領');
       return;
     }
 
-    setRecords((current) =>
-      current.map((item) =>
-        item.id === record.id
-          ? {
-              ...item,
-              response,
-              status: 'grace_response',
-              responseType: responseTypeDrafts[record.id] || 'grace',
-            }
-          : item
-      )
-    );
-    setRespondingRecordId(null);
-    toast.success('已存入恩典紀錄簿');
+    try {
+      await save.mutateAsync({ id: record.id, input: {
+        ...record, response, status: 'grace_response',
+        responseType: responseTypeDrafts[record.id] || 'grace',
+      } });
+      setRespondingRecordId(null);
+      setResponseDrafts(current => { const next = { ...current }; delete next[record.id]; return next; });
+      setResponseTypeDrafts(current => { const next = { ...current }; delete next[record.id]; return next; });
+      toast.success('已存入恩典紀錄簿');
+    } catch {
+      toast.error('尚未儲存回應，請稍後重試。');
+    }
   };
 
-  const moveBackToWaiting = (record: GraceRecord) => {
-    setRecords((current) =>
-      current.map((item) =>
-        item.id === record.id
-          ? {
-              ...item,
-              response: '',
-              status: 'waiting',
-              responseType: undefined,
-            }
-          : item
-      )
-    );
-    toast.success('已放回禱告清單');
+  const moveBackToWaiting = async (record: GraceRecord) => {
+    try {
+      await save.mutateAsync({ id: record.id, input: {
+        ...record, status: 'waiting',
+      } });
+      toast.success('已放回禱告清單，原有回應已保留');
+    } catch {
+      toast.error('尚未更新，請稍後重試。');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-emerald-50/40">
-      <Header title="個人禱告" subtitle="禱告清單與恩典紀錄簿" variant="compact" backTo="/share" />
+    <div className="min-h-screen bg-background">
+      <UnsavedChangesGuard dirty={!!user && (!!title.trim() || !!prayer.trim() || Object.entries(responseDrafts).some(([id, value]) => value !== (records.find(record => record.id === id)?.response || '')))} />
+      <Header title="個人禱告" subtitle="禱告清單與恩典紀錄簿" variant="compact" backTo="/" />
 
       <main className="container mx-auto px-3 py-4 sm:px-4 md:px-6 md:py-8">
         <div className="mx-auto max-w-5xl space-y-4">
-          <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
-            <div className="grid gap-0 md:grid-cols-[1fr_0.72fr]">
-              <div className="p-4 sm:p-6">
-                <Badge variant="outline" className="mb-3 border-emerald-200 bg-emerald-50 text-emerald-700">
-                  個人紀錄
-                </Badge>
-                <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                  <BookHeart className="h-7 w-7 text-emerald-600" />
-                  從禱告清單到恩典紀錄簿
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  先把需要禱告的事放進清單，它會同步出現在首頁的「個人禱告」。等神有帶領或回應時，再從那一筆禱告補上恩典回應，存入恩典紀錄簿。
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 border-t bg-muted/25 md:border-l md:border-t-0 md:grid-cols-1">
-                <div className="p-4 md:border-b">
-                  <p className="text-xl font-bold">{waitingRecords.length}</p>
-                  <p className="text-xs text-muted-foreground">正在禱告</p>
-                </div>
-                <div className="border-l p-4 md:border-l-0">
-                  <p className="text-xl font-bold">{graceRecords.length}</p>
-                  <p className="text-xs text-muted-foreground">恩典紀錄</p>
-                </div>
-              </div>
+          <section className="flex flex-wrap items-start justify-between gap-4 border-b pb-5">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-semibold"><BookHeart className="h-6 w-6 text-primary" />個人禱告</h1>
+              <p className="mt-2 text-sm text-muted-foreground">私人原稿 · 僅自己可見</p>
+              <p className="mt-2 text-sm text-muted-foreground">正在禱告 {waitingRecords.length} · 恩典紀錄 {graceRecords.length}</p>
             </div>
+            {user && !isPending && !isError && <Button aria-expanded={composerOpen} aria-controls="personal-prayer-composer" onClick={() => setComposerOpen(!composerOpen)}>
+              <Plus className="h-4 w-4" />{composerOpen ? '收起新增' : '新增禱告'}
+            </Button>}
           </section>
 
-          <section className="space-y-4">
-            <Card className="rounded-lg shadow-sm">
+          {!user ? (
+            <div className="py-8 text-center"><Button asChild><Link to="/login">登入個人禱告</Link></Button></div>
+          ) : isPending ? (
+            <p role="status" className="py-8 text-center text-muted-foreground">正在載入個人禱告…</p>
+          ) : isError ? (
+            <div role="alert" className="space-y-3 py-8 text-center">
+              <p>目前無法載入個人禱告，既有紀錄沒有被刪除。</p>
+              <Button variant="outline" onClick={() => refetch()}>重新載入</Button>
+            </div>
+          ) : <section className="space-y-4">
+            <Card id="personal-prayer-composer" hidden={!composerOpen} className="rounded-lg shadow-sm">
               <CardContent className="p-4 sm:p-5">
                 <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-foreground">新增一筆禱告</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      寫下禱告就代表開始禱告；恩典回應之後再補。
-                    </p>
+
                   </div>
                 </div>
 
@@ -219,6 +179,8 @@ const GraceRecordPage = () => {
                     <Label htmlFor="grace-title">標題</Label>
                     <Input
                       id="grace-title"
+                      maxLength={160}
+                      disabled={save.isPending}
                       value={title}
                       onChange={(event) => setTitle(event.target.value)}
                       placeholder="例如：我要買房"
@@ -229,6 +191,8 @@ const GraceRecordPage = () => {
                     <Label htmlFor="grace-prayer">禱告內容</Label>
                     <AutoResizeTextarea
                       id="grace-prayer"
+                      maxLength={10000}
+                      disabled={save.isPending}
                       minRows={1}
                       maxRows={4}
                       value={prayer}
@@ -240,15 +204,20 @@ const GraceRecordPage = () => {
                   <Button
                     className="h-11 rounded-lg gap-2 lg:w-36"
                     onClick={handleAdd}
-                    disabled={!title.trim() && !prayer.trim()}
+                    disabled={save.isPending || (!title.trim() && !prayer.trim())}
                   >
                     <Plus className="h-4 w-4" />
-                    開始禱告
+                    {save.isPending ? '儲存中…' : '開始禱告'}
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
+            {selected.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-y bg-background py-3" role="region" aria-label="分享選取的禱告">
+              <p className="text-sm">已選 {selected.length} 筆</p>
+              <Button variant="outline" disabled={!selected.length} onClick={()=>setSharing(true)}><Share2 className="mr-2 h-4 w-4" />分享選取的禱告</Button>
+            </div>}
+            {deliveries.isError && <p role="alert" className="text-sm text-destructive">暫時無法確認分享狀態。<button className="ml-2 underline" onClick={()=>deliveries.refetch()}>重新載入</button></p>}
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3 px-1">
                 <h2 className="text-lg font-bold text-foreground">正在禱告清單</h2>
@@ -265,7 +234,7 @@ const GraceRecordPage = () => {
                             <CalendarCheck2 className="h-3.5 w-3.5" />
                             {getDateLabel(record.createdAt)}
                           </p>
-                          <h3 className="text-base font-bold leading-tight text-foreground">{record.title}</h3>
+                          <label className="flex min-h-11 items-center gap-2 text-base font-bold leading-tight text-foreground"><input type="checkbox" aria-label={`選取 ${record.title}`} checked={selected.includes(record.id)} onChange={e=>selectPrayer(record.id,e.target.checked)} />{record.title}</label>
                           <p className="line-clamp-2 rounded-lg bg-muted/35 px-3 py-2 text-sm leading-6 text-muted-foreground lg:line-clamp-1">
                             {record.prayer || '沒有補充內容'}
                           </p>
@@ -281,6 +250,7 @@ const GraceRecordPage = () => {
                           </Button>
                         </div>
 
+                        <PrayerDeliveries items={deliveries.data?.filter(d=>d.prayerId===record.id) || []} busy={deliveries.withdraw.isPending} onWithdraw={d=>deliveries.withdraw.mutate(d)} />
                         {respondingRecordId === record.id && (
                           <div className="border-t bg-muted/20 p-3 sm:p-4">
                             <div className="grid gap-3 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(18rem,1.2fr)_auto] lg:items-end">
@@ -326,7 +296,7 @@ const GraceRecordPage = () => {
                                 />
                               </div>
                               <div className="flex gap-2 lg:flex-col">
-                                <Button className="flex-1 rounded-lg lg:flex-none" onClick={() => saveGraceResponse(record)}>
+                                <Button disabled={save.isPending} className="flex-1 rounded-lg lg:flex-none" onClick={() => saveGraceResponse(record)}>
                                   存入紀錄簿
                                 </Button>
                                 <Button variant="outline" className="rounded-lg" onClick={() => setRespondingRecordId(null)}>
@@ -361,12 +331,12 @@ const GraceRecordPage = () => {
                 <Card className="overflow-hidden rounded-lg shadow-sm">
                   <CardContent className="divide-y p-0">
                     {graceRecords.map((record) => (
-                      <div key={record.id} className="grid gap-3 p-3 sm:p-4 lg:grid-cols-[9.5rem_minmax(9rem,0.7fr)_minmax(14rem,1fr)_7rem_8rem] lg:items-center">
+                      <div key={record.id}><div className="grid gap-3 p-3 sm:p-4 lg:grid-cols-[9.5rem_minmax(9rem,0.7fr)_minmax(14rem,1fr)_7rem_8rem] lg:items-center">
                         <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                           <CalendarCheck2 className="h-3.5 w-3.5" />
                           {getDateLabel(record.createdAt)}
                         </p>
-                        <h3 className="text-base font-bold leading-tight text-foreground">{record.title}</h3>
+                        <label className="flex min-h-11 items-center gap-2 text-base font-bold leading-tight text-foreground"><input type="checkbox" aria-label={`選取 ${record.title}`} checked={selected.includes(record.id)} onChange={e=>selectPrayer(record.id,e.target.checked)} />{record.title}</label>
                         <div className="space-y-1">
                           <p className="line-clamp-1 text-xs text-muted-foreground">{record.prayer}</p>
                           <p className="line-clamp-2 text-sm leading-6 text-foreground lg:line-clamp-1">{record.response}</p>
@@ -379,10 +349,11 @@ const GraceRecordPage = () => {
                           size="sm"
                           className="h-9 justify-start px-0 text-muted-foreground hover:text-foreground lg:justify-center lg:px-2"
                           onClick={() => moveBackToWaiting(record)}
+                          disabled={save.isPending}
                         >
                           放回清單
                         </Button>
-                      </div>
+                      </div><PrayerDeliveries items={deliveries.data?.filter(d=>d.prayerId===record.id) || []} busy={deliveries.withdraw.isPending} onWithdraw={d=>deliveries.withdraw.mutate(d)} /></div>
                     ))}
                   </CardContent>
                 </Card>
@@ -399,28 +370,10 @@ const GraceRecordPage = () => {
               )}
             </section>
 
-            {answeredMine.length > 0 && (
-              <Card className="rounded-lg shadow-sm">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h2 className="text-lg font-bold text-foreground">我的公開禱告已蒙應允</h2>
-                    <Button variant="link" asChild className="h-auto p-0 text-emerald-700">
-                      <Link to="/prayer-wall?view=my">回禱告牆</Link>
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {answeredMine.slice(0, 3).map((item) => (
-                      <div key={item.id} className="rounded-lg border bg-background/80 p-3">
-                        <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{item.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </section>
+          </section>}
         </div>
       </main>
+      {sharing && user && <PersonalPrayerShareDialog key={user.id} records={records.filter(r=>selected.includes(r.id))} close={()=>setSharing(false)} done={()=>{setSharing(false);setSelected([]);}} />}
     </div>
   );
 };

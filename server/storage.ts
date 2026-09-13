@@ -2,8 +2,8 @@ import { db } from "./db";
 import { eq, and, desc, sql, asc, like, or, isNull, inArray } from "drizzle-orm";
 import { bibleCache, timelineCache, cacheKeys } from "./cache";
 import {
-  users, sessions, participants, submissions, aiReports,
-  studyResponses, prayers, prayerAmens, prayerComments,
+  users, sessions, participants, participantAccess, submissions, aiReports,
+  studyResponses, prayers, prayerAmens, prayerComments, prayerNotifications,
   featureToggles, potentialMembers, icebreakerGames, icebreakerPlayers,
   cardQuestions, messageCards, messageCardDownloads, userRoles,
   chineseUnionTrad, jesus4Seasons, jesusDailyContent, readingPlanTemplates, readingPlanTemplateItems, blessingVerses, savedVerses,
@@ -13,7 +13,7 @@ import {
   User, InsertUser, Session, InsertSession, Participant, InsertParticipant,
   Submission, InsertSubmission, Prayer, InsertPrayer, StudyResponse, InsertStudyResponse,
   FeatureToggle, PotentialMember, IcebreakerGame, IcebreakerPlayer, CardQuestion,
-  AiReport, MessageCard, MessageCardDownload,
+  AiReport, MessageCard, MessageCardDownload, AppRole,
   ChineseUnionTrad, Jesus4Season, JesusDailyContent, ReadingPlanTemplate, ReadingPlanTemplateItem, BlessingVerse, SavedVerse, InsertSavedVerse,
   UserReadingPlan, InsertUserReadingPlan, UserReadingProgress, InsertUserReadingProgress,
   DevotionalNote, InsertDevotionalNote, InsertReadingPlanTemplate,
@@ -32,7 +32,7 @@ export interface IStorage {
 
   getUserRoles(church?: string | null): Promise<{ userId: string; role: string }[]>;
   getUserRole(userId: string): Promise<string | undefined>;
-  upsertUserRole(userId: string, role: string): Promise<void>;
+  upsertUserRole(userId: string, role: AppRole): Promise<void>;
 
   getSession(id: string): Promise<Session | undefined>;
   getSessions(): Promise<Session[]>;
@@ -44,7 +44,7 @@ export interface IStorage {
   getParticipants(sessionId: string, filters?: { groupNumber?: number }): Promise<Participant[]>;
   getParticipant(id: string): Promise<Participant | undefined>;
   getParticipantBySessionEmail(sessionId: string, email: string): Promise<Participant | undefined>;
-  createParticipant(participant: InsertParticipant): Promise<Participant>;
+  createParticipant(participant: InsertParticipant, access?: { userId: string | null; browserHash: string }): Promise<Participant>;
   updateParticipant(id: string, data: Partial<Participant>): Promise<Participant | undefined>;
   deleteParticipantsBySession(sessionId: string): Promise<void>;
   forceVerifyAllParticipants(sessionId: string): Promise<number>;
@@ -61,11 +61,11 @@ export interface IStorage {
   getStudyResponse(sessionId: string, participantId: string): Promise<StudyResponse | undefined>;
   upsertStudyResponse(response: InsertStudyResponse & { sessionId: string; userId: string }): Promise<StudyResponse>;
   updateStudyResponseById(id: string, data: Partial<InsertStudyResponse>): Promise<StudyResponse | undefined>;
-  getStudyResponseWithOwner(id: string): Promise<{ id: string; userId: string; ownerEmail: string | null } | undefined>;
+  getStudyResponseWithOwner(id: string): Promise<{ id: string; sessionId: string; userId: string; ownerEmail: string | null } | undefined>;
   deleteStudyResponse(id: string): Promise<void>;
-  getNotebookEntries(email: string): Promise<any[]>;
-  getNotebookSessions(email: string): Promise<any[]>;
-  getNotebookSessionsWithData(email: string): Promise<any[]>;
+  getNotebookEntries(userId: string, browserHash: string): Promise<any[]>;
+  getNotebookSessions(userId: string, browserHash: string): Promise<any[]>;
+  getNotebookSessionsWithData(userId: string, browserHash: string): Promise<any[]>;
   getGroupStudyResponses(sessionId: string, groupNumber: number): Promise<any[]>;
 
   getPrayers(): Promise<Prayer[]>;
@@ -146,7 +146,7 @@ export interface IStorage {
 
   deleteAiReport(id: string): Promise<void>;
 
-  getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]>;
+  getBibleBooks(): Promise<{ bookName: string; bookNumber: number | null; chapterCount: number }[]>;
   getBibleChapters(bookName: string): Promise<{ chapter: number; verseCount: number }[]>;
   getBibleVerses(bookName: string, chapter: number): Promise<ChineseUnionTrad[]>;
   searchBibleVerses(query: string, limit?: number): Promise<ChineseUnionTrad[]>;
@@ -164,17 +164,17 @@ export interface IStorage {
   getSavedVerses(userId: string): Promise<SavedVerse[]>;
   getSavedVerse(userId: string, bookName: string, chapter: number, verse: number): Promise<SavedVerse | undefined>;
   createSavedVerse(data: InsertSavedVerse): Promise<SavedVerse>;
-  deleteSavedVerse(id: string): Promise<void>;
+  deleteSavedVerse(id: string, userId: string): Promise<void>;
 
   getUserReadingPlans(userId: string): Promise<UserReadingPlan[]>;
-  getUserReadingPlan(id: string): Promise<UserReadingPlan | undefined>;
+  getUserReadingPlan(id: string, userId: string): Promise<UserReadingPlan | undefined>;
   createUserReadingPlan(plan: InsertUserReadingPlan): Promise<UserReadingPlan>;
-  updateUserReadingPlan(id: string, updates: Partial<InsertUserReadingPlan>): Promise<UserReadingPlan | undefined>;
-  deleteUserReadingPlan(id: string): Promise<void>;
+  updateUserReadingPlan(id: string, userId: string, updates: Partial<InsertUserReadingPlan>): Promise<UserReadingPlan | undefined>;
+  deleteUserReadingPlan(id: string, userId: string): Promise<void>;
 
   getUserReadingProgress(planId: string): Promise<UserReadingProgress[]>;
   getUserTodayProgress(userId: string): Promise<UserReadingProgress[]>;
-  markReadingComplete(id: string): Promise<UserReadingProgress | undefined>;
+  markReadingComplete(id: string, userId: string): Promise<UserReadingProgress | undefined>;
   createReadingProgress(progress: InsertUserReadingProgress): Promise<UserReadingProgress>;
 
   getDevotionalNote(id: string): Promise<DevotionalNote | undefined>;
@@ -182,9 +182,9 @@ export interface IStorage {
   getDevotionalNotes(userId: string): Promise<DevotionalNote[]>;
   getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
   getDevotionalNoteByPlanDayForUser(userId: string, planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
-  createDevotionalNote(note: InsertDevotionalNote): Promise<DevotionalNote>;
+  createDevotionalNote(note: InsertDevotionalNote, clientId?: string): Promise<DevotionalNote | undefined>;
   updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined>;
-  updateDevotionalNoteForUser(id: string, userId: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined>;
+  updateDevotionalNoteForUser(id: string, userId: string, updates: Partial<InsertDevotionalNote>, version?: number): Promise<DevotionalNote | undefined>;
   toggleDevotionalNoteHiddenForUser(id: string, userId: string, hidden: boolean): Promise<DevotionalNote | undefined>;
   getDevotionalNoteByVerseReference(userId: string, verseReference: string): Promise<DevotionalNote | undefined>;
 
@@ -255,7 +255,7 @@ export class DatabaseStorage implements IStorage {
     return role?.role;
   }
 
-  async upsertUserRole(userId: string, role: string): Promise<void> {
+  async upsertUserRole(userId: string, role: AppRole): Promise<void> {
     const existing = await db.select().from(userRoles).where(eq(userRoles.userId, userId)).limit(1);
     if (existing.length > 0) {
       await db.update(userRoles).set({ role }).where(eq(userRoles.userId, userId));
@@ -326,8 +326,19 @@ export class DatabaseStorage implements IStorage {
     return participant;
   }
 
-  async createParticipant(participant: InsertParticipant): Promise<Participant> {
-    const [newParticipant] = await db.insert(participants).values(participant).returning();
+  async createParticipant(participant: InsertParticipant, access?: { userId: string | null; browserHash: string }): Promise<Participant> {
+    const newParticipant = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${participant.sessionId}:${participant.email.trim().toLowerCase()}`},0))`);
+      const [existing] = await tx.select().from(participants).where(and(eq(participants.sessionId, participant.sessionId), sql`lower(trim(${participants.email}))=${participant.email.trim().toLowerCase()}`));
+      if (existing) {
+        const [owner] = await tx.select().from(participantAccess).where(eq(participantAccess.participantId, existing.id));
+        if (access && owner && ((!owner.userId && owner.browserHash === access.browserHash) || (access.userId && owner.userId === access.userId))) return existing;
+        throw Object.assign(new Error('此參與紀錄已存在，請使用原本身份或聯絡管理員'), { status: 409 });
+      }
+      const [created] = await tx.insert(participants).values({ ...participant, email: participant.email.trim().toLowerCase() }).returning();
+      if (access) await tx.insert(participantAccess).values({ participantId: created.id, ...access });
+      return created;
+    });
     const [session] = await db
       .select({ churchUnit: sessions.churchUnit })
       .from(sessions)
@@ -338,7 +349,7 @@ export class DatabaseStorage implements IStorage {
       name: participant.name,
       gender: participant.gender,
       church: normalizeChurch(session?.churchUnit),
-    });
+    }).catch(error => console.error('[Participant] CRM follow-up failed; participation was saved', error));
     return newParticipant;
   }
 
@@ -433,10 +444,11 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getStudyResponseWithOwner(id: string): Promise<{ id: string; userId: string; ownerEmail: string | null } | undefined> {
+  async getStudyResponseWithOwner(id: string): Promise<{ id: string; sessionId: string; userId: string; ownerEmail: string | null } | undefined> {
     const [result] = await db
       .select({
         id: studyResponses.id,
+        sessionId: studyResponses.sessionId,
         userId: studyResponses.userId,
         ownerEmail: participants.email,
       })
@@ -451,7 +463,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(studyResponses).where(eq(studyResponses.id, id));
   }
 
-  async getNotebookEntries(email: string): Promise<any[]> {
+  async getNotebookEntries(userId: string, browserHash: string): Promise<any[]> {
     const results = await db
       .select({
         id: studyResponses.id,
@@ -471,7 +483,8 @@ export class DatabaseStorage implements IStorage {
       .from(studyResponses)
       .innerJoin(participants, eq(studyResponses.userId, participants.id))
       .innerJoin(sessions, eq(studyResponses.sessionId, sessions.id))
-      .where(and(eq(participants.email, email), eq(studyResponses.hidden, false)))
+      .where(and(inArray(participants.id, db.select({ id: participantAccess.participantId }).from(participantAccess)
+        .where(or(eq(participantAccess.userId, userId), and(sql`${participantAccess.userId} IS NULL`, eq(participantAccess.browserHash, browserHash))))), eq(studyResponses.hidden, false)))
       .orderBy(desc(studyResponses.createdAt));
 
     return results.map(row => ({
@@ -490,7 +503,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getNotebookSessions(email: string): Promise<any[]> {
+  async getNotebookSessions(userId: string, browserHash: string): Promise<any[]> {
     const results = await db
       .select({
         sessionId: sessions.id,
@@ -501,7 +514,8 @@ export class DatabaseStorage implements IStorage {
       })
       .from(participants)
       .innerJoin(sessions, eq(participants.sessionId, sessions.id))
-      .where(eq(participants.email, email))
+      .where(inArray(participants.id, db.select({ id: participantAccess.participantId }).from(participantAccess)
+        .where(or(eq(participantAccess.userId, userId), and(sql`${participantAccess.userId} IS NULL`, eq(participantAccess.browserHash, browserHash))))))
       .orderBy(desc(sessions.createdAt));
     return results.map(row => ({
       session_id: row.sessionId,
@@ -512,8 +526,8 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getNotebookSessionsWithData(email: string): Promise<any[]> {
-    const sessionRows = await this.getNotebookSessions(email);
+  async getNotebookSessionsWithData(userId: string, browserHash: string): Promise<any[]> {
+    const sessionRows = await this.getNotebookSessions(userId, browserHash);
     if (sessionRows.length === 0) return [];
 
     const sessionIds = [...new Set(sessionRows.map((r: any) => r.session_id))];
@@ -524,7 +538,7 @@ export class DatabaseStorage implements IStorage {
 
     return sessionRows.map((session: any) => ({
       ...session,
-      reports: reports.filter(r => r.sessionId === session.session_id),
+      reports: reports.filter(r => r.sessionId === session.session_id && (r.reportType === 'overall' || r.groupNumber === session.group_number)),
     }));
   }
 
@@ -586,11 +600,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePrayer(id: string): Promise<void> {
-    await db.delete(prayers).where(eq(prayers.id, id));
+    await db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM prayers WHERE id=${id} FOR UPDATE`);
+      await tx.delete(prayerNotifications).where(eq(prayerNotifications.prayerId,id));
+      await tx.delete(prayerComments).where(eq(prayerComments.prayerId,id));
+      await tx.delete(prayerAmens).where(eq(prayerAmens.prayerId,id));
+      await tx.delete(prayers).where(eq(prayers.id, id));
+    });
   }
 
   async createPrayerAmen(prayerId: string, userId: string): Promise<{ prayerId: string; userId: string }> {
-    await db.insert(prayerAmens).values({ prayerId, userId }).onConflictDoNothing();
+    await db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM prayers WHERE id=${prayerId} FOR UPDATE`);
+      await tx.execute(sql`INSERT INTO prayer_amens(prayer_id,user_id) SELECT ${prayerId},${userId} WHERE NOT EXISTS(SELECT 1 FROM prayer_amens WHERE prayer_id=${prayerId} AND user_id=${userId})`);
+    });
     return { prayerId, userId };
   }
 
@@ -1051,9 +1074,9 @@ export class DatabaseStorage implements IStorage {
     return code!;
   }
 
-  async getBibleBooks(): Promise<{ bookName: string; bookNumber: number; chapterCount: number }[]> {
+  async getBibleBooks(): Promise<{ bookName: string; bookNumber: number | null; chapterCount: number }[]> {
     const cacheKey = cacheKeys.bibleBooks();
-    const cached = bibleCache.get<{ bookName: string; bookNumber: number; chapterCount: number }[]>(cacheKey);
+    const cached = bibleCache.get<{ bookName: string; bookNumber: number | null; chapterCount: number }[]>(cacheKey);
     if (cached && cached.length > 0) return cached;
 
     const result = await db
@@ -1163,7 +1186,10 @@ export class DatabaseStorage implements IStorage {
 
   async getJesusDailyContent(season?: string): Promise<JesusDailyContent[]> {
     if (season) {
-      return db.select().from(jesusDailyContent).where(eq(jesusDailyContent.season, season));
+      return db.select().from(jesusDailyContent).where(inArray(
+        jesusDailyContent.eventId,
+        db.select({ eventId: jesus4Seasons.eventId }).from(jesus4Seasons).where(eq(jesus4Seasons.season, season)),
+      ));
     }
     return db.select().from(jesusDailyContent);
   }
@@ -1202,16 +1228,16 @@ export class DatabaseStorage implements IStorage {
     return saved;
   }
 
-  async deleteSavedVerse(id: string): Promise<void> {
-    await db.delete(savedVerses).where(eq(savedVerses.id, id));
+  async deleteSavedVerse(id: string, userId: string): Promise<void> {
+    await db.delete(savedVerses).where(and(eq(savedVerses.id, id), eq(savedVerses.userId, userId)));
   }
 
   async getUserReadingPlans(userId: string): Promise<UserReadingPlan[]> {
     return db.select().from(userReadingPlans).where(eq(userReadingPlans.userId, userId)).orderBy(desc(userReadingPlans.createdAt));
   }
 
-  async getUserReadingPlan(id: string): Promise<UserReadingPlan | undefined> {
-    const [plan] = await db.select().from(userReadingPlans).where(eq(userReadingPlans.id, id)).limit(1);
+  async getUserReadingPlan(id: string, userId: string): Promise<UserReadingPlan | undefined> {
+    const [plan] = await db.select().from(userReadingPlans).where(and(eq(userReadingPlans.id, id), eq(userReadingPlans.userId, userId))).limit(1);
     return plan;
   }
 
@@ -1220,15 +1246,20 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateUserReadingPlan(id: string, updates: Partial<InsertUserReadingPlan>): Promise<UserReadingPlan | undefined> {
-    const [updated] = await db.update(userReadingPlans).set({ ...updates, updatedAt: new Date() }).where(eq(userReadingPlans.id, id)).returning();
+  async updateUserReadingPlan(id: string, userId: string, updates: Partial<InsertUserReadingPlan>): Promise<UserReadingPlan | undefined> {
+    const [updated] = await db.update(userReadingPlans).set({ ...updates, userId, updatedAt: new Date() }).where(and(eq(userReadingPlans.id, id), eq(userReadingPlans.userId, userId))).returning();
     return updated;
   }
 
-  async deleteUserReadingPlan(id: string): Promise<void> {
-    await db.delete(devotionalNotes).where(eq(devotionalNotes.readingPlanId, id));
-    await db.delete(userReadingProgress).where(eq(userReadingProgress.planId, id));
-    await db.delete(userReadingPlans).where(eq(userReadingPlans.id, id));
+  async deleteUserReadingPlan(id: string, userId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      const [plan] = await tx.select().from(userReadingPlans)
+        .where(and(eq(userReadingPlans.id, id), eq(userReadingPlans.userId, userId))).for('update');
+      if (!plan) return;
+      await tx.delete(devotionalNotes).where(and(eq(devotionalNotes.readingPlanId, id), eq(devotionalNotes.userId, userId)));
+      await tx.delete(userReadingProgress).where(and(eq(userReadingProgress.planId, id), eq(userReadingProgress.userId, userId)));
+      await tx.delete(userReadingPlans).where(and(eq(userReadingPlans.id, id), eq(userReadingPlans.userId, userId)));
+    });
   }
 
   async getUserReadingProgress(planId: string): Promise<UserReadingProgress[]> {
@@ -1245,11 +1276,11 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async markReadingComplete(id: string): Promise<UserReadingProgress | undefined> {
+  async markReadingComplete(id: string, userId: string): Promise<UserReadingProgress | undefined> {
     const [updated] = await db.update(userReadingProgress).set({
       isCompleted: true,
       completedAt: new Date(),
-    }).where(eq(userReadingProgress.id, id)).returning();
+    }).where(and(eq(userReadingProgress.id, id), eq(userReadingProgress.userId, userId))).returning();
     return updated;
   }
 
@@ -1311,23 +1342,27 @@ export class DatabaseStorage implements IStorage {
     return note;
   }
 
-  async createDevotionalNote(note: InsertDevotionalNote): Promise<DevotionalNote> {
-    const [created] = await db.insert(devotionalNotes).values(note).returning();
-    return created;
+  async createDevotionalNote(note: InsertDevotionalNote, clientId?: string): Promise<DevotionalNote | undefined> {
+    const [created] = await db.insert(devotionalNotes).values({ ...note, ...(clientId ? { id: clientId } : {}) })
+      .onConflictDoNothing({ target: devotionalNotes.id }).returning();
+    if (created || !clientId) return created;
+    const [existing] = await db.select().from(devotionalNotes).where(and(eq(devotionalNotes.id, clientId), eq(devotionalNotes.userId, note.userId)));
+    if (!existing || !Object.entries(note).every(([key,value]) => value === undefined || value === existing[key as keyof DevotionalNote])) return undefined;
+    return existing;
   }
 
   async updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined> {
-    const [updated] = await db.update(devotionalNotes).set({ ...updates, updatedAt: new Date() }).where(eq(devotionalNotes.id, id)).returning();
+    const [updated] = await db.update(devotionalNotes).set({ ...updates, version: sql`${devotionalNotes.version} + 1`, updatedAt: new Date() }).where(eq(devotionalNotes.id, id)).returning();
     return updated;
   }
 
-  async updateDevotionalNoteForUser(id: string, userId: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined> {
+  async updateDevotionalNoteForUser(id: string, userId: string, updates: Partial<InsertDevotionalNote>, version?: number): Promise<DevotionalNote | undefined> {
     const safeUpdates = { ...updates };
     delete (safeUpdates as { userId?: unknown }).userId;
     const [updated] = await db
       .update(devotionalNotes)
-      .set({ ...safeUpdates, updatedAt: new Date() })
-      .where(and(eq(devotionalNotes.id, id), eq(devotionalNotes.userId, userId)))
+      .set({ ...safeUpdates, version: sql`${devotionalNotes.version} + 1`, updatedAt: new Date() })
+      .where(and(eq(devotionalNotes.id, id), eq(devotionalNotes.userId, userId), version === undefined ? undefined : eq(devotionalNotes.version, version)))
       .returning();
     return updated;
   }

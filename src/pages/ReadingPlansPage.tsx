@@ -222,7 +222,7 @@ const ReadingPlansPage = () => {
   const totalSelectedChapters = selectedBooks.reduce((sum, s) => sum + (s.chapterEnd - s.chapterStart + 1), 0);
   const estimatedDays = selectedTemplate ? selectedTemplate.durationDays : (chaptersPerDay > 0 ? Math.ceil(totalSelectedChapters / chaptersPerDay) : 0);
 
-  const canSubmit = planName.trim() && (selectedTemplate || (selectedBooks.length > 0 && chaptersPerDay > 0));
+  const canSubmit = !!planName.trim() && (!!selectedTemplate || (selectedBooks.length > 0 && chaptersPerDay > 0));
 
   const handleCreateSubmit = () => {
     if (!canSubmit) return;

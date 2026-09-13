@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { MobileHeaderContext } from './MobileHeaderContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { cn } from '@/lib/utils';
@@ -39,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
   backTo,
 }) => {
   const { user, loading, signOut } = useAuth();
+  const mobileHeader = useContext(MobileHeaderContext);
   const { profile } = useUserProfile();
   const { isAdmin, isLeader } = useUserRole();
   const navigate = useNavigate();
@@ -50,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
     navigate('/');
   };
 
-  const getInitials = (email: string | undefined) => {
+  const getInitials = (email: string | null | undefined) => {
     if (!email) return 'U';
     return email.charAt(0).toUpperCase();
   };
@@ -78,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
       ) : user ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full w-9 h-9 p-0">
+            <Button variant="ghost" size="icon" aria-label="開啟帳號選單" className="rounded-full p-0">
               <Avatar className="w-9 h-9">
                 <AvatarImage src={avatarUrl || undefined} />
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
@@ -128,7 +131,8 @@ export const Header: React.FC<HeaderProps> = ({
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full w-9 h-9"
+          aria-label="登入"
+          className="rounded-full"
           onClick={() => navigate('/login')}
         >
           <User className="w-5 h-5 text-muted-foreground" />
@@ -138,11 +142,17 @@ export const Header: React.FC<HeaderProps> = ({
   );
 
   return (
+    <>
+    {mobileHeader?.actionsTarget && rightContent && createPortal(
+      <div className="flex justify-center border-b border-border p-2 md:hidden">{rightContent}</div>,
+      mobileHeader.actionsTarget,
+    )}
     <header className={cn(
       'sticky top-0 z-40 w-full border-b border-border/70 bg-background/90 shadow-[0_10px_30px_-28px_rgba(30,58,95,0.45)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80',
       variant === 'default' ? 'py-3 sm:py-5 md:py-3' : 'py-2 sm:py-3',
+      mobileHeader && 'hidden md:block',
       className
-    )}>
+    )} data-testid="page-header">
       <div className="container mx-auto px-3 sm:px-4 md:px-6">
         <div className="flex items-center justify-between">
           <div className={cn("md:hidden flex shrink-0 items-center", backTo ? "w-20 sm:w-24" : rightContent ? "w-[5.25rem] sm:w-24" : "w-10 sm:w-12")}>
@@ -201,6 +211,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <Link
                   key={item.id}
                   to={item.href}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
                     "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     active
@@ -238,5 +249,6 @@ export const Header: React.FC<HeaderProps> = ({
         onOpenChange={setShowProfileSettings}
       />
     </header>
+    </>
   );
 };

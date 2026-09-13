@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { assertOutboundEmailAllowed } from './deploymentSafety';
 
 // Resend integration using Replit connector
 // Reference: connection:conn_resend_01KGF9YPHTDQ9CJCH6XWM8SGHQ
@@ -46,6 +47,7 @@ async function getCredentials() {
 // Access tokens expire, so a new client must be created each time.
 // Always call this function again to get a fresh client.
 export async function getResendClient() {
+  assertOutboundEmailAllowed();
   const { apiKey, fromEmail } = await getCredentials();
   
   // Use verified wechurch.online domain for sending emails
@@ -78,9 +80,8 @@ export async function sendEmail(options: SendEmailOptions) {
     from: options.from || fromEmail,
     to: options.to,
     subject: options.subject,
-    html: options.html,
-    text: options.text,
-    reply_to: options.replyTo || 'reply@wechurch.online',
+    ...(options.html != null ? { html: options.html, text: options.text } : { text: options.text || '' }),
+    replyTo: options.replyTo || 'reply@wechurch.online',
   });
   
   console.log('[Resend] Send result:', JSON.stringify(result));
@@ -131,7 +132,7 @@ export async function sendBulkEmail(
         from: fromEmail,
         to: recipient.email,
         subject: subject,
-        reply_to: 'reply@wechurch.online',
+        replyTo: 'reply@wechurch.online',
         ...(isHtml ? { html: body } : { text: body }),
         ...(resendAttachments && resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
       });
