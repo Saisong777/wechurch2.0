@@ -293,6 +293,7 @@ export const AdminPage: React.FC = () => {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {([
+                ...(isAdmin ? [{ icon: BookOpen, label: '每日靈修課表', desc: '課表、短文與發佈', action: () => navigate('/admin/church-devotions'), testId: 'button-church-devotions' }] : []),
                 { icon: History, label: '歷史資料', desc: '查看過往活動', action: () => setStep('history'), testId: 'button-history' },
                 { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
                 { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
@@ -436,7 +437,17 @@ export const AdminPage: React.FC = () => {
               <>
                 {role && (
                   <span className="text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden md:inline">
-                    {role === 'admin' ? '管理員' : role === 'leader' ? '小組長' : '儲備'}
+                    {role === 'admin'
+                      ? '系統管理員'
+                      : role === 'senior_pastor'
+                        ? '主任牧師'
+                        : role === 'pastor'
+                          ? '牧師'
+                          : role === 'minister'
+                            ? '傳道人'
+                            : role === 'group_leader' || role === 'leader'
+                              ? '小組長'
+                              : '儲備'}
                   </span>
                 )}
                 <span className="text-xs sm:text-sm opacity-90 hidden lg:inline truncate max-w-32">
