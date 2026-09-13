@@ -2,7 +2,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, Trash2, User, Pin, PartyPopper, Check, BookOpen, CalendarCheck2 } from 'lucide-react';
+import { Heart, Trash2, User, Pin, PartyPopper, Check, BookOpen, CalendarCheck2, HandHeart, HeartHandshake, Sprout, AlertCircle } from 'lucide-react';
+import { REACTION_LABELS, isUrgentPrayer, isClosedPrayer, type PrayerReaction } from '@shared/prayerInteraction';
+import { usePrayerReaction, useUrgentPrayer, useClosePrayer } from '@/hooks/usePrayerWall';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { Prayer, useDeletePrayer, useToggleAmen, useTogglePinPrayer, useMarkPrayerAnswered, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
@@ -44,10 +46,14 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
   const toggleAmenMutation = useToggleAmen();
   const togglePinMutation = useTogglePinPrayer();
   const markAnsweredMutation = useMarkPrayerAnswered();
+  const reactionMutation = usePrayerReaction();
+  const urgentMutation = useUrgentPrayer();
+  const closeMutation = useClosePrayer();
+  const closed = isClosedPrayer(prayer);
 
   const canDelete = prayer.isOwner || isAdmin;
-  const canPin = prayer.isOwner;
-  const canMarkAnswered = prayer.isOwner;
+  const canPin = prayer.isOwner && !closed;
+  const canMarkAnswered = prayer.isOwner && !closed;
 
   const handleToggleAmen = () => {
     vibrate(50);
@@ -65,6 +71,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
   };
 
   const handleMarkAnswered = () => {
+    if (!window.confirm('標記為蒙應允並移出公開牆？本人仍可查看紀錄。')) return;
     markAnsweredMutation.mutate({
       prayerId: prayer.id,
       isAnswered: prayer.isAnswered,
@@ -81,7 +88,8 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
   });
 
   return (
-    <div
+    <article
+      aria-label={`代禱：${prayer.content.split('\n')[0]}`}
       className={cn(
         'bg-card transition-colors hover:bg-muted/20',
         prayer.isAnswered && 'bg-emerald-50/30 dark:bg-emerald-950/10'
@@ -116,6 +124,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
+            {isUrgentPrayer(prayer) && <Badge className="gap-1 bg-red-700 text-white"><AlertCircle className="h-3 w-3" />緊急代禱</Badge>}
             <Badge variant="outline" className={cn('rounded-full border px-2 py-0.5 text-xs', CATEGORY_COLORS[prayer.category] || CATEGORY_COLORS.other)}>
               {CATEGORY_LABELS[prayer.category]}
             </Badge>
@@ -129,7 +138,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
         </div>
 
         <div className="min-w-0 space-y-2">
-          <p className="line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-foreground lg:line-clamp-2">
+          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
             {prayer.content}
           </p>
           {prayer.scriptureReference && (
@@ -146,7 +155,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
               <PartyPopper className="h-3 w-3" />
               已蒙應允
             </Badge>
-          ) : (
+          ) : closed ? <Badge variant="outline">已結束 · 僅本人可見</Badge> : (
             <Badge variant="outline" className="rounded-full">
               守望中
             </Badge>
@@ -154,24 +163,24 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end lg:grid lg:grid-cols-2">
-          <Button
+          {!closed && <Button
             variant={prayer.hasAmened ? 'default' : 'outline'}
             size="sm"
             onClick={handleToggleAmen}
-            disabled={toggleAmenMutation.isPending}
+            disabled={toggleAmenMutation.isPending || prayer.hasAmened}
             className={cn(
               'h-9 rounded-lg gap-1.5',
               prayer.hasAmened && 'border-rose-500 bg-rose-500 text-white hover:bg-rose-600'
             )}
           >
-            <Heart className={cn('h-4 w-4', prayer.hasAmened && 'fill-current')} />
-            阿門
+            <HandHeart className="h-4 w-4" />
+            {prayer.hasAmened ? '已代禱' : '阿門'}
             {prayer.amenCount > 0 && (
               <span className={cn('rounded-full px-1.5 py-0.5 text-xs font-bold', prayer.hasAmened ? 'bg-white/20' : 'bg-muted text-muted-foreground')}>
                 {prayer.amenCount}
               </span>
             )}
-          </Button>
+          </Button>}
 
           {canMarkAnswered && (
             <TooltipProvider>
@@ -208,6 +217,9 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
             </Button>
           )}
 
+          {prayer.isOwner && !closed && <Button variant="ghost" size="sm" className="h-9 gap-1.5" aria-pressed={!!prayer.isUrgent} disabled={urgentMutation.isPending} onClick={()=>urgentMutation.mutate({prayerId:prayer.id,isUrgent:!prayer.isUrgent})}><AlertCircle className="h-4 w-4" />{prayer.isUrgent?'解除緊急':'標記緊急'}</Button>}
+          {prayer.isOwner && <Button variant="outline" size="sm" className="h-9 gap-1.5" disabled={closeMutation.isPending} onClick={()=>{if(window.confirm(closed?'重新公開此代禱與原有回應，邀請大家繼續守望？':'結束這則代禱並移出公開牆？本人仍可查看紀錄。'))closeMutation.mutate({prayerId:prayer.id,isClosed:!closed});}}><Check className="h-4 w-4" />{closed?'重新公開':'結束代禱'}</Button>}
+
           {canDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -237,8 +249,13 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
       </div>
 
       <div className="border-t bg-muted/10 px-3 py-2 sm:px-4">
-        <PrayerComments prayerId={prayer.id} />
+        {!closed && <div className="mb-1 flex flex-wrap gap-2" role="group" aria-label="關懷回應">{(Object.keys(REACTION_LABELS) as PrayerReaction[]).map(kind=>{
+          const reaction=prayer.reactions?.find(r=>r.kind===kind);
+          const Icon={heart:Heart,support:HeartHandshake,strength:Sprout}[kind];
+          return <Button key={kind} variant={reaction?.selected?'secondary':'ghost'} size="sm" className="min-w-20 gap-1.5" aria-pressed={!!reaction?.selected} title={`${reaction?.selected?'撤回':'送出'}${REACTION_LABELS[kind]}`} disabled={reactionMutation.isPending} onClick={()=>reactionMutation.mutate({prayerId:prayer.id,kind,selected:!reaction?.selected})}><Icon className={cn('h-4 w-4',kind==='heart'?'text-rose-600':kind==='support'?'text-teal-700':'text-green-700',reaction?.selected && kind==='heart' && 'fill-current')} />{REACTION_LABELS[kind]}<span className="inline-block w-4 tabular-nums">{reaction?.count || 0}</span></Button>;
+        })}</div>}
+        <PrayerComments prayerId={prayer.id} count={prayer.commentCount} anonymousOwner={prayer.isOwner && prayer.isAnonymous} readOnly={closed} />
       </div>
-    </div>
+    </article>
   );
 };

@@ -1,8 +1,11 @@
 import type { Express, RequestHandler } from "express";
 import express from "express";
+import { mergePersons, PersonMergeError } from './personMerge';
+import { mayManageStudySession } from './studySessionPolicy';
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { uploadRoot, messageCardRoot } from './uploadPaths';
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
@@ -10,9 +13,13 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { careActions, careContacts, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants, userEmailPreferences } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { readingPlanBodySchema } from './readingPlanInput';
+import { createReadingPlan, ReadingPlanError } from './readingPlanTransaction';
+import { soulGymAccess, visibleSubmissions, browserIdentity } from './soulGymAccess';
 import { pool, getPoolStats } from "./db";
+import type { AppRole, DevotionalNote } from '@shared/schema';
 import { bibleCache, timelineCache, apiCache, sessionCache, prayerCache, cacheKeys } from "./cache";
-import { getKnownChurchOptions, normalizeChurch, UNASSIGNED_CHURCH_ID } from "./churches";
+import { getKnownChurchOptions, normalizeChurch, UNASSIGNED_CHURCH_ID, getChurchAliases } from "./churches";
 import {
   canAssignCrmScopes,
   filterPotentialMembersForCrmAccess,
@@ -31,10 +38,10 @@ import {
   isPastoralSchemaMissingError,
   listPersonMergeSuggestions,
   listPastoralTasks,
-  mergePastoralPersons,
   reconcilePastoralPersons,
   startLoveJourneyForPerson,
   startSelfLoveJourney,
+  changeSelfJourneyStatus,
   updatePastoralTask,
   updateSelfJourneyProgress,
   updateJourneyMilestone,
@@ -75,7 +82,6 @@ import {
 import {
   parseAuthenticatedPrayerBody,
   parseDevotionalNotePatch,
-  prayerCommentBodySchema,
   prayerPatchSchema,
 } from "./securityPolicies";
 import compression from "compression";
@@ -102,7 +108,21 @@ import {
   requestContext,
   scoreAiReportQuality,
 } from "./observability";
-import { buildFallbackDailyDevotionBrief, fetchDailyDevotionBrief } from "./dailyDevotion";
+import { readingPlanAccess, retiredOperations } from './readingPlanAccess';
+import { personalPrayerRoutes } from './personalPrayerRoutes';
+import { prayerSharingRoutes } from './prayerSharingRoutes';
+import { prayerInteractionRoutes } from './prayerInteractionRoutes';
+import { devotionWallRoutes } from './devotionWallRoutes';
+import { publicPrayerFeed, publicPrayerReceipt } from './prayerSharingRepository';
+import { lifeGroupRoutes } from './lifeGroupRoutes';
+import { supportRoutes } from './supportRoutes';
+import { mentoringRoutes } from './mentoringRoutes';
+import { assignCrmGroupMember } from './crmGroupMembership';
+import { churchDevotionRoutes } from './churchDevotionRoutes';
+import { getManagedChurchDevotion } from './churchDevotionRepository';
+import { managedDevotionBrief } from './churchDevotionPublic';
+import { withDevotionScripture } from './devotionScripture';
+import { devotionDate, taipeiToday } from '../shared/churchDevotion';
 import { releaseFlags } from "@shared/releaseFlags";
 
 // Legacy proxy client (keep for unchanged endpoints until fully migrated)
@@ -210,6 +230,8 @@ const pastoralTaskPatchSchema = pastoralTaskBodySchema.partial().extend({
 const mergeSuggestionBodySchema = z.object({
   primaryPersonId: z.string().uuid(),
   duplicatePersonId: z.string().uuid(),
+  preview: z.boolean().optional(),
+  previewToken: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 });
 const servingTeamBodySchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -434,7 +456,7 @@ function prependReportDashboard(
 // Configure multer for file uploads
 const messageCardStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), 'public', 'message-cards');
+    const uploadDir = messageCardRoot;
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -459,7 +481,6 @@ const uploadMessageCard = multer({
   }
 });
 
-type AppRole = "member" | "leader" | "future_leader" | "admin" | "senior_pastor" | "pastor" | "minister" | "group_leader";
 
 const knownChurches = getKnownChurchOptions();
 
@@ -565,7 +586,7 @@ export async function registerRoutes(app: Express) {
     next();
   });
 
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  app.use('/uploads', express.static(uploadRoot));
 
   async function resolveUserId(req: any): Promise<string | null> {
     const user = req.user;
@@ -601,7 +622,7 @@ export async function registerRoutes(app: Express) {
     return null;
   }
 
-  const requireRole = (...roles: AppRole[]): RequestHandler => async (req, res, next) => {
+  const requireRole = (...roles: AppRole[]): RequestHandler<Record<string, string>> => async (req, res, next) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -620,7 +641,7 @@ export async function registerRoutes(app: Express) {
     }
   };
 
-  const requireSelfOrRole = (paramName: string, ...roles: AppRole[]): RequestHandler => async (req, res, next) => {
+  const requireSelfOrRole = (paramName: string, ...roles: AppRole[]): RequestHandler<Record<string, string>> => async (req, res, next) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -644,7 +665,16 @@ export async function registerRoutes(app: Express) {
   };
 
   const crmLeaderRoles: AppRole[] = ["admin", "senior_pastor", "pastor", "minister", "group_leader", "leader", "future_leader"];
-  const requireSessionManager = requireRole(...crmLeaderRoles);
+  const sessionManagerRoleGuard = requireRole(...crmLeaderRoles);
+  const requireSessionManager: RequestHandler<Record<string, string>> = (req, res, next) => sessionManagerRoleGuard(req, res, async error => {
+    if (error) return next(error);
+    try {
+      // Creation has no session yet; batch assignment validates every target before writing.
+      if (req.method === 'POST' && ['/api/sessions', '/api/participants/batch-assign-groups'].includes(req.path)) return next();
+      if (!await canManageSession(req)) return res.status(403).json({ error: 'Session management access denied' });
+      next();
+    } catch (failure) { next(failure); }
+  });
   const requireLeader = requireRole(...crmLeaderRoles);
   const requireCrmDirector = requireRole("admin", "senior_pastor");
   const requireAdmin = requireRole("admin");
@@ -675,9 +705,9 @@ export async function registerRoutes(app: Express) {
 
   app.use("/api/pastoral", requireReleaseFeature(releaseFlags.pastoral));
   app.use("/api/me/love-journey", requireReleaseFeature(releaseFlags.pastoral));
-  app.use("/api/care", requireReleaseFeature(releaseFlags.pastoral));
-  app.use("/api/serving", requireReleaseFeature(releaseFlags.serving));
-  app.use("/api/facilities", requireReleaseFeature(releaseFlags.facilities));
+  app.use("/api/mentoring", requireReleaseFeature(releaseFlags.pastoral));
+  // Personal care has owner-scoped authentication on every route; it is not a pastoral beta feature.
+  app.use(['/api/serving', '/api/facilities'], retiredOperations);
   app.use("/api/line-login", requireReleaseFeature(releaseFlags.lineLogin));
 
   const sessionManagerRoles: AppRole[] = crmLeaderRoles;
@@ -714,16 +744,35 @@ export async function registerRoutes(app: Express) {
     return role ? role as AppRole : null;
   };
 
-  const canManageSession = async (req: any): Promise<boolean> => {
+  const canManageSession = async (req: any, explicitSessionId?: string): Promise<boolean> => {
     const role = await getRequestRole(req);
-    return !!role && sessionManagerRoles.includes(role);
+    if (!role || !sessionManagerRoles.includes(role)) return false;
+    if (role === 'admin') return true;
+    let sessionId = explicitSessionId || req.params?.sessionId || req.query?.sessionId;
+    if (!sessionId && req.params?.id) {
+      if (req.path.includes('/participants/')) sessionId = (await storage.getParticipant(req.params.id))?.sessionId;
+      else if (req.path.includes('/reports/')) sessionId = (await pool.query('SELECT session_id FROM ai_reports WHERE id=$1', [req.params.id])).rows[0]?.session_id;
+      else if (req.path.includes('/sessions/')) sessionId = req.params.id;
+    }
+    if (!sessionId || !z.string().uuid().safeParse(sessionId).success) return false;
+    const session = await storage.getSession(sessionId);
+    const userId = await resolveUserId(req);
+    if (!session || !userId) return false;
+    const user = await storage.getUser(userId);
+    return mayManageStudySession(role, user, session);
   };
 
-  const getCrmAccessForRequest = async (req: any) => {
+  const getCrmChurchFilter = async (req: any): Promise<string | null> => {
+    const selected = normalizeChurch(typeof req.query?.church === 'string' ? req.query.church : null);
+    return selected && selected !== 'all' ? selected : null;
+  };
+  const getCrmAccessForRequest = async (req: any, capability?: import('./crmPermissions').CrmCapability) => {
     const userId = req.legacyUserId || await resolveUserId(req);
     if (!userId) return null;
     const role = await storage.getUserRole(userId);
-    return getCrmAccessContext(userId, role);
+    const access = await getCrmAccessContext(userId, role, capability);
+    access.personalAccess = await getCrmAccessContext(userId, role, 'personal');
+    return access;
   };
 
   const sanitizeParticipant = (participant: any) => ({
@@ -813,10 +862,18 @@ export async function registerRoutes(app: Express) {
     console.log("[Routes] Auth setup completed successfully");
   } catch (error) {
     console.error("[Routes] Auth setup failed:", error);
-    // Continue without auth - routes will still work but auth will fail
+    throw error;
   }
 
+  const studyAccess = soulGymAccess({ pool, resolveUserId, canManageSession });
+  app.use('/api', studyAccess.router);
+
   // Health check endpoint - detailed with database
+  app.use('/api/admin/church-devotions', churchDevotionRoutes(requireCrmDirector));
+  app.use('/api/life-groups', lifeGroupRoutes(resolveUserId));
+  app.use('/api/support', supportRoutes(resolveUserId));
+  app.use('/api/mentoring', mentoringRoutes(resolveUserId));
+
   app.get("/api/health/detailed", requireAdmin, async (req, res) => {
     const startTime = Date.now();
     let dbStatus = "ok";
@@ -901,7 +958,7 @@ export async function registerRoutes(app: Express) {
       `);
 
       const seen = new Set<string>();
-      const churches = [...knownChurches];
+      const churches: Array<{ id: string; name: string }> = [...knownChurches];
       for (const church of churches) seen.add(church.id);
       for (const row of [...usersResult.rows, ...potentialResult.rows]) {
         const value = normalizeChurch(row.church);
@@ -958,6 +1015,7 @@ export async function registerRoutes(app: Express) {
       }
       const director = directorUserId ? await storage.getUser(directorUserId) : undefined;
       const directorChurch = normalizeChurch(director?.church);
+      if (directorRole === 'senior_pastor' && !directorChurch) return res.json([]);
       const result = directorRole === "senior_pastor" && directorChurch
         ? await pool.query(
             `SELECT a.*, u.display_name AS assignee_name, u.email AS assignee_email
@@ -1001,6 +1059,7 @@ export async function registerRoutes(app: Express) {
       const normalizedChurch = normalizeChurch(input.church);
 
       if (directorRole === "senior_pastor") {
+        if (!directorChurch) return res.status(403).json({ error: '請先指定教會管理範圍' });
         if (input.scopeType === "church" && normalizedChurch !== directorChurch) {
           return res.status(403).json({ error: "Forbidden" });
         }
@@ -1059,6 +1118,13 @@ export async function registerRoutes(app: Express) {
       const directorRole = directorUserId ? await storage.getUserRole(directorUserId) : null;
       if (!canAssignCrmScopes(directorRole)) {
         return res.status(403).json({ error: "Forbidden" });
+      }
+      if (directorRole === 'senior_pastor') {
+        const church = normalizeChurch((await storage.getUser(directorUserId!))?.church);
+        if (!church || !(await pool.query(`SELECT a.id FROM crm_scope_assignments a WHERE a.id=$1 AND (
+          a.church=ANY($2::text[]) OR a.group_id IN(SELECT id FROM small_groups WHERE church=ANY($2::text[]))
+          OR a.member_user_id IN(SELECT id FROM users WHERE church=ANY($2::text[]))
+          OR a.potential_member_id IN(SELECT id FROM potential_members WHERE church=ANY($2::text[])))`, [req.params.id, getChurchAliases(church)])).rowCount) return res.status(403).json({ error: 'Forbidden' });
       }
       await pool.query(
         "UPDATE crm_scope_assignments SET is_active = false, updated_at = NOW() WHERE id = $1",
@@ -1163,40 +1229,9 @@ export async function registerRoutes(app: Express) {
   app.post("/api/crm/groups/:id/members", requireLeader, async (req, res) => {
     try {
       const input = crmGroupMemberBodySchema.parse(req.body);
-      const access = await getCrmAccessForRequest(req);
-      if (!access || !access.canManageMembers) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      const groupResult = await pool.query("SELECT id, church FROM small_groups WHERE id = $1 AND is_active = true", [req.params.id]);
-      const group = groupResult.rows[0];
-      if (!group) {
-        return res.status(404).json({ error: "Group not found" });
-      }
-      if (access.role !== "admin" && access.role !== "senior_pastor") {
-        const canUseGroup = access.groupIds.includes(group.id) || access.churchScopes.includes(normalizeChurch(group.church) || "");
-        if (!canUseGroup) {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-      }
-
-      if (input.userId) {
-        await pool.query("UPDATE small_group_members SET is_active = false, updated_at = NOW() WHERE user_id = $1", [input.userId]);
-      }
-      if (input.potentialMemberId) {
-        await pool.query("UPDATE small_group_members SET is_active = false, updated_at = NOW() WHERE potential_member_id = $1", [input.potentialMemberId]);
-      }
-      if (input.memberEmail) {
-        await pool.query("UPDATE small_group_members SET is_active = false, updated_at = NOW() WHERE lower(member_email) = lower($1)", [input.memberEmail]);
-      }
-
-      const result = await pool.query(
-        `INSERT INTO small_group_members (group_id, user_id, potential_member_id, member_email, joined_at, updated_at)
-         VALUES ($1, $2, $3, $4, NOW(), NOW())
-         RETURNING *`,
-        [req.params.id, input.userId || null, input.potentialMemberId || null, input.memberEmail || null]
-      );
-      res.status(201).json(result.rows[0]);
+      const access = await getCrmAccessForRequest(req, 'members');
+      if (!access || !access.canManageMembers) return res.status(403).json({error:'Forbidden'});
+      res.status(201).json(await assignCrmGroupMember(req.params.id, input, access));
     } catch (error) {
       console.error("Error assigning CRM group member:", error);
       res.status(400).json({ error: "Failed to assign group member" });
@@ -1302,10 +1337,13 @@ export async function registerRoutes(app: Express) {
     try {
       const sessionId = req.params.id;
       const phase = (req.query.phase as string) || 'all';
-      const groupNumber = req.query.groupNumber ? parseInt(req.query.groupNumber as string) : undefined;
+      const member = res.locals.soulGymParticipant;
+      const groupNumber = res.locals.soulGymManager
+        ? (req.query.groupNumber ? parseInt(req.query.groupNumber as string) : undefined)
+        : member?.groupNumber ?? undefined;
       const clientVersion = req.query.v as string | undefined;
 
-      const cacheKey = `poll:${sessionId}:${phase}:${groupNumber || 'all'}`;
+      const cacheKey = `poll:${sessionId}:${phase}:${groupNumber || 'all'}:${res.locals.soulGymManager ? 'manager' : member.id}`;
       const cached = sessionCache.get<any>(cacheKey);
 
       if (cached) {
@@ -1366,8 +1404,8 @@ export async function registerRoutes(app: Express) {
 
       const responseData = {
         session,
-        participants,
-        submissions,
+        participants: participants?.map(sanitizeParticipant) ?? null,
+        submissions: submissions ? visibleSubmissions(submissions, member, !!res.locals.soulGymManager) : null,
         version,
         participantCount,
       };
@@ -1384,7 +1422,7 @@ export async function registerRoutes(app: Express) {
     try {
       const parsed = insertSessionSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid session data", details: parsed.error.errors });
+        return res.status(400).json({ error: "Invalid session data", details: parsed.error.issues });
       }
       const session = await storage.createSession(parsed.data);
       res.status(201).json(session);
@@ -1448,6 +1486,7 @@ export async function registerRoutes(app: Express) {
       if (!participant) {
         return res.status(404).json({ error: "Participant not found" });
       }
+      if (!await studyAccess.canOwn(req, participant)) return res.status(403).json({ error: '請使用原瀏覽器或已綁定的帳號；舊紀錄請由管理員確認身份後恢復' });
       res.json(participant);
     } catch (error) {
       res.status(500).json({ error: "Failed to get participant" });
@@ -1460,6 +1499,7 @@ export async function registerRoutes(app: Express) {
       if (!participant || participant.sessionId !== req.params.sessionId) {
         return res.status(404).json({ error: "Participant not found" });
       }
+      if (!await studyAccess.canOwn(req, participant)) return res.status(403).json({ error: 'Participant identity required' });
       res.json(sanitizeParticipant(participant));
     } catch (error) {
       res.status(500).json({ error: "Failed to get participant" });
@@ -1470,18 +1510,19 @@ export async function registerRoutes(app: Express) {
     try {
       const parsed = insertParticipantSchema.safeParse({ ...req.body, sessionId: req.params.sessionId });
       if (!parsed.success) {
-        console.error("[create-participant] Validation error:", (parsed as any).error.errors);
-        return res.status(400).json({ error: "Invalid participant data", details: (parsed as any).error.errors });
+        return res.status(400).json({ error: "Invalid participant data", details: parsed.error.issues });
       }
       const existing = await storage.getParticipantBySessionEmail(req.params.sessionId, parsed.data.email);
       if (existing) {
+        if (!await studyAccess.canOwn(req, existing)) return res.status(403).json({ error: '此參與紀錄需使用原瀏覽器或已綁定的帳號，請聯絡管理員恢復身份' });
         return res.status(200).json(existing);
       }
-      const participant = await storage.createParticipant(parsed.data);
+      const participant = await storage.createParticipant({ ...parsed.data, groupNumber: null, readyConfirmed: false }, await studyAccess.grant(req));
       sessionCache.invalidate(`poll:${req.params.sessionId}`);
       res.status(201).json(participant);
     } catch (error) {
       console.error("[create-participant] Error:", error);
+      if ((error as { status?: number }).status === 409) return res.status(409).json({ error: (error as Error).message });
       res.status(500).json({ error: "Failed to create participant" });
     }
   });
@@ -1493,8 +1534,9 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Participant not found" });
       }
 
-      let updateData = req.body;
+      let updateData: Record<string, unknown> = {};
       if (!(await canManageSession(req))) {
+        if (!await studyAccess.canOwn(req, existing)) return res.status(403).json({ error: 'Participant identity required' });
         const selfUpdateSchema = z.object({
           sessionId: z.string().uuid(),
           email: z.string().email(),
@@ -1513,8 +1555,16 @@ export async function registerRoutes(app: Express) {
         }
 
         updateData = {};
-        if (parsed.data.groupNumber !== undefined) updateData.groupNumber = parsed.data.groupNumber;
+        if (parsed.data.groupNumber !== undefined && parsed.data.groupNumber !== existing.groupNumber) {
+          return res.status(403).json({ error: '變更小組請由主持人分組，以保護各組分享內容' });
+        }
         if (parsed.data.readyConfirmed !== undefined) updateData.readyConfirmed = parsed.data.readyConfirmed;
+      } else {
+        const managed = z.object({ name: z.string().trim().min(1).max(100).optional(), email: z.string().email().optional(),
+          gender: z.enum(['male', 'female']).optional(), location: z.string().trim().min(1).max(100).optional(),
+          groupNumber: z.number().int().positive().nullable().optional(), readyConfirmed: z.boolean().optional() }).safeParse(req.body);
+        if (!managed.success) return res.status(400).json({ error: 'Invalid participant update' });
+        updateData = managed.data;
       }
 
       const participant = await storage.updateParticipant(req.params.id, updateData);
@@ -1555,6 +1605,8 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Verification failed", success: false });
       }
 
+      if (!await studyAccess.canOwn(req, participant)) return res.status(403).json({ error: 'Participant identity required' });
+
       const session = await storage.getSession(sessionId);
       if (!session || (session.status !== "grouping" && session.status !== "studying")) {
         return res.status(400).json({ error: "Session not in valid state", success: false });
@@ -1585,13 +1637,26 @@ export async function registerRoutes(app: Express) {
 
       const { assignments } = parsed.data;
 
-      const updatePromises: Promise<any>[] = [];
-      for (const { participantIds, groupNumber } of assignments) {
-        for (const participantId of participantIds) {
-          updatePromises.push(storage.updateParticipant(participantId, { groupNumber, readyConfirmed: false }));
-        }
+      const allIds = [...new Set(assignments.flatMap(assignment => assignment.participantIds))];
+      if (!allIds.length || allIds.length > 1000) return res.status(400).json({ error: 'Invalid assignment count' });
+      const targets = await pool.query('SELECT id,session_id FROM participants WHERE id=ANY($1::uuid[])', [allIds]);
+      if (targets.rows.length !== allIds.length) return res.status(404).json({ error: 'Participant not found' });
+      for (const sessionId of new Set<string>(targets.rows.map(row => row.session_id))) {
+        if (!await canManageSession(req, sessionId)) return res.status(403).json({ error: 'Session management access denied' });
       }
-      await Promise.all(updatePromises);
+
+      const updates = assignments.flatMap(assignment => assignment.participantIds.map(id => ({ id, group_number: assignment.groupNumber })));
+      if (updates.length !== allIds.length) return res.status(400).json({ error: '同一位成員不可重複分組' });
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT id FROM sessions WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...new Set(targets.rows.map(row => row.session_id))]]);
+        const result = await client.query(`UPDATE participants p SET group_number=a.group_number,ready_confirmed=false,updated_at=NOW()
+          FROM jsonb_to_recordset($1::jsonb) AS a(id uuid,group_number integer) WHERE p.id=a.id RETURNING p.id`, [JSON.stringify(updates)]);
+        if (result.rowCount !== allIds.length) throw new Error('Group assignment changed during update');
+        await client.query('COMMIT');
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
 
       sessionCache.clear();
       res.json({ success: true });
@@ -1604,7 +1669,7 @@ export async function registerRoutes(app: Express) {
   app.get("/api/sessions/:sessionId/submissions", async (req, res) => {
     try {
       const submissions = await storage.getSubmissions(req.params.sessionId);
-      res.json(submissions);
+      res.json(visibleSubmissions(submissions, res.locals.soulGymParticipant, !!res.locals.soulGymManager));
     } catch (error) {
       res.status(500).json({ error: "Failed to get submissions" });
     }
@@ -1621,17 +1686,19 @@ export async function registerRoutes(app: Express) {
         participantId: participantId || legacyParticipantId,
       });
       if (!parsed.success) {
-        console.error("[create-submission] Validation error:", (parsed as any).error.errors);
-        return res.status(400).json({ error: "Invalid submission data", details: (parsed as any).error.errors });
+        return res.status(400).json({ error: "Invalid submission data", details: parsed.error.issues });
       }
       const submissionInput = parsed.data;
+      const owner = await storage.getParticipant(submissionInput.participantId);
+      if (!owner || owner.sessionId !== req.params.sessionId || !await studyAccess.canOwn(req, owner)) return res.status(403).json({ error: 'Participant identity required' });
+      if (!owner.groupNumber) return res.status(409).json({ error: '尚未分組' });
       // Ensure all fields are present or default to empty string to satisfy DB schema
       const submissionData = {
         sessionId: submissionInput.sessionId,
         participantId: submissionInput.participantId,
-        groupNumber: submissionInput.groupNumber,
-        name: submissionInput.name,
-        email: submissionInput.email,
+        groupNumber: owner.groupNumber,
+        name: owner.name,
+        email: owner.email,
         bibleVerse: submissionInput.bibleVerse,
         theme: submissionInput.theme || "",
         movingVerse: submissionInput.movingVerse || "",
@@ -1718,27 +1785,7 @@ export async function registerRoutes(app: Express) {
         return res.json(reports);
       }
 
-      const participantId = typeof req.query.participantId === "string" ? req.query.participantId : undefined;
-      if (participantId) {
-        const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : "";
-        if (!email) {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-        const participant = await storage.getParticipant(participantId);
-        if (!participant || participant.sessionId !== req.params.sessionId || participant.email.trim().toLowerCase() !== email) {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-        return res.json(filterReportsForParticipant(reports, participant));
-      }
-
-      const user = (req as any).user;
-      const email = (user?.email || user?.claims?.email || "").trim().toLowerCase();
-      if (!email) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      const participants = await storage.getParticipants(req.params.sessionId);
-      const participant = participants.find(p => p.email.trim().toLowerCase() === email);
+      const participant = res.locals.soulGymParticipant;
       if (!participant) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -2279,7 +2326,9 @@ export async function registerRoutes(app: Express) {
       if (!user) return res.status(401).json({ error: "Unauthorized" });
       const email = user.email || user.claims?.email;
       if (!email) return res.status(401).json({ error: "User email not found" });
-      const entries = await storage.getNotebookEntries(email);
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const entries = await storage.getNotebookEntries(userId, browserIdentity(req));
       res.json({ entries });
     } catch (error) {
       console.error("[notebook] Error:", error);
@@ -2291,9 +2340,11 @@ export async function registerRoutes(app: Express) {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const email = user.email || req.query.email as string;
+      const email = user.email || user.claims?.email;
       if (!email) return res.status(400).json({ error: "Email is required" });
-      const notebookSessions = await storage.getNotebookSessions(email);
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const notebookSessions = await storage.getNotebookSessions(userId, browserIdentity(req));
       res.json({ sessions: notebookSessions });
     } catch (error) {
       console.error("[notebook-sessions] Error:", error);
@@ -2307,7 +2358,9 @@ export async function registerRoutes(app: Express) {
       if (!user) return res.status(401).json({ error: "Unauthorized" });
       const email = user.email || user.claims?.email;
       if (!email) return res.status(401).json({ error: "User email not found" });
-      const sessions = await storage.getNotebookSessionsWithData(email);
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const sessions = await storage.getNotebookSessionsWithData(userId, browserIdentity(req));
       res.json({ sessions });
     } catch (error) {
       console.error("[notebook-sessions-with-data] Error:", error);
@@ -2324,8 +2377,11 @@ export async function registerRoutes(app: Express) {
       if (!sessionId || isNaN(groupNumber)) {
         return res.status(400).json({ error: "sessionId and groupNumber are required" });
       }
+      const member = await studyAccess.owned(req, sessionId);
+      const manager = await canManageSession(req);
+      if (!manager && (!member || member.groupNumber !== groupNumber)) return res.status(403).json({ error: 'Group access denied' });
       const responses = await storage.getGroupStudyResponses(sessionId, groupNumber);
-      res.json({ responses });
+      res.json({ responses: manager ? responses : responses.map(({ participant_email: _email, ...response }) => response) });
     } catch (error) {
       console.error("[group-responses] Error:", error);
       res.status(500).json({ error: "Failed to get group responses" });
@@ -2334,6 +2390,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/study-responses/:sessionId/:participantId", async (req, res) => {
     try {
+      if (!await studyAccess.owned(req, req.params.sessionId, req.params.participantId)) return res.status(403).json({ error: 'Participant identity required' });
       const response = await storage.getStudyResponse(req.params.sessionId, req.params.participantId);
       res.json(response || null);
     } catch (error) {
@@ -2381,9 +2438,11 @@ export async function registerRoutes(app: Express) {
       } = parsed.data;
 
       const resolvedUserId = bodyUserId || participantId;
+      if (bodyUserId && participantId && bodyUserId !== participantId) return res.status(400).json({ error: 'Conflicting participant identity' });
       if (!sessionId || !resolvedUserId) {
         return res.status(400).json({ error: "sessionId and userId/participantId are required" });
       }
+      if (!await studyAccess.owned(req, sessionId, resolvedUserId)) return res.status(403).json({ error: 'Participant identity required' });
 
       // Verify the participant belongs to this session (cached to reduce DB load during study phase)
       const participantCacheKey = `participant-session:${resolvedUserId}`;
@@ -2440,7 +2499,7 @@ export async function registerRoutes(app: Express) {
       }
 
       const ownerMatch = (userId && existing.userId === userId) ||
-        (existing.ownerEmail && existing.ownerEmail.toLowerCase() === userEmail.toLowerCase());
+        await studyAccess.owned(req, existing.sessionId, existing.userId);
       if (!ownerMatch) {
         return res.status(403).json({ error: "Not authorized to edit this note" });
       }
@@ -2488,19 +2547,19 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.use('/api/personal-prayers', personalPrayerRoutes(resolveUserId));
+  app.use('/api/prayer-sharing', prayerSharingRoutes(resolveUserId));
+  app.use('/api/devotion-wall', devotionWallRoutes(resolveUserId));
+  app.use('/api/prayers', prayerInteractionRoutes(resolveUserId, id => storage.getUserRole(id)));
+
   app.get("/api/prayers", async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const cached = prayerCache.get<any[]>(cacheKeys.prayers());
-      if (cached) {
-        return res.json(cached);
-      }
-      const prayers = await storage.getPrayers();
-      prayerCache.set(cacheKeys.prayers(), prayers, 3);
-      res.json(prayers);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json(await publicPrayerFeed(userId, req.query.view === 'my'));
     } catch (error) {
       res.status(500).json({ error: "Failed to get prayers" });
     }
@@ -2518,7 +2577,7 @@ export async function registerRoutes(app: Express) {
       }
       const prayer = await storage.createPrayer(parsed.data);
       prayerCache.invalidatePattern('prayers:');
-      res.status(201).json(prayer);
+      res.status(201).json((await publicPrayerFeed(userId, true)).find(p => p.id === prayer.id));
     } catch (error) {
       console.error("[create-prayer] Error:", error);
       res.status(500).json({ error: "Failed to create prayer" });
@@ -2548,9 +2607,15 @@ export async function registerRoutes(app: Express) {
       }
       const updateData: Record<string, any> = {};
       if (parsed.data.isPinned !== undefined) updateData.isPinned = parsed.data.isPinned;
+      if (parsed.data.isUrgent !== undefined) updateData.isUrgent = parsed.data.isUrgent;
+      if (parsed.data.isClosed !== undefined) {
+        updateData.closedAt = parsed.data.isClosed ? new Date() : null;
+        if (!parsed.data.isClosed) { updateData.isAnswered = false; updateData.answeredAt = null; }
+      }
       if (parsed.data.isAnswered !== undefined) {
         updateData.isAnswered = parsed.data.isAnswered;
         updateData.answeredAt = parsed.data.isAnswered ? new Date() : null;
+        updateData.closedAt = parsed.data.isAnswered ? new Date() : null;
       }
 
       const prayer = await storage.updatePrayer(req.params.id, updateData);
@@ -2558,7 +2623,7 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Prayer not found" });
       }
       prayerCache.invalidatePattern('prayers:');
-      res.json(prayer);
+      res.json(publicPrayerReceipt(prayer));
     } catch (error) {
       console.error("[update-prayer] Error:", error);
       res.status(500).json({ error: "Failed to update prayer" });
@@ -2587,65 +2652,6 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete prayer" });
-    }
-  });
-
-  app.post("/api/prayers/:id/amen", async (req, res) => {
-    try {
-      const userId = await resolveUserId(req);
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const amen = await storage.createPrayerAmen(req.params.id, userId);
-      prayerCache.invalidatePattern('prayers:');
-      res.status(201).json(amen);
-    } catch (error) {
-      console.error("[create-prayer-amen] Error:", error);
-      res.status(500).json({ error: "Failed to add amen" });
-    }
-  });
-
-  app.get("/api/prayers/:id/comments", async (req, res) => {
-    try {
-      const currentUserId = await resolveUserId(req);
-      if (!currentUserId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const comments = await storage.getPrayerComments(req.params.id, currentUserId);
-      res.json(comments);
-    } catch (error) {
-      console.error("[get-prayer-comments] Error:", error);
-      res.status(500).json({ error: "Failed to get comments" });
-    }
-  });
-
-  app.post("/api/prayers/:id/comments", async (req, res) => {
-    try {
-      const userId = await resolveUserId(req);
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      const parsed = prayerCommentBodySchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid prayer comment", details: parsed.error.flatten() });
-      }
-      const comment = await storage.createPrayerComment(req.params.id, userId, parsed.data.content);
-      prayerCache.invalidatePattern('prayers:');
-      res.status(201).json(comment);
-    } catch (error) {
-      console.error("[create-prayer-comment] Error:", error);
-      res.status(500).json({ error: "Failed to create comment" });
-    }
-  });
-
-  app.delete("/api/prayers/:id/comments/:commentId", requireLeader, async (req, res) => {
-    try {
-      await storage.deletePrayerComment(req.params.commentId);
-      prayerCache.invalidatePattern('prayers:');
-      res.json({ success: true });
-    } catch (error) {
-      console.error("[delete-prayer-comment] Error:", error);
-      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 
@@ -2706,9 +2712,9 @@ export async function registerRoutes(app: Express) {
         userId,
         name: input.name,
         relationship: input.relationship || null,
-        need: input.need || "需要更多了解與陪伴。",
-        nextAction: input.nextAction || "這週主動問候一次。",
-        prayer: input.prayer || "求主讓我用合宜的方式關心他。",
+        need: input.need || "",
+        nextAction: input.nextAction || "",
+        prayer: input.prayer || "",
         source: input.source || "personal",
         visibility: input.visibility || "private",
         isArchived: false,
@@ -2803,22 +2809,18 @@ export async function registerRoutes(app: Express) {
       }
 
       const input = careActionBodySchema.parse(req.body);
-      const [action] = await db
-        .insert(careActions)
-        .values({
-          contactId: contact.id,
-          userId,
-          actionType: input.actionType,
-          note: input.note || null,
-        })
-        .returning();
-
-      if (careActionTypesThatUpdateLastCared.has(input.actionType)) {
-        await db
-          .update(careContacts)
-          .set({ lastCaredAt: new Date(), updatedAt: new Date() })
-          .where(and(eq(careContacts.id, contact.id), eq(careContacts.userId, userId)));
-      }
+      const action = await db.transaction(async (tx) => {
+        const createdAt = new Date();
+        const [saved] = await tx.insert(careActions).values({
+          contactId: contact.id, userId, actionType: input.actionType, note: input.note || null, createdAt,
+        }).returning();
+        if (careActionTypesThatUpdateLastCared.has(input.actionType)) {
+          await tx.update(careContacts)
+            .set({ lastCaredAt: createdAt, updatedAt: createdAt })
+            .where(and(eq(careContacts.id, contact.id), eq(careContacts.userId, userId)));
+        }
+        return saved;
+      });
 
       res.status(201).json(action);
     } catch (error) {
@@ -2871,7 +2873,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/potential-members", requireLeader, async (req, res) => {
     try {
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const access = await getCrmAccessForRequest(req);
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
@@ -4294,43 +4296,6 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Close a prayer meeting (mark as closed, keep data for history)
-  app.delete("/api/prayer-meetings/:id", async (req, res) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      const meeting = await storage.getPrayerMeeting(req.params.id);
-      if (!meeting) {
-        return res.status(404).json({ error: "Prayer meeting not found" });
-      }
-
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
-
-      if (meeting.ownerId !== userId) {
-        const role = userId ? await storage.getUserRole(userId) : undefined;
-        if (role !== 'admin') {
-          return res.status(403).json({ error: "Only the meeting owner can close it" });
-        }
-      }
-
-      // Mark as closed instead of deleting - preserves prayer data for history
-      await storage.updatePrayerMeetingStatus(meeting.id, 'closed');
-      res.json({ success: true, status: 'closed' });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to close prayer meeting" });
-    }
-  });
 
 
   // Card Questions CRUD for admin
@@ -4427,7 +4392,7 @@ export async function registerRoutes(app: Express) {
       return res.status(400).json({ error: "Invalid filename" });
     }
 
-    const filePath = path.join(process.cwd(), 'public', 'message-cards', filename);
+    const filePath = path.join(messageCardRoot, filename);
 
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
@@ -4456,7 +4421,7 @@ export async function registerRoutes(app: Express) {
   // Delete message card image
   app.delete("/api/message-cards/image/:filename", requireLeader, async (req, res) => {
     try {
-      const filePath = path.join(process.cwd(), 'public', 'message-cards', path.basename(req.params.filename));
+      const filePath = path.join(messageCardRoot, path.basename(req.params.filename));
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
@@ -4578,7 +4543,7 @@ export async function registerRoutes(app: Express) {
 
         const fsP = await import("fs/promises");
         const pathMod = await import("path");
-        const uploadDir = pathMod.default.join(process.cwd(), "uploads", "avatars");
+        const uploadDir = pathMod.default.join(uploadRoot, "avatars");
         await fsP.mkdir(uploadDir, { recursive: true });
 
         const filename = `${req.params.id}-${Date.now()}.jpg`;
@@ -4606,7 +4571,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/users", requireLeader, async (req, res) => {
     try {
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const access = await getCrmAccessForRequest(req);
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
@@ -4620,7 +4585,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/user-roles", requireLeader, async (req, res) => {
     try {
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const access = await getCrmAccessForRequest(req);
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
@@ -4647,6 +4612,7 @@ export async function registerRoutes(app: Express) {
           directorUserId ? storage.getUser(directorUserId) : Promise.resolve(undefined),
           storage.getUser(req.params.userId),
         ]);
+        if (role === 'admin' || role === 'senior_pastor' || ['admin','senior_pastor'].includes(await storage.getUserRole(req.params.userId) || '') || !normalizeChurch(director?.church)) return res.status(403).json({ error: '只有系統管理員可以調整管理者權限' });
         if (!target || normalizeChurch(target.church) !== normalizeChurch(director?.church)) {
           return res.status(403).json({ error: "Forbidden" });
         }
@@ -4660,28 +4626,28 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/potential-members/:id", requireLeader, async (req, res) => {
     try {
-      const churchScope = await getChurchScope(req);
-      const access = await getCrmAccessForRequest(req);
+      const churchScope = await getCrmChurchFilter(req);
+      const careOnly = Object.keys(req.body || {}).every(key => ['status','subscribed'].includes(key));
+      const access = await getCrmAccessForRequest(req, careOnly ? 'careOrMembers' : 'members');
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      if (churchScope) {
+      {
         const existing = await pool.query("SELECT id, email, church FROM potential_members WHERE id = $1", [req.params.id]);
         if (existing.rows.length === 0) {
           return res.status(404).json({ error: "Potential member not found" });
         }
         const existingChurch = normalizeChurch(existing.rows[0].church);
-        const inScope = churchScope === UNASSIGNED_CHURCH_ID
-          ? !existingChurch
-          : existingChurch === churchScope;
+        const inScope = !churchScope || (churchScope === UNASSIGNED_CHURCH_ID ? !existingChurch : existingChurch === churchScope);
         const inCrmAccess = filterPotentialMembersForCrmAccess(existing.rows, access).length > 0;
         if (!inScope || !inCrmAccess || (!access.canManageMembers && !access.canManageCare)) {
           return res.status(403).json({ error: "Forbidden" });
         }
       }
-      const updates = { ...req.body };
+      const updates = z.object({ status: z.enum(['pending','member','declined']).optional(), subscribed: z.boolean().optional(), name: z.string().trim().min(1).max(160).optional(), gender: z.string().max(30).nullable().optional(), church: z.string().max(120).optional() }).strict().parse(req.body);
       if (typeof updates.church === "string") {
-        updates.church = normalizeChurch(updates.church);
+        updates.church = normalizeChurch(updates.church) || '';
+        if (access.role !== 'admin' && !access.churchScopes.includes(updates.church || '')) return res.status(403).json({ error: '目的教會不在管理範圍內' });
       }
       const updated = await storage.updatePotentialMember(req.params.id, updates);
       if (!updated) {
@@ -4689,26 +4655,25 @@ export async function registerRoutes(app: Express) {
       }
       res.json(updated);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid member fields' });
       res.status(500).json({ error: "Failed to update potential member" });
     }
   });
 
   app.delete("/api/potential-members/:id", requireLeader, async (req, res) => {
     try {
-      const churchScope = await getChurchScope(req);
-      const access = await getCrmAccessForRequest(req);
+      const churchScope = await getCrmChurchFilter(req);
+      const access = await getCrmAccessForRequest(req, 'members');
       if (!access || !access.canManageMembers) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      if (churchScope) {
+      {
         const existing = await pool.query("SELECT id, email, church FROM potential_members WHERE id = $1", [req.params.id]);
         if (existing.rows.length === 0) {
           return res.status(404).json({ error: "Potential member not found" });
         }
         const existingChurch = normalizeChurch(existing.rows[0].church);
-        const inScope = churchScope === UNASSIGNED_CHURCH_ID
-          ? !existingChurch
-          : existingChurch === churchScope;
+        const inScope = !churchScope || (churchScope === UNASSIGNED_CHURCH_ID ? !existingChurch : existingChurch === churchScope);
         const inCrmAccess = filterPotentialMembersForCrmAccess(existing.rows, access).length > 0;
         if (!inScope || !inCrmAccess) {
           return res.status(403).json({ error: "Forbidden" });
@@ -4721,17 +4686,13 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sessions/:sessionId/study-responses", requireLeader, async (req, res) => {
+  app.get("/api/sessions/:sessionId/study-responses", requireSessionManager, async (req, res) => {
     try {
       const responses = await storage.getStudyResponses(req.params.sessionId);
       res.json(responses);
     } catch (error) {
       res.status(500).json({ error: "Failed to get study responses" });
     }
-  });
-
-  app.get("/api/health", async (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
   // Profile notification endpoint using Resend integration
@@ -5428,15 +5389,16 @@ export async function registerRoutes(app: Express) {
   });
 
   app.get("/api/church-reading/today", async (req, res) => {
-    const date = typeof req.query.date === "string" ? req.query.date : undefined;
+    const parsedDate = devotionDate.safeParse(req.query.date ?? taipeiToday());
+    if (!parsedDate.success) return void res.status(400).json({ error: '日期格式錯誤' });
+    const date = parsedDate.data;
+    res.setHeader('Cache-Control', 'no-store');
     try {
-      const content = await fetchDailyDevotionBrief(date);
-      res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
-      res.json(content);
+      const managed = await getManagedChurchDevotion(date);
+      return void res.json(await withDevotionScripture(managedDevotionBrief(date, managed.entry), (book, chapter) => storage.getBibleVerses(book, chapter)));
     } catch (error) {
-      console.error("Error fetching church daily devotion:", error);
-      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
-      res.json(buildFallbackDailyDevotionBrief(date));
+      console.error('[church-reading] Schedule unavailable', error);
+      return void res.status(503).json({ error: '暫時無法取得教會靈修課表' });
     }
   });
 
@@ -5459,7 +5421,7 @@ export async function registerRoutes(app: Express) {
     });
   });
 
-  app.get("/api/line-login/url", (req: any, res) => {
+  app.get("/api/line-login/url", async (req: any, res) => {
     const config = getLineLoginConfig(req);
     if (!config.configured) {
       return res.status(409).json({
@@ -5472,11 +5434,14 @@ export async function registerRoutes(app: Express) {
     const state = randomBytes(24).toString("hex");
     const nonce = randomBytes(24).toString("hex");
     const redirectPath = getSafeRedirectPath(req.query.redirect);
+    const linkUserId = req.query.link === '1' ? await resolveUserId(req) : null;
+    if (req.query.link === '1' && (!linkUserId || req.get('sec-fetch-site') === 'cross-site')) return res.status(403).json({ error: '請從已登入的個人設定確認綁定' });
     req.session.lineLogin = {
       state,
       nonce,
       redirectPath,
       createdAt: Date.now(),
+      linkUserId,
     };
 
     const scopes = ["profile", "openid"];
@@ -5527,7 +5492,8 @@ export async function registerRoutes(app: Express) {
         channelSecret: config.channelSecret,
         expectedNonce: savedState.nonce,
       });
-      const linked = await ensureLineLinkedUser(profile);
+      if (savedState.linkUserId && savedState.linkUserId !== await resolveUserId(req)) return res.status(403).send('登入帳號已變更，請重新確認綁定。');
+      const linked = await ensureLineLinkedUser(profile, savedState.linkUserId || undefined);
 
       const sessionUser: any = {
         claims: {
@@ -5555,13 +5521,15 @@ export async function registerRoutes(app: Express) {
         return res.status(409).send("LINE schema is not ready. Run npm run db:push first.");
       }
       console.error("[LINE Login] Callback failed:", error);
+      if (error instanceof Error && error.message === 'LINE_ACCOUNT_LINK_REQUIRED') return res.status(409).send('這個 Email 已有帳號。為保護原有資料，請先使用原本方式登入，再由本人確認帳號綁定。');
+      if (error instanceof Error && error.message === 'LINE_ACCOUNT_ALREADY_LINKED') return res.status(409).send('這個 LINE 或系統帳號已經綁定，原有連結未變更。');
       res.status(500).send("LINE Login failed.");
     }
   });
 
-  app.post("/api/pastoral/journey-templates/love-journey-28/seed", requireLeader, async (req, res) => {
+  app.post("/api/pastoral/journey-templates/love-journey-28/seed", requireCrmDirector, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -5887,8 +5855,8 @@ export async function registerRoutes(app: Express) {
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const churchScope = await getChurchScope(req);
-      const overview = await getPastoralFrameworkOverview(churchScope);
+      const churchScope = await getCrmChurchFilter(req);
+      const overview = await getPastoralFrameworkOverview(churchScope, access);
       res.json({ schemaReady: true, ...overview });
     } catch (error) {
       if (isPastoralFrameworkSchemaMissingError(error)) {
@@ -5904,9 +5872,9 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/pastoral/framework/seed-153", requireLeader, async (req, res) => {
+  app.post("/api/pastoral/framework/seed-153", requireCrmDirector, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || (!access.canManageCare && !access.canManageMembers)) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -5929,17 +5897,17 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/pastoral/persons/:personId/stage", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || (!access.canManageCare && !access.canManageMembers)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const input = personStagePatchSchema.parse(req.body);
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const allowedPerson = await getPastoralPersonDetail(req.params.personId, churchScope, { canViewPersonal: false, access });
       if (!allowedPerson) {
         return res.status(404).json({ error: "Person or pastoral stage not found" });
       }
-      const result = await updatePersonPastoralStage({ personId: req.params.personId, ...input }, churchScope);
+      const result = await updatePersonPastoralStage({ personId: allowedPerson.person.id, ...input }, churchScope);
       if (!result) return res.status(404).json({ error: "Person or pastoral stage not found" });
       res.json(result);
     } catch (error) {
@@ -5956,7 +5924,7 @@ export async function registerRoutes(app: Express) {
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const limit = Number.parseInt(String(req.query.limit || "120"), 10);
       const offset = Number.parseInt(String(req.query.offset || "0"), 10);
       const persons = await getPastoralPersons(churchScope, {
@@ -5980,9 +5948,9 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/pastoral/reconcile", requireLeader, async (req, res) => {
+  app.post("/api/pastoral/reconcile", requireCrmDirector, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || (!access.canManageCare && !access.canManageMembers)) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -6013,7 +5981,7 @@ export async function registerRoutes(app: Express) {
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const detail = await getPastoralPersonDetail(req.params.personId, churchScope, { canViewPersonal: access.canViewPersonal, access });
       if (!detail) {
         return res.status(404).json({ error: "Pastoral person not found" });
@@ -6034,12 +6002,12 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/pastoral/persons/:personId/love-journey/start", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || (!access.canManageCare && !access.canManageMembers)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const userId = (req as any).legacyUserId || await resolveUserId(req);
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const journeyId = await startLoveJourneyForPerson(req.params.personId, userId, churchScope, access);
       if (!journeyId) {
         return res.status(404).json({ error: "Pastoral person not found" });
@@ -6054,6 +6022,9 @@ export async function registerRoutes(app: Express) {
           action: "Run npm run db:push before starting 愛的旅程",
         });
       }
+      if ((error as {code?:string}).code === 'JOURNEY_OWNER_REQUIRED') {
+        return res.status(409).json({error:'請先確認唯一的學員帳號，再開啟個人課程。'});
+      }
       console.error("Error starting love journey:", error);
       res.status(500).json({ error: "Failed to start love journey" });
     }
@@ -6061,12 +6032,12 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/pastoral/journey-progress/:progressId", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const input = journeyProgressPatchSchema.parse(req.body);
-      const churchScope = await getChurchScope(req);
+      const input = journeyProgressPatchSchema.omit({ responseText: true }).extend({ version: z.number().int().positive() }).strict().parse(req.body);
+      const churchScope = await getCrmChurchFilter(req);
       const progress = await updateJourneyProgress(req.params.progressId, input, churchScope, access);
       if (!progress) {
         return res.status(404).json({ error: "Journey progress not found" });
@@ -6090,12 +6061,12 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/pastoral/journey-milestones/:milestoneId", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const input = journeyMilestonePatchSchema.parse(req.body);
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const milestone = await updateJourneyMilestone(req.params.milestoneId, input, churchScope, access);
       if (!milestone) {
         return res.status(404).json({ error: "Journey milestone not found" });
@@ -6123,7 +6094,7 @@ export async function registerRoutes(app: Express) {
       if (!access || !access.canManageCare) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       res.json({ schemaReady: true, tasks: await listPastoralTasks(req.params.personId, churchScope, access) });
     } catch (error) {
       if (isPastoralSchemaMissingError(error)) {
@@ -6136,13 +6107,13 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/pastoral/persons/:personId/tasks", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const input = pastoralTaskBodySchema.parse(req.body);
       const userId = (req as any).legacyUserId || await resolveUserId(req);
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const task = await createPastoralTask({
         personId: req.params.personId,
         title: input.title,
@@ -6171,12 +6142,12 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/pastoral/persons/:personId/tasks/next-step", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const userId = (req as any).legacyUserId || await resolveUserId(req);
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const task = await createNextStepTaskForPerson(req.params.personId, userId, churchScope, access);
       if (!task) return res.status(404).json({ error: "Pastoral person not found" });
       res.status(201).json(task);
@@ -6191,12 +6162,12 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/pastoral/tasks/:taskId", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const input = pastoralTaskPatchSchema.parse(req.body);
-      const churchScope = await getChurchScope(req);
+      const churchScope = await getCrmChurchFilter(req);
       const task = await updatePastoralTask(req.params.taskId, input, churchScope, access);
       if (!task) return res.status(404).json({ error: "Pastoral task not found" });
       res.json(task);
@@ -6214,12 +6185,12 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/pastoral/merge-suggestions", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'members');
       if (!access || !access.canManageMembers) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const churchScope = await getChurchScope(req);
-      res.json({ schemaReady: true, suggestions: await listPersonMergeSuggestions(churchScope) });
+      const churchScope = await getCrmChurchFilter(req);
+      res.json({ schemaReady: true, suggestions: await listPersonMergeSuggestions(churchScope, access) });
     } catch (error) {
       if (isPastoralSchemaMissingError(error)) {
         return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
@@ -6231,12 +6202,18 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/pastoral/merge-suggestions/dismiss", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'members');
       if (!access || !access.canManageMembers) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const input = mergeSuggestionBodySchema.parse(req.body);
-      res.json(await dismissPersonMergeSuggestion(input.primaryPersonId, input.duplicatePersonId));
+      const churchScope = await getCrmChurchFilter(req);
+      for (const id of [input.primaryPersonId, input.duplicatePersonId]) {
+        if (!await getPastoralPersonDetail(id, churchScope, { canViewPersonal: false, access })) return res.status(404).json({ error: 'Merge candidate not found' });
+      }
+      const result = await dismissPersonMergeSuggestion(input.primaryPersonId, input.duplicatePersonId, churchScope);
+      if (!result) return res.status(404).json({ error: 'Merge candidate not found' });
+      res.json(result);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid merge suggestion", details: error.flatten() });
       console.error("Error dismissing merge suggestion:", error);
@@ -6246,13 +6223,13 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/pastoral/merge-suggestions/merge", requireLeader, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'members');
       if (!access || !access.canManageMembers) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const input = mergeSuggestionBodySchema.parse(req.body);
-      const churchScope = await getChurchScope(req);
-      const result = await mergePastoralPersons(input.primaryPersonId, input.duplicatePersonId, churchScope);
+      const churchScope = await getCrmChurchFilter(req);
+      const result = await mergePersons(pool, { ...input, churchScope, access, actorUserId: await resolveUserId(req) });
       if (!result) return res.status(404).json({ error: "Merge candidate not found" });
       res.json(result);
     } catch (error) {
@@ -6261,6 +6238,7 @@ export async function registerRoutes(app: Express) {
         return res.status(409).json({ schemaReady: false, error: "Pastoral schema is not ready" });
       }
       console.error("Error merging pastoral persons:", error);
+      if (error instanceof PersonMergeError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to merge pastoral persons" });
     }
   });
@@ -6297,11 +6275,27 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/me/love-journey/:journeyId/status", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const id = z.string().uuid().parse(req.params.journeyId);
+      const input = z.object({ expectedStatus: z.enum(['active','paused']), status: z.enum(['active','paused']) }).strict().parse(req.body);
+      const result = await changeSelfJourneyStatus(userId,id,input.expectedStatus,input.status);
+      if (!result) return res.status(409).json({ error: "旅程狀態已變更或無法存取，請重新載入" });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid journey status" });
+      console.error('Error changing self journey status:', error);
+      res.status(500).json({ error: "Failed to change journey status" });
+    }
+  });
+
   app.patch("/api/me/love-journey/progress/:progressId", async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
-      const input = journeyProgressPatchSchema.pick({ status: true, responseText: true }).parse(req.body);
+      const input = journeyProgressPatchSchema.pick({ status: true, responseText: true }).extend({ version: z.number().int().positive(), visibility: z.enum(['private','pastoral','mentor']).optional(), mentorContractId:z.string().uuid().optional() }).strict().refine(value=>value.visibility!=='mentor'||!!value.mentorContractId).parse(req.body);
       const progress = await updateSelfJourneyProgress(userId, req.params.progressId, input);
       if (!progress) return res.status(404).json({ error: "Journey progress not found" });
       res.json(progress);
@@ -6495,13 +6489,15 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.use('/api/user-reading-plans/:id', readingPlanAccess(resolveUserId, (id, userId) => storage.getUserReadingPlan(id, userId)));
+
   app.get("/api/user-reading-plans/:id", async (req, res) => {
     try {
       const user = (req as any).user;
       if (!user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const plan = await storage.getUserReadingPlan(req.params.id);
+      const plan = await storage.getUserReadingPlan(req.params.id, res.locals.readingOwnerId);
       if (!plan) {
         return res.status(404).json({ error: "Reading plan not found" });
       }
@@ -6534,122 +6530,15 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "User not found" });
       }
 
-      const { name, description, startDate, bookSelections, chaptersPerDay, reminderEnabled, reminderMorning, reminderNoon, reminderEvening, templateId } = req.body;
-      if (!name || !startDate) {
-        return res.status(400).json({ error: "Missing required fields: name, startDate" });
-      }
-
-      let finalTemplateId = templateId;
-      let totalDays = 0;
-      let templateItems: Array<{ templateId: string; dayNumber: number; bookName: string; chapterStart: number; chapterEnd: number; scriptureReference: string }> = [];
-
-      if (templateId) {
-        const template = await storage.getReadingPlanTemplate(templateId);
-        if (!template) {
-          return res.status(404).json({ error: "Reading plan template not found" });
-        }
-        const existingItems = await storage.getReadingPlanItems(templateId);
-        templateItems = existingItems.map(item => ({
-          templateId: item.templateId,
-          dayNumber: item.dayNumber,
-          bookName: item.bookName || '',
-          chapterStart: item.chapterStart || 1,
-          chapterEnd: item.chapterEnd || 1,
-          scriptureReference: item.scriptureReference,
-        }));
-        totalDays = template.durationDays;
-      } else {
-        if (!bookSelections || !chaptersPerDay) {
-          return res.status(400).json({ error: "Missing required fields for custom plan: bookSelections, chaptersPerDay" });
-        }
-
-        const chapters: Array<{ bookName: string; chapter: number }> = [];
-        for (const sel of bookSelections) {
-          const start = sel.chapterStart || 1;
-          const end = sel.chapterEnd || start;
-          for (let ch = start; ch <= end; ch++) {
-            chapters.push({ bookName: sel.bookName, chapter: ch });
-          }
-        }
-
-        totalDays = Math.ceil(chapters.length / chaptersPerDay);
-
-        const template = await storage.createReadingPlanTemplate({
-          name: `${name} - Personal`,
-          description: description || null,
-          category: "personal",
-          durationDays: totalDays,
-          isPublic: false,
-          createdBy: userId,
-        });
-        finalTemplateId = template.id;
-
-        for (let day = 0; day < totalDays; day++) {
-          const dayChapters = chapters.slice(day * chaptersPerDay, (day + 1) * chaptersPerDay);
-          if (dayChapters.length === 0) continue;
-          const firstChapter = dayChapters[0];
-          const lastChapter = dayChapters[dayChapters.length - 1];
-          let scriptureRef: string;
-          if (firstChapter.bookName === lastChapter.bookName) {
-            if (firstChapter.chapter === lastChapter.chapter) {
-              scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}`;
-            } else {
-              scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter}-${lastChapter.chapter}`;
-            }
-          } else {
-            scriptureRef = `${firstChapter.bookName} ${firstChapter.chapter} - ${lastChapter.bookName} ${lastChapter.chapter}`;
-          }
-          templateItems.push({
-            templateId: template.id,
-            dayNumber: day + 1,
-            bookName: firstChapter.bookName,
-            chapterStart: firstChapter.chapter,
-            chapterEnd: lastChapter.chapter,
-            scriptureReference: scriptureRef,
-          });
-        }
-
-        await storage.createReadingPlanTemplateItems(templateItems);
-      }
-
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + totalDays - 1);
-
-      const plan = await storage.createUserReadingPlan({
-        userId,
-        templateId: finalTemplateId,
-        name,
-        description: description || null,
-        startDate,
-        endDate: endDate.toISOString().split('T')[0],
-        isActive: true,
-        totalDays,
-        reminderEnabled: reminderEnabled ?? true,
-        reminderMorning: reminderMorning ?? "07:00",
-        reminderNoon: reminderNoon ?? "12:00",
-        reminderEvening: reminderEvening ?? "20:00",
-      });
-
-      const progressEntries = templateItems.map((item, idx) => {
-        const readingDate = new Date(startDate);
-        readingDate.setDate(readingDate.getDate() + idx);
-        return {
-          userId,
-          planId: plan.id,
-          dayNumber: item.dayNumber,
-          readingDate: readingDate.toISOString().split('T')[0],
-          scriptureReference: item.scriptureReference,
-          isCompleted: false,
-        };
-      });
-
-      for (const entry of progressEntries) {
-        await storage.createReadingProgress(entry);
-      }
+      const parsed = readingPlanBodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'Invalid reading plan', details: parsed.error.issues });
+      const { name, description, startDate, bookSelections, chaptersPerDay, reminderEnabled, reminderMorning, reminderNoon, reminderEvening, templateId } = parsed.data;
+      const plan = await createReadingPlan(db, userId, parsed.data);
 
       res.status(201).json(plan);
     } catch (error) {
       console.error('Error creating user reading plan:', error);
+      if (error instanceof ReadingPlanError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to create reading plan" });
     }
   });
@@ -6670,7 +6559,7 @@ export async function registerRoutes(app: Express) {
       if (reminderNoon !== undefined) updates.reminderNoon = reminderNoon;
       if (reminderEvening !== undefined) updates.reminderEvening = reminderEvening;
 
-      const plan = await storage.updateUserReadingPlan(req.params.id, updates);
+      const plan = await storage.updateUserReadingPlan(req.params.id, res.locals.readingOwnerId, updates);
       if (!plan) {
         return res.status(404).json({ error: "Reading plan not found" });
       }
@@ -6687,7 +6576,7 @@ export async function registerRoutes(app: Express) {
       if (!user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      await storage.deleteUserReadingPlan(req.params.id);
+      await storage.deleteUserReadingPlan(req.params.id, res.locals.readingOwnerId);
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting user reading plan:', error);
@@ -6716,7 +6605,7 @@ export async function registerRoutes(app: Express) {
       if (!user) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const plan = await storage.getUserReadingPlan(req.params.id);
+      const plan = await storage.getUserReadingPlan(req.params.id, res.locals.readingOwnerId);
       if (!plan) {
         return res.status(404).json({ error: "Reading plan not found" });
       }
@@ -6755,7 +6644,7 @@ export async function registerRoutes(app: Express) {
       if (!dayProgress) {
         return res.status(404).json({ error: "Progress entry not found for this day" });
       }
-      const updated = await storage.markReadingComplete(dayProgress.id);
+      const updated = await storage.markReadingComplete(dayProgress.id, res.locals.readingOwnerId);
       res.json(updated);
     } catch (error) {
       console.error('Error marking reading complete:', error);
@@ -6839,9 +6728,15 @@ export async function registerRoutes(app: Express) {
       }
       const parsed = insertDevotionalNoteSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid devotional note data", details: parsed.error.errors });
+        return res.status(400).json({ error: "Invalid devotional note data", details: parsed.error.issues });
       }
-      const note = await storage.createDevotionalNote(parsed.data);
+      if (parsed.data.readingPlanId && !await storage.getUserReadingPlan(parsed.data.readingPlanId, userId)) {
+        return res.status(404).json({ error: 'Reading plan not found' });
+      }
+      const mutationId = z.string().uuid().optional().safeParse(req.body.clientMutationId);
+      if (!mutationId.success) return res.status(400).json({ error: 'Invalid save identifier' });
+      const note = await storage.createDevotionalNote(parsed.data, mutationId.data);
+      if (!note) return res.status(409).json({ error: 'Save identifier conflict' });
       res.status(201).json(note);
     } catch (error) {
       console.error('Error creating devotional note:', error);
@@ -6859,9 +6754,14 @@ export async function registerRoutes(app: Express) {
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid devotional note data", details: parsed.error.flatten() });
       }
-      const note = await storage.updateDevotionalNoteForUser(req.params.id, userId, parsed.data);
+      if (parsed.data.readingPlanId && !await storage.getUserReadingPlan(parsed.data.readingPlanId, userId)) {
+        return res.status(404).json({ error: 'Reading plan not found' });
+      }
+      const version = z.number().int().positive().safeParse(req.body.version);
+      if (!version.success) return res.status(428).json({ error: '請重新載入筆記後再儲存；目前輸入請先保留。' });
+      const note = await storage.updateDevotionalNoteForUser(req.params.id, userId, parsed.data, version.data);
       if (!note) {
-        return res.status(404).json({ error: "Devotional note not found" });
+        return res.status(409).json({ error: '筆記已變更或無法存取，尚未覆蓋；請保留草稿並重新確認。' });
       }
       res.json(note);
     } catch (error) {
@@ -6900,6 +6800,10 @@ export async function registerRoutes(app: Express) {
       const { hidden } = req.body;
       if (typeof hidden !== 'boolean') {
         return res.status(400).json({ error: "hidden must be a boolean" });
+      }
+      const existing = await storage.getStudyResponseWithOwner(req.params.id);
+      if (!existing || !await studyAccess.owned(req, existing.sessionId, existing.userId)) {
+        return res.status(404).json({ error: "Entry not found" });
       }
       const entry = await storage.toggleStudyResponseHidden(req.params.id, hidden);
       if (!entry) {
@@ -7073,11 +6977,11 @@ export async function registerRoutes(app: Express) {
   // ============ Saved Verses API Routes ============
   app.get("/api/saved-verses", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const verses = await storage.getSavedVerses(user.id);
+      const verses = await storage.getSavedVerses(userId);
       res.json(verses);
     } catch (error) {
       console.error('Error fetching saved verses:', error);
@@ -7087,15 +6991,15 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/saved-verses/check", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const { bookName, chapter, verse } = req.query;
       if (!bookName || !chapter || !verse) {
         return res.status(400).json({ error: "Missing required parameters" });
       }
-      const saved = await storage.getSavedVerse(user.id, bookName as string, parseInt(chapter as string), parseInt(verse as string));
+      const saved = await storage.getSavedVerse(userId, bookName as string, parseInt(chapter as string), parseInt(verse as string));
       res.json({ saved: !!saved, id: saved?.id });
     } catch (error) {
       console.error('Error checking saved verse:', error);
@@ -7105,11 +7009,11 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/saved-verses", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      const data = insertSavedVerseSchema.parse({ ...req.body, userId: user.id });
+      const data = insertSavedVerseSchema.parse({ ...req.body, userId });
       const saved = await storage.createSavedVerse(data);
       res.status(201).json(saved);
     } catch (error) {
@@ -7120,11 +7024,11 @@ export async function registerRoutes(app: Express) {
 
   app.delete("/api/saved-verses/:id", async (req, res) => {
     try {
-      const user = (req as any).user;
-      if (!user) {
+      const userId = await resolveUserId(req);
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      await storage.deleteSavedVerse(req.params.id);
+      await storage.deleteSavedVerse(req.params.id, userId);
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting saved verse:', error);

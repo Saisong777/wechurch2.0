@@ -19,10 +19,11 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import {
   createLocalDevotionalNoteId,
   findLocalDevotionalNoteByPlanDay,
-  upsertLocalDevotionalNote,
 } from '@/lib/localDevotionalNotes';
+import { saveDevotionalNote as persistDevotionalNote, noteSaveMessage } from '@/lib/saveDevotionalNote';
 import type { InsightCategory } from '@/types/spiritual-fitness';
 import { cn } from '@/lib/utils';
+import { LeaveConfirmation, UnsavedChangesGuard } from '@/components/layout/UnsavedChangesGuard';
 
 interface PlanInfo {
   id: string;
@@ -160,7 +161,14 @@ const ReadingExperiencePage = () => {
     coolDownNote: '',
   });
   const [devotionalNoteId, setDevotionalNoteId] = useState<string | null>(null);
-  const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved' | 'pending' | 'blocked'>('idle');
+  const [noteBaseline, setNoteBaseline] = useState(devotionalForm);
+  const [pendingDay, setPendingDay] = useState<number | null>(null);
+  const noteEdited = useRef(false);
+  const noteDirty = JSON.stringify(devotionalForm) !== JSON.stringify(noteBaseline);
+  const loadDevotionalForm = useCallback((value: typeof devotionalForm) => {
+    setDevotionalForm(value); setNoteBaseline(value); noteEdited.current = false;
+  }, []);
 
   const dayStripRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -224,9 +232,10 @@ const ReadingExperiencePage = () => {
   });
 
   const { data: existingNote } = useQuery<DevotionalNote | null>({
-    queryKey: ['/api/user-reading-plans', planId, 'devotional', selectedDay],
+    queryKey: ['/api/user-reading-plans', planId, 'devotional', selectedDay, user?.id],
     queryFn: async () => {
-      const localNote = planId ? findLocalDevotionalNoteByPlanDay(planId, selectedDay) : null;
+      const localNote = planId ? findLocalDevotionalNoteByPlanDay(planId, selectedDay, user?.id || '') : null;
+      if (localNote && localNote.syncStatus !== 'synced') return localNote;
       try {
         const res = await fetch(`/api/user-reading-plans/${planId}/devotional/${selectedDay}`, { credentials: 'include' });
         if (res.status === 404) return localNote;
@@ -248,9 +257,10 @@ const ReadingExperiencePage = () => {
   }, [plan?.startDate, plan?.totalDays, progressEntries.length, searchParams]);
 
   useEffect(() => {
+    if (noteEdited.current) return;
     if (existingNote) {
       setDevotionalNoteId(existingNote.id);
-      setDevotionalForm({
+      loadDevotionalForm({
         titlePhrase: existingNote.titlePhrase || '',
         heartbeatVerse: existingNote.heartbeatVerse || '',
         observation: existingNote.observation || '',
@@ -262,7 +272,7 @@ const ReadingExperiencePage = () => {
       });
     } else {
       setDevotionalNoteId(null);
-      setDevotionalForm({
+      loadDevotionalForm({
         titlePhrase: '',
         heartbeatVerse: '',
         observation: '',
@@ -273,7 +283,7 @@ const ReadingExperiencePage = () => {
         coolDownNote: '',
       });
     }
-  }, [existingNote]);
+  }, [existingNote, loadDevotionalForm]);
 
   useEffect(() => {
     if (dayStripRef.current) {
@@ -354,48 +364,34 @@ const ReadingExperiencePage = () => {
     };
 
     try {
-      let savedNote: DevotionalNote;
-      if (devotionalNoteId && !devotionalNoteId.startsWith('local-devotional-')) {
-        const res = await apiRequest('PATCH', `/api/devotional-notes/${devotionalNoteId}`, body);
-        savedNote = await res.json();
-      } else {
-        const res = await apiRequest('POST', '/api/devotional-notes', body);
-        savedNote = await res.json();
-      }
-      if (savedNote.id) setDevotionalNoteId(savedNote.id);
-      upsertLocalDevotionalNote(savedNote);
-      queryClient.invalidateQueries({ queryKey: ['/api/user-reading-plans', planId, 'devotional', selectedDay] });
-      queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
-      setSavingState('saved');
-      toast({ title: '筆記已儲存' });
-      setTimeout(() => setSavingState('idle'), 2000);
-    } catch (err) {
       const now = new Date().toISOString();
-      const localNote: DevotionalNote = {
+      const result = await persistDevotionalNote(user.id, {
+        ...existingNote,
         id: devotionalNoteId || createLocalDevotionalNoteId(),
         createdAt: existingNote?.createdAt || now,
         updatedAt: now,
         ...body,
-      };
-      setDevotionalNoteId(localNote.id);
-      upsertLocalDevotionalNote(localNote);
-      queryClient.setQueryData<DevotionalNote[]>(['/api/devotional-notes'], (current = []) => [
-        localNote,
-        ...current.filter((note) => note.id !== localNote.id),
-      ]);
-      queryClient.setQueryData(['/api/user-reading-plans', planId, 'devotional', selectedDay], localNote);
+      });
+      setDevotionalNoteId(result.note.id);
+      setNoteBaseline(devotionalForm);
+      noteEdited.current = false;
+      queryClient.invalidateQueries({ queryKey: ['/api/user-reading-plans', planId, 'devotional', selectedDay] });
       queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
-      setSavingState('saved');
-      toast({ title: '筆記已儲存' });
-      setTimeout(() => setSavingState('idle'), 2000);
+      setSavingState(result.status === 'synced' ? 'saved' : result.status);
+      toast({ title: noteSaveMessage(result.status), variant: result.status === 'blocked' ? 'destructive' : 'default' });
+    } catch (err) {
+      setSavingState('idle');
+      toast({ title: '儲存失敗，請保留此頁並重試', variant: 'destructive' });
     }
-  }, [user, planId, selectedDay, devotionalForm, devotionalNoteId, currentDayEntry, allVerses, toast, existingNote?.createdAt]);
+  }, [user, planId, selectedDay, devotionalForm, devotionalNoteId, currentDayEntry, allVerses, toast, existingNote]);
 
   const updateDevotionalField = useCallback((field: string, value: string | InsightCategory | null) => {
+    noteEdited.current = true;
     setDevotionalForm(prev => ({ ...prev, [field]: value }));
   }, []);
 
   const updateReceivingField = useCallback((value: string) => {
+    noteEdited.current = true;
     setDevotionalForm(prev => ({
       ...prev,
       heartbeatVerse: value,
@@ -492,9 +488,12 @@ const ReadingExperiencePage = () => {
   }, [speed]);
 
   const handleDaySelect = useCallback((day: number) => {
+    if (day === selectedDay || savingState === 'saving') return;
+    if (noteDirty) { setPendingDay(day); return; }
+    noteEdited.current = false;
     handleStop();
     setSelectedDay(day);
-  }, [handleStop]);
+  }, [handleStop, selectedDay, savingState, noteDirty]);
 
   const groupedVerses = useMemo(() => {
     const groups: { bookName: string; chapter: number; verses: BibleVerse[] }[] = [];
@@ -545,6 +544,14 @@ const ReadingExperiencePage = () => {
 
   return (
     <div className="min-h-screen bg-background" data-testid="reading-experience-page">
+      <UnsavedChangesGuard dirty={noteDirty} />
+      <LeaveConfirmation open={pendingDay !== null} onStay={() => setPendingDay(null)} onLeave={() => {
+        if (pendingDay !== null) {
+          noteEdited.current = false;
+          setNoteBaseline(devotionalForm);
+          handleStop(); setSelectedDay(pendingDay); setPendingDay(null);
+        }
+      }} />
       <Header variant="compact" title="每日讀經" backTo="/learn/reading-plans" />
 
       <div className="max-w-3xl lg:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 pb-24">
@@ -814,6 +821,7 @@ const ReadingExperiencePage = () => {
                 <Label htmlFor="dev-observation" className="sr-only">看見</Label>
                 <AutoResizeTextarea
                   id="dev-observation"
+                  disabled={savingState === 'saving'}
                   value={devotionalForm.observation}
                   onChange={(e) => updateDevotionalField('observation', e.target.value)}
                   placeholder="例如：人物、場景、重複的詞、讓你注意到的細節..."
@@ -833,6 +841,7 @@ const ReadingExperiencePage = () => {
                 <Label htmlFor="dev-receiving" className="sr-only">領受</Label>
                 <AutoResizeTextarea
                   id="dev-receiving"
+                  disabled={savingState === 'saving'}
                   value={devotionalForm.coreInsightNote}
                   onChange={(e) => updateReceivingField(e.target.value)}
                   placeholder="例如：我對神有什麼新的認識？哪句話觸動我？我被提醒、安慰或光照的是什麼？"
@@ -852,6 +861,7 @@ const ReadingExperiencePage = () => {
                 <Label htmlFor="dev-actionPlan" className="sr-only">回應</Label>
                 <AutoResizeTextarea
                   id="dev-actionPlan"
+                  disabled={savingState === 'saving'}
                   value={devotionalForm.actionPlan}
                   onChange={(e) => updateDevotionalField('actionPlan', e.target.value)}
                   placeholder="例如：今天或這週的一個具體行動、我要如何禱告或調整生活..."
@@ -862,6 +872,9 @@ const ReadingExperiencePage = () => {
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t">
+                {(savingState === 'pending' || savingState === 'blocked') && (
+                  <p role="status" className="text-sm text-amber-700">{noteSaveMessage(savingState)}</p>
+                )}
                 {savingState === 'saved' && (
                   <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <Check className="w-3.5 h-3.5" />

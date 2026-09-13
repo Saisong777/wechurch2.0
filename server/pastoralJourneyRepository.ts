@@ -1,6 +1,9 @@
+import { appendPastoralAccessCondition, type PastoralAccessFilter } from './pastoralAccess';
+export { appendPastoralAccessCondition, type PastoralAccessFilter } from './pastoralAccess';
 import type { PoolClient } from "pg";
 import { getChurchAliases, UNASSIGNED_CHURCH_ID, normalizeChurch } from "./churches";
 import { pool } from "./db";
+import { mentoringGroupEligibleSql } from './mentoringAccess';
 import {
   LOVE_JOURNEY_TEMPLATE_SLUG,
   buildLoveJourneyTemplateSeed,
@@ -92,13 +95,6 @@ export interface PersonMergeSuggestion {
   status: string;
 }
 
-export interface PastoralAccessFilter {
-  accessLevel: "all" | "assigned" | "group" | "self" | "none";
-  userIds?: string[];
-  potentialMemberIds?: string[];
-  memberEmails?: string[];
-}
-
 export function isPastoralSchemaMissingError(error: unknown) {
   const maybeError = error as { code?: string; message?: string };
   return maybeError?.code === "42P01" || maybeError?.code === "42703";
@@ -126,62 +122,13 @@ function getRows<T>(result: { rows: T[] }) {
   return result.rows;
 }
 
-function appendPastoralAccessCondition(
-  conditions: string[],
-  params: unknown[],
-  personAlias: string,
-  access?: PastoralAccessFilter | null,
-) {
-  if (!access || access.accessLevel === "all") return;
-
-  const clauses: string[] = [];
-  const userIds = (access.userIds ?? []).filter(Boolean);
-  const potentialMemberIds = (access.potentialMemberIds ?? []).filter(Boolean);
-  const memberEmails = (access.memberEmails ?? [])
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (userIds.length > 0) {
-    params.push(userIds);
-    clauses.push(`EXISTS (
-      SELECT 1 FROM person_identity_links pal_user
-       WHERE pal_user.person_id = ${personAlias}.id
-         AND pal_user.user_id = ANY($${params.length}::uuid[])
-    )`);
-  }
-
-  if (potentialMemberIds.length > 0) {
-    params.push(potentialMemberIds);
-    clauses.push(`EXISTS (
-      SELECT 1 FROM person_identity_links pal_potential
-       WHERE pal_potential.person_id = ${personAlias}.id
-         AND pal_potential.potential_member_id = ANY($${params.length}::uuid[])
-    )`);
-  }
-
-  if (memberEmails.length > 0) {
-    params.push(memberEmails);
-    clauses.push(`(
-      lower(${personAlias}.primary_email) = ANY($${params.length}::text[])
-      OR EXISTS (
-        SELECT 1
-          FROM person_identity_links pal_email
-          LEFT JOIN users u ON u.id = pal_email.user_id
-          LEFT JOIN potential_members pm ON pm.id = pal_email.potential_member_id
-         WHERE pal_email.person_id = ${personAlias}.id
-           AND lower(COALESCE(u.email, pm.email, '')) = ANY($${params.length}::text[])
-      )
-    )`);
-  }
-
-  conditions.push(clauses.length > 0 ? `(${clauses.join(" OR ")})` : "false");
-}
-
 export async function listPastoralTasks(personId: string, churchScope: string | null, access?: PastoralAccessFilter | null): Promise<PastoralTaskSummary[]> {
   const params: unknown[] = [personId];
   const conditions = ["pt.person_id = $1", "p.id = pt.person_id"];
   appendChurchCondition(conditions, params, "p.church", churchScope);
   appendPastoralAccessCondition(conditions, params, "p", access);
+  params.push(access?.userId || null);
+  conditions.push(`(pt.visibility <> 'private' OR pt.created_by_user_id = $${params.length}::uuid)`);
 
   const result = await pool.query<PastoralTaskSummary>(
     `SELECT
@@ -292,6 +239,8 @@ export async function updatePastoralTask(
     updates.assignedToUserId ?? null,
   ];
   const conditions = ["pt.id = $1", "p.id = pt.person_id"];
+  params.push(access?.userId || null);
+  conditions.push(`(pt.visibility <> 'private' OR pt.created_by_user_id = $${params.length}::uuid)`);
   appendChurchCondition(conditions, params, "p.church", churchScope);
   appendPastoralAccessCondition(conditions, params, "p", access);
 
@@ -548,7 +497,7 @@ async function upsertIdentitySource(client: Queryable, input: IdentitySeedInput)
   let personId: string | undefined;
   if (primaryEmail) {
     const existingPerson = await client.query<{ id: string }>(
-      "SELECT id FROM persons WHERE primary_email = $1 LIMIT 1",
+      "SELECT COALESCE(merged_into_person_id, id) AS id FROM persons WHERE primary_email = $1 LIMIT 1",
       [primaryEmail],
     );
     personId = existingPerson.rows[0]?.id;
@@ -694,7 +643,7 @@ export async function getPastoralPersons(
   options: { limit?: number; offset?: number; search?: string | null; filter?: string | null; access?: PastoralAccessFilter | null } = {},
 ): Promise<PastoralPersonSummary[]> {
   const params: unknown[] = [LOVE_JOURNEY_TEMPLATE_SLUG];
-  const conditions: string[] = [];
+  const conditions: string[] = ['p.merged_into_person_id IS NULL'];
   appendChurchCondition(conditions, params, "p.church", churchScope);
   appendPastoralAccessCondition(conditions, params, "p", options.access);
   const search = options.search?.trim();
@@ -722,6 +671,8 @@ export async function getPastoralPersons(
 
   const limit = Math.min(Math.max(options.limit ?? 120, 20), 500);
   const offset = Math.max(options.offset ?? 0, 0);
+  params.push(options.access?.userId || null);
+  const actorPlaceholder = `$${params.length}`;
   params.push(limit, offset);
   const limitPlaceholder = `$${params.length - 1}`;
   const offsetPlaceholder = `$${params.length}`;
@@ -764,6 +715,7 @@ export async function getPastoralPersons(
           person_id,
           COUNT(*) FILTER (WHERE status IN ('open', 'deferred'))::int AS "openTaskCount"
         FROM pastoral_tasks
+        WHERE visibility <> 'private' OR created_by_user_id = ${actorPlaceholder}::uuid
         GROUP BY person_id
       )
       SELECT
@@ -814,6 +766,7 @@ export async function getPastoralPersons(
 }
 
 async function getPastoralTimeline(input: {
+  ownerUserId?: string;
   person: {
     id: string;
     displayName: string;
@@ -1049,10 +1002,10 @@ async function getPastoralTimeline(input: {
     }>(
       `SELECT id, name, need, next_action, created_at, last_cared_at
          FROM care_contacts
-        WHERE id = ANY($1::uuid[])
+        WHERE id = ANY($1::uuid[]) AND user_id = $2
         ORDER BY created_at DESC
         LIMIT 50`,
-      [careContactIds],
+      [careContactIds, input.ownerUserId || null],
     ));
 
     for (const row of careRows) {
@@ -1086,10 +1039,10 @@ async function getPastoralTimeline(input: {
     }>(
       `SELECT id, action_type, note, created_at
          FROM care_actions
-        WHERE contact_id = ANY($1::uuid[])
+        WHERE contact_id = ANY($1::uuid[]) AND user_id = $2
         ORDER BY created_at DESC
         LIMIT 50`,
-      [careContactIds],
+      [careContactIds, input.ownerUserId || null],
     ));
 
     for (const row of careActionRows) {
@@ -1213,8 +1166,11 @@ async function getPastoralTimeline(input: {
 export async function getPastoralPersonDetail(
   personId: string,
   churchScope: string | null,
-  options: { canViewPersonal?: boolean; access?: PastoralAccessFilter | null } = {},
+  options: { canViewPersonal?: boolean; access?: PastoralAccessFilter | null; self?: boolean } = {},
 ) {
+  const canonical = await pool.query<{ id: string }>('SELECT COALESCE(merged_into_person_id,id) AS id FROM persons WHERE id=$1', [personId]);
+  if (!canonical.rows[0]) return null;
+  personId = canonical.rows[0].id;
   const personParams: unknown[] = [personId];
   const personConditions = ["p.id = $1"];
   appendChurchCondition(personConditions, personParams, "p.church", churchScope);
@@ -1238,6 +1194,13 @@ export async function getPastoralPersonDetail(
   ))[0];
 
   if (!person) return null;
+
+  let canViewPersonal = options.canViewPersonal === true;
+  if (options.access) {
+    const params: unknown[] = [personId], conditions = ['p.id=$1'];
+    appendPastoralAccessCondition(conditions, params, 'p', options.access.personalAccess || { accessLevel: 'none' });
+    canViewPersonal = canViewPersonal && !!(await pool.query(`SELECT p.id FROM persons p WHERE ${conditions.join(' AND ')}`, params)).rows[0];
+  }
 
   const links = getRows(await pool.query(
     `SELECT
@@ -1273,25 +1236,29 @@ export async function getPastoralPersonDetail(
       JOIN journey_templates jt ON jt.id = pj.template_id
       WHERE pj.person_id = $1
         AND jt.slug = $2
+        AND ($3::uuid IS NULL OR pj.owner_user_id=$3)
       ORDER BY pj.started_at DESC
       LIMIT 1`,
-    [personId, LOVE_JOURNEY_TEMPLATE_SLUG],
+    [personId, LOVE_JOURNEY_TEMPLATE_SLUG,options.self ? options.access?.userId : null],
   ))[0] ?? null;
 
   const progress = journey
     ? getRows(await pool.query(
         `SELECT
             jp.id,
+            jp.version,
             jd.day_number AS "dayNumber",
-            jd.title,
-            jd.scripture_reference AS "scriptureReference",
-            jd.body_markdown AS "bodyMarkdown",
-            jd.action_prompt AS "actionPrompt",
-            jd.reflection_prompt AS "reflectionPrompt",
-            jd.discussion_prompt AS "discussionPrompt",
-            jd.milestone_key AS "milestoneKey",
+            CASE WHEN jp.content_snapshot IS NULL THEN jd.title ELSE jp.content_snapshot->>'title' END AS title,
+            CASE WHEN jp.content_snapshot IS NULL THEN jd.scripture_reference ELSE jp.content_snapshot->>'scripture_reference' END AS "scriptureReference",
+            CASE WHEN jp.content_snapshot IS NULL THEN jd.body_markdown ELSE jp.content_snapshot->>'body_markdown' END AS "bodyMarkdown",
+            CASE WHEN jp.content_snapshot IS NULL THEN jd.action_prompt ELSE jp.content_snapshot->>'action_prompt' END AS "actionPrompt",
+            CASE WHEN jp.content_snapshot IS NULL THEN jd.reflection_prompt ELSE jp.content_snapshot->>'reflection_prompt' END AS "reflectionPrompt",
+            CASE WHEN jp.content_snapshot IS NULL THEN jd.discussion_prompt ELSE jp.content_snapshot->>'discussion_prompt' END AS "discussionPrompt",
+            CASE WHEN jp.content_snapshot IS NULL THEN jd.milestone_key ELSE jp.content_snapshot->>'milestone_key' END AS "milestoneKey",
             jp.status,
             jp.response_text AS "responseText",
+            jp.visibility,
+            jp.mentor_contract_id AS "mentorContractId",
             jp.mentor_note AS "mentorNote",
             jp.needs_follow_up AS "needsFollowUp",
             jp.completed_at AS "completedAt"
@@ -1319,21 +1286,23 @@ export async function getPastoralPersonDetail(
         [journey.id],
       ))
     : [];
-  const timeline = await getPastoralTimeline({ person, links });
-  const tasks = await listPastoralTasks(personId, churchScope, options.access);
-  const canViewPersonal = options.canViewPersonal ?? true;
+  // Legacy timelines copy notes from private source records. Keep them out of CRM until source consent is available.
+  const timeline: PastoralTimelineEvent[] = [];
+  const tasks = options.self ? [] : await listPastoralTasks(personId, churchScope, options.access);
 
   return {
-    person,
-    links,
+    person: { ...person, notes: canViewPersonal && !options.self ? person.notes : null },
+    links:options.self?links.filter(link=>link.userId===options.access?.userId):links,
     loveJourney: journey ? {
       ...journey,
       privateNote: canViewPersonal ? journey.privateNote : null,
       progress: progress.map((day: any) => ({
         ...day,
+        mentorContractId: options.self ? day.mentorContractId : null,
+        responseText: options.self || (canViewPersonal && day.visibility === 'pastoral') ? day.responseText : null,
         mentorNote: canViewPersonal ? day.mentorNote : null,
       })),
-      milestones,
+      milestones: milestones.map((milestone: any) => ({ ...milestone, note: canViewPersonal && !options.self ? milestone.note : null })),
     } : null,
     timeline,
     tasks: canViewPersonal ? tasks : tasks.filter((task) => task.visibility !== "private"),
@@ -1341,11 +1310,12 @@ export async function getPastoralPersonDetail(
   };
 }
 
-export async function startLoveJourneyForPerson(personId: string, mentorUserId: string | null, churchScope: string | null, access?: PastoralAccessFilter | null) {
+export async function startLoveJourneyForPerson(personId: string, mentorUserId: string | null, churchScope: string | null, access?: PastoralAccessFilter | null, ownerUserId?:string) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('start-journey:' || $1))", [personId]);
     const personParams: unknown[] = [personId];
     const personConditions = ["p.id = $1"];
     appendChurchCondition(personConditions, personParams, "p.church", churchScope);
@@ -1359,6 +1329,14 @@ export async function startLoveJourneyForPerson(personId: string, mentorUserId: 
       return null;
     }
 
+    if (!ownerUserId) {
+      const owners = await client.query<{user_id:string}>(
+        'SELECT DISTINCT user_id FROM person_identity_links WHERE person_id=$1 AND user_id IS NOT NULL', [personId]);
+      if (owners.rows.length !== 1) {
+        throw Object.assign(new Error('請先確認唯一的學員帳號，再開啟個人課程。'), {code:'JOURNEY_OWNER_REQUIRED'});
+      }
+      ownerUserId = owners.rows[0].user_id;
+    }
     const { templateId, seed } = await ensureLoveJourneyTemplate(client);
     const existing = await client.query<{ id: string }>(
       `SELECT pj.id
@@ -1367,29 +1345,30 @@ export async function startLoveJourneyForPerson(personId: string, mentorUserId: 
         WHERE pj.person_id = $1
           AND jt.slug = $2
           AND pj.status IN ('active', 'paused')
+          AND ($3::uuid IS NULL OR pj.owner_user_id=$3)
         ORDER BY pj.started_at DESC
         LIMIT 1`,
-      [personId, LOVE_JOURNEY_TEMPLATE_SLUG],
+      [personId, LOVE_JOURNEY_TEMPLATE_SLUG,ownerUserId||null],
     );
 
     let journeyId = existing.rows[0]?.id;
     if (!journeyId) {
       const createdJourney = await client.query<{ id: string }>(
         `INSERT INTO person_journeys (
-            person_id, template_id, mentor_user_id, status, started_at, created_at, updated_at
+            person_id, template_id, mentor_user_id, owner_user_id,status, started_at, created_at, updated_at
           )
-          VALUES ($1, $2, $3, 'active', NOW(), NOW(), NOW())
+          VALUES ($1, $2, $3, $4,'active', NOW(), NOW(), NOW())
           RETURNING id`,
-        [personId, templateId, mentorUserId],
+        [personId, templateId, mentorUserId,ownerUserId||null],
       );
       journeyId = createdJourney.rows[0].id;
     }
 
     await client.query(
       `INSERT INTO journey_progress (
-          person_journey_id, journey_day_id, day_number, status, created_at, updated_at
+          person_journey_id, journey_day_id, day_number, status, content_snapshot, created_at, updated_at
         )
-        SELECT $1, id, day_number, 'not_started', NOW(), NOW()
+        SELECT $1, id, day_number, 'not_started', to_jsonb(journey_days), NOW(), NOW()
           FROM journey_days
          WHERE template_id = $2
         ON CONFLICT (person_journey_id, journey_day_id) DO NOTHING`,
@@ -1425,6 +1404,7 @@ export async function startLoveJourneyForPerson(personId: string, mentorUserId: 
 export async function updateJourneyProgress(
   progressId: string,
   updates: {
+    version: number;
     status?: string;
     responseText?: string | null;
     mentorNote?: string | null;
@@ -1441,13 +1421,16 @@ export async function updateJourneyProgress(
     typeof updates.needsFollowUp === "boolean" ? updates.needsFollowUp : null,
   ];
   const conditions = ["jp.id = $1"];
+  params.push(updates.version);
+  conditions.push(`jp.version=$${params.length}`);
   const scopeConditions = ["pj.id = jp.person_journey_id", "p.id = pj.person_id"];
   appendChurchCondition(scopeConditions, params, "p.church", churchScope);
   appendPastoralAccessCondition(scopeConditions, params, "p", access);
+  if (updates.mentorNote !== undefined) appendPastoralAccessCondition(scopeConditions, params, 'p', access?.personalAccess || { accessLevel: 'none' });
 
   const result = await pool.query(
     `UPDATE journey_progress jp
-        SET status = COALESCE($2, jp.status),
+        SET version = jp.version + 1, status = COALESCE($2, jp.status),
             response_text = COALESCE($3, jp.response_text),
             mentor_note = COALESCE($4, jp.mentor_note),
             needs_follow_up = COALESCE($5, jp.needs_follow_up),
@@ -1463,7 +1446,7 @@ export async function updateJourneyProgress(
             FROM person_journeys pj, persons p
            WHERE ${scopeConditions.join(" AND ")}
         )
-      RETURNING *`,
+      RETURNING jp.id, jp.version, jp.status, jp.needs_follow_up, jp.completed_at, jp.updated_at`,
     params,
   );
   return result.rows[0] ?? null;
@@ -1488,6 +1471,7 @@ export async function updateJourneyMilestone(
   const scopeConditions = ["jm.id = $1", "pj.id = jm.person_journey_id", "p.id = pj.person_id"];
   appendChurchCondition(scopeConditions, params, "p.church", churchScope);
   appendPastoralAccessCondition(scopeConditions, params, "p", access);
+  if (updates.note !== undefined) appendPastoralAccessCondition(scopeConditions, params, 'p', access?.personalAccess || { accessLevel: 'none' });
 
   const result = await pool.query(
     `UPDATE journey_milestones jm
@@ -1502,64 +1486,34 @@ export async function updateJourneyMilestone(
             updated_at = NOW()
        FROM person_journeys pj, persons p
       WHERE ${scopeConditions.join(" AND ")}
-      RETURNING jm.*`,
+      RETURNING jm.id, jm.status, jm.scheduled_at, jm.completed_at, jm.updated_at`,
     params,
   );
   return result.rows[0] ?? null;
 }
 
 export async function ensurePersonForUser(userId: string) {
-  const user = await pool.query<{
-    id: string;
-    email: string;
-    display_name: string | null;
-    church: string | null;
-  }>(
-    `SELECT id, email, display_name, church FROM users WHERE id = $1 LIMIT 1`,
-    [userId],
-  );
-  const row = user.rows[0];
-  if (!row) return null;
-
-  const existingLink = await pool.query<{ person_id: string }>(
-    `SELECT person_id FROM person_identity_links WHERE user_id = $1 LIMIT 1`,
-    [userId],
-  );
-  if (existingLink.rows[0]) return existingLink.rows[0].person_id;
-
-  const email = normalizeIdentityEmail(row.email);
-  const existingPerson = email
-    ? await pool.query<{ id: string }>(`SELECT id FROM persons WHERE primary_email = $1 LIMIT 1`, [email])
-    : { rows: [] as Array<{ id: string }> };
-
-  let personId = existingPerson.rows[0]?.id;
-  if (!personId) {
-    const created = await pool.query<{ id: string }>(
-      `INSERT INTO persons (display_name, primary_email, church, pastoral_stage, pastoral_status, created_at, updated_at)
-       VALUES ($1, $2, $3, 'member', 'active', NOW(), NOW())
-       RETURNING id`,
-      [row.display_name || row.email.split("@")[0], email, normalizeChurch(row.church)],
-    );
-    personId = created.rows[0].id;
-  }
-
-  await pool.query(
-    `INSERT INTO person_identity_links (
-        person_id, user_id, source_type, source_label, match_method, confidence, is_primary, created_at, updated_at
-      )
-      VALUES ($1, $2, 'user', '會員', 'email', 100, true, NOW(), NOW())
-      ON CONFLICT (user_id) DO UPDATE
-        SET person_id = EXCLUDED.person_id,
-            updated_at = NOW()`,
-    [personId, userId],
-  );
-  return personId;
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    await c.query("SELECT pg_advisory_xact_lock(hashtext('self-person:' || $1))", [userId]);
+    const row = (await c.query('SELECT id,email,display_name,church FROM users WHERE id=$1 FOR SHARE', [userId])).rows[0];
+    if (!row) { await c.query('COMMIT'); return null; }
+    const linked = (await c.query('SELECT COALESCE(p.merged_into_person_id,p.id) AS id FROM person_identity_links l JOIN persons p ON p.id=l.person_id WHERE l.user_id=$1', [userId])).rows[0];
+    if (linked) { await c.query('COMMIT'); return linked.id as string; }
+    const email = normalizeIdentityEmail(row.email);
+    const claimed = email && (await c.query('SELECT id FROM persons WHERE lower(primary_email)=$1', [email])).rowCount;
+    // An entered email is not proof that an unclaimed pastoral profile belongs to this account.
+    const person = (await c.query("INSERT INTO persons(display_name,primary_email,church,pastoral_stage,pastoral_status) VALUES($1,$2,$3,'friend','active') RETURNING id", [row.display_name || row.email.split('@')[0], claimed ? null : email, normalizeChurch(row.church)])).rows[0];
+    await c.query("INSERT INTO person_identity_links(person_id,user_id,source_type,source_label,match_method,confidence,is_primary) VALUES($1,$2,'user','會員','account',100,true)", [person.id,userId]);
+    await c.query('COMMIT'); return person.id as string;
+  } catch (error) { await c.query('ROLLBACK'); throw error; } finally { c.release(); }
 }
 
 export async function getSelfLoveJourney(userId: string) {
   const personId = await ensurePersonForUser(userId);
   if (!personId) return null;
-  const detail = await getPastoralPersonDetail(personId, null, { canViewPersonal: true });
+  const detail = await getPastoralPersonDetail(personId, null, { canViewPersonal: false, self: true, access: { accessLevel: 'self', userId, userIds: [userId] } });
   if (!detail) return null;
   return {
     ...detail,
@@ -1584,14 +1538,25 @@ export async function getSelfLoveJourney(userId: string) {
 export async function startSelfLoveJourney(userId: string) {
   const personId = await ensurePersonForUser(userId);
   if (!personId) return null;
-  await startLoveJourneyForPerson(personId, null, null);
+  await startLoveJourneyForPerson(personId, null, null,undefined,userId);
   return getSelfLoveJourney(userId);
+}
+
+export async function changeSelfJourneyStatus(userId: string, journeyId: string, expectedStatus: 'active' | 'paused', status: 'active' | 'paused') {
+  const personId = await ensurePersonForUser(userId);
+  if (!personId) return null;
+  const result = await pool.query(`UPDATE person_journeys SET status=$4, updated_at=NOW()
+    WHERE id=$1 AND owner_user_id=$2 AND status=$3 RETURNING id,status`, [journeyId,userId,expectedStatus,status]);
+  return result.rows[0] ?? null;
 }
 
 export async function updateSelfJourneyProgress(
   userId: string,
   progressId: string,
   updates: {
+    version: number;
+    visibility?: 'private' | 'pastoral' | 'mentor';
+    mentorContractId?: string;
     status?: string;
     responseText?: string | null;
   },
@@ -1599,9 +1564,18 @@ export async function updateSelfJourneyProgress(
   const personId = await ensurePersonForUser(userId);
   if (!personId) return null;
 
-  const result = await pool.query(
+  const client=await pool.connect();
+  try {
+  await client.query('BEGIN');
+  if(updates.visibility==='mentor'){
+    const allowed=await client.query(`SELECT c.id FROM mentoring_contracts c JOIN journey_progress jp ON jp.person_journey_id=c.journey_id
+      WHERE c.id=$1 AND c.learner_id=$2 AND jp.id=$3 AND c.status='active' AND ${mentoringGroupEligibleSql} FOR SHARE OF c`,[updates.mentorContractId||null,userId,progressId]);
+    if(!allowed.rowCount){await client.query('ROLLBACK');return null;}
+  }
+  const result = await client.query(
     `UPDATE journey_progress jp
-        SET status = COALESCE($3, jp.status),
+        SET version = jp.version + 1, visibility = COALESCE($6, jp.visibility), status = COALESCE($3, jp.status),
+            mentor_contract_id=CASE WHEN $6='mentor' THEN $8::uuid WHEN $6 IS NOT NULL THEN NULL ELSE jp.mentor_contract_id END,
             response_text = COALESCE($4, jp.response_text),
             completed_at = CASE
               WHEN $3 = 'completed' THEN COALESCE(jp.completed_at, NOW())
@@ -1613,20 +1587,27 @@ export async function updateSelfJourneyProgress(
       WHERE jp.id = $1
         AND pj.id = jp.person_journey_id
         AND pj.person_id = $2
-      RETURNING jp.*`,
-    [progressId, personId, updates.status ?? null, updates.responseText ?? null],
+        AND pj.owner_user_id=$9
+        AND jp.version = $5 AND (pj.status = 'active' OR ($7 AND $6 = 'private'))
+      RETURNING jp.id, jp.version, jp.visibility, jp.status, jp.response_text, jp.completed_at, jp.updated_at`,
+    [progressId, personId, updates.status ?? null, updates.responseText ?? null, updates.version, updates.visibility ?? null, updates.status === undefined && updates.responseText === undefined,updates.mentorContractId||null,userId],
   );
+  await client.query('COMMIT');
   return result.rows[0] ?? null;
+  } catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }
 
-export async function listPersonMergeSuggestions(churchScope: string | null): Promise<PersonMergeSuggestion[]> {
+export async function listPersonMergeSuggestions(churchScope: string | null, access?: PastoralAccessFilter): Promise<PersonMergeSuggestion[]> {
   const params: unknown[] = [];
   const conditions = [
     "a.id < b.id",
+    "a.merged_into_person_id IS NULL AND b.merged_into_person_id IS NULL",
     "lower(trim(a.display_name)) = lower(trim(b.display_name))",
     "length(trim(a.display_name)) >= 2",
   ];
   appendChurchCondition(conditions, params, "COALESCE(a.church, b.church)", churchScope);
+  appendPastoralAccessCondition(conditions, params, 'a', access);
+  appendPastoralAccessCondition(conditions, params, 'b', access);
 
   const result = await pool.query<PersonMergeSuggestion>(
     `WITH candidates AS (
@@ -1667,7 +1648,12 @@ export async function listPersonMergeSuggestions(churchScope: string | null): Pr
   return result.rows;
 }
 
-export async function dismissPersonMergeSuggestion(primaryPersonId: string, duplicatePersonId: string) {
+export async function dismissPersonMergeSuggestion(primaryPersonId: string, duplicatePersonId: string, churchScope: string | null) {
+  const params: unknown[] = [[primaryPersonId, duplicatePersonId]];
+  const conditions = ['id=ANY($1::uuid[])', 'merged_into_person_id IS NULL'];
+  appendChurchCondition(conditions, params, 'church', churchScope);
+  const visible = await pool.query(`SELECT id FROM persons WHERE ${conditions.join(' AND ')}`, params);
+  if (visible.rows.length !== 2) return null;
   await pool.query(
     `INSERT INTO person_merge_suggestions (
         primary_person_id, duplicate_person_id, reason, confidence, status, created_at, updated_at
@@ -1679,50 +1665,4 @@ export async function dismissPersonMergeSuggestion(primaryPersonId: string, dupl
     [primaryPersonId, duplicatePersonId],
   );
   return { success: true };
-}
-
-export async function mergePastoralPersons(primaryPersonId: string, duplicatePersonId: string, churchScope: string | null) {
-  const params: unknown[] = [[primaryPersonId, duplicatePersonId]];
-  const conditions = ["id = ANY($1::uuid[])"];
-  appendChurchCondition(conditions, params, "church", churchScope);
-  const visible = await pool.query<{ id: string }>(
-    `SELECT id FROM persons WHERE ${conditions.join(" AND ")}`,
-    params,
-  );
-  if (visible.rows.length < 2) return null;
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query(`UPDATE person_identity_links SET person_id = $1, updated_at = NOW() WHERE person_id = $2`, [primaryPersonId, duplicatePersonId]);
-    await client.query(`UPDATE person_journeys SET person_id = $1, updated_at = NOW() WHERE person_id = $2`, [primaryPersonId, duplicatePersonId]);
-    await client.query(`UPDATE journey_milestones SET person_id = $1, updated_at = NOW() WHERE person_id = $2`, [primaryPersonId, duplicatePersonId]);
-    await client.query(`UPDATE mentor_assignments SET person_id = $1, updated_at = NOW() WHERE person_id = $2`, [primaryPersonId, duplicatePersonId]);
-    await client.query(`UPDATE pastoral_tasks SET person_id = $1, updated_at = NOW() WHERE person_id = $2`, [primaryPersonId, duplicatePersonId]);
-    await client.query(
-      `UPDATE persons p
-          SET notes = concat_ws(E'\n', NULLIF(p.notes, ''), concat('Merged duplicate person ', $2::text, ' at ', NOW()::text)),
-              updated_at = NOW()
-        WHERE p.id = $1`,
-      [primaryPersonId, duplicatePersonId],
-    );
-    await client.query(`DELETE FROM persons WHERE id = $1`, [duplicatePersonId]);
-    await client.query(
-      `INSERT INTO person_merge_suggestions (
-          primary_person_id, duplicate_person_id, reason, confidence, status, created_at, updated_at
-        )
-        VALUES ($1, $2, '已合併', 100, 'merged', NOW(), NOW())
-        ON CONFLICT (primary_person_id, duplicate_person_id) DO UPDATE
-          SET status = 'merged',
-              updated_at = NOW()`,
-      [primaryPersonId, duplicatePersonId],
-    );
-    await client.query("COMMIT");
-    return { success: true, primaryPersonId, duplicatePersonId };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
 }

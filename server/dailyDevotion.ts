@@ -4,6 +4,8 @@ export interface DailyDevotionBrief {
   planName: string;
   dayNumber: number;
   scriptureReference: string;
+  scriptureText?: string;
+  scriptureStatus?: 'ready' | 'unavailable';
   devotionalTitle: string;
   devotionalText: string;
   previewVerses: Array<{ verse: number; text: string }>;
@@ -258,6 +260,7 @@ export function parseMorningBriefHtml(html: string, requestedDate: string): Dail
 }
 
 export async function fetchDailyDevotionBrief(date = taipeiDateString()): Promise<DailyDevotionBrief> {
+  if (process.env.DISABLE_MORNING_BRIEF === '1') throw new Error('External devotion feed disabled in this environment.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new Error("Invalid date format. Expected YYYY-MM-DD.");
   }

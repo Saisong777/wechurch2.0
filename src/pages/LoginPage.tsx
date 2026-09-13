@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { SiGoogle } from 'react-icons/si';
+import { consumeLoginReturn } from '@/lib/loginReturn';
 
 const bibleVerses = [
   '「你們祈求，就給你們；尋找，就尋見；叩門，就給你們開門。」— 馬太福音 7:7',
@@ -60,13 +61,15 @@ const RadialLightSVG = () => (
 const LoginPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const recipeTest = searchParams.get('recipeTest') === 'form-flow' ? 'form-flow' : 'default';
 
   React.useEffect(() => {
     if (!loading && user) {
       localStorage.removeItem('login_redirect');
-      navigate('/', { replace: true });
+      navigate(consumeLoginReturn(searchParams.get('returnTo')), { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, searchParams]);
 
   if (loading) {
     return (
@@ -77,11 +80,14 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1E3A5F] via-[#1a2d5a] to-[#2d1b69] relative overflow-hidden">
+    <div
+      className="login-surface min-h-screen bg-gradient-to-b from-[#1E3A5F] via-[#1a2d5a] to-[#2d1b69] relative overflow-hidden"
+      data-login-recipe={recipeTest}
+    >
       <RadialLightSVG />
 
       <main className="relative z-10 container mx-auto px-4 flex flex-col items-center justify-start min-h-screen pt-16 pb-8">
-        <div className="text-center mb-10">
+        <div className="login-brand-lockup text-center mb-10">
           <div className="mb-4">
             <WeChurchLogo size={64} className="mx-auto" />
           </div>
@@ -117,6 +123,13 @@ const LoginForm: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [staging, setStaging] = useState(false);
+  React.useEffect(() => {
+    let active = true;
+    fetch('/api/deployment', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
+      .then(data => { if (active) setStaging(data?.staging === true); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const randomVerse = useMemo(() => bibleVerses[Math.floor(Math.random() * bibleVerses.length)], []);
 
@@ -178,7 +191,7 @@ const LoginForm: React.FC = () => {
   if (mode === 'forgot') {
     if (resetEmailSent) {
       return (
-        <Card className="w-full rounded-3xl shadow-sheet border-0 bg-white text-foreground">
+        <Card className="login-form-card w-full rounded-3xl shadow-sheet border-0 bg-white text-foreground">
           <CardContent className="py-8 px-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-brand-sky/10 flex items-center justify-center mx-auto">
               <Mail className="w-6 h-6 text-brand-sky" />
@@ -208,7 +221,7 @@ const LoginForm: React.FC = () => {
     }
 
     return (
-      <Card className="w-full rounded-3xl shadow-sheet border-0 bg-white text-foreground">
+      <Card className="login-form-card w-full rounded-3xl shadow-sheet border-0 bg-white text-foreground">
         <CardHeader className="text-center pb-4 pt-8 px-6">
           <CardTitle className="text-xl">忘記密碼</CardTitle>
           <CardDescription>輸入您的電子郵件，我們將發送重設連結</CardDescription>
@@ -263,7 +276,7 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <Card className="w-full rounded-3xl shadow-sheet border-0 bg-white text-foreground">
+    <Card className="login-form-card w-full rounded-3xl shadow-sheet border-0 bg-white text-foreground">
       <CardContent className="py-8 px-6">
         <p className="text-sm italic text-brand-sky mb-4 text-center leading-relaxed" data-testid="text-bible-verse">
           {randomVerse}
@@ -278,7 +291,7 @@ const LoginForm: React.FC = () => {
           </p>
         </div>
 
-        <div className="space-y-3">
+        {!staging && <><div className="space-y-3">
           <Button
             type="button"
             className="w-full h-[52px] rounded-xl font-semibold text-base gap-3 bg-white hover:bg-gray-50 text-brand-indigo border-[1.5px] border-brand-indigo"
@@ -298,6 +311,8 @@ const LoginForm: React.FC = () => {
             <span className="bg-white px-2 text-muted-foreground">或使用電子郵件</span>
           </div>
         </div>
+
+        </>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (

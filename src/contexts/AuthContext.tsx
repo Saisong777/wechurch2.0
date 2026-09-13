@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, createContext, useContext, ReactNode } from 'react';
+import { queryClient } from '@/lib/queryClient';
 
 interface AuthUser {
   id: string;
@@ -31,7 +32,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const SESSION_REFRESH_INTERVAL = 5 * 60 * 1000;
 const AUTH_FAILURE_THRESHOLD = 5; // 5 × 5min = 25min tolerance (handles deploys/network blips)
 
-function mapUserData(userData: any): AuthUser {
+function mapUserData(userData: AuthUser): AuthUser {
+  if (!userData || typeof (userData.legacyUserId || userData.id) !== 'string' || !(userData.legacyUserId || userData.id)) {
+    throw new Error('Invalid session response');
+  }
   return {
     id: userData.legacyUserId || userData.id,
     email: userData.email,
@@ -44,33 +48,57 @@ function mapUserData(userData: any): AuthUser {
     church: userData.church,
     user_metadata: {
       display_name: userData.displayName || (userData.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : undefined),
-      avatar_url: userData.profileImageUrl,
+      avatar_url: userData.profileImageUrl || undefined,
     },
   };
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, updateUser] = useState<AuthUser | null>(null);
+  const accountRef = useRef<string | null>(null);
+  const setUser = useCallback((next: AuthUser | null) => {
+    const account = next?.id || null;
+    if (accountRef.current !== account) queryClient.clear();
+    accountRef.current = account;
+    updateUser(next);
+  }, []);
   const [loading, setLoading] = useState(true);
   const failureCountRef = useRef(0);
   const hadUserRef = useRef(false);
+  const requestRef = useRef(0);
+  const controllerRef = useRef<AbortController>();
+  const authAttemptRef = useRef(0);
+  const changingAuthRef = useRef(false);
 
-  const fetchUser = async (isInitial = false): Promise<AuthUser | null> => {
+  const invalidateRequest = useCallback(() => {
+    requestRef.current += 1;
+    controllerRef.current?.abort();
+  }, []);
+
+  const fetchUser = useCallback(async (isInitial = false): Promise<AuthUser | null> => {
+    invalidateRequest();
+    const request = requestRef.current;
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
       const response = await fetch('/api/auth/user', {
         credentials: 'include',
+        signal: controller.signal,
       });
+      if (request !== requestRef.current) return null;
 
       if (response.ok) {
         const userData = await response.json();
+        if (request !== requestRef.current) return null;
         const authUser = mapUserData(userData);
         setUser(authUser);
         hadUserRef.current = true;
         failureCountRef.current = 0;
         return authUser;
       } else {
-        if (isInitial) {
+        if (isInitial || response.status === 401 || response.status === 403) {
           setUser(null);
+          hadUserRef.current = false;
         } else if (hadUserRef.current) {
           failureCountRef.current += 1;
           if (failureCountRef.current >= AUTH_FAILURE_THRESHOLD) {
@@ -81,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
     } catch (error) {
+      if (request !== requestRef.current || controller.signal.aborted) return null;
       console.warn('[AuthContext] Failed to fetch user:', error);
       if (isInitial) {
         setUser(null);
@@ -93,61 +122,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return null;
     }
-  };
+  }, [invalidateRequest, setUser]);
 
   useEffect(() => {
-    fetchUser(true).finally(() => setLoading(false));
+    let active = true;
+    fetchUser(true).finally(() => { if (active) setLoading(false); });
 
     const interval = setInterval(() => {
-      fetchUser(false);
+      if (!changingAuthRef.current) void fetchUser(false);
     }, SESSION_REFRESH_INTERVAL);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      active = false;
+      clearInterval(interval);
+      invalidateRequest();
+      authAttemptRef.current += 1;
+    };
+  }, [fetchUser, invalidateRequest]);
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const authenticate = async (path: string, body: { email: string; password: string; displayName?: string }, action: string) => {
+    // Serialize account changes; an old refresh must never restore a previous account.
+    if (changingAuthRef.current) return { error: new Error('登入處理中，請稍候') };
+    changingAuthRef.current = true;
+    const attempt = ++authAttemptRef.current;
+    invalidateRequest();
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password, displayName }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        return { error: new Error(data.message || '註冊失敗') };
+        return { error: new Error(data.message || `${action}失敗`) };
       }
 
-      await fetchUser(false);
-      return { error: null };
-    } catch (err) {
-      return { error: new Error('註冊失敗，請稍後重試') };
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      const response = await fetch('/api/auth/email-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        return { error: new Error(data.message || '登入失敗') };
+      if (attempt !== authAttemptRef.current) return { error: new Error('登入已取消') };
+      setUser(null);
+      hadUserRef.current = false;
+      const authenticated = await fetchUser(false);
+      return { error: authenticated ? null : new Error('無法確認登入狀態，請稍後重試') };
+    } catch {
+      return { error: new Error(`${action}失敗，請稍後重試`) };
+    } finally {
+      if (attempt === authAttemptRef.current) {
+        changingAuthRef.current = false;
+        setLoading(false);
       }
-
-      await fetchUser(false);
-      return { error: null };
-    } catch (err) {
-      return { error: new Error('登入失敗，請稍後重試') };
     }
   };
+  const signUp = (email: string, password: string, displayName?: string) => authenticate('/api/auth/register', { email, password, displayName }, '註冊');
+  const signIn = (email: string, password: string) => authenticate('/api/auth/email-login', { email, password }, '登入');
 
   const signOut = async () => {
+    invalidateRequest();
+    authAttemptRef.current += 1;
+    changingAuthRef.current = true;
+    hadUserRef.current = false;
+    setUser(null);
+    queryClient.clear();
     window.location.href = '/api/logout';
   };
 
@@ -155,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{ session, user, loading, signUp, signIn, signOut }}>
-      {children}
+      <React.Fragment key={user?.id || 'signed-out'}>{children}</React.Fragment>
     </AuthContext.Provider>
   );
 };

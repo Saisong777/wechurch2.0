@@ -1,4 +1,4 @@
-import { Dumbbell, BookMarked, QrCode, ClipboardList } from 'lucide-react';
+import { BookMarked, QrCode, ClipboardList } from 'lucide-react';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
 
@@ -48,16 +48,7 @@ export const WeLiveLandingPage = () => {
       <FeaturePortalPage
         title="SoulGym"
         subtitle="靈魂健身房"
-        eyebrow="Bible study flow"
-        description="從加入、分組、分享、查經到 AI 整理，讓一場查經班可以穩定地走完，也留下可以回看的屬靈成果。"
-        icon={Dumbbell}
-        iconTone="bg-primary/15 text-primary"
         actions={actions}
-        moments={[
-          { label: '進場', value: '代碼、QR Code、手機加入' },
-          { label: '現場', value: '分組、抽卡、三步驟查經' },
-          { label: '會後', value: '小組摘要、大組總結、個人筆記' },
-        ]}
       />
     </FeatureGate>
   );

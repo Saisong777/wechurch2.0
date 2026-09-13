@@ -1,10 +1,13 @@
 import React from 'react';
-import { Heart, ImageIcon, PartyPopper, Sparkles } from 'lucide-react';
+import { Heart, ImageIcon, PartyPopper, Sparkles, BookOpen } from 'lucide-react';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
 
 const shareFeatures: Array<FeaturePortalAction & { featureKey: string }> = [
+  {
+    id:'devotion-wall',featureKey:'we_learn',title:'今日靈修牆',subtitle:'看見彼此今日的領受，午夜換日',icon:BookOpen,href:'/devotion-wall',tone:'bg-teal-500/10',iconTone:'text-teal-700',badge:'靈修分享',testId:'link-feature-devotion-wall',
+  },
   {
     id: 'prayer',
     featureKey: 'prayer_wall',
@@ -68,16 +71,7 @@ const SharePage: React.FC = () => {
       <FeaturePortalPage
         title="來禱告"
         subtitle="彼此守望"
-        eyebrow="Prayer and care"
-        description="把需要被記念的事放在一起：可以匿名分享、回應阿門、留下鼓勵，也能在蒙應允時一起感謝。"
-        icon={Heart}
-        iconTone="bg-rose-500/15 text-rose-600"
         actions={enabledFeatures}
-        moments={[
-          { label: '個人', value: '寫下今天需要代禱的事' },
-          { label: '教會', value: '為緊急與小組需要守望' },
-          { label: '恩典', value: '私下記錄神如何回應' },
-        ]}
       />
     </FeatureGate>
   );

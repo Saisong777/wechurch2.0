@@ -79,16 +79,7 @@ const LearnPage = () => {
       <FeaturePortalPage
         title="讀聖經"
         subtitle="學習成長"
-        eyebrow="Word and notes"
-        description="把讀經、靈修、筆記和耶穌生平放在同一個入口，讓個人靈修與小組查經可以接在一起。"
-        icon={BookOpen}
-        iconTone="bg-sky-500/15 text-sky-600"
         actions={enabledFeatures}
-        moments={[
-          { label: '今天', value: '接續讀經與經文收藏' },
-          { label: '查找', value: '快速打開聖經與耶穌時間軸' },
-          { label: '沉澱', value: '筆記、心得、查經紀錄' },
-        ]}
       />
     </FeatureGate>
   );

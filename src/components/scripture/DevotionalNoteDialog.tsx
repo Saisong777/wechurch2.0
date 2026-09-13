@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useAuth } from '@/contexts/AuthContext';
+import { saveDevotionalNote, noteSaveMessage } from '@/lib/saveDevotionalNote';
 import {
   createLocalDevotionalNoteId,
   findLocalDevotionalNoteById,
   findLocalDevotionalNoteByReference,
-  upsertLocalDevotionalNote,
   type LocalDevotionalNote,
 } from '@/lib/localDevotionalNotes';
 import {
@@ -23,6 +24,14 @@ import {
 } from 'lucide-react';
 import { parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
 import type { InsightCategory } from '@/types/spiritual-fitness';
+import { DevotionWallShareDialog } from './DevotionWallShareDialog';
+import type { DevotionShareDraft } from '@shared/devotionWall';
+import { createDevotionShareDraft } from '@/lib/devotionShareDraft';
+import { LeaveConfirmation, UnsavedChangesGuard } from '@/components/layout/UnsavedChangesGuard';
+import { DeviceDraft } from '@/components/layout/DeviceDraft';
+import { clearDeviceDraft } from '@/lib/deviceDraft';
+import { z } from 'zod';
+import { NoteConflictReview } from './NoteConflictReview';
 
 interface DevotionalNoteDialogProps {
   open: boolean;
@@ -55,6 +64,11 @@ const emptyForm: FormFields = {
 };
 
 const RECEIVE_KEY: InsightCategory = 'GOD_ATTRIBUTE';
+const formSchema = z.object({
+  titlePhrase:z.string(),heartbeatVerse:z.string(),observation:z.string(),
+  coreInsightCategory:z.array(z.enum(['PROMISE','COMMAND','WARNING','GOD_ATTRIBUTE'])),
+  coreInsightNote:z.record(z.string()),scholarsNote:z.string(),actionPlan:z.string(),coolDownNote:z.string(),
+});
 
 const applyNoteToForm = (
   note: LocalDevotionalNote,
@@ -87,14 +101,29 @@ export function DevotionalNoteDialog({
   noteId,
 }: DevotionalNoteDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const userId = user?.id || '';
+  const draftScope = `devotional:${noteId || verseReference}`;
+  const discardDraft = () => { try { clearDeviceDraft(userId,draftScope); } catch { /* Keep the current form recoverable. */ } };
   const [form, setForm] = useState<FormFields>(emptyForm);
+  const [baseline, setBaseline] = useState<FormFields>(emptyForm);
+  const [confirmClose, setConfirmClose] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
+  const [loadedNote, setLoadedNote] = useState<LocalDevotionalNote | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [displayReference, setDisplayReference] = useState(verseReference);
   const [displayText, setDisplayText] = useState(verseText);
+  const [shareDraft,setShareDraft] = useState<DevotionShareDraft|null>(null);
+  const dirty = open && JSON.stringify(form) !== JSON.stringify(baseline);
+  const loadForm = useCallback((value: FormFields) => { setForm(value); setBaseline(value); }, []);
+  const requestOpenChange = (next: boolean) => {
+    if (!next && isSaving) { toast({ title: '正在儲存，請稍候' }); return; }
+    if (!next && dirty) { setConfirmClose(true); return; }
+    onOpenChange(next);
+  };
 
   const updateField = useCallback(<K extends keyof FormFields>(key: K, value: FormFields[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -106,9 +135,12 @@ export function DevotionalNoteDialog({
   }, [verseReference, verseText]);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || !userId) {
       setForm(emptyForm);
+      setBaseline(emptyForm);
+      setConfirmClose(false);
       setExistingId(null);
+      setLoadedNote(null);
       return;
     }
 
@@ -116,16 +148,25 @@ export function DevotionalNoteDialog({
 
     let cancelled = false;
     setIsLoading(true);
+    setForm(emptyForm);
+    setBaseline(emptyForm);
+    setExistingId(null);
+    setLoadedNote(null);
 
     const url = noteId
       ? `/api/devotional-notes/${noteId}`
       : `/api/devotional-notes/by-reference?ref=${encodeURIComponent(verseReference)}`;
 
     const localNote = noteId
-      ? findLocalDevotionalNoteById(noteId)
-      : findLocalDevotionalNoteByReference(verseReference);
+      ? findLocalDevotionalNoteById(noteId, userId)
+      : findLocalDevotionalNoteByReference(verseReference, userId);
     if (localNote) {
-      applyNoteToForm(localNote, setExistingId, setDisplayReference, setDisplayText, setForm);
+      setLoadedNote(localNote);
+      applyNoteToForm(localNote, setExistingId, setDisplayReference, setDisplayText, loadForm);
+    }
+    if (noteId?.startsWith('local-devotional-')) {
+      setIsLoading(false);
+      return;
     }
 
     fetch(url, { credentials: 'include' })
@@ -134,8 +175,9 @@ export function DevotionalNoteDialog({
         return res.json();
       })
       .then((data) => {
-        if (cancelled || !data) return;
-        applyNoteToForm(data, setExistingId, setDisplayReference, setDisplayText, setForm);
+        if (cancelled || !data || data.userId !== userId || (localNote && localNote.syncStatus !== 'synced')) return;
+        setLoadedNote(data);
+        applyNoteToForm(data, setExistingId, setDisplayReference, setDisplayText, loadForm);
       })
       .catch(() => {})
       .finally(() => {
@@ -145,9 +187,13 @@ export function DevotionalNoteDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, verseReference, noteId]);
+  }, [open, verseReference, noteId, userId, loadForm]);
 
-  const handleSave = async () => {
+  const handleSave = async (share = false) => {
+    if (!userId) {
+      toast({ title: '請先登入', variant: 'destructive' });
+      return;
+    }
     setIsSaving(true);
     try {
       const { coreInsightCategory, coreInsightNote, ...rest } = form;
@@ -157,44 +203,34 @@ export function DevotionalNoteDialog({
         coreInsightNote: serializeNotes(coreInsightNote),
       };
 
-      let savedNote: LocalDevotionalNote;
-      try {
-        if (existingId && !existingId.startsWith('local-devotional-')) {
-          const response = await apiRequest('PATCH', `/api/devotional-notes/${existingId}`, payload);
-          savedNote = await response.json();
-        } else {
-          const response = await apiRequest('POST', '/api/devotional-notes', {
-            verseReference: displayReference,
-            verseText: displayText,
-            readingPlanId: null,
-            dayNumber: null,
-            ...payload,
-          });
-          savedNote = await response.json();
-        }
-      } catch {
-        const now = new Date().toISOString();
-        savedNote = {
-          id: existingId || createLocalDevotionalNoteId(),
-          verseReference: displayReference,
-          verseText: displayText,
-          readingPlanId: null,
-          dayNumber: null,
-          createdAt: now,
-          updatedAt: now,
-          ...payload,
-        };
-      }
-
-      upsertLocalDevotionalNote(savedNote);
+      const now = new Date().toISOString();
+      const previous = loadedNote || (existingId ? findLocalDevotionalNoteById(existingId, userId) : null);
+      const result = await saveDevotionalNote(userId, {
+        ...previous,
+        id: existingId || createLocalDevotionalNoteId(),
+        verseReference: displayReference,
+        verseText: displayText,
+        readingPlanId: previous?.readingPlanId || null,
+        dayNumber: previous?.dayNumber ?? null,
+        createdAt: previous?.createdAt || now,
+        updatedAt: now,
+        ...payload,
+      });
+      const savedNote = result.note;
+      setBaseline(form);
       setExistingId(savedNote.id);
-      queryClient.setQueryData<LocalDevotionalNote[]>(['/api/devotional-notes'], (current = []) => [
+      setLoadedNote(savedNote);
+      queryClient.setQueryData<LocalDevotionalNote[]>(['/api/devotional-notes', userId], (current = []) => [
         savedNote,
         ...current.filter((note) => note.id !== savedNote.id),
       ]);
       queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
-      toast({ title: '已儲存', description: '靈修筆記已成功儲存' });
-      onOpenChange(false);
+      toast({ title: noteSaveMessage(result.status), variant: result.status === 'blocked' ? 'destructive' : 'default' });
+      if (result.status === 'synced') {
+        discardDraft();
+        if(share)setShareDraft(createDevotionShareDraft(savedNote));
+        else onOpenChange(false);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '儲存失敗';
       toast({ title: '儲存失敗', description: message, variant: 'destructive' });
@@ -244,7 +280,9 @@ export function DevotionalNoteDialog({
   const progressPercent = Math.round((filledFields / 3) * 100);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <><UnsavedChangesGuard dirty={dirty || (open && isSaving)} onDiscard={discardDraft} />
+    <LeaveConfirmation open={confirmClose} onStay={() => setConfirmClose(false)} onLeave={() => { discardDraft(); setConfirmClose(false); onOpenChange(false); }} />
+    <Sheet open={open && !shareDraft} onOpenChange={requestOpenChange}>
       <SheetContent
         side="right"
         className="w-full sm:w-[500px] sm:max-w-[500px] overflow-y-auto"
@@ -255,6 +293,7 @@ export function DevotionalNoteDialog({
             <BookMarked className="w-5 h-5 text-primary shrink-0" />
             靈修筆記
           </SheetTitle>
+          <SheetDescription className="sr-only">個人靈修筆記；只有確認分享的內容才會公開。</SheetDescription>
         </SheetHeader>
 
         {isLoading ? (
@@ -263,6 +302,13 @@ export function DevotionalNoteDialog({
           </div>
         ) : (
           <div className="space-y-4 pb-24">
+            {loadedNote && <NoteConflictReview key={`${userId}:${loadedNote.id}`} note={loadedNote} owner={userId} busy={isSaving} onRebase={cloud => {
+              setLoadedNote({ ...cloud, syncStatus: 'synced' });
+              setExistingId(cloud.id);
+              setBaseline(emptyForm);
+              toast({ title: '目前輸入已保留，請再次儲存以同步' });
+            }} />}
+            <DeviceDraft<FormFields> key={`${userId}:${draftScope}`} owner={userId} scope={draftScope} revision={loadedNote?.version ?? null} value={form} dirty={dirty} busy={isSaving} schema={formSchema} restore={value=>setForm(value)} preview={value => <>{value.observation}{'\n\n'}{Object.values(value.coreInsightNote).join('\n')}{'\n\n'}{value.actionPlan}</>} />
             <div className="rounded-md bg-muted/50 p-3 space-y-1">
               <p className="text-xs font-medium text-muted-foreground">經文</p>
               <p className="font-serif font-semibold text-sm" data-testid="text-verse-reference">
@@ -294,6 +340,7 @@ export function DevotionalNoteDialog({
               <Label htmlFor="dn-observation" className="sr-only">看見</Label>
               <AutoResizeTextarea
                 id="dn-observation"
+                disabled={isSaving}
                 data-testid="textarea-observation"
                 value={form.observation}
                 onChange={(e) => updateField('observation', e.target.value)}
@@ -314,6 +361,7 @@ export function DevotionalNoteDialog({
               <Label htmlFor="dn-receiving" className="sr-only">領受</Label>
               <AutoResizeTextarea
                 id="dn-receiving"
+                disabled={isSaving}
                 data-testid="textarea-core-insight-note-GOD_ATTRIBUTE"
                 value={receivingValue}
                 onChange={(e) => handleReceivingChange(e.target.value)}
@@ -334,6 +382,7 @@ export function DevotionalNoteDialog({
               <Label htmlFor="dn-actionPlan" className="sr-only">回應</Label>
               <AutoResizeTextarea
                 id="dn-actionPlan"
+                disabled={isSaving}
                 data-testid="textarea-action-plan"
                 value={form.actionPlan}
                 onChange={(e) => updateField('actionPlan', e.target.value)}
@@ -345,7 +394,7 @@ export function DevotionalNoteDialog({
             </section>
 
             <Button
-              onClick={handleSave}
+              onClick={()=>handleSave()}
               disabled={isSaving}
               className="w-full"
               data-testid="button-save-devotional-note"
@@ -359,6 +408,8 @@ export function DevotionalNoteDialog({
                 '儲存'
               )}
             </Button>
+
+            <Button variant="outline" className="w-full" disabled={isSaving} onClick={()=>handleSave(true)}>儲存並預覽公開分享</Button>
 
             {existingId && (
               <Button
@@ -397,5 +448,6 @@ export function DevotionalNoteDialog({
         )}
       </SheetContent>
     </Sheet>
+    {shareDraft && <DevotionWallShareDialog draft={shareDraft} close={()=>setShareDraft(null)} />}</>
   );
 }

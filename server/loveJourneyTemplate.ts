@@ -22,15 +22,14 @@ export const LOVE_JOURNEY_MILESTONES = {
 } as const;
 
 export function buildLoveJourneyTemplateSeed() {
+  const days: readonly ((typeof LOVE_JOURNEY_DAYS)[number] & { milestoneKey?: keyof typeof LOVE_JOURNEY_MILESTONES })[] = LOVE_JOURNEY_DAYS;
   return {
     template: LOVE_JOURNEY_TEMPLATE,
-    days: LOVE_JOURNEY_DAYS,
-    milestones: LOVE_JOURNEY_DAYS
-      .filter((day) => day.milestoneKey)
-      .map((day) => ({
-        milestoneKey: day.milestoneKey!,
-        title: LOVE_JOURNEY_MILESTONES[day.milestoneKey! as keyof typeof LOVE_JOURNEY_MILESTONES],
+    days,
+    milestones: days.flatMap((day) => day.milestoneKey ? [{
+        milestoneKey: day.milestoneKey,
+        title: LOVE_JOURNEY_MILESTONES[day.milestoneKey],
         dayNumber: day.dayNumber,
-      })),
+      }] : []),
   };
 }

@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { useSession } from '@/contexts/SessionContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { joinSession, findSmallestGroup, assignLatecomerToGroup } from '@/lib/api-helpers';
+import { joinSession, assignLatecomerToGroup } from '@/lib/api-helpers';
 import { Users, Mail, User as UserIcon, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -78,14 +78,11 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
         const isLatecomer = ['grouping', 'verification', 'studying'].includes(sessionStatus) && !joinedUser.groupNumber;
 
         if (isLatecomer) {
-          const smallestGroup = await findSmallestGroup(currentSession.id, location);
-          if (smallestGroup) {
-            const assigned = await assignLatecomerToGroup(joinedUser.id, smallestGroup, currentSession.id, email);
-            if (assigned) {
-              joinedUser.groupNumber = smallestGroup;
-              toast.success(`歡迎加入！您已被分配到第 ${smallestGroup} 組`);
-            }
-          }
+          const assignedGroup = await assignLatecomerToGroup(joinedUser.id, currentSession.id);
+          if (assignedGroup) {
+            joinedUser.groupNumber = assignedGroup;
+            toast.success(`歡迎加入！您已被分配到第 ${assignedGroup} 組`);
+          } else toast.info('已加入，請等候主持人分組');
         }
 
         setCurrentUser(joinedUser);
@@ -100,7 +97,7 @@ export const JoinForm: React.FC<JoinFormProps> = ({ onJoined }) => {
       }
     } catch (error) {
       console.error('[JoinForm] Error during join:', error);
-      toast.error('加入失敗，請重試');
+      toast.error(error instanceof Error ? error.message : '加入失敗，請重試');
     }
     
     setIsLoading(false);

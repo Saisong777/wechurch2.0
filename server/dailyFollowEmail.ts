@@ -1,7 +1,9 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { CareContact, DevotionalNote, Prayer, User } from "@shared/schema";
 import { careContacts, userEmailPreferences } from "@shared/schema";
-import { getChurchReadingForToday } from "../src/lib/churchReading";
+import { getManagedChurchDevotion } from './churchDevotionRepository';
+import { managedDevotionBrief } from './churchDevotionPublic';
+import { withDevotionScripture } from './devotionScripture';
 import { db } from "./db";
 import { sendEmail } from "./resend";
 import { storage } from "./storage";
@@ -98,7 +100,9 @@ export interface DailyFollowEmail {
 }
 
 export async function buildDailyFollowEmail(user: User, date = new Date()): Promise<DailyFollowEmail> {
-  const reading = getChurchReadingForToday(date);
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+  const schedule = await getManagedChurchDevotion(day);
+  const reading = await withDevotionScripture(managedDevotionBrief(day, schedule.entry), (book, chapter) => storage.getBibleVerses(book, chapter));
   const [devotionalNote, prayers, contacts] = await Promise.all([
     storage.getDevotionalNoteByVerseReference(user.id, reading.scriptureReference),
     getPrayerWallItems(),

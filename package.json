@@ -4,6 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "staging:check": "tsx scripts/railway-staging.mjs check",
+    "staging:backup": "tsx scripts/railway-staging.mjs backup",
+    "staging:backup:encrypted": "node scripts/seal-staging-backup.mjs",
+    "staging:migrate": "tsx scripts/railway-staging.mjs migrate",
+    "staging:deploy": "tsx scripts/railway-staging.mjs deploy",
+    "staging:release:record": "node scripts/record-staging-release.mjs",
+    "staging:verify": "node scripts/verify-staging-live.mjs",
+    "test:b": "npm run staging:verify",
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
@@ -12,21 +20,19 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:local": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:migrate",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "test:deployment": "node --test scripts/railway-staging-content.test.mjs scripts/backup-envelope.test.mjs",
+    "test:integrity": "node scripts/verify-integrity.mjs",
+    "check": "npm run typecheck && npm test && npm run test:deployment && npm run lint && npm run build",
     "lint:strict": "eslint . --max-warnings=0",
     "test": "vitest run --environment node --pool forks --maxWorkers=1",
     "test:watch": "vitest",
-    "local:prod": "NODE_ENV=production PORT=${PORT:-5099} SESSION_SECRET=${SESSION_SECRET:-local-prod-session-secret} LOCAL_INSECURE_COOKIES=${LOCAL_INSECURE_COOKIES:-1} DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev} tsx server/index.ts",
-    "local:verify": "node scripts/local-verify.cjs",
-    "preview:mobile": "node scripts/mobile-preview.cjs",
-    "safe:check": "npm run build && npm test && npm audit && npm run local:verify",
-    "audit:mobile": "node scripts/mobile-smoke.cjs",
-    "audit:soulgym-load": "node scripts/soulgym-load-test.cjs",
+    "safe:check": "npm run build && npm test && npm audit",
     "local:db": "cat compose.yml | docker compose -f - up -d db",
     "local:db:wait": "until cat compose.yml | docker compose -f - exec -T db pg_isready -U postgres -d wechurch_dev; do sleep 1; done",
     "local:db:down": "cat compose.yml | docker compose -f - down",
     "local:db:reset": "cat compose.yml | docker compose -f - down -v && cat compose.yml | docker compose -f - up -d db && npm run local:db:wait && DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:push",
     "db:push:local": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:push",
-    "safe:check:full": "npm run local:db && npm run local:db:wait && npm run db:push:local && DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run safe:check",
     "content:export": "node scripts/content-export.cjs",
     "content:export:railway": "railway run --service Postgres sh -c 'DATABASE_URL=\"$DATABASE_PUBLIC_URL\" node scripts/content-export.cjs'",
     "content:import:local": "DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev} node scripts/content-import.cjs",
@@ -38,7 +44,9 @@
     "soulgym:sync:local": "npm run soulgym:export:railway && npm run local:db && npm run local:db:wait && npm run db:push:local && npm run soulgym:import:local && npm run local:admin-password",
     "local:admin-password": "DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev} node scripts/local-admin-password.cjs",
     "love-journey:sync": "node scripts/sync-love-journey-template.cjs",
-    "love-journey:sync:check": "node scripts/sync-love-journey-template.cjs --check"
+    "love-journey:sync:check": "node scripts/sync-love-journey-template.cjs --check",
+    "pastoral-os:index": "node pastoral-os/scripts/validate-content.mjs --write",
+    "pastoral-os:validate": "node pastoral-os/scripts/validate-content.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -91,7 +99,8 @@
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
-    "esbuild": "^0.27.2",
+    "esbuild": "^0.28.1",
+    "exceljs": "4.4.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "framer-motion": "^11.18.2",
@@ -149,6 +158,8 @@
     "ws": "^8.20.0"
   },
   "overrides": {
-    "esbuild": "^0.27.2"
+    "exceljs": { "uuid": "11.1.1" },
+    "esbuild": "^0.28.1",
+    "brace-expansion@^1.1.7": "1.1.18"
   }
 }

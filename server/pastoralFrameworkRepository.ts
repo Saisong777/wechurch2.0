@@ -263,13 +263,15 @@ export async function seedPastoralFramework153() {
   return { stageCount: stageIds.size };
 }
 
-export async function getPastoralFrameworkOverview(churchScope: string | null): Promise<{
+export async function getPastoralFrameworkOverview(churchScope: string | null, access?: import('./pastoralAccess').PastoralAccessFilter): Promise<{
   stages: PastoralFrameworkStageSummary[];
   sources: PastoralFrameworkSource[];
 }> {
   const params: unknown[] = [];
   const personConditions = ["p.pastoral_status <> 'inactive'"];
   appendChurchCondition(personConditions, params, "p.church", churchScope);
+  const { appendPastoralAccessCondition } = await import('./pastoralAccess');
+  appendPastoralAccessCondition(personConditions, params, 'p', access);
 
   const stageCountsResult = await pool.query<{ slug: string; count: number }>(
     `SELECT

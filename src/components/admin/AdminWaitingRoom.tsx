@@ -14,6 +14,7 @@ import { SessionQRCode } from './SessionQRCode';
 import { StressTestSimulator } from './StressTestSimulator';
 import { getSessionJoinUrl } from '@/lib/url-helpers';
 import { MeetingFlowGuide } from './MeetingFlowGuide';
+import { RestoreParticipantAccess } from './RestoreParticipantAccess';
 
 // Fetch participants from Express API
 const fetchParticipantsFromAPI = async (sessionId: string): Promise<User[]> => {
@@ -383,6 +384,7 @@ export const AdminWaitingRoom: React.FC<AdminWaitingRoomProps> = ({ onGroupingCo
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm sm:text-base truncate">{user.name}</p>
+                          <RestoreParticipantAccess participantId={user.id} name={user.name} />
                           <p className="text-xs text-muted-foreground">
                             {user.gender === 'male' ? '男' : '女'}
                             {locationCount === 1 && user.location !== 'On-site' && ` • ${user.location}`}

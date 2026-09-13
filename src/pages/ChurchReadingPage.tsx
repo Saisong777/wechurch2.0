@@ -1,38 +1,90 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { BookOpen, Briefcase, CalendarDays, CheckCircle2, Clock, HandHeart, Heart, PenLine, Sparkles } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { BookOpen, Briefcase, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Clock, HandHeart, Heart, PenLine, Sparkles } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
-import { FeatureGate } from '@/components/ui/feature-gate';
 import { fetchChurchReadingForToday, getChurchReadingForToday } from '@/lib/churchReading';
+import type { ChurchReadingSummary } from '@/lib/churchReading';
+
+function ScriptureSection({ reading, retry }: { reading: ChurchReadingSummary; retry: () => void }) {
+  const location = useLocation();
+  const expansionKey = `wechurch:reading-expanded:${location.key}:${reading.date}:${reading.scriptureReference}`;
+  const [expanded, setExpanded] = useState(() => {
+    try { return sessionStorage.getItem(expansionKey) === 'true'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(expansionKey, String(expanded)); } catch { /* Storage may be disabled. */ }
+  }, [expanded, expansionKey]);
+  const contentId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const canCollapse = reading.previewVerses.length > 2 || Boolean(reading.scriptureText);
+  const verses = expanded ? reading.previewVerses : reading.previewVerses.slice(0, 2);
+  const collapseFromEnd = () => {
+    setExpanded(false);
+    toggleRef.current?.focus({ preventScroll: true });
+    toggleRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
+  };
+
+  return (
+    <section aria-label="今日經文" className="space-y-2 rounded-lg bg-primary/5 p-3" data-testid="daily-scripture-full">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 className="min-w-0 break-words text-base font-semibold">{reading.scriptureReference}</h2>
+        {canCollapse && <Button ref={toggleRef} variant="ghost" size="sm" className="min-h-11 shrink-0" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(!expanded)}>
+          {expanded ? <ChevronUp className="mr-1 h-4 w-4" aria-hidden="true" /> : <ChevronDown className="mr-1 h-4 w-4" aria-hidden="true" />}
+          {expanded ? '收起經文' : '展開經文'}
+        </Button>}
+      </div>
+      {reading.scriptureStatus === 'unavailable' && <div role="status" className="flex flex-wrap items-center gap-2 text-sm"><p>經文暫時無法載入。</p><Button variant="outline" size="sm" onClick={retry}>重新載入經文</Button></div>}
+      <div id={contentId} className="space-y-2">
+        {reading.scriptureText && <p className={`whitespace-pre-wrap text-[16px] leading-8 text-foreground ${expanded ? '' : 'line-clamp-4'}`}>{reading.scriptureText}</p>}
+        {!reading.scriptureText && !reading.previewVerses.length && <Link to="/learn/bible" className="text-sm font-medium text-primary">在聖經中閱讀：{reading.scriptureReference}</Link>}
+        {verses.map((verse) => (
+          <p key={verse.verse} className="text-[16px] leading-8 text-foreground" data-testid={`daily-verse-${verse.verse}`}>
+            <sup className="mr-2 text-xs text-muted-foreground">{verse.verse}</sup>{verse.text}
+          </p>
+        ))}
+      </div>
+      {expanded && canCollapse && <Button variant="ghost" size="sm" className="min-h-11" aria-expanded={expanded} aria-controls={contentId} onClick={collapseFromEnd}>
+        <ChevronUp className="mr-1 h-4 w-4" aria-hidden="true" />收起經文
+      </Button>}
+    </section>
+  );
+}
 
 const ChurchReadingPage = () => {
   const fallbackReading = useMemo(() => getChurchReadingForToday(), []);
-  const { data: syncedReading, isLoading } = useQuery({
+  const { data: syncedReading, isLoading, isError, refetch } = useQuery({
     queryKey: ['/api/church-reading/today'],
     queryFn: () => fetchChurchReadingForToday(),
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000,
     retry: 1,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 30000,
   });
   const reading = syncedReading || fallbackReading;
   const [noteOpen, setNoteOpen] = useState(false);
-  const verseText = reading.previewVerses.map((verse) => `${verse.verse} ${verse.text}`).join('\n');
+  const verseText = reading.scriptureText || reading.previewVerses.map((verse) => `${verse.verse} ${verse.text}`).join('\n');
   const displayedDate = reading.date
     ? new Date(`${reading.date}T00:00:00`).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' })
     : '今天';
 
   return (
-    <FeatureGate featureKey="daily_devotion_beta" title="每日靈修 beta 測試中" description="每日靈修目前只開放給 beta 同工">
       <div className="min-h-screen bg-brand-warm">
       <Header variant="compact" title="每日靈修" backTo="/" />
 
       <main className="mx-auto max-w-2xl px-3 py-3 sm:px-4 sm:py-5">
+        <Link to="/groups" className="mb-3 inline-flex min-h-11 items-center text-sm font-medium text-primary">與小組一起讀經</Link>
         <section className="space-y-3">
+          {isLoading ? <p role="status" className="py-8">正在載入教會靈修課表…</p> : isError ? (
+            <div role="alert" className="space-y-3 py-8"><p>暫時無法取得教會靈修課表。</p><Button variant="outline" onClick={() => refetch()}>重新載入</Button></div>
+          ) : reading.sourceStatus === 'unpublished' ? (
+            <div className="space-y-3 py-8"><h1 className="text-xl font-semibold">{reading.devotionalTitle}</h1><p className="text-sm text-muted-foreground">{displayedDate}</p><Button asChild variant="outline"><Link to="/learn/bible">閱讀聖經</Link></Button></div>
+          ) : <>
+          {reading.sourceStatus === 'fallback' && <p role="status" className="text-sm text-muted-foreground">目前顯示備用內容，非已發佈的教會課表。</p>}
           <Card className="overflow-hidden rounded-lg border-primary/15 bg-white/95 shadow-sm">
             <CardContent className="p-0">
               <div className="border-b bg-primary/5 p-4">
@@ -77,13 +129,7 @@ const ChurchReadingPage = () => {
                   </div>
                 )}
 
-                <div className="space-y-2 rounded-lg bg-primary/5 p-3">
-                  {reading.previewVerses.map((verse) => (
-                    <p key={verse.verse} className="text-[16px] leading-8 text-foreground">
-                      {verse.text}
-                    </p>
-                  ))}
-                </div>
+                <ScriptureSection key={`${reading.date}:${reading.scriptureReference}`} reading={reading} retry={() => refetch()} />
 
                 <div className="rounded-lg border border-sky-100 bg-sky-50/80 p-3">
                   <div className="mb-2 flex items-center gap-2">
@@ -91,7 +137,7 @@ const ChurchReadingPage = () => {
                     <p className="text-sm font-semibold text-foreground">靈修短文</p>
                   </div>
                   <h2 className="text-base font-bold text-foreground">{reading.devotionalTitle}</h2>
-                  <p className="mt-2 text-[15px] leading-7 text-muted-foreground">
+                  <p className="mt-2 whitespace-pre-wrap text-[15px] leading-7 text-muted-foreground">
                     {reading.devotionalText}
                   </p>
                 </div>
@@ -164,17 +210,17 @@ const ChurchReadingPage = () => {
               </div>
             </CardContent>
           </Card>
+          </>}
         </section>
       </main>
 
       <DevotionalNoteDialog
-        open={noteOpen}
+        open={noteOpen && !isError && reading.sourceStatus !== 'unpublished'}
         onOpenChange={setNoteOpen}
         verseReference={reading.scriptureReference}
         verseText={verseText}
       />
       </div>
-    </FeatureGate>
   );
 };
 
