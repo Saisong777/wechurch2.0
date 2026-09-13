@@ -64,6 +64,7 @@ const WePlayPage = lazyNamed(() => import("./pages/WePlayPage"), "WePlayPage");
 const IcebreakerPage = lazyNamed(() => import("./pages/IcebreakerPage"), "IcebreakerPage");
 const GrouperPage = lazyNamed(() => import("./pages/GrouperPage"), "GrouperPage");
 const PrayerWallPage = lazyPage(() => import("./pages/PrayerWallPage"));
+const PublicWallsPage = lazyPage(() => import('./pages/PublicWallsPage'));
 const DevotionWallPage = lazyPage(() => import("./pages/DevotionWallPage"));
 const MessageCardPage = lazyPage(() => import("./pages/MessageCardPage"));
 const SharePage = lazyPage(() => import("./pages/SharePage"));
@@ -126,6 +127,7 @@ const router = createBrowserRouter([{ path: '*', element: (
                     <Route path="/play/bible-quiz" element={<BibleQuizPage />} />
                     <Route path="/play/disciple-quiz" element={<DiscipleQuizPage />} />
                     <Route path="/prayer-wall" element={<PrayerWallPage />} />
+                    <Route path="/walls" element={<PublicWallsPage />} />
                     <Route path="/devotion-wall" element={<DevotionWallPage />} />
                     <Route path="/card" element={<MessageCardPage />} />
                     <Route path="/share" element={<SharePage />} />

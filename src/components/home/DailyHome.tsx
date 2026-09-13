@@ -100,8 +100,7 @@ export function DailyHome({
         ) : <p className="mt-3 text-sm text-muted-foreground">目前沒有正在等候的禱告。</p>}
         <div className="mt-2 flex flex-wrap gap-x-5">
           <Link to="/grace-record" className={quietLink}>禱告與恩典紀錄</Link>
-          <Link to="/prayer-wall" className={quietLink}>禱告牆</Link>
-          <Link to="/prayer-meeting" className={quietLink}>禱告會</Link>
+          <Link to="/walls" className={quietLink}>分享牆</Link>
         </div>
       </section>
 

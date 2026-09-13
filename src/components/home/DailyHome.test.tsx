@@ -31,9 +31,10 @@ describe('daily homepage', () => {
   it('preserves destinations without the redundant module cards', () => {
     const { container } = show({ showAdmin: true });
     const hrefs = [...container.querySelectorAll('a')].map(link => link.getAttribute('href'));
-    for (const href of ['/learn/church-reading', '/learn/my-notes', '/grace-record', '/prayer-wall', '/prayer-meeting', '/care', '/play', '/admin']) {
+    for (const href of ['/learn/church-reading', '/learn/my-notes', '/grace-record', '/walls', '/care', '/play', '/admin']) {
       expect(hrefs).toContain(href);
     }
+    expect(hrefs).not.toContain('/prayer-meeting');
   });
 
   it.each(['pending', 'blocked'] as const)('keeps %s draft visible and editable', syncStatus => {

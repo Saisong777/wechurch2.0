@@ -1,4 +1,4 @@
-import { Book, Calendar, BookOpen, BookMarked } from 'lucide-react';
+import { Book, BookOpen, BookMarked } from 'lucide-react';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
@@ -27,30 +27,6 @@ const features: Array<FeaturePortalAction & { featureKey: string }> = [
     iconTone: 'text-primary',
     badge: '今天',
     testId: 'link-feature-church-reading',
-  },
-  {
-    id: 'reading-plans',
-    featureKey: 'reading_plans',
-    title: '接續讀經',
-    subtitle: '每天打開就能接著讀',
-    icon: BookOpen,
-    href: '/learn/reading-plans',
-    tone: 'bg-emerald-500/15',
-    iconTone: 'text-emerald-600',
-    badge: '每日',
-    testId: 'link-feature-reading-plans',
-  },
-  {
-    id: 'jesus-timeline',
-    featureKey: 'jesus_timeline',
-    title: '看耶穌四季',
-    subtitle: '用時間軸看耶穌生平事件',
-    icon: Calendar,
-    href: '/learn/jesus-timeline',
-    tone: 'bg-amber-500/15',
-    iconTone: 'text-amber-600',
-    badge: '認識耶穌',
-    testId: 'link-feature-jesus-timeline',
   },
   {
     id: 'my-notes',
