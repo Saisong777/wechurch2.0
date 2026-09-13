@@ -49,7 +49,7 @@ export function MobileNavigation() {
       <MobileNavLinks placement="header" onNavigate={() => setOpen(false)} />
       <div className="mx-auto grid max-w-xl grid-cols-3 gap-1 border-t border-border p-2">
         {([{ href: '/care', label: '關懷', icon: HandHeart }, { href: '/me', label: '個人設定', icon: UserRound }, { href: '/play', label: '工具', icon: Wrench }]).map(item => <Link
-          key={item.href} to={item.href} onClick={() => setOpen(false)} aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? 'page' : undefined}
+          key={item.href} to={item.href} data-testid={`mobile-menu-${item.href.slice(1)}`} onClick={() => setOpen(false)} aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? 'page' : undefined}
           className="flex min-h-12 items-center justify-center gap-1 rounded-md text-sm text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring">
           <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />{item.label}
         </Link>)}

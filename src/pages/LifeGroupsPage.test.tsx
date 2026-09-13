@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import LifeGroupsPage from './LifeGroupsPage';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'member' }, loading: false }) }));
+vi.mock('@/components/layout/Header', () => ({ Header: ({ title }: { title: string }) => <header data-testid="shared-header">{title}</header> }));
 const clients: QueryClient[] = [];
 beforeEach(() => {
   vi.spyOn(crypto, 'randomUUID').mockImplementation(function (this: Crypto) {
@@ -33,6 +34,12 @@ it('opens the response form with a correctly bound browser UUID function', async
   show('note');
   fireEvent.click(await screen.findByRole('button', { name: '回應 0' }));
   expect(await screen.findByRole('textbox', { name: '寫下回應' })).toBeTruthy();
+});
+
+it('uses the shared header and preserves the group selector', async () => {
+  show('note');
+  expect(screen.getByTestId('shared-header')).toHaveTextContent('我的小組');
+  expect(await screen.findByRole('combobox', { name: '選擇小組' })).toHaveValue('group');
 });
 
 it('opens care progress and preserves the creator edit action', async () => {

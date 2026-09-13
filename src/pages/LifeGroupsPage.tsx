@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, BookOpen, Check, Heart, HandHeart, Loader2, MessageCircle, Pencil, Plus, RefreshCw, Star, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,11 +55,12 @@ export default function LifeGroupsPage() {
       await client.invalidateQueries({ queryKey: [base] });
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  if (loading) return <p role="status" className="p-6">載入中…</p>;
-  if (!user) return <main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-semibold">我的小組</h1><Button asChild><Link to="/login">登入小組</Link></Button></main>;
-  return <div className="min-h-screen bg-background pb-24 [overflow-wrap:anywhere]">
-    <header className="border-b"><div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4"><div className="flex items-center gap-3"><Button asChild variant="ghost" size="icon" title="返回首頁"><Link to="/" aria-label="返回首頁"><ArrowLeft className="h-5 w-5" /></Link></Button><h1 className="text-xl font-semibold">我的小組</h1></div>{q.data && q.data.groups.length > 0 && <select aria-label="選擇小組" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">所有小組</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select>}</div></header>
+  if (loading) return <><Header title="我的小組" backTo="/" /><p role="status" className="p-6">載入中…</p></>;
+  if (!user) return <><Header title="我的小組" backTo="/" /><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-semibold">我的小組</h1><Button asChild><Link to="/login">登入小組</Link></Button></main></>;
+  return <div className="min-h-screen bg-background pb-6 [overflow-wrap:anywhere]">
+    <Header title="我的小組" backTo="/" />
     <main className="mx-auto max-w-5xl px-4 py-5">
+      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小組" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">所有小組</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
       {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}`} id={groupId} initialTab={search.get('view') || 'reading'} /> : q.isPending ? <p role="status">載入小組中…</p> : <>
         <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'reading'}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小組管理' : ''}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
         {!q.data?.groups.length && <p className="py-6 text-muted-foreground">目前尚未加入小組。</p>}
