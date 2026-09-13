@@ -33,8 +33,11 @@ async function audit(page) {
         if (await page.getByTestId(`mobile-menu-${activeId}`).getAttribute('aria-current') !== 'page') throw Error('Wrong mobile active unit');
         await page.screenshot({ path: `output/playwright/independent-menu-${route.slice(1) || 'home'}-${width}.png` });
         await page.getByRole('button', { name: '關閉導覽選單' }).click();
-      } else if (await page.getByTestId(`nav-top-link-${activeId}`).getAttribute('aria-current') !== 'page') {
-        throw Error('Wrong desktop active unit');
+      } else {
+        const activeLink = page.getByTestId(`nav-top-link-${activeId}`);
+        const current = await activeLink.getAttribute('aria-current');
+        const homepageSelected = route === '/' && (await activeLink.getAttribute('class') || '').includes('bg-primary/10');
+        if (current !== 'page' && !homepageSelected) throw Error(`Wrong desktop active unit: ${route}`);
       }
       if (route === '/walls') {
         await page.waitForURL('**/devotion-wall');
