@@ -45,7 +45,8 @@ async function verify(page,runId) {
     await page.getByTestId('devotional-note-sheet').waitFor({state:'hidden'});
     const final=await (await page.request.get(origin+`/api/devotional-notes/${note.id}`)).json();
     if(final.version!==3 || final.observation!=='Other device + Device draft')throw new Error('Manual merge did not persist');
-    evidence={runId,at:new Date().toISOString(),origin,mobileWidth:390,syntheticNote:true,slowReadMs:800,reloadRecovery:true,conflictProtected:true,manualMergeSaved:true};
+    if((await page.getByTestId(`text-filled-count-${note.id}`).textContent()).trim()!=='1/3')throw new Error('Empty insight counted as completed');
+    evidence={runId,at:new Date().toISOString(),origin,mobileWidth:390,syntheticNote:true,slowReadMs:800,reloadRecovery:true,conflictProtected:true,manualMergeSaved:true,emptyInsightExcluded:true};
   } finally {
     await page.unroute('**/api/devotional-notes/**',slow);
     page.off('dialog',accept);
