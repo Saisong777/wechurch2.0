@@ -35,6 +35,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import {
   LoveJourneyProgressDay,
   PastoralTimelineEvent,
@@ -149,6 +150,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
   const [search, setSearch] = useState('');
   const [personFilter, setPersonFilter] = useState<PersonFilter>('all');
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [mergePreview, setMergePreview] = useState<null | { primaryPersonId: string; duplicatePersonId: string; primaryName: string; duplicateName: string; previewToken: string; counts: Record<string, number> }>(null);
   const [selectedWeek, setSelectedWeek] = useState(0);
   const [showOnlyOpenDays, setShowOnlyOpenDays] = useState(false);
   const deferredSearch = useDeferredValue(search.trim());
@@ -324,9 +326,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
 
   const handleMergeSuggestion = async (primaryPersonId: string, duplicatePersonId: string) => {
     try {
-      await mutations.mergePersons.mutateAsync({ primaryPersonId, duplicatePersonId });
-      setSelectedPersonId(primaryPersonId);
-      toast.success('已合併重複牧養對象');
+      setMergePreview(await mutations.mergePersons.mutateAsync({ primaryPersonId, duplicatePersonId, preview: true }));
     } catch (error) {
       toast.error('合併失敗', { description: error instanceof Error ? error.message : '請稍後再試' });
     }
@@ -337,7 +337,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
     mutations.updateProgress.mutate({
       progressId: day.id,
       personId: selectedPersonId,
-      updates: { status: checked ? 'completed' : 'not_started' },
+      updates: { version: day.version, status: checked ? 'completed' : 'not_started' },
     });
   };
 
@@ -346,7 +346,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
     mutations.updateProgress.mutate({
       progressId: day.id,
       personId: selectedPersonId,
-      updates: { needsFollowUp },
+      updates: { version: day.version, needsFollowUp },
     });
   };
 
@@ -374,6 +374,29 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
 
   return (
     <section className="space-y-4">
+      <Dialog open={!!mergePreview} onOpenChange={open => { if (!open && !mutations.mergePersons.isPending) setMergePreview(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>確認合併對象</DialogTitle><DialogDescription>
+            將「{mergePreview?.duplicateName}」的關聯紀錄移至「{mergePreview?.primaryName}」。原始資料保留於合併紀錄，不會刪除。
+          </DialogDescription></DialogHeader>
+          <p>移轉 {Object.values(mergePreview?.counts || {}).reduce((sum, count) => sum + count, 0)} 筆關聯紀錄</p>
+          <DialogFooter>
+            <Button variant="outline" disabled={mutations.mergePersons.isPending} onClick={() => setMergePreview(null)}>取消</Button>
+            <Button disabled={mutations.mergePersons.isPending} onClick={async () => {
+              if (!mergePreview) return;
+              try {
+                await mutations.mergePersons.mutateAsync({ primaryPersonId: mergePreview.primaryPersonId, duplicatePersonId: mergePreview.duplicatePersonId, previewToken: mergePreview.previewToken });
+                setSelectedPersonId(mergePreview.primaryPersonId);
+                setMergePreview(null);
+                toast.success('已合併，原始紀錄仍保留');
+              } catch (error) {
+                setMergePreview(null);
+                toast.error(error instanceof Error ? error.message : '合併失敗，請重新預覽');
+              }
+            }}><GitMerge className="mr-2 h-4 w-4" />確認合併</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="grid gap-3 md:grid-cols-4">
         {[
           { label: '牧養對象', value: stats.total, icon: Users, tone: 'bg-sky-50 text-sky-700' },

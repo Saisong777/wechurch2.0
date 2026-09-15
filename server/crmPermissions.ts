@@ -12,6 +12,7 @@ export type CrmRole =
   | "member";
 
 export interface CrmAccessContext {
+  personalAccess?: CrmAccessContext;
   userId: string;
   role: CrmRole;
   canEnterCrm: boolean;
@@ -65,7 +66,8 @@ const addNormalized = (set: Set<string>, value?: string | null) => {
   if (normalized) set.add(normalized);
 };
 
-export async function getCrmAccessContext(userId: string, roleInput?: string | null): Promise<CrmAccessContext> {
+export type CrmCapability = 'personal' | 'care' | 'members' | 'careOrMembers';
+export async function getCrmAccessContext(userId: string, roleInput?: string | null, capability?: CrmCapability): Promise<CrmAccessContext> {
   const role: CrmRole = isCrmRole(roleInput) ? roleInput : "member";
   const canEnterCrm = isCrmEntryRole(role);
   const canAssignScopes = canAssignCrmScopes(role);
@@ -83,8 +85,11 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   const potentialMemberIds = new Set<string>();
   const memberEmails = new Set<string>();
 
-  if (currentUser?.email) memberEmails.add(String(currentUser.email).trim().toLowerCase());
-  userIds.add(userId);
+  const roleGrant = capability === 'personal' || capability === 'care' || capability === 'careOrMembers' ? role === 'pastor' || role === 'minister' : capability === 'members' ? role === 'pastor' : true;
+  if (roleGrant) {
+    if (currentUser?.email) memberEmails.add(String(currentUser.email).trim().toLowerCase());
+    userIds.add(userId);
+  }
 
   if (role === "admin") {
     return {
@@ -110,7 +115,7 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
       userId,
       role,
       canEnterCrm,
-      accessLevel: "all",
+      accessLevel: "assigned",
       churchScopes: [...churchScopes],
       groupIds: [],
       userIds: [],
@@ -139,6 +144,8 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   let canManageMembers = role === "pastor";
 
   for (const assignment of assignmentsResult.rows) {
+    const granted = !capability || roleGrant || (capability === 'careOrMembers' ? assignment.can_manage_care || assignment.can_manage_members : assignment[capability === 'personal' ? 'can_view_personal' : capability === 'care' ? 'can_manage_care' : 'can_manage_members']);
+    if (!granted) continue;
     if (assignment.scope_type === "church") addNormalized(churchScopes, assignment.church);
     if (assignment.scope_type === "group" && assignment.group_id) groupIds.add(assignment.group_id);
     if (assignment.scope_type === "member" && assignment.member_user_id) userIds.add(assignment.member_user_id);
@@ -158,8 +165,8 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
     [userId]
   );
   for (const group of ownedGroupsResult.rows) {
+    if (capability && !roleGrant && !((capability === 'care' || capability === 'careOrMembers') && (role === 'group_leader' || role === 'leader'))) continue;
     groupIds.add(group.id);
-    addNormalized(churchScopes, group.church);
   }
   if (groupIds.size > 0 && (role === "group_leader" || role === "leader")) {
     canManageCare = true;
@@ -235,9 +242,7 @@ export function filterUsersForCrmAccess<T extends { id: string; email?: string |
 ) {
   if (access.role === "admin") return records;
   if (access.role === "senior_pastor") {
-    return access.churchScopes.length === 0
-      ? records
-      : records.filter((record) => churchMatches(access.churchScopes, record.church));
+    return records.filter((record) => churchMatches(access.churchScopes, record.church));
   }
   const userIds = new Set(access.userIds);
   const emails = new Set(access.memberEmails.map((email) => email.toLowerCase()));
@@ -254,9 +259,7 @@ export function filterPotentialMembersForCrmAccess<T extends { id: string; email
 ) {
   if (access.role === "admin") return records;
   if (access.role === "senior_pastor") {
-    return access.churchScopes.length === 0
-      ? records
-      : records.filter((record) => churchMatches(access.churchScopes, record.church));
+    return records.filter((record) => churchMatches(access.churchScopes, record.church));
   }
   const potentialIds = new Set(access.potentialMemberIds);
   const emails = new Set(access.memberEmails.map((email) => email.toLowerCase()));

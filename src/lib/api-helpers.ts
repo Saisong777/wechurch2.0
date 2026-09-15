@@ -120,54 +120,23 @@ export const updateSessionIcebreakerEnabled = async (
   }
 };
 
-// Find the group number with the fewest members (filtered by location for site isolation)
-export const findSmallestGroup = async (sessionId: string, location: string = "On-site"): Promise<number | null> => {
-  try {
-    const response = await fetch(`/api/sessions/${sessionId}/participants`);
-    if (!response.ok) return null;
-    const participants = await response.json();
-    
-    const relevant = participants.filter((p: any) => p.location === location && p.groupNumber !== null);
-    if (relevant.length === 0) return 1;
-
-    const counts = new Map<number, number>();
-    relevant.forEach((p: any) => {
-      counts.set(p.groupNumber, (counts.get(p.groupNumber) || 0) + 1);
-    });
-
-    let minGroup = 1;
-    let minCount = Infinity;
-    counts.forEach((count, gn) => {
-      if (count < minCount) {
-        minCount = count;
-        minGroup = gn;
-      }
-    });
-
-    return minGroup;
-  } catch (error) {
-    console.error("Find smallest group error:", error);
-    return null;
-  }
-};
-
 // Assign a latecomer to the smallest group
 export const assignLatecomerToGroup = async (
   participantId: string,
-  groupNumber: number,
   sessionId: string,
-  email: string
-): Promise<boolean> => {
+): Promise<number | null> => {
   try {
-    const response = await fetch(`/api/participants/${participantId}`, {
-      method: "PATCH",
+    const response = await fetch(`/api/participants/${participantId}/late-join`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, email, groupNumber, readyConfirmed: false }),
+      body: JSON.stringify({ sessionId }),
     });
-    return response.ok;
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.participant?.group_number ?? data.participant?.groupNumber ?? null;
   } catch (error) {
     console.error("Assign latecomer error:", error);
-    return false;
+    return null;
   }
 };
 
@@ -203,7 +172,10 @@ export const joinSession = async (
       body: JSON.stringify({ name, email, gender, location }),
     });
 
-    if (!joinRes.ok) return null;
+    if (!joinRes.ok) {
+      const error = await joinRes.json().catch(() => ({}));
+      throw new Error(error.error || '加入失敗，請稍後再試');
+    }
     const data = await joinRes.json();
 
     return {
@@ -218,7 +190,7 @@ export const joinSession = async (
     };
   } catch (error) {
     console.error("Join session error:", error);
-    return null;
+    throw error;
   }
 };
 

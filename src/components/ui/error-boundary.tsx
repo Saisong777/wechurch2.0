@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <p className="text-sm text-muted-foreground mb-4" data-testid="text-error-message">
                 很抱歉，頁面發生了錯誤。請嘗試重新載入。
               </p>
-              <div className="flex gap-2 justify-center">
+              <div className="flex flex-wrap gap-2 justify-center">
                 <Button variant="outline" onClick={this.handleRetry} data-testid="button-retry">
                   重試
                 </Button>
@@ -58,6 +58,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   <RefreshCw className="w-4 h-4 mr-1" />
                   重新載入
                 </Button>
+                <Button asChild variant="ghost"><a href="/">回首頁</a></Button>
               </div>
             </CardContent>
           </Card>

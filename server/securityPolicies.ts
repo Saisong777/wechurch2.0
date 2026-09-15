@@ -6,11 +6,14 @@ export const prayerBodySchema = z.object({
   category: z.string().trim().min(1).max(80).optional(),
   isAnonymous: z.boolean().optional(),
   isPinned: z.boolean().optional(),
+  isUrgent: z.boolean().optional(),
   isAnswered: z.boolean().optional(),
   scriptureReference: z.string().trim().max(120).optional().nullable(),
 });
 
 export const prayerPatchSchema = z.object({
+  isClosed: z.boolean().optional(),
+  isUrgent: z.boolean().optional(),
   isPinned: z.boolean().optional(),
   isAnswered: z.boolean().optional(),
 });

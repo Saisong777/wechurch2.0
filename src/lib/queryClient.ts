@@ -1,9 +1,16 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(`${status}: ${message}`);
+    this.name = 'ApiError';
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
 }
 
@@ -14,8 +21,8 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers: data !== undefined ? { "Content-Type": "application/json" } : {},
+    body: data !== undefined ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
@@ -28,9 +35,10 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-    async ({ queryKey }) => {
+    async ({ queryKey, signal }) => {
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
+        signal,
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -51,7 +59,8 @@ export const queryClient = new QueryClient({
       // Retry 2x with exponential backoff for network resilience
       retry: (failureCount, error) => {
         // Don't retry auth errors or client errors
-        if (error instanceof Error && error.message.startsWith('4')) return false;
+        if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
+        if (error.name === 'AbortError') return false;
         return failureCount < 2;
       },
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),

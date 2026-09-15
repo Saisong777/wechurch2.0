@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import {
-  Dumbbell,
   BookOpen,
   Gamepad2,
   Share2,
@@ -35,6 +34,7 @@ import {
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
+import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,15 +43,19 @@ import { appNavItems, isNavItemActive } from '@/lib/navigation';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCareContacts } from '@/hooks/useCareContacts';
 import { usePrayerWall } from '@/hooks/usePrayerWall';
+import { usePersonalPrayers } from '@/hooks/usePersonalPrayers';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { fetchChurchReadingForToday, getChurchReadingForToday } from '@/lib/churchReading';
+import { churchScripturePreview, fetchChurchReadingForToday, getChurchReadingForToday } from '@/lib/churchReading';
 import {
   createLocalDevotionalNoteId,
   mergeLocalDevotionalNotes,
-  upsertLocalDevotionalNote,
 } from '@/lib/localDevotionalNotes';
+import { saveDevotionalNote, noteSaveMessage } from '@/lib/saveDevotionalNote';
+import { toast } from 'sonner';
+import { DailyHome } from '@/components/home/DailyHome';
 
 interface DevotionalNoteSummary {
+  syncStatus?: 'pending' | 'blocked' | 'synced';
   id: string;
   userId?: string | null;
   verseReference: string;
@@ -70,22 +74,12 @@ interface DevotionalNoteSummary {
   updatedAt: string;
 }
 
-interface PersonalPrayerRecord {
-  id: string;
-  title: string;
-  prayer?: string;
-  response?: string;
-  status?: 'waiting' | 'answered' | 'grace_response';
-  createdAt: string;
-}
-
 interface HomeDevotionalDraft {
   observation: string;
   receiving: string;
   actionPlan: string;
 }
 
-const GRACE_RECORD_STORAGE_KEY = 'wechurch_grace_records_v1';
 const RECEIVE_KEY = 'GOD_ATTRIBUTE';
 const EMPTY_DEVOTIONAL_DRAFT: HomeDevotionalDraft = {
   observation: '',
@@ -194,15 +188,24 @@ function HomeSection({
 
 const Index = () => {
   const [searchParams] = useSearchParams();
+  const requestedDashboardVariant = searchParams.get('dashboardVariant');
+  const dashboardVariant = requestedDashboardVariant === 'b' || requestedDashboardVariant === 'c' || requestedDashboardVariant === 'd'
+    ? requestedDashboardVariant
+    : 'a';
+  const isCompanionVariant = dashboardVariant === 'c' || dashboardVariant === 'd';
+  const isIllustratedCompanionVariant = dashboardVariant === 'd';
+  const styleLabMode = searchParams.get('styleLab') === '1';
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
   const { profile } = useUserProfile();
   const { canCreateSession } = useUserRole();
-  const { contacts: careContacts } = useCareContacts();
+  const { contacts: allCareContacts, isLoading: careLoading, isError: careError } = useCareContacts();
+  const careContacts = useMemo(() => allCareContacts.filter(contact => !!user && contact.userId === user.id), [allCareContacts, user]);
   const { isFeatureEnabled, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [personalPrayerRecords, setPersonalPrayerRecords] = useState<PersonalPrayerRecord[]>([]);
+  const [showDevotionalEditor, setShowDevotionalEditor] = useState(false);
+  const { data: personalPrayerRecords = [], isError: personalPrayerError, isLoading: prayersLoading, refetch: retryPrayers } = usePersonalPrayers();
   const [devotionalDraft, setDevotionalDraft] = useState<HomeDevotionalDraft>(EMPTY_DEVOTIONAL_DRAFT);
   const [savedHomeDevotionalNote, setSavedHomeDevotionalNote] = useState<DevotionalNoteSummary | null>(null);
   const [isSavingDevotional, setIsSavingDevotional] = useState(false);
@@ -221,14 +224,14 @@ const Index = () => {
   const { data: homePrayers = [] } = usePrayerWall();
 
   const { data: devotionalNotes = [], isLoading: devotionalNotesLoading } = useQuery<DevotionalNoteSummary[]>({
-    queryKey: ['/api/devotional-notes'],
+    queryKey: ['/api/devotional-notes', user?.id],
     queryFn: async () => {
       try {
         const res = await fetch('/api/devotional-notes', { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch devotional notes');
-        return mergeLocalDevotionalNotes((await res.json()) as DevotionalNoteSummary[]);
+        return mergeLocalDevotionalNotes((await res.json()) as DevotionalNoteSummary[], user?.id || '');
       } catch {
-        return mergeLocalDevotionalNotes<DevotionalNoteSummary>([]);
+        return mergeLocalDevotionalNotes<DevotionalNoteSummary>([], user?.id || '', true);
       }
     },
     enabled: !!user,
@@ -238,12 +241,13 @@ const Index = () => {
   });
 
   const fallbackChurchReading = useMemo(() => getChurchReadingForToday(), []);
-  const { data: syncedChurchReading } = useQuery({
+  const { data: syncedChurchReading, isLoading: churchReadingLoading, isError: churchReadingError } = useQuery({
     queryKey: ['/api/church-reading/today'],
     queryFn: () => fetchChurchReadingForToday(),
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000,
     retry: 1,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 30000,
   });
 
   useEffect(() => {
@@ -252,30 +256,6 @@ const Index = () => {
       navigate(`/user/study?session=${sessionId}`);
     }
   }, [searchParams, navigate]);
-
-  const loadPersonalPrayers = () => {
-    try {
-      const raw = localStorage.getItem(GRACE_RECORD_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      setPersonalPrayerRecords(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setPersonalPrayerRecords([]);
-    }
-  };
-
-  useEffect(() => {
-    loadPersonalPrayers();
-    window.addEventListener('storage', loadPersonalPrayers);
-    window.addEventListener('wechurch:grace-records-updated', loadPersonalPrayers);
-    return () => {
-      window.removeEventListener('storage', loadPersonalPrayers);
-      window.removeEventListener('wechurch:grace-records-updated', loadPersonalPrayers);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (location.pathname === '/') loadPersonalPrayers();
-  }, [location.pathname]);
 
   useEffect(() => {
     localStorage.setItem(HOME_SECTION_STATE_KEY, JSON.stringify(openSections));
@@ -286,7 +266,7 @@ const Index = () => {
     navigate('/');
   };
 
-  const getInitials = (email: string | undefined) => {
+  const getInitials = (email: string | null | undefined) => {
     if (!email) return 'U';
     return email.charAt(0).toUpperCase();
   };
@@ -327,7 +307,7 @@ const Index = () => {
     return [...personalPrayerRecords]
       .filter((record) => {
         const hasContent = !!(record.prayer?.trim() || record.title?.trim());
-        const stillWaiting = record.status !== 'answered' && record.status !== 'grace_response' && !record.response?.trim();
+        const stillWaiting = record.status === 'waiting';
         return hasContent && stillWaiting;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -354,9 +334,7 @@ const Index = () => {
 
     const byReference = devotionalNotes.find((note) => note.verseReference === todayScripture.title);
 
-    return byReference || [...devotionalNotes].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )[0];
+    return byReference;
   }, [devotionalNotes, savedHomeDevotionalNote, todayScripture.title]);
   const todayDevotionalText = todayDevotionalNote
     ? getCoreInsightText(todayDevotionalNote.coreInsightNote)
@@ -403,26 +381,18 @@ const Index = () => {
         ...notePayload,
       };
 
-      let savedNote: DevotionalNoteSummary;
-      try {
-        const shouldPatchRemote = todayDevotionalNote && !todayDevotionalNote.id.startsWith('local-devotional-');
-        const response = shouldPatchRemote
-          ? await apiRequest('PATCH', `/api/devotional-notes/${todayDevotionalNote.id}`, notePayload)
-          : await apiRequest('POST', '/api/devotional-notes', payload);
-        savedNote = (await response.json()) as DevotionalNoteSummary;
-      } catch {
-        const now = new Date().toISOString();
-        savedNote = {
-          id: todayDevotionalNote?.id || createLocalDevotionalNoteId(),
-          userId: (user as any)?.legacyUserId || user?.id,
-          titlePhrase: null,
-          coolDownNote: null,
-          scholarsNote: null,
-          createdAt: todayDevotionalNote?.createdAt || now,
-          updatedAt: now,
-          ...payload,
-        } as DevotionalNoteSummary;
-      }
+      const now = new Date().toISOString();
+      const result = await saveDevotionalNote(user.id, {
+        ...todayDevotionalNote,
+        id: todayDevotionalNote?.id || createLocalDevotionalNoteId(),
+        titlePhrase: todayDevotionalNote?.titlePhrase || null,
+        coolDownNote: todayDevotionalNote?.coolDownNote || null,
+        scholarsNote: todayDevotionalNote?.scholarsNote || null,
+        createdAt: todayDevotionalNote?.createdAt || now,
+        updatedAt: now,
+        ...payload,
+      });
+      const savedNote = result.note;
       const visibleSavedNote: DevotionalNoteSummary = {
         ...savedNote,
         verseReference: savedNote.verseReference || todayScripture.title,
@@ -434,14 +404,16 @@ const Index = () => {
         updatedAt: savedNote.updatedAt || new Date().toISOString(),
       };
 
-      upsertLocalDevotionalNote(visibleSavedNote);
       setSavedHomeDevotionalNote(visibleSavedNote);
-      queryClient.setQueryData<DevotionalNoteSummary[]>(['/api/devotional-notes'], (current = []) => [
+      queryClient.setQueryData<DevotionalNoteSummary[]>(['/api/devotional-notes', user.id], (current = []) => [
         visibleSavedNote,
         ...current.filter((note) => note.id !== visibleSavedNote.id),
       ]);
-      setDevotionalDraft(EMPTY_DEVOTIONAL_DRAFT);
+      toast(noteSaveMessage(result.status));
+      if (result.status === 'synced') setDevotionalDraft(EMPTY_DEVOTIONAL_DRAFT);
       await queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
+    } catch {
+      toast.error('儲存失敗，請保留此頁並重試');
     } finally {
       setIsSavingDevotional(false);
     }
@@ -466,16 +438,6 @@ const Index = () => {
       tone: 'border-border/70 bg-white/95 hover:border-secondary/25',
       iconTone: 'bg-secondary/10 text-secondary',
       featureKeys: ['we_share'],
-    },
-    {
-      id: 'study-module',
-      title: '查經',
-      subtitle: 'SoulGym 查經、查經筆記、個人與小組成果整理',
-      href: '/user',
-      icon: Dumbbell,
-      tone: 'border-border/70 bg-white/95 hover:border-accent/25',
-      iconTone: 'bg-accent/10 text-accent',
-      featureKeys: ['we_live'],
     },
     {
       id: 'care-module',
@@ -535,9 +497,42 @@ const Index = () => {
       chip: 'bg-emerald-50 text-emerald-700',
     },
   ];
+  const featuredCareContact = activeCareContacts[0];
+  const todayEssenceText =
+    todayDevotionalText ||
+    todayScripture.devotionalText ||
+    churchReading.loveAction ||
+    '今天用公義、憐憫與謙卑回應神，也把愛具體帶到一個人身上。';
+  const todayLoveGodFocus =
+    churchReading.prayer ||
+    todayDevotionalText ||
+    '先安靜讀經與靈修，讓神的話校正今天的方向。';
+  const todayLovePeopleFocus = featuredCareContact
+    ? `${featuredCareContact.name}：${featuredCareContact.nextAction || featuredCareContact.need || '今天主動關心他'}`
+    : prayerFocus.intercessionCount > 0
+      ? `為 ${prayerFocus.intercessionCount} 件需要守望，從一件事開始代禱。`
+      : '今天選一個人，用一個具體行動去愛他。';
+  const companionPillars = [
+    {
+      label: '愛神',
+      title: '與神建立更親密的關係',
+      detail: todayLoveGodFocus,
+      meta: `${todayScripture.title} · 讀經與靈修`,
+      icon: <BookOpen className="h-4 w-4" />,
+      tone: 'companion-pillar--god',
+    },
+    {
+      label: '愛人',
+      title: '與人建立更好的關係',
+      detail: todayLovePeopleFocus,
+      meta: '關懷一人 · 為人事物禱告',
+      icon: <HandHeart className="h-4 w-4" />,
+      tone: 'companion-pillar--people',
+    },
+  ];
   return (
-    <div className="min-h-screen bg-[#F8FAF9]">
-      <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background/90 px-4 py-3 shadow-[0_10px_30px_-28px_rgba(30,58,95,0.45)] backdrop-blur-xl transition-all sm:px-6 sm:py-4 md:py-3">
+    <div className="dashboard-surface min-h-screen bg-[#F8FAF9]" data-dashboard-variant={styleLabMode ? dashboardVariant : 'together'}>
+      <header className="dashboard-header sticky top-0 z-50 w-full border-b border-border/70 bg-background/90 px-4 py-3 shadow-[0_10px_30px_-28px_rgba(30,58,95,0.45)] backdrop-blur-xl transition-all sm:px-6 sm:py-4 md:py-3">
         <div className="container mx-auto flex items-center justify-between">
           {/* Mobile: Left spacer */}
           <div className="w-10 md:hidden" />
@@ -573,6 +568,7 @@ const Index = () => {
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                     }`}
+                  aria-current={active ? 'page' : undefined}
                   data-testid={`nav-top-link-${item.id}`}
                 >
                   <Icon className="w-4 h-4" />
@@ -588,7 +584,7 @@ const Index = () => {
             ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full w-8 h-8 p-0">
+                  <Button variant="ghost" size="icon" aria-label="開啟帳號選單" className="rounded-full p-0">
                     <Avatar className="w-8 h-8">
                       <AvatarImage src={avatarUrl || undefined} />
                       <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
@@ -632,7 +628,7 @@ const Index = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full w-8 h-8"
+                aria-label="登入" className="rounded-full"
                 onClick={() => navigate('/me')}
               >
                 <User className="w-4 h-4 text-muted-foreground" />
@@ -642,11 +638,56 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="mobile-readable container mx-auto px-4 py-4 sm:px-6 md:py-8">
+      <main className="dashboard-main mobile-readable container mx-auto px-4 py-4 sm:px-6 md:py-8">
+        {!styleLabMode ? (
+          <DailyHome
+            date={todayLabel}
+            scripture={{ reference: todayScripture.title, preview: churchScripturePreview(churchReading), href: todayScripture.href }}
+            readingState={churchReadingLoading ? 'loading' : churchReadingError ? 'error' : churchReading.sourceStatus === 'unpublished' ? 'unpublished' : 'ready'}
+            note={todayDevotionalNote}
+            notesLoading={devotionalNotesLoading}
+            onOpenNote={() => user ? setShowDevotionalEditor(true) : navigate('/login')}
+            signedIn={!!user}
+            prayersLoading={prayersLoading}
+            prayersError={personalPrayerError}
+            onRetryPrayers={() => { void retryPrayers(); }}
+            prayerCount={activePrivatePrayerRecords.length}
+            prayer={activePrivatePrayerRecords[0]}
+            careLoading={careLoading}
+            careUnavailable={!!user && careError}
+            care={featuredCareContact}
+            showTools={!featuresLoading && isFeatureEnabled('we_play')}
+            showAdmin={!featuresLoading && canCreateSession && isFeatureEnabled('we_live')}
+          />
+        ) : (
         <div className="mx-auto max-w-6xl space-y-5">
-          <section className="animate-fade-in space-y-4" aria-labelledby="today-dashboard-title">
-            <div className="overflow-hidden rounded-lg border border-border/70 bg-white/95 shadow-[0_16px_48px_-34px_rgba(30,58,95,0.42)]">
-              <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(22rem,0.62fr)] lg:items-stretch">
+          {styleLabMode && (
+            <div className="dashboard-style-lab" role="region" aria-label="Dashboard Style Lab">
+              <div>
+                <p className="dashboard-style-lab__eyebrow">STYLE LAB / DASHBOARD VARIANTS</p>
+                <p className="dashboard-style-lab__description">切換首頁實驗版本；不改變資料、路由或核心互動。</p>
+              </div>
+              <div className="dashboard-style-lab__links" role="group" aria-label="選擇 Dashboard 風格版本">
+                <Link className={`dashboard-style-lab__link ${dashboardVariant === 'a' ? 'is-active' : ''}`} to="/?styleLab=1&dashboardVariant=a">
+                  A · 日課
+                </Link>
+                <Link className={`dashboard-style-lab__link ${dashboardVariant === 'b' ? 'is-active' : ''}`} to="/?styleLab=1&dashboardVariant=b">
+                  B · 週報
+                </Link>
+                <Link className={`dashboard-style-lab__link ${dashboardVariant === 'c' ? 'is-active' : ''}`} to="/?styleLab=1&dashboardVariant=c">
+                  C · 陪伴
+                </Link>
+                <Link className={`dashboard-style-lab__link ${dashboardVariant === 'd' ? 'is-active' : ''}`} to="/?styleLab=1&dashboardVariant=d">
+                  D · 圖卡
+                </Link>
+              </div>
+            </div>
+          )}
+
+          <section className="dashboard-hero-section animate-fade-in space-y-4" aria-labelledby="today-dashboard-title">
+            <div className="dashboard-hero overflow-hidden rounded-lg border border-border/70 bg-white/95 shadow-[0_16px_48px_-34px_rgba(30,58,95,0.42)]">
+              <div className="dashboard-hero__grid grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(22rem,0.62fr)] lg:items-stretch">
+                {!isCompanionVariant && (
                 <div className="flex min-w-0 flex-col">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="inline-flex h-7 items-center rounded-md bg-primary/10 px-2.5 text-xs font-semibold text-primary">
@@ -675,30 +716,83 @@ const Index = () => {
                     </div>
                   </div>
                 </div>
+                )}
 
-                <div className="grid content-start gap-2">
-                  {dailyOfficeSteps.map((item) => (
-                    <div key={item.number} className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 rounded-lg border border-border/60 bg-background/75 p-3">
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-md text-sm font-bold ${item.chip}`}>
-                        {item.number}
+                {isCompanionVariant ? (
+                  <div className={isIllustratedCompanionVariant ? 'dashboard-morning-companion' : 'dashboard-companion-panel dashboard-companion-panel--single'}>
+                    {isIllustratedCompanionVariant && (
+                      <div className="dashboard-morning-companion__art" aria-hidden="true">
+                        <img src="/images/morning-companion-hero.png" alt="" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className={`text-sm font-bold ${item.tone}`}>{item.label}</p>
-                          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-muted-foreground shadow-sm">
-                            {item.status}
-                          </span>
-                        </div>
-                        <p className="mt-1 truncate text-sm font-medium text-foreground">{item.detail}</p>
+                    )}
+                    <div className={isIllustratedCompanionVariant ? 'dashboard-morning-card' : 'dashboard-companion-content'}>
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex h-7 items-center rounded-md bg-secondary/10 px-2.5 text-xs font-semibold text-secondary">
+                          {isIllustratedCompanionVariant ? 'Morning Companion' : '今日同行'}
+                        </span>
+                        <span className="text-xs font-medium text-muted-foreground">{todayLabel}</span>
+                      </div>
+                      <p className="dashboard-companion-panel__eyebrow">今天最精華</p>
+                      <h2 id="today-dashboard-title" className="dashboard-companion-panel__title">{todayScripture.devotionalTitle}</h2>
+                      <p className="dashboard-companion-panel__body">{todayEssenceText}</p>
+                      <div className="companion-verse-inline">
+                        <p className="companion-verse-inline__reference">{todayScripture.title}</p>
+                        {todayScripture.verses.slice(0, 1).map((verse, index) => (
+                          <p key={`${verse.marker}-companion-${index}`} className="scripture-serif companion-verse-inline__text">
+                            {verse.marker && <span>{verse.marker}</span>}
+                            {verse.text}
+                          </p>
+                        ))}
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="dashboard-companion-pillars">
+                      {companionPillars.map((item) => (
+                        <div key={item.label} className={`companion-pillar ${item.tone}`}>
+                          <div className="companion-pillar__icon">{item.icon}</div>
+                          <div className="min-w-0">
+                            <p className="companion-pillar__label">{item.label}</p>
+                            <h4 className="companion-pillar__title">{item.title}</h4>
+                            <p className="companion-pillar__meta">{item.meta}</p>
+                            <p className="companion-pillar__detail">{item.detail}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="dashboard-companion-actions" aria-label="今日操練入口">
+                      <Link to={todayScripture.href}>讀今天經文</Link>
+                      <Link to="/grace-record">寫禱告</Link>
+                      <Link to="/care">關懷一人</Link>
+                    </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="dashboard-rhythm grid content-start gap-2">
+                    {dailyOfficeSteps.map((item) => (
+                      <div key={item.number} className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 rounded-lg border border-border/60 bg-background/75 p-3">
+                        <div className={`flex h-11 w-11 items-center justify-center rounded-md text-sm font-bold ${item.chip}`}>
+                          {item.number}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className={`text-sm font-bold ${item.tone}`}>{item.label}</p>
+                            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-muted-foreground shadow-sm">
+                              {item.status}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-sm font-medium text-foreground">{item.detail}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-              <Card className="overflow-hidden rounded-lg border-border/70 bg-white/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
+            <div className={`dashboard-sections grid gap-3 lg:grid-cols-2 lg:items-start ${isCompanionVariant ? 'dashboard-sections--companion-detail' : ''}`}>
+              <Card className="dashboard-section dashboard-section-love overflow-hidden rounded-lg border-border/70 bg-white/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
                 <CardContent className="p-0">
                   <div className="border-b border-border/60 bg-primary/5 p-4">
                     <div className="flex items-center gap-3">
@@ -706,8 +800,10 @@ const Index = () => {
                         <Heart className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-primary">愛神</p>
-                        <h3 className="text-lg font-bold text-foreground">今天與神同行</h3>
+                        <p className="text-xs font-semibold text-primary">{isCompanionVariant ? '深入操練' : '愛神'}</p>
+                        <h3 className="text-lg font-bold text-foreground">
+                          {isCompanionVariant ? '讀經、靈修、個人禱告' : '今天與神同行'}
+                        </h3>
                       </div>
                     </div>
                   </div>
@@ -789,6 +885,9 @@ const Index = () => {
                           <h5 className="text-sm font-bold text-foreground">
                             {todayDevotionalNote?.titlePhrase || '今天的三步驟筆記'}
                           </h5>
+                          {(todayDevotionalNote?.syncStatus === 'pending' || todayDevotionalNote?.syncStatus === 'blocked') && (
+                            <p role="status" className="text-sm text-amber-700">此裝置草稿，尚未同步</p>
+                          )}
                           {todayDevotionalSteps.length > 0 ? (
                             <div className="space-y-1.5">
                               {todayDevotionalSteps.map((step) => (
@@ -801,6 +900,10 @@ const Index = () => {
                           ) : (
                             <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm leading-6 text-muted-foreground">{todayDevotionalText}</p>
                           )}
+                          <Button size="sm" variant="outline" onClick={() => setShowDevotionalEditor(true)}>
+                            <PenLine className="h-4 w-4" />
+                            {todayDevotionalNote?.syncStatus === 'pending' || todayDevotionalNote?.syncStatus === 'blocked' ? '開啟草稿' : '編輯筆記'}
+                          </Button>
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -861,13 +964,13 @@ const Index = () => {
                     <HomeSection
                       id="personalPrayer"
                       title="個人禱告"
-                      summary={activePrivatePrayerRecords.length > 0 ? `${activePrivatePrayerRecords.length} 筆正在等候` : '前往清單新增'}
+                      summary={personalPrayerError ? '暫時無法載入' : activePrivatePrayerRecords.length > 0 ? `${activePrivatePrayerRecords.length} 筆正在等候` : '前往清單新增'}
                       icon={<PenLine className="h-4 w-4 text-secondary" />}
                       action={<Link to="/grace-record" className="shrink-0 text-xs font-medium text-secondary">記錄</Link>}
                       openSections={openSections}
                       setOpenSections={setOpenSections}
                     >
-                      {visiblePrivatePrayerRecords.length > 0 ? (
+                      {personalPrayerError ? <p role="alert" className="text-sm text-muted-foreground">目前無法載入，請前往個人禱告重新整理。</p> : visiblePrivatePrayerRecords.length > 0 ? (
                         <div className="space-y-3">
                           <p className="text-sm leading-6 text-muted-foreground">
                             今天為自己的需要認真禱告，把正在等候的事帶到神面前。
@@ -909,7 +1012,7 @@ const Index = () => {
                 </CardContent>
               </Card>
 
-              <Card className="overflow-hidden rounded-lg border-border/70 bg-white/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
+              <Card className="dashboard-section dashboard-section-care overflow-hidden rounded-lg border-border/70 bg-white/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
                 <CardContent className="p-0">
                   <div className="border-b border-border/60 bg-secondary/5 p-4">
                     <div className="flex items-center gap-3">
@@ -917,8 +1020,10 @@ const Index = () => {
                         <HandHeart className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-secondary">愛人</p>
-                        <h3 className="text-lg font-bold text-foreground">今天去關心人</h3>
+                        <p className="text-xs font-semibold text-secondary">{isCompanionVariant ? '實踐清單' : '愛人'}</p>
+                        <h3 className="text-lg font-bold text-foreground">
+                          {isCompanionVariant ? '代求與關懷安排' : '今天去關心人'}
+                        </h3>
                       </div>
                     </div>
                   </div>
@@ -1043,7 +1148,7 @@ const Index = () => {
             </div>
           </section>
 
-          <section className="animate-fade-in" style={{ animationDelay: '80ms' }} aria-labelledby="home-actions-title">
+          <section className="dashboard-actions-section animate-fade-in" style={{ animationDelay: '80ms' }} aria-labelledby="home-actions-title">
             <div className="mb-3 flex items-center justify-between gap-3 px-1">
               <h2 id="home-actions-title" className="text-sm font-semibold text-muted-foreground">
                 主要入口
@@ -1052,7 +1157,7 @@ const Index = () => {
             </div>
 
             {featuresLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="dashboard-actions grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <Skeleton key={index} className="h-24 rounded-lg bg-primary/10" />
                 ))}
@@ -1083,6 +1188,7 @@ const Index = () => {
             )}
           </section>
         </div>
+        )}
       </main>
 
       <footer className="w-full py-4 px-4 mt-auto border-t border-border/50">
@@ -1106,6 +1212,16 @@ const Index = () => {
       <ProfileSettingsDialog
         open={showProfileSettings}
         onOpenChange={setShowProfileSettings}
+      />
+      <DevotionalNoteDialog
+        open={showDevotionalEditor}
+        onOpenChange={(open) => {
+          setShowDevotionalEditor(open);
+          if (!open) setSavedHomeDevotionalNote(null);
+        }}
+        noteId={todayDevotionalNote?.id}
+        verseReference={todayDevotionalNote?.verseReference || todayScripture.title}
+        verseText={todayDevotionalNote?.verseText || churchReading.scriptureText || todayScripture.verses.map(verse => `${verse.marker} ${verse.text}`).join('\n')}
       />
     </div>
   );

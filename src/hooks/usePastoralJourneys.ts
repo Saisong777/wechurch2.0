@@ -25,6 +25,9 @@ export interface PastoralPersonSummary {
 
 export interface LoveJourneyProgressDay {
   id: string;
+  version: number;
+  visibility: 'private' | 'pastoral' | 'mentor';
+  mentorContractId?: string | null;
   dayNumber: number;
   title: string;
   scriptureReference: string | null;
@@ -263,7 +266,7 @@ export function usePastoralJourneyMutations(church: string) {
   });
 
   const mergePersons = useMutation({
-    mutationFn: async (input: { primaryPersonId: string; duplicatePersonId: string }) => {
+    mutationFn: async (input: { primaryPersonId: string; duplicatePersonId: string; preview?: boolean; previewToken?: string }) => {
       const response = await apiRequest('POST', `/api/pastoral/merge-suggestions/merge${churchQuery(church)}`, input);
       return response.json();
     },
@@ -281,7 +284,7 @@ export function usePastoralJourneyMutations(church: string) {
     }: {
       progressId: string;
       personId: string;
-      updates: Partial<Pick<LoveJourneyProgressDay, 'status' | 'responseText' | 'mentorNote' | 'needsFollowUp'>>;
+      updates: { version: number } & Partial<Pick<LoveJourneyProgressDay, 'status' | 'mentorNote' | 'needsFollowUp'>>;
     }) => {
       const response = await apiRequest('PATCH', `/api/pastoral/journey-progress/${progressId}${churchQuery(church)}`, updates);
       return { data: await response.json(), personId };

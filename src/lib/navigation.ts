@@ -1,4 +1,4 @@
-import { BookOpen, Dumbbell, HandHeart, Home, Share2, type LucideIcon } from 'lucide-react';
+import { BookOpen, Heart, Home, PanelsTopLeft, Users, type LucideIcon } from 'lucide-react';
 
 export interface AppNavItem {
   id: string;
@@ -12,19 +12,11 @@ export interface AppNavItem {
 export const appNavItems: AppNavItem[] = [
   {
     id: 'home',
-    label: '首頁',
-    shortLabel: '首頁',
+    label: '今日',
+    shortLabel: '今日',
     href: '/',
     icon: Home,
     match: ['/'],
-  },
-  {
-    id: 'live',
-    label: '查經',
-    shortLabel: '查經',
-    href: '/user',
-    icon: Dumbbell,
-    match: ['/user'],
   },
   {
     id: 'learn',
@@ -39,16 +31,24 @@ export const appNavItems: AppNavItem[] = [
     label: '禱告',
     shortLabel: '禱告',
     href: '/share',
-    icon: Share2,
-    match: ['/share', '/prayer-wall', '/prayer-meeting'],
+    icon: Heart,
+    match: ['/share', '/grace-record'],
   },
   {
-    id: 'care',
-    label: '關懷',
-    shortLabel: '關懷',
-    href: '/care',
-    icon: HandHeart,
-    match: ['/care'],
+    id: 'walls',
+    label: '分享牆',
+    shortLabel: '分享牆',
+    href: '/walls',
+    icon: PanelsTopLeft,
+    match: ['/walls', '/devotion-wall', '/prayer-wall'],
+  },
+  {
+    id: 'groups',
+    label: '小組',
+    shortLabel: '小組',
+    href: '/groups',
+    icon: Users,
+    match: ['/groups'],
   },
 ];
 
@@ -57,4 +57,22 @@ export function isNavItemActive(pathname: string, item: AppNavItem) {
     if (prefix === '/') return pathname === '/';
     return pathname === prefix || pathname.startsWith(`${prefix}/`);
   });
+}
+
+const mobileTitles: Record<string, string> = {
+  '/me/activity': '待回應', '/me/sharing': '我的分享',
+  '/': 'WeChurch', '/learn/church-reading': '每日靈修', '/learn/my-notes': '我的筆記',
+  '/learn/reading-plans': '讀經計畫', '/learn/bible': '聖經', '/bible': '聖經',
+  '/learn/jesus-timeline': '耶穌時間軸', '/jesus-timeline': '耶穌時間軸',
+  '/prayer-meeting': '禱告會', '/walls': '分享牆', '/prayer-wall': '分享牆', '/devotion-wall': '分享牆',
+  '/grace-record': '禱告與恩典', '/groups': '我的小組', '/care': '關懷',
+  '/learn': '聖經', '/share': '禱告', '/me/love-journey': '愛的旅程', '/me': '個人管理',
+  '/play': '工具', '/user': 'SoulGym', '/cards': '話語卡', '/card': '話語卡',
+  '/icebreaker': '破冰工具', '/grouper': '分組工具', '/notebook': '筆記',
+};
+
+export function mobilePageTitle(pathname: string) {
+  const match = Object.keys(mobileTitles).sort((a, b) => b.length - a.length)
+    .find(path => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)));
+  return match ? mobileTitles[match] : 'WeChurch';
 }
