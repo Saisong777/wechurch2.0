@@ -29,19 +29,21 @@ interface IncompleteMember {
   createdAt: string;
 }
 
-export const IncompleteMembersPanel = () => {
+export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) => {
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
 
   // Fetch incomplete members from multiple sources using API
-  const { data: incompleteMembers, isLoading, refetch } = useQuery({
-    queryKey: ['incomplete-members'],
-    queryFn: async () => {
+  const { data: incompleteMembers, isLoading, isError, refetch } = useQuery({
+    queryKey: ['incomplete-members', { church }],
+    queryFn: async ({ signal }) => {
       const members: IncompleteMember[] = [];
+      const query = `?${new URLSearchParams({ church })}`;
 
       // 1. Get users with missing display name (incomplete profile)
-      const usersRes = await fetch('/api/users');
+      const usersRes = await fetch(`/api/users${query}`, { signal });
+      if (!usersRes.ok) throw new Error('會員資料讀取失敗');
       if (usersRes.ok) {
         const users = await usersRes.json();
         for (const user of users || []) {
@@ -59,7 +61,8 @@ export const IncompleteMembersPanel = () => {
       }
 
       // 2. Get potential members who haven't registered (status = 'pending' and no userId)
-      const pmRes = await fetch('/api/potential-members');
+      const pmRes = await fetch(`/api/potential-members${query}`, { signal });
+      if (!pmRes.ok) throw new Error('會員資料讀取失敗');
       if (pmRes.ok) {
         const potentialMembers = await pmRes.json();
         for (const pm of potentialMembers || []) {
@@ -83,7 +86,9 @@ export const IncompleteMembersPanel = () => {
 
       return members;
     },
-    refetchInterval: getPollingInterval(30000),
+    staleTime: 30_000,
+    refetchInterval: getPollingInterval(60000),
+    retry: false,
   });
 
   // Send notification mutation using API
@@ -252,6 +257,11 @@ export const IncompleteMembersPanel = () => {
             {[...Array(3)].map((_, i) => (
               <Skeleton key={i} className="h-16 w-full" />
             ))}
+          </div>
+        ) : isError ? (
+          <div role="alert" className="py-6 text-center text-sm">
+            <p>無法載入待完善會員。</p>
+            <Button variant="outline" className="mt-3" onClick={() => refetch()}>重試</Button>
           </div>
         ) : !incompleteMembers || incompleteMembers.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">

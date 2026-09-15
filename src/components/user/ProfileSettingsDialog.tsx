@@ -200,7 +200,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
     }
   };
 
-  const getInitials = (email: string | undefined) => {
+  const getInitials = (email: string | null | undefined) => {
     if (!email) return 'U';
     return email.charAt(0).toUpperCase();
   };
@@ -374,12 +374,12 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
         </DialogContent>
       </Dialog>
 
-      <AvatarCropDialog
+      {selectedImageSrc && <AvatarCropDialog
         open={cropDialogOpen}
         onOpenChange={setCropDialogOpen}
         imageSrc={selectedImageSrc}
         onCropComplete={handleCropComplete}
-      />
+      />}
     </>
   );
 };

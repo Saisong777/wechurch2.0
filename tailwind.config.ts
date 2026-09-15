@@ -14,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        serif: ['Nunito', 'sans-serif'],
-        display: ['Nunito', 'sans-serif'],
+        serif: ['Inter', 'PingFang TC', 'Microsoft JhengHei', 'sans-serif'],
+        display: ['Inter', 'PingFang TC', 'Microsoft JhengHei', 'sans-serif'],
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'sans-serif'],
       },
       colors: {
@@ -23,7 +23,7 @@ export default {
           indigo: '#1E3A5F',
           amber: '#E8A020',
           sky: '#4A90D9',
-          warm: '#FAFAF7',
+          warm: '#F8FAF9',
           soft: '#F2F2EE',
           border: '#E0DED8',
           orange: '#E8841A',

@@ -30,4 +30,13 @@ export default tseslint.config(
       "prefer-const": "warn",
     },
   },
+  {
+    files: ['server/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: [
+        { name: 'pptxgenjs', message: 'Presentation export is browser-only. Do not load its vulnerable Node image parser on the server.' },
+        { name: 'image-size', message: 'No patched image-size release is available; do not introduce server image parsing.' },
+      ] }],
+    },
+  },
 );

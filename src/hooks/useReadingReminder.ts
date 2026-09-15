@@ -52,7 +52,7 @@ function sendNotification(title: string, body: string) {
     try {
       new Notification(title, {
         body,
-        icon: '/favicon.ico',
+        icon: '/wechurch-together.png',
         tag: 'reading-reminder',
         requireInteraction: false,
       });

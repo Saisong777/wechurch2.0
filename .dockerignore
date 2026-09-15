@@ -11,3 +11,12 @@ npm-debug.log*
 *.swp
 *.swo
 start-test*.log
+output
+outputs
+exports
+artifacts
+.playwright-cli
+uploads
+public/message-cards
+pastoral-os
+design
