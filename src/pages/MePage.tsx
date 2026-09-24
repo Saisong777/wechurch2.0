@@ -27,6 +27,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mergeLocalDevotionalNotes, type LocalDevotionalNote } from '@/lib/localDevotionalNotes';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from 'sonner';
+import { AppearanceControl } from '@/components/theme/AppearanceControl';
 
 interface EmailPreferences {
   userId: string;
@@ -198,6 +199,11 @@ const MePage = () => {
             </div>
           </section>
 
+          <section aria-label="外觀" className="space-y-3 border-b border-border py-4">
+            <h2 className="text-lg font-semibold">外觀</h2>
+            <div className="max-w-sm"><AppearanceControl inline /></div>
+          </section>
+
           <section aria-labelledby="my-records-title">
             <LineAccountLink />
             <div className="mb-3 px-1">
@@ -269,7 +275,7 @@ const MePage = () => {
                     />
                   </div>
 
-                  <div className="mt-4 flex flex-col gap-3 rounded-lg border border-sky-100 bg-white/80 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mt-4 flex flex-col gap-3 rounded-lg border border-sky-100 bg-card/80 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-sky-600" />
                       <span>每天 {emailPreferences?.dailyFollowTime || '07:00'}（台灣時間）寄出</span>
@@ -277,7 +283,7 @@ const MePage = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 rounded-lg gap-2 bg-white"
+                      className="h-9 rounded-lg gap-2 bg-card"
                       onClick={() => sendTestEmail.mutate()}
                       disabled={sendTestEmail.isPending}
                     >
@@ -287,7 +293,7 @@ const MePage = () => {
                   </div>
 
                   {emailPreview && (
-                    <div className="mt-4 rounded-lg border border-sky-100 bg-white p-4">
+                    <div className="mt-4 rounded-lg border border-sky-100 bg-card p-4">
                       <p className="text-xs font-semibold text-sky-600">測試信預覽</p>
                       <h4 className="mt-1 text-base font-bold text-foreground">{emailPreview.subject}</h4>
                       <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-muted-foreground">

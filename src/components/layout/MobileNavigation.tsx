@@ -6,6 +6,7 @@ import { MobileNavLinks } from './BottomNav';
 import { MobileHeaderContext } from './MobileHeaderContext';
 import { MobileAccountActions } from './MobileAccountActions';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
+import { AppearanceControl } from '@/components/theme/AppearanceControl';
 
 export function MobileNavigation() {
   const [open, setOpen] = useState(false);
@@ -56,6 +57,7 @@ export function MobileNavigation() {
         </Link>)}
       </div>
       <MobileAccountActions close={() => setOpen(false)} />
+      <div className="mx-auto max-w-xl border-t border-border p-3"><AppearanceControl inline /></div>
     </nav>
   </div>;
 }

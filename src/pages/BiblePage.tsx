@@ -625,16 +625,16 @@ const BibleReader = ({ entryKey }: { entryKey: string }) => {
     const totalChapters = categoryBooks.reduce((sum, b) => sum + b.chapterCount, 0);
 
     return (
-      <div key={category.name} className="bg-white rounded-2xl shadow-card mx-3 mb-3 overflow-hidden">
+      <div key={category.name} className="bg-card rounded-2xl shadow-card mx-3 mb-3 overflow-hidden">
         <button
           className="w-full flex items-center gap-2.5 px-4 py-3 text-left"
           onClick={() => toggleCategory(category.name)}
           data-testid={`button-category-${category.name}`}
         >
           <span className={`w-3 h-3 rounded-sm flex-shrink-0 ${category.colorDot}`} />
-          <span className="font-bold text-sm text-gray-800 flex-1">{category.name}</span>
-          <span className="text-xs text-gray-400">{totalChapters}章</span>
-          {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          <span className="font-bold text-sm text-foreground flex-1">{category.name}</span>
+          <span className="text-xs text-muted-foreground">{totalChapters}章</span>
+          {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </button>
         {isExpanded && (
           <div className="px-3 pb-3 grid grid-cols-3 gap-2">
@@ -643,13 +643,13 @@ const BibleReader = ({ entryKey }: { entryKey: string }) => {
                 key={book.bookNumber}
                 className={`h-11 rounded-lg text-sm flex flex-col items-center justify-center transition-colors ${selectedBook === book.bookName
                   ? 'bg-brand-amber text-white font-bold'
-                  : 'bg-brand-soft text-gray-700 hover:bg-brand-sky/10'
+                  : 'bg-brand-soft text-foreground hover:bg-brand-sky/10'
                   }`}
                 onClick={() => setSelectedBook(book.bookName)}
                 data-testid={`button-book-${book.bookNumber}`}
               >
                 <span>{book.bookName}</span>
-                <span className={`text-[10px] ${selectedBook === book.bookName ? 'text-white/80' : 'text-gray-400'}`}>{book.chapterCount}章</span>
+                <span className={`text-[10px] ${selectedBook === book.bookName ? 'text-white/80' : 'text-muted-foreground'}`}>{book.chapterCount}章</span>
               </button>
             ))}
           </div>
@@ -682,14 +682,14 @@ const BibleReader = ({ entryKey }: { entryKey: string }) => {
                 <Search className="w-4 h-4" />
               </Button>
               <button
-                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-muted'}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 0 ? 'text-muted-foreground' : 'text-muted-foreground hover:bg-muted'}`}
                 onClick={() => changeFontSize(-1)}
                 disabled={fontSizeLevel === 0}
                 data-testid="button-font-decrease"
               >A-</button>
-              <span className="text-xs text-gray-400 w-6 text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
+              <span className="text-xs text-muted-foreground w-6 text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
               <button
-                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 3 ? 'text-gray-300' : 'text-gray-500 hover:bg-muted'}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 3 ? 'text-muted-foreground' : 'text-muted-foreground hover:bg-muted'}`}
                 onClick={() => changeFontSize(1)}
                 disabled={fontSizeLevel === 3}
                 data-testid="button-font-increase"

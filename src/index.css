@@ -10,7 +10,7 @@
   }
 
   body {
-    background-color: #F8FAF9;
+    background-color: hsl(var(--background));
     font-family: var(--font-sans);
   }
 
@@ -18,6 +18,10 @@
     /* WeChurch - calm, durable product palette */
     --background: 150 24% 98%;
     --foreground: 170 8% 16%;
+    --brand-indigo: 213 52% 25%;
+    --brand-sky: 211 65% 45%;
+    --scripture-surface: 41 56% 96%;
+    --scripture-border: 38 36% 85%;
 
     --card: 0 0% 100%;
     --card-foreground: 170 8% 16%;
@@ -69,16 +73,18 @@
   }
 
   .dark {
-    --background: 0 0% 0%;
-    /* OLED Black */
-    --foreground: 210 40% 98%;
+    --background: 195 9% 9%;
+    --foreground: 160 10% 95%;
+    --brand-indigo: 204 58% 76%;
+    --brand-sky: 204 70% 74%;
+    --scripture-surface: 170 8% 13%;
+    --scripture-border: 170 8% 29%;
 
-    --card: 240 5% 10%;
-    /* #18181B */
-    --card-foreground: 210 40% 98%;
+    --card: 180 6% 13%;
+    --card-foreground: 160 10% 95%;
 
-    --popover: 240 5% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 180 6% 16%;
+    --popover-foreground: 160 10% 95%;
 
     --primary: 165 45% 68%;
     --primary-foreground: 170 18% 12%;
@@ -86,18 +92,18 @@
     --secondary: 14 66% 70%;
     --secondary-foreground: 170 18% 12%;
 
-    --muted: 240 5% 16%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 180 5% 20%;
+    --muted-foreground: 165 7% 72%;
 
     --accent: 171 48% 29%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 78% 73%;
+    --destructive-foreground: 0 0% 9%;
 
-    --border: 240 5% 16%;
-    --input: 240 5% 16%;
-    --ring: 205 85% 55%;
+    --border: 175 7% 29%;
+    --input: 175 7% 34%;
+    --ring: 165 45% 68%;
   }
 }
 
@@ -130,12 +136,6 @@
   #root {
     min-height: 100%;
     @apply bg-background;
-  }
-
-  /* Dark mode background color */
-  .dark html,
-  .dark body {
-    background-color: hsl(0, 0%, 0%);
   }
 
   /* Modern, friendly typography */
@@ -322,8 +322,8 @@
   }
 
   .scripture-paper {
-    background: #FBF8F1;
-    border-color: #E7DDCC;
+    background: hsl(var(--scripture-surface));
+    border-color: hsl(var(--scripture-border));
   }
 
   .scripture-serif {
@@ -1173,4 +1173,72 @@
   .devotion-schedule-table tbody td:nth-child(5) { grid-column: 2 / 4; white-space: normal; }
   .devotion-schedule-table tbody td:last-child { grid-column: 3; grid-row: 1; padding: 0; }
   .devotion-schedule-table input[type='checkbox'] { width: 20px; height: 20px; }
+}
+
+/* Legacy tonal surfaces keep their meaning in dark mode. Explicit dark variants win.
+   White QR canvases, generated artwork and projection surfaces remain unchanged. */
+@layer utilities {
+  .dark :where(.bg-sky-50, .bg-sky-50\/10, .bg-sky-50\/40, .bg-sky-50\/60, .bg-sky-50\/70) { @apply bg-sky-400/10; }
+  .dark :where(.text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900) { @apply text-sky-300; }
+  .dark :where(.border-sky-100, .border-sky-200) { @apply border-sky-400/30; }
+  .dark :where(.from-sky-50) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.bg-blue-100, .bg-blue-100\/30, .bg-blue-200, .bg-blue-50, .bg-blue-50\/10, .bg-blue-50\/50, .bg-blue-50\/60) { @apply bg-blue-400/10; }
+  .dark :where(.text-blue-600, .text-blue-700, .text-blue-800) { @apply text-blue-300; }
+  .dark :where(.border-blue-200, .border-blue-300) { @apply border-blue-400/30; }
+  .dark :where(.from-blue-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-blue-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-emerald-100, .bg-emerald-50, .bg-emerald-50\/10, .bg-emerald-50\/30, .bg-emerald-50\/40, .bg-emerald-50\/50, .bg-emerald-50\/60, .bg-emerald-50\/70) { @apply bg-emerald-400/10; }
+  .dark :where(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-950) { @apply text-emerald-300; }
+  .dark :where(.border-emerald-100, .border-emerald-200, .border-emerald-300) { @apply border-emerald-400/30; }
+  .dark :where(.bg-green-100, .bg-green-200, .bg-green-50, .bg-green-50\/10, .bg-green-50\/50, .bg-green-50\/60) { @apply bg-green-400/10; }
+  .dark :where(.text-green-600, .text-green-700, .text-green-800) { @apply text-green-300; }
+  .dark :where(.border-green-200, .border-green-300) { @apply border-green-400/30; }
+  .dark :where(.from-green-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-green-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-teal-100, .bg-teal-200, .bg-teal-50) { @apply bg-teal-400/10; }
+  .dark :where(.text-teal-600, .text-teal-700, .text-teal-800) { @apply text-teal-300; }
+  .dark :where(.from-teal-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-teal-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-amber-100, .bg-amber-50, .bg-amber-50\/10, .bg-amber-50\/40, .bg-amber-50\/60, .bg-amber-50\/70) { @apply bg-amber-400/10; }
+  .dark :where(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900, .text-amber-900\/80, .text-amber-950) { @apply text-amber-300; }
+  .dark :where(.border-amber-100, .border-amber-200, .border-amber-300) { @apply border-amber-400/30; }
+  .dark :where(.from-amber-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-amber-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-yellow-100, .bg-yellow-200, .bg-yellow-50\/10, .bg-yellow-50\/50) { @apply bg-yellow-400/10; }
+  .dark :where(.text-yellow-600, .text-yellow-700, .text-yellow-800) { @apply text-yellow-300; }
+  .dark :where(.border-yellow-200) { @apply border-yellow-400/30; }
+  .dark :where(.from-yellow-50\/50, .from-yellow-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-yellow-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-orange-100, .bg-orange-50) { @apply bg-orange-400/10; }
+  .dark :where(.text-orange-600, .text-orange-700) { @apply text-orange-300; }
+  .dark :where(.border-orange-300) { @apply border-orange-400/30; }
+  .dark :where(.from-orange-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-orange-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-red-100, .bg-red-50) { @apply bg-red-400/10; }
+  .dark :where(.text-red-600, .text-red-700, .text-red-800) { @apply text-red-300; }
+  .dark :where(.border-red-200) { @apply border-red-400/30; }
+  .dark :where(.bg-rose-100, .bg-rose-50, .bg-rose-50\/70) { @apply bg-rose-400/10; }
+  .dark :where(.text-rose-600, .text-rose-700, .text-rose-800) { @apply text-rose-300; }
+  .dark :where(.border-rose-200, .border-rose-300) { @apply border-rose-400/30; }
+  .dark :where(.bg-violet-50, .bg-violet-50\/70) { @apply bg-violet-400/10; }
+  .dark :where(.text-violet-600, .text-violet-700, .text-violet-800) { @apply text-violet-300; }
+  .dark :where(.border-violet-200) { @apply border-violet-400/30; }
+  .dark :where(.bg-purple-100, .bg-purple-50, .bg-purple-50\/60) { @apply bg-purple-400/10; }
+  .dark :where(.text-purple-600, .text-purple-700) { @apply text-purple-300; }
+  .dark :where(.border-purple-200) { @apply border-purple-400/30; }
+  .dark :where(.from-purple-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-purple-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-indigo-50) { @apply bg-indigo-400/10; }
+  .dark :where(.text-indigo-700, .text-indigo-800) { @apply text-indigo-300; }
+  .dark :where(.border-indigo-200) { @apply border-indigo-400/30; }
+  .dark :where(.from-indigo-50\/70) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-indigo-50\/20) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-slate-100, .bg-slate-50) { @apply bg-slate-400/10; }
+  .dark :where(.text-slate-600, .text-slate-700) { @apply text-slate-300; }
+  .dark :where(.border-slate-200, .border-slate-300) { @apply border-slate-400/30; }
+  .dark :where(.from-slate-50) { --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .dark :where(.to-slate-100) { --tw-gradient-to: hsl(var(--card)) var(--tw-gradient-to-position); }
+  .dark :where(.bg-gray-100, .bg-gray-50) { @apply bg-gray-400/10; }
+  .dark :where(.text-gray-500, .text-gray-600, .text-gray-700, .text-gray-900) { @apply text-gray-300; }
+  .dark :where(.border-gray-200) { @apply border-gray-400/30; }
 }

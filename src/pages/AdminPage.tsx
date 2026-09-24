@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
+import { AppearanceControl } from '@/components/theme/AppearanceControl';
 import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown, Mail, Inbox, Plus, BookOpen, QrCode, Gauge } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
@@ -432,6 +433,7 @@ export const AdminPage: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <AppearanceControl />
             {user && (
               <>
                 {role && (

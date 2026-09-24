@@ -1,6 +1,7 @@
 import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { AppearanceControl } from '@/components/theme/AppearanceControl';
 import { Card, CardContent } from '@/components/ui/card';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import {
@@ -425,7 +426,7 @@ const Index = () => {
       subtitle: '閱覽聖經、每日讀經、靈修筆記、耶穌四季',
       href: '/learn',
       icon: BookOpen,
-      tone: 'border-border/70 bg-white/95 hover:border-primary/25',
+      tone: 'border-border/70 bg-card/95 hover:border-primary/25',
       iconTone: 'bg-primary/10 text-primary',
       featureKeys: ['we_learn'],
     },
@@ -435,7 +436,7 @@ const Index = () => {
       subtitle: '個人需求禱告、恩典紀錄、教會禱告網、緊急禱告',
       href: '/share',
       icon: Share2,
-      tone: 'border-border/70 bg-white/95 hover:border-secondary/25',
+      tone: 'border-border/70 bg-card/95 hover:border-secondary/25',
       iconTone: 'bg-secondary/10 text-secondary',
       featureKeys: ['we_share'],
     },
@@ -445,7 +446,7 @@ const Index = () => {
       subtitle: '個人關懷清單、小組關懷清單、具體要關心的人',
       href: '/care',
       icon: HandHeart,
-      tone: 'border-border/70 bg-white/95 hover:border-emerald-200',
+      tone: 'border-border/70 bg-card/95 hover:border-emerald-200',
       iconTone: 'bg-emerald-500/10 text-emerald-600',
       featureKeys: ['care'],
     },
@@ -455,7 +456,7 @@ const Index = () => {
       subtitle: '牌卡、隨機分組、十二門徒人格測驗、聖經問答',
       href: '/play',
       icon: Gamepad2,
-      tone: 'border-border/70 bg-white/95 hover:border-amber-200',
+      tone: 'border-border/70 bg-card/95 hover:border-amber-200',
       iconTone: 'bg-amber-500/10 text-amber-700',
       featureKeys: ['we_play'],
     },
@@ -465,7 +466,7 @@ const Index = () => {
       subtitle: '主持 SoulGym、管理禱告會、查看歷史資料與成員',
       href: '/admin',
       icon: Settings,
-      tone: 'border-border/70 bg-white/95 hover:border-slate-300',
+      tone: 'border-border/70 bg-card/95 hover:border-slate-300',
       iconTone: 'bg-slate-500/10 text-slate-700',
       featureKeys: ['we_live'],
     }] : []),
@@ -531,7 +532,7 @@ const Index = () => {
     },
   ];
   return (
-    <div className="dashboard-surface min-h-screen bg-[#F8FAF9]" data-dashboard-variant={styleLabMode ? dashboardVariant : 'together'}>
+    <div className="dashboard-surface min-h-screen bg-background" data-dashboard-variant={styleLabMode ? dashboardVariant : 'together'}>
       <header className="dashboard-header sticky top-0 z-50 w-full border-b border-border/70 bg-background/90 px-4 py-3 shadow-[0_10px_30px_-28px_rgba(30,58,95,0.45)] backdrop-blur-xl transition-all sm:px-6 sm:py-4 md:py-3">
         <div className="container mx-auto flex items-center justify-between">
           {/* Mobile: Left spacer */}
@@ -578,7 +579,8 @@ const Index = () => {
             })}
           </nav>
 
-          <div className="w-10 flex justify-end">
+          <div className="flex shrink-0 items-center justify-end gap-1">
+            <AppearanceControl />
             {authLoading ? (
               <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
             ) : user ? (
@@ -685,7 +687,7 @@ const Index = () => {
           )}
 
           <section className="dashboard-hero-section animate-fade-in space-y-4" aria-labelledby="today-dashboard-title">
-            <div className="dashboard-hero overflow-hidden rounded-lg border border-border/70 bg-white/95 shadow-[0_16px_48px_-34px_rgba(30,58,95,0.42)]">
+            <div className="dashboard-hero overflow-hidden rounded-lg border border-border/70 bg-card/95 shadow-[0_16px_48px_-34px_rgba(30,58,95,0.42)]">
               <div className="dashboard-hero__grid grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(22rem,0.62fr)] lg:items-stretch">
                 {!isCompanionVariant && (
                 <div className="flex min-w-0 flex-col">
@@ -778,7 +780,7 @@ const Index = () => {
                         <div className="min-w-0">
                           <div className="flex items-center justify-between gap-3">
                             <p className={`text-sm font-bold ${item.tone}`}>{item.label}</p>
-                            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-muted-foreground shadow-sm">
+                            <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[11px] font-semibold text-muted-foreground shadow-sm">
                               {item.status}
                             </span>
                           </div>
@@ -792,7 +794,7 @@ const Index = () => {
             </div>
 
             <div className={`dashboard-sections grid gap-3 lg:grid-cols-2 lg:items-start ${isCompanionVariant ? 'dashboard-sections--companion-detail' : ''}`}>
-              <Card className="dashboard-section dashboard-section-love overflow-hidden rounded-lg border-border/70 bg-white/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
+              <Card className="dashboard-section dashboard-section-love overflow-hidden rounded-lg border-border/70 bg-card/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
                 <CardContent className="p-0">
                   <div className="border-b border-border/60 bg-primary/5 p-4">
                     <div className="flex items-center gap-3">
@@ -850,13 +852,13 @@ const Index = () => {
                         {(churchReading.prayer || churchReading.loveAction) && (
                           <div className="grid gap-2 sm:grid-cols-2">
                             {churchReading.prayer && (
-                              <div className="rounded-lg bg-white/70 p-3">
+                              <div className="rounded-lg bg-card/70 p-3">
                                 <p className="text-xs font-semibold text-primary">今日愛神</p>
                                 <p className="mt-1 line-clamp-3 text-sm leading-6 text-muted-foreground">{churchReading.prayer}</p>
                               </div>
                             )}
                             {churchReading.loveAction && (
-                              <div className="rounded-lg bg-white/70 p-3">
+                              <div className="rounded-lg bg-card/70 p-3">
                                 <p className="text-xs font-semibold text-emerald-700">今日愛人</p>
                                 <p className="mt-1 line-clamp-3 text-sm leading-6 text-muted-foreground">{churchReading.loveAction}</p>
                               </div>
@@ -1012,7 +1014,7 @@ const Index = () => {
                 </CardContent>
               </Card>
 
-              <Card className="dashboard-section dashboard-section-care overflow-hidden rounded-lg border-border/70 bg-white/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
+              <Card className="dashboard-section dashboard-section-care overflow-hidden rounded-lg border-border/70 bg-card/95 shadow-[0_16px_50px_-34px_rgba(30,58,95,0.5)]">
                 <CardContent className="p-0">
                   <div className="border-b border-border/60 bg-secondary/5 p-4">
                     <div className="flex items-center gap-3">

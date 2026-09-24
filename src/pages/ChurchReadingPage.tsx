@@ -65,7 +65,7 @@ const ChurchReadingPage = () => {
 
               <div className="space-y-6">
                 {isLoading && !syncedReading && (
-                  <div className="space-y-2 rounded-lg border bg-white/70 p-3">
+                  <div className="space-y-2 rounded-lg border bg-card/70 p-3">
                     <Skeleton className="h-4 w-2/3" />
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-5/6" />

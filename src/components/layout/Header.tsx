@@ -20,6 +20,7 @@ import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
 import { useUserRole } from '@/hooks/useUserRole';
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
+import { AppearanceControl } from '@/components/theme/AppearanceControl';
 
 interface HeaderProps {
   title?: string;
@@ -239,6 +240,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
             {rightContent}
+            <AppearanceControl />
             {userMenu}
           </div>
         </div>

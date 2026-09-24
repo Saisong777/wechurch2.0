@@ -453,7 +453,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
               <div className="flex items-center gap-2">
                 <GitMerge className="h-4 w-4 text-amber-700" />
                 <p className="font-semibold text-amber-950">可能重複的牧養對象</p>
-                <Badge variant="outline" className="border-amber-300 bg-white/70 text-amber-800">
+                <Badge variant="outline" className="border-amber-300 bg-card/70 text-amber-800">
                   {mergeSuggestions.length}
                 </Badge>
               </div>
@@ -465,7 +465,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {mergeSuggestions.slice(0, 4).map((suggestion) => (
-              <div key={suggestion.id} className="rounded-lg border border-amber-200 bg-white/80 p-3">
+              <div key={suggestion.id} className="rounded-lg border border-amber-200 bg-card/80 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">
@@ -481,7 +481,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-8 bg-white"
+                      className="h-8 bg-card"
                       onClick={() => {
                         setSelectedPersonId(suggestion.primaryPersonId);
                         setPersonFilter('all');
@@ -493,7 +493,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-8 bg-white"
+                      className="h-8 bg-card"
                       disabled={mutations.dismissMergeSuggestion.isPending}
                       onClick={() => handleDismissMergeSuggestion(suggestion.primaryPersonId, suggestion.duplicatePersonId)}
                     >
@@ -719,9 +719,9 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
                       <div className={cn(
                         'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border',
                         nextFollowUpDay
-                          ? 'border-rose-200 bg-white text-rose-700'
+                          ? 'border-rose-200 bg-card text-rose-700'
                           : journeyCompletion >= 100
-                            ? 'border-emerald-200 bg-white text-emerald-700'
+                            ? 'border-emerald-200 bg-card text-emerald-700'
                             : 'border-primary/20 bg-background text-primary'
                       )}
                       >

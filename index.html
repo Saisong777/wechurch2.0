@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="zh-TW" style="background-color: var(--brand-warm, #F8FAF9); height: 100%;">
+<html lang="zh-TW" style="height: 100%;">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#F8FAF9" />
+  <script src="/theme-init.js"></script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="icon" type="image/png" href="/wechurch-together.png" />
@@ -26,6 +27,8 @@
 
   <!-- Inline critical CSS for faster FCP -->
   <style>
+    html { background: #F8FAF9; color: #252C2B; color-scheme: light; }
+    html.dark { background: #151819; color: #F0F3F2; color-scheme: dark; }
     body {
       margin: 0;
       font-family: system-ui, -apple-system, sans-serif;
@@ -54,7 +57,7 @@
     }
 
     .bg-background {
-      background-color: var(--brand-warm, #F8FAF9);
+      background-color: hsl(var(--background, 150 24% 98%));
     }
 
     .rounded-full {

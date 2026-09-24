@@ -1,4 +1,5 @@
 import { CrmOperationalPanel } from '@/components/admin/CrmOperationalPanel';
+import { AppearanceControl } from '@/components/theme/AppearanceControl';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
@@ -532,6 +533,7 @@ const CRMPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <AppearanceControl />
             <Select value={selectedChurch} onValueChange={setSelectedChurch} disabled={writesPending}>
               <SelectTrigger aria-label="選擇教會" className="hidden w-[170px] sm:flex">
                 <SelectValue placeholder="選擇教會" />

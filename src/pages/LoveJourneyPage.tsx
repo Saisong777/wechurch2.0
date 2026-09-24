@@ -319,7 +319,7 @@ export default function LoveJourneyPage() {
                               value={drafts[day.id] ?? day.responseText ?? ''}
                               onChange={(event) => setDrafts((current) => ({ ...current, [day.id]: event.target.value }))}
                               placeholder="寫下今天的回應"
-                              className="min-h-24 resize-y bg-white/80"
+                              className="min-h-24 resize-y bg-card/80"
                             />
                             <label className="block space-y-2 py-2 text-sm"><span>回答分享範圍 · 第 {day.dayNumber} 天</span><select className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3" disabled={updateProgress.isPending || loveJourney.status !== 'active'} value={sharing[day.id]?.scope ?? day.visibility ?? 'private'} onChange={e => setSharing(current => ({ ...current, [day.id]: {scope:e.target.value as LoveJourneyProgressDay['visibility'],contractId:e.target.value==='mentor'?activeMentor?.id:null} }))}><option value="private">只有自己</option><option value="mentor" disabled={!activeMentor}>目前已確認的陪伴者{activeMentor ? `：${activeMentor.mentorName}` : '（尚未安排）'}</option>{day.visibility === 'pastoral' && <option value="pastoral">原先分享的被授權牧養同工</option>}</select></label>
                             {sharing[day.id]?.scope==='mentor'&&sharing[day.id].contractId!==activeMentor?.id&&<p role="alert" className="text-sm text-destructive">陪伴者已變更，請先選「只有自己」，再確認新的分享對象。</p>}
