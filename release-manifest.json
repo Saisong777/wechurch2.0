@@ -1,5 +1,5 @@
 {
-  "fingerprint": "af365247ca206fdace53ffecaa20508895b234f51457999ce9cc34d1b10cbe58",
+  "fingerprint": "884d4f1cfad63f7514cab31aecadefe096a399e4caaf09980fb16c278d3536b4",
   "files": [
     {
       "file": "Dockerfile",
@@ -19,7 +19,7 @@
     },
     {
       "file": "index.html",
-      "sha256": "24af05c48040604e0549e0b439e4f0699489405007a412c0f44af5f96c680ec5"
+      "sha256": "ad58763f4c5c4839255987b9724afdaf392d772c710a46ac3fbcce1ee7fda9c9"
     },
     {
       "file": "components.json",
@@ -35,7 +35,7 @@
     },
     {
       "file": "tailwind.config.ts",
-      "sha256": "17fa192a9dfb5cf31aebe6b83a26fc80da422f0bdb4e0ec3b9804d5dbbc756f8"
+      "sha256": "1e9093fffa05cc2bf2198fc602e725df9c5a509a37c4763c1af6c497a0768735"
     },
     {
       "file": "postcss.config.js",
@@ -155,7 +155,7 @@
     },
     {
       "file": "src/components/admin/PastoralJourneyPanel.tsx",
-      "sha256": "f0f5eec51d106769dd7010564ac07c0ea61d453b827ac356010c5386f1ee91aa"
+      "sha256": "07269f35c8fe151b7dcc287dd56a10443324a9a607276f97a7ebef8a0afcb84a"
     },
     {
       "file": "src/components/admin/PlatformMaturityPanel.tsx",
@@ -323,7 +323,7 @@
     },
     {
       "file": "src/components/layout/Header.tsx",
-      "sha256": "1d1f4e3306045016090408d937bb53203c4020dba480bc12bdb9f02424ce1c89"
+      "sha256": "1df726f098b8822d0add4a225a0af5833f07b223d042d136df954dfa255b144e"
     },
     {
       "file": "src/components/layout/MobileAccountActions.tsx",
@@ -339,7 +339,7 @@
     },
     {
       "file": "src/components/layout/MobileNavigation.tsx",
-      "sha256": "a25eee0109dd7ecbfc604a44ebdf6622c2ed24823fe22de083edc60c00bf8868"
+      "sha256": "215c1c339082dc91501e33c43d3902e735606750d28819e3596fe8d0709e322a"
     },
     {
       "file": "src/components/layout/NetworkStatusBanner.tsx",
@@ -484,6 +484,22 @@
     {
       "file": "src/components/support/SupportPanel.tsx",
       "sha256": "a0d696fddf5c7d4143ee899e76241ef761c752711d6f3628a83b162099ac3a89"
+    },
+    {
+      "file": "src/components/theme/AppearanceControl.test.tsx",
+      "sha256": "e9f642ed2e178bb52e6063f976cefc93a8dc849665496c32e2cf701ae811ddd5"
+    },
+    {
+      "file": "src/components/theme/AppearanceControl.tsx",
+      "sha256": "2553cbd3314ea5ad21ca1004fefad98c62e484c38c62cc22969e37369410e117"
+    },
+    {
+      "file": "src/components/theme/AppearanceProvider.tsx",
+      "sha256": "d4b735a1343524d0c26671121b9b4f7d4baf2728342a56517bf85a8851bf356a"
+    },
+    {
+      "file": "src/components/theme/appearance-init.test.ts",
+      "sha256": "69959e13f2313fe86ef63bae3504e37a1e501e1b0644512c4a9396fe8eb3d4da"
     },
     {
       "file": "src/components/ui/alert-dialog.tsx",
@@ -807,7 +823,7 @@
     },
     {
       "file": "src/index.css",
-      "sha256": "983c5c524641cbce86817e970b032c5c8eb131f76f61cc7c02b6eac69addebfd"
+      "sha256": "bdbc50574d4fc333fd651757ad18da4fcad630590c86214a57d2b79cfdba6e84"
     },
     {
       "file": "src/lib/admin-helpers.ts",
@@ -931,11 +947,11 @@
     },
     {
       "file": "src/main.tsx",
-      "sha256": "8f32e669cfe980ba70eb20dcf6de84a404068dc0b142855cf688c4e8eecf84d1"
+      "sha256": "04a5728c6da281de183a332323cb2f7519112a834cb0dd7f13430dc3191861b1"
     },
     {
       "file": "src/pages/AdminPage.tsx",
-      "sha256": "081cd5cd614e25d8f6ba5a2155645b52efe79e6ba1ebc91ebecb0ebfd10c7cf5"
+      "sha256": "bf78b9a7943ec46b4abacce4c54366c45fa7c6db3717c7f487eff17da106bcc1"
     },
     {
       "file": "src/pages/BiblePage.test.tsx",
@@ -943,7 +959,7 @@
     },
     {
       "file": "src/pages/BiblePage.tsx",
-      "sha256": "48b162816ad2f8d355142665686be3f6a54e4cd23ce3667c93436331b038ea3b"
+      "sha256": "b6ecd95d327948cfea2b11184d6bad40a9dd9a5a991fcd06ca8d1f218ae4e6f0"
     },
     {
       "file": "src/pages/BibleQuizPage.tsx",
@@ -951,7 +967,7 @@
     },
     {
       "file": "src/pages/CRMPage.tsx",
-      "sha256": "3528156365133dfa57b794f85085a0437b043ce90f213ef83de889cfcebddc98"
+      "sha256": "7db337087be8b4f3f31ffd8b4b7594be7af13ae72e95b9659b8701c314c14c45"
     },
     {
       "file": "src/pages/CarePage.test.tsx",
@@ -975,7 +991,7 @@
     },
     {
       "file": "src/pages/ChurchReadingPage.tsx",
-      "sha256": "dd405032508de74941393701df6ec6d0aa3c4b953362168c2ff0d966a782ca3d"
+      "sha256": "2263a78fa2a7a53aa5e0a5c1e08c9d981ce69473095a1982c94f9ec79d509ba8"
     },
     {
       "file": "src/pages/DailyPortals.test.tsx",
@@ -1007,7 +1023,7 @@
     },
     {
       "file": "src/pages/Index.tsx",
-      "sha256": "f39cf62d93d495049f5d624d3d089db795c30bbf67316b9ce65a619508906ecf"
+      "sha256": "1e09cd2c75f2b3ff6a9c3edbf167968d98573729157a10cab771c1c23b18168d"
     },
     {
       "file": "src/pages/JesusTimelinePage.tsx",
@@ -1031,7 +1047,7 @@
     },
     {
       "file": "src/pages/LoginPage.tsx",
-      "sha256": "88ac17de4844a7cc78df8d0de43c69622d8da9bb3359142fa779f664d317298a"
+      "sha256": "764830f70968c5fa9aacd26ce1a66f84ee98c3b9f614df1bed814694fe7d070c"
     },
     {
       "file": "src/pages/LoveJourneyPage.test.tsx",
@@ -1039,11 +1055,11 @@
     },
     {
       "file": "src/pages/LoveJourneyPage.tsx",
-      "sha256": "48068c21239d683392ca5df531e98b0ac187401837d17a9d2be368f2b5344b4f"
+      "sha256": "5b7101111ce782cc5de7dbec2987a17d1e6e498874e6a7e4dfd7a5ba032569c9"
     },
     {
       "file": "src/pages/MePage.tsx",
-      "sha256": "7328c31caa91e615c33685f768310948cb0b3d935bb2ba983a968465068f470b"
+      "sha256": "96a0871506b940c55b5cc529bfe17296baad4faa3b820c48e0642bb528ecf856"
     },
     {
       "file": "src/pages/MentoringPage.tsx",
@@ -1576,6 +1592,10 @@
     {
       "file": "public/robots.txt",
       "sha256": "a3d27b3ca5ce32341fa9f96f01169b521b1657c05d1860c45d1e53a6258e9e8b"
+    },
+    {
+      "file": "public/theme-init.js",
+      "sha256": "0fa3836421cd6e5d396e3cdc064c387b9c3b859001627911cd436ded70ee4793"
     },
     {
       "file": "public/wechurch-together.png",

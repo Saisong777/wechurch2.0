@@ -13,6 +13,17 @@ tokens live in `src/index.css`. Controls default to at least 44px, card radius 8
 Reading width 672px, body 18px/32px. Admin uses compact task-first lists.
 No oversized explanation panels above content. Secondary help lives in disclosures.
 See `design/ui-ux-refresh-2026-09-13.md` for scope and verification.
+## Appearance Added 2026-09-25
+
+Default to light; offer explicit light, dark, and system choices through one
+shared control. Store the preference per browser, not in the member record.
+Desktop headers use a 44px icon menu; the existing mobile menu and personal
+settings use a three-option segmented control. Do not add another navigation bar.
+Dark mode uses neutral charcoal surfaces, mint primary, and coral accents.
+Use semantic tokens for reading, forms, popovers, and management surfaces.
+Keep QR canvases, photos, and exported media in their original colors.
+See `design/appearance-2026-09-25.md` for B release evidence and limitations.
+
 The sections below are historical experiments, not current navigation or palette.
 
 ---

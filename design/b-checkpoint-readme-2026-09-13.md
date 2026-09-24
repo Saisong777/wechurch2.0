@@ -9,9 +9,10 @@
 ## 版本識別
 
 - B 網址：https://wechurch-staging-staging.up.railway.app
-- B 部署：`c4349339-c0f7-45af-ab19-6c853fc2c3ac`
-- 程式指紋：`af365247ca206fdace53ffecaa20508895b234f51457999ce9cc34d1b10cbe58`
-- `release-manifest.json` 列出實際 B 部署的 449 個檔案與 SHA-256。
+- B 部署：`38b8a5c0-7b91-43fd-bf0f-d4222f163408`
+- 程式指紋：`884d4f1cfad63f7514cab31aecadefe096a399e4caaf09980fb16c278d3536b4`
+- `release-manifest.json` 列出實際 B 部署的 454 個檔案與 SHA-256。
+- 2026-09-25 新增明亮／暗色／跟隨裝置，見 [外觀驗收](appearance-2026-09-25.md)。
 - `node ops/verify-b-checkpoint.mjs` 可以逐檔核對版本；不需要資料庫或密碼。
 - `design/releases/` 保存發布紀錄時，`sourceCommit` 指向確切來源提交，不以日期或分支名稱代替。
 
