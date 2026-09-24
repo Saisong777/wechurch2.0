@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { RequestHandler } from 'express';
 import { stagingLineReady } from './lineLoginPolicy';
 import { invitationLanding, invitationScript } from './stagingInvitation';
+import { googleLoginConfig, googleOnlyRegistration } from './googleLoginPolicy';
 
 type Env = NodeJS.ProcessEnv;
 export function isTestDeployment(env: Env = process.env) {
@@ -14,6 +15,7 @@ export function assertDeploymentSafety(env: Env = process.env) {
   if (!env.STAGING_ACCESS_CODE || env.STAGING_ACCESS_CODE.length < 16) throw new Error('Staging requires an invitation code of at least 16 characters.');
   if (!env.SESSION_SECRET || env.SESSION_SECRET.length < 32) throw new Error('Staging requires an independent session secret.');
   if (env.STAGING_LINE_LOGIN_ENABLED === '1' && !stagingLineReady(env)) throw new Error('Staging LINE configuration is incomplete or unsafe.');
+  if ((env.STAGING_GOOGLE_LOGIN_ENABLED === '1' || googleOnlyRegistration(env)) && !googleLoginConfig(env).enabled) throw new Error('Staging Google configuration is incomplete or unsafe.');
   if (env.LOCAL_INSECURE_COOKIES === '1') throw new Error('Insecure local cookies are forbidden on staging.');
   const origin = new URL(env.PUBLIC_BASE_URL || '');
   if (origin.protocol !== 'https:' || ['wechurch.online', 'www.wechurch.online'].includes(origin.hostname)) throw new Error('Staging requires its own HTTPS origin.');
@@ -83,7 +85,7 @@ export function stagingAccessGate(env: Env = process.env): RequestHandler {
       if (req.path.startsWith('/api/') || req.method !== 'GET') return res.status(401).json({ error: '請先輸入測試邀請碼。', code: 'STAGING_ACCESS_REQUIRED' });
       return res.status(401).type('html').send(invitationPage());
     }
-    if (req.path === '/api/dev-login' || req.path === '/api/login' || req.path === '/api/callback' || (req.path.startsWith('/api/line-login') && !stagingLineReady(env)) || req.path.startsWith('/api/cron/') || req.path.includes('webhook')) return res.status(403).json({ error: '測試站未開放此整合。' });
+    if (req.path === '/api/dev-login' || (['/api/login', '/api/callback'].includes(req.path) && !googleLoginConfig(env).enabled) || (req.path.startsWith('/api/line-login') && !stagingLineReady(env)) || req.path.startsWith('/api/cron/') || req.path.includes('webhook')) return res.status(403).json({ error: '測試站未開放此整合。' });
     next();
   };
 }

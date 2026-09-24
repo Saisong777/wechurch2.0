@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { pool } from "../../db";
 import { sendEmail } from "../../resend";
+import { googleOnlyRegistration } from '../../googleLoginPolicy';
 
 export function registerAuthRoutes(app: Express): void {
   const authRateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -46,6 +47,7 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   app.post("/api/auth/register", authRateLimit("register", 5), async (req: any, res) => {
+    if (googleOnlyRegistration()) return res.status(403).json({ message: '請使用 Google 帳號註冊。', code: 'GOOGLE_REGISTRATION_REQUIRED' });
     try {
       const { email, password, displayName } = req.body;
 

@@ -6,6 +6,28 @@ const env = { APP_ENV: 'staging', NODE_ENV: 'production', PUBLIC_BASE_URL: 'http
 afterEach(() => vi.unstubAllEnvs());
 
 describe('deployment safety', () => {
+  it('opens only Google routes for invited B users when separately configured', async () => {
+    const googleEnv = { ...env, GOOGLE_CLIENT_ID: 'b-client', GOOGLE_CLIENT_SECRET: 'b-secret',
+      STAGING_GOOGLE_CLIENT_ID: 'b-client', STAGING_GOOGLE_LOGIN_ENABLED: '1', AUTH_REGISTRATION_MODE: 'google-only' };
+    expect(() => assertDeploymentSafety(googleEnv)).not.toThrow();
+    expect(() => assertDeploymentSafety({ ...googleEnv, GOOGLE_CLIENT_SECRET: '' })).toThrow(/Google/);
+    const app = express();
+    app.use(stagingAccessGate(googleEnv));
+    app.use((_req, res) => res.json({ allowed: true }));
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise<void>(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    try {
+      const headers = { Cookie: `__Host-wechurch-staging=${stagingTicket(env.STAGING_ACCESS_CODE)}` };
+      for (const path of ['/api/login', '/api/callback', '/api/auth/options']) {
+        expect((await fetch(base + path)).status).toBe(401);
+        expect((await fetch(base + path, { headers })).status).toBe(200);
+      }
+      for (const path of ['/api/dev-login', '/api/cron/daily-follow-email', '/api/webhooks/resend']) {
+        expect((await fetch(base + path, { headers })).status).toBe(403);
+      }
+    } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
   it('fails closed on insecure staging or production targets', () => {
     expect(() => assertDeploymentSafety(env)).not.toThrow();
     for (const patch of [{ NODE_ENV: 'development' }, { LOCAL_INSECURE_COOKIES: '1' }, { STAGING_ACCESS_CODE: '' }, { SESSION_SECRET: '' }, { PUBLIC_BASE_URL: 'https://wechurch.online' }, { STAGING_EXPECTED_DB_HOST: 'production-db' }, { RAILWAY_ENVIRONMENT_NAME: 'production' }, { RAILWAY_ENVIRONMENT_ID: 'wrong' }]) expect(() => assertDeploymentSafety({ ...env, ...patch })).toThrow();

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { readBackupKey, unseal } from './backup-envelope.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'cf36df49-a0f4-4224-80f2-4d0e4d1c1194', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
@@ -32,6 +33,11 @@ export function inspectStaging() {
   if (!app.DATABASE_URL || app.DATABASE_URL !== database.DATABASE_URL) throw new Error('App is not connected to the staging database service.');
   if (new URL(app.DATABASE_URL).hostname === new URL(live.DATABASE_URL).hostname || app.SESSION_SECRET === live.SESSION_SECRET) throw new Error('Staging isolation failed.');
   if (app.PUBLIC_BASE_URL !== target.origin) throw new Error('Unexpected staging origin.');
+  if (app.STAGING_GOOGLE_LOGIN_ENABLED === '1') {
+    if (!app.GOOGLE_CLIENT_ID || !app.GOOGLE_CLIENT_SECRET || app.GOOGLE_CLIENT_ID !== app.STAGING_GOOGLE_CLIENT_ID ||
+        app.GOOGLE_CLIENT_ID === live.GOOGLE_CLIENT_ID || app.GOOGLE_CLIENT_SECRET === live.GOOGLE_CLIENT_SECRET ||
+        app.GOOGLE_CALLBACK_URL !== `${target.origin}/api/callback`) throw new Error('Staging Google requires its own client and callback.');
+  }
   if (app.STAGING_LINE_LOGIN_ENABLED === '1') {
     const channel = app.LINE_CHANNEL_ID || app.LINE_LOGIN_CHANNEL_ID;
     const secret = app.LINE_CHANNEL_SECRET || app.LINE_LOGIN_CHANNEL_SECRET;
@@ -68,8 +74,23 @@ function backup() {
 }
 
 async function migrate(database) {
-  const b = JSON.parse(fs.readFileSync(path.join(evidence, 'backup.json'), 'utf8'));
-  if (b.environment !== target.environment || Date.now() - Date.parse(b.createdAt) > 3600_000 || sha(fs.readFileSync(path.join(evidence, b.file))) !== b.sha256) throw new Error('A verified staging backup from the last hour is required.');
+  if (process.env.WECHURCH_BACKUP_MANIFEST) {
+    const manifestPath = fs.realpathSync(process.env.WECHURCH_BACKUP_MANIFEST);
+    if (!path.relative(root, manifestPath).startsWith(`..${path.sep}`)) throw new Error('Encrypted backup must be outside the repository.');
+    const b = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const age = Date.now() - Date.parse(b.createdAt);
+    const entry = b.files?.find(f => f.name === 'database.dump.enc');
+    if (b.environment !== target.environment || b.complete !== true || !Number.isFinite(age) || age < 0 || age > 3600_000 || !entry) throw new Error('A verified staging backup from the last hour is required.');
+    const encrypted = fs.readFileSync(path.join(path.dirname(manifestPath), entry.name));
+    if (sha(encrypted) !== entry.sha256) throw new Error('Encrypted backup checksum mismatch.');
+    const key = readBackupKey(process.env.WECHURCH_BACKUP_KEY_FILE, root);
+    try {
+      if (unseal(encrypted, key).subarray(0, 5).toString() !== 'PGDMP') throw new Error('Invalid encrypted database archive.');
+    } finally { key.fill(0); }
+  } else {
+    const b = JSON.parse(fs.readFileSync(path.join(evidence, 'backup.json'), 'utf8'));
+    if (b.environment !== target.environment || Date.now() - Date.parse(b.createdAt) > 3600_000 || sha(fs.readFileSync(path.join(evidence, b.file))) !== b.sha256) throw new Error('A verified staging backup from the last hour is required.');
+  }
   const client = new pg.Client({ connectionString: database.DATABASE_PUBLIC_URL, connectionTimeoutMillis: 10000 });
   await client.connect();
   try {

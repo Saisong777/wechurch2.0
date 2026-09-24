@@ -2,6 +2,7 @@ import { pgTable, text, serial, integer, boolean, timestamp, uuid, pgEnum, date,
 import { createInsertSchema } from "drizzle-zod";
 import type { z } from "zod/v4";
 import { sql } from "drizzle-orm";
+import { authUsers } from './models/auth';
 
 export const sessionStatusEnum = pgEnum("session_status", ["waiting", "grouping", "studying", "verification", "completed"]);
 export const genderEnum = pgEnum("gender", ["male", "female"]);
@@ -38,6 +39,13 @@ export const users = pgTable("users", {
   church: text("church"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const googleAccountLinks = pgTable('google_account_links', {
+  googleSubject: text('google_subject').primaryKey(),
+  userId: uuid('user_id').notNull().unique().references(() => users.id),
+  authUserId: text('auth_user_id').notNull().unique().references(() => authUsers.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 export const passwordResetTokens = pgTable("password_reset_tokens", {

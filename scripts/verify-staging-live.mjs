@@ -6,6 +6,10 @@ import pg from 'pg';
 import { inspectStaging, root, target } from './railway-staging.mjs';
 
 const { app, database } = inspectStaging();
+if (app.AUTH_REGISTRATION_MODE === 'google-only') {
+  await import('./verify-staging-google.mjs');
+  process.exit(0);
+}
 const evidence = path.join(root, 'artifacts/railway-staging');
 const credentialsFile = path.join(evidence, 'test-account.json');
 const credentials = fs.existsSync(credentialsFile)

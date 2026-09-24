@@ -10,7 +10,7 @@ import { Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { SiGoogle } from 'react-icons/si';
-import { consumeLoginReturn } from '@/lib/loginReturn';
+import { consumeLoginReturn, rememberLoginReturn } from '@/lib/loginReturn';
 import { LineLoginButton } from '@/components/auth/LineLoginButton';
 
 const bibleVerses = [
@@ -126,10 +126,17 @@ const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [staging, setStaging] = useState(false);
+  const [authOptions, setAuthOptions] = useState<{ google: boolean; emailRegistration: boolean } | null>(null);
+  const [optionsError, setOptionsError] = useState(false);
   React.useEffect(() => {
     let active = true;
-    fetch('/api/deployment', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
-      .then(data => { if (active) setStaging(data?.staging === true); }).catch(() => {});
+    fetch('/api/auth/options', { cache: 'no-store' }).then(r => {
+      if (!r.ok) throw new Error('AUTH_OPTIONS_UNAVAILABLE');
+      return r.json();
+    }).then(data => {
+      if (typeof data?.google !== 'boolean' || typeof data?.emailRegistration !== 'boolean') throw new Error('AUTH_OPTIONS_INVALID');
+      if (active) { setStaging(data.staging === true); setAuthOptions(data); }
+    }).catch(() => { if (active) setOptionsError(true); });
     return () => { active = false; };
   }, []);
 
@@ -274,31 +281,46 @@ const LoginForm: React.FC = () => {
   }
 
   const handleGoogleLogin = () => {
+    const returnTo = params.get('returnTo');
+    if (returnTo) rememberLoginReturn(returnTo);
     window.location.href = '/api/login';
   };
+
+  if (!authOptions) return <Card className="login-form-card"><CardContent className="p-6 text-center">
+    {optionsError ? <><p role="alert">暫時無法載入登入方式，請重試。</p><Button className="mt-4" onClick={() => window.location.reload()}>重新載入</Button></> : <p role="status">載入登入方式…</p>}
+  </CardContent></Card>;
+  const googleOnly = !authOptions.emailRegistration;
 
   return (
     <Card className="login-form-card w-full rounded-3xl shadow-sheet border-0 bg-white text-foreground">
       <CardContent className="py-8 px-6">
+        {params.get('error') === 'google_link_required' && (
+          <p role="alert" className="mb-4 text-sm text-destructive">
+            此信箱已有帳號。請先用原本的方式登入，並聯絡同工協助確認 Google 帳號連結，避免建立重複帳號。
+          </p>
+        )}
+        {['google_login_failed', 'google_unavailable'].includes(params.get('error') || '') && (
+          <p role="alert" className="mb-4 text-sm text-destructive">Google 登入未完成，請重新嘗試。</p>
+        )}
         <p className="text-sm italic text-brand-sky mb-4 text-center leading-relaxed" data-testid="text-bible-verse">
           {randomVerse}
         </p>
 
         <div className="text-center mb-6">
           <h2 className="text-xl font-semibold text-foreground">
-            {mode === 'login' ? '登入帳戶' : '建立新帳戶'}
+            {googleOnly ? '歡迎來到 WeChurch' : mode === 'login' ? '登入帳戶' : '建立新帳戶'}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {mode === 'login' ? 'Sign In' : 'Create Account'}
+            {googleOnly ? '登入或建立帳號' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </p>
         </div>
 
-        <div className="mb-5 grid grid-cols-2 gap-1 rounded-md bg-muted p-1" role="group" aria-label="帳號操作">
+        {!googleOnly && <div className="mb-5 grid grid-cols-2 gap-1 rounded-md bg-muted p-1" role="group" aria-label="帳號操作">
           <Button type="button" variant={mode === 'signup' ? 'default' : 'ghost'} aria-pressed={mode === 'signup'} onClick={() => setMode('signup')}>首次使用</Button>
           <Button type="button" variant={mode === 'login' ? 'default' : 'ghost'} aria-pressed={mode === 'login'} onClick={() => setMode('login')}>已有帳號</Button>
-        </div>
-        <LineLoginButton />
-        {!staging && <><div className="space-y-3">
+        </div>}
+        {!googleOnly && <LineLoginButton />}
+        {authOptions.google && <><div className="space-y-3">
           <Button
             type="button"
             className="w-full h-[52px] rounded-xl font-semibold text-base gap-3 bg-white hover:bg-gray-50 text-brand-indigo border-[1.5px] border-brand-indigo"
@@ -310,18 +332,19 @@ const LoginForm: React.FC = () => {
           </Button>
         </div>
 
-        <div className="relative my-6">
+        {!googleOnly && <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
             <span className="bg-white px-2 text-muted-foreground">或使用電子郵件</span>
           </div>
-        </div>
+        </div>}
 
         </>}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {googleOnly && !authOptions.google && <p role="alert">Google 登入尚未開放，請稍後再試。</p>}
+        {!googleOnly && <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div className="space-y-2">
               <Label htmlFor="displayName" className="flex items-center gap-2">
@@ -405,7 +428,7 @@ const LoginForm: React.FC = () => {
               {mode === 'login' ? '沒有帳戶？建立新帳戶' : '已有帳戶？登入'}
             </button>
           </div>
-        </form>
+        </form>}
       </CardContent>
     </Card>
   );

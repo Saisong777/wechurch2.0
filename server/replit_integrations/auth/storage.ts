@@ -1,5 +1,5 @@
 import { authUsers, type User, type UpsertUser } from "@shared/models/auth";
-import { users as legacyUsers, userRoles } from "@shared/schema";
+import { users as legacyUsers, userRoles, googleAccountLinks } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { normalizeChurch } from "../../churches";
@@ -25,9 +25,12 @@ class AuthStorage implements IAuthStorage {
     
     if (!authUser) return undefined;
     
-    // Try to find linked legacy user by email
-    if (authUser.email) {
-      const [legacyUser] = await db.select().from(legacyUsers).where(eq(legacyUsers.email, authUser.email));
+    // Google ownership is anchored to a member ID, not a changeable email.
+    const [googleLink] = await db.select().from(googleAccountLinks).where(eq(googleAccountLinks.authUserId, id));
+    if (googleLink || authUser.email) {
+      const [legacyUser] = await db.select().from(legacyUsers).where(
+        googleLink ? eq(legacyUsers.id, googleLink.userId) : eq(legacyUsers.email, authUser.email!)
+      );
       
       if (legacyUser) {
         // Get user role
