@@ -51,6 +51,7 @@ try {
   await verifySupportHttp(pool,a,b,guest,makeClient,ids[0],ids[1]);
   const { verifyMentoringHttp }=await import('./verify-mentoring-http'); await verifyMentoringHttp(pool,makeClient);
   const { verifyLineIdentity }=await import('./verify-line-identity'); await verifyLineIdentity(pool);
+  const { verifyImImportHttp }=await import('./verify-im-import-http'); await verifyImImportHttp(pool,a,b,guest,ids);
   const repo=await import('../server/churchDevotionRepository');
   const input={date:'2026-09-13',planName:'Fixture',dayNumber:1,scriptureReference:'以賽亞書 1',scriptureText:'',devotionalTitle:'Original',devotionalText:'Original body',prayer:'',loveAction:'',status:'published' as const};
   const original=await repo.saveChurchDevotion(ids[0],input);

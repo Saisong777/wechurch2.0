@@ -6656,6 +6656,20 @@ export async function registerRoutes(app: Express) {
   });
 
   // ============ Devotional Notes API Routes ============
+  app.get('/api/im-reading-history', async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      res.setHeader('Cache-Control', 'private, no-store');
+      const result = await pool.query(`SELECT p.id,p.reading_date::text AS date,p.scripture_reference AS reference,
+        p.is_completed AS completed FROM im_source_records r
+        JOIN user_reading_progress p ON p.id=r.progress_id AND p.user_id=r.user_id
+        WHERE r.user_id=$1 AND r.kind='read-day' ORDER BY p.reading_date DESC,p.id`, [userId]);
+      res.json(result.rows);
+    } catch {
+      res.status(500).json({ error: '讀經紀錄暫時無法載入，請稍後重試。' });
+    }
+  });
   app.get("/api/devotional-notes", async (req, res) => {
     try {
       const userId = await resolveUserId(req);

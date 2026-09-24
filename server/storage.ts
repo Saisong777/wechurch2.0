@@ -1304,7 +1304,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDevotionalNotes(userId: string): Promise<DevotionalNote[]> {
-    return db.select().from(devotionalNotes).where(and(eq(devotionalNotes.userId, userId), eq(devotionalNotes.hidden, false))).orderBy(desc(devotionalNotes.createdAt));
+    return db.select().from(devotionalNotes).where(and(eq(devotionalNotes.userId, userId), eq(devotionalNotes.hidden, false)))
+      .orderBy(desc(sql`coalesce(${devotionalNotes.sourceDevotionalDate}::timestamp, ${devotionalNotes.createdAt})`), desc(devotionalNotes.createdAt));
   }
 
   async toggleDevotionalNoteHidden(id: string, hidden: boolean): Promise<DevotionalNote | undefined> {

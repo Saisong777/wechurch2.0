@@ -623,6 +623,8 @@ export const jesusDailyContent = pgTable("jesus_daily_content", {
 // Devotional Notes
 export const devotionalNotes = pgTable("devotional_notes", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceDevotionalDate: date('source_devotional_date'),
+  sourceLabel: text('source_label'),
   version: integer('version').notNull().default(1),
   userId: uuid("user_id").references(() => users.id).notNull(),
   verseReference: text("verse_reference").notNull(),
@@ -1305,7 +1307,7 @@ export type InboxEmail = typeof inboxEmails.$inferSelect;
 export type InsertInboxEmail = z.infer<typeof insertInboxEmailSchema>;
 export const insertInboxEmailSchema = createInsertSchema(inboxEmails).omit({ id: true, receivedAt: true });
 
-export const insertDevotionalNoteSchema = createInsertSchema(devotionalNotes).omit({ id: true, createdAt: true, updatedAt: true, version: true });
+export const insertDevotionalNoteSchema = createInsertSchema(devotionalNotes).omit({ id: true, createdAt: true, updatedAt: true, version: true, sourceDevotionalDate: true, sourceLabel: true });
 export const insertSavedVerseSchema = createInsertSchema(savedVerses).omit({ id: true, createdAt: true });
 export const insertReadingPlanTemplateSchema = createInsertSchema(readingPlanTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserReadingPlanSchema = createInsertSchema(userReadingPlans).omit({ id: true, createdAt: true, updatedAt: true });

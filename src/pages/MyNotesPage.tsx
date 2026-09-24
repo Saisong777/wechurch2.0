@@ -23,8 +23,11 @@ import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritu
 import { createDevotionShareDraft } from '@/lib/devotionShareDraft';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { ImportedReadingHistory } from '@/components/scripture/ImportedReadingHistory';
 
 interface DevotionalNote {
+  sourceDevotionalDate?: string | null;
+  sourceLabel?: string | null;
   syncStatus?: 'pending' | 'blocked' | 'synced';
   id: string;
   userId: string;
@@ -131,7 +134,8 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                   <Badge variant="outline">此裝置草稿，尚未同步</Badge>
                 )}
                 <Calendar className="w-4 h-4" />
-                {format(new Date(note.updatedAt), 'yyyy年M月d日', { locale: zhTW })}
+                {format(new Date(note.sourceDevotionalDate ? `${note.sourceDevotionalDate}T00:00:00` : note.updatedAt), 'yyyy年M月d日', { locale: zhTW })}
+                {note.sourceLabel && <Badge variant="outline">{note.sourceLabel} · 讀經日期</Badge>}
                 {note.dayNumber && (
                   <span>第 {note.dayNumber} 天</span>
                 )}
@@ -618,9 +622,10 @@ const StudyNoteCard = ({ entry, userEmail }: { entry: NotebookEntry; userEmail: 
 };
 
 const formatDevotionalNoteMarkdown = (note: DevotionalNote): string => {
-  const date = format(new Date(note.updatedAt), 'yyyy-MM-dd', { locale: zhTW });
+  const date = note.sourceDevotionalDate || format(new Date(note.updatedAt), 'yyyy-MM-dd', { locale: zhTW });
   const lines: string[] = [];
   lines.push(`## ${note.verseReference} (${date})`);
+  if (note.sourceLabel) lines.push(`來源：${note.sourceLabel}；日期為讀經日期，原撰寫時間未知。`);
   const receivingText = getDevotionalReceivingText(note);
   if (note.observation) lines.push(`**1. 看見:** ${note.observation}`);
   if (receivingText) lines.push(`**2. 領受:** ${receivingText}`);
@@ -822,6 +827,7 @@ const MyNotesPage = () => {
               </details>
             </section>
 
+            <ImportedReadingHistory userId={user.id} />
             <Tabs defaultValue="devotional" value={activeTab} onValueChange={setActiveTab} className="w-full">
               <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
                 <TabsList className="grid grid-cols-3 flex-1 min-w-0" data-testid="notes-tabs">
