@@ -4,14 +4,14 @@
 
 本版套用三人並肩 Logo 與 Together UI/UX。設計與驗收範圍見 [更新紀錄](design/ui-ux-refresh-2026-09-13.md)。
 
-新增同工測試邀請連結、首次註冊入口、小組邀請跨登入保留與 LINE Channel 保護。LINE Console 設定與真實 OAuth 驗收尚待完成；沒有將 B 會員搬到 A。見 [同工測試與 LINE 身分銜接](design/testing-onboarding-line-2026-09-15.md)。
+保留同工測試邀請與小組邀請跨登入返回；2026-09-24 改為 Google 註冊／登入，真實登入已驗收。見 [Google 登入紀錄](google-staging-registration-2026-09-24.md)。LINE 未啟用，沒有將 B 會員搬到 A。
 
 ## 版本識別
 
 - B 網址：https://wechurch-staging-staging.up.railway.app
-- B 部署：`43a342c3-1e43-4866-90ad-06e846a3f3c5`
-- 程式指紋：`ef75eb2ee8866e0158de4efa2e05a5d97b0ea5b4aea4ee6450512ef8eaaceaae`
-- `release-manifest.json` 列出實際 B 部署的 443 個檔案與 SHA-256。
+- B 部署：`c4349339-c0f7-45af-ab19-6c853fc2c3ac`
+- 程式指紋：`af365247ca206fdace53ffecaa20508895b234f51457999ce9cc34d1b10cbe58`
+- `release-manifest.json` 列出實際 B 部署的 449 個檔案與 SHA-256。
 - `node ops/verify-b-checkpoint.mjs` 可以逐檔核對版本；不需要資料庫或密碼。
 - `design/releases/` 保存發布紀錄時，`sourceCommit` 指向確切來源提交，不以日期或分支名稱代替。
 

@@ -1,5 +1,5 @@
 {
-  "fingerprint": "ef75eb2ee8866e0158de4efa2e05a5d97b0ea5b4aea4ee6450512ef8eaaceaae",
+  "fingerprint": "af365247ca206fdace53ffecaa20508895b234f51457999ce9cc34d1b10cbe58",
   "files": [
     {
       "file": "Dockerfile",
@@ -1027,11 +1027,11 @@
     },
     {
       "file": "src/pages/LoginPage.test.tsx",
-      "sha256": "aa6b799af00e98c49da3d1837bd7fa803e6da723bcb85ffb230d12c016816efc"
+      "sha256": "b99108e6d0d235adae1299e11296c059b1c1ef46e0435592d04aee4cdcca263b"
     },
     {
       "file": "src/pages/LoginPage.tsx",
-      "sha256": "3d7c5eadd796c551cb47236c64e26b312c546300276a61111d779ac0119dd4a3"
+      "sha256": "88ac17de4844a7cc78df8d0de43c69622d8da9bb3359142fa779f664d317298a"
     },
     {
       "file": "src/pages/LoveJourneyPage.test.tsx",
@@ -1207,11 +1207,11 @@
     },
     {
       "file": "server/deploymentSafety.test.ts",
-      "sha256": "c405f32517573a637c86e974f205b485b44c999053ac39baf0f4b18987487b79"
+      "sha256": "42ba90ca0d3154ff8bd0d1de78adc6042899a1e99542de9c223904ac0cf32dec"
     },
     {
       "file": "server/deploymentSafety.ts",
-      "sha256": "3edab2749d674c82ca99ea16a49570bde1db6bdb690c0cd106c435c0c0b0d886"
+      "sha256": "3f45c776dc60ab6602aa216bdde6ec194adb57f34fd8249f7fe2c35544452751"
     },
     {
       "file": "server/devotionScripture.test.ts",
@@ -1240,6 +1240,18 @@
     {
       "file": "server/generated/loveJourneyTemplate.generated.ts",
       "sha256": "b02936bf9f211017185339b94864526b365696b0d3e38084067df7e894485bae"
+    },
+    {
+      "file": "server/googleIdentityRepository.ts",
+      "sha256": "bddbc9ecd8bd4bc863488ec3f98b48c993f0c3d9e185177b6a7bbac5303fd1ba"
+    },
+    {
+      "file": "server/googleLoginPolicy.test.ts",
+      "sha256": "22e939ebafeb04234fe4f7c7082f32a1068057fe195491d8126e17409ce5b870"
+    },
+    {
+      "file": "server/googleLoginPolicy.ts",
+      "sha256": "fea5b370251de43303002ded2fd94ea9cf3fb903a960ea475287e3fefce88155"
     },
     {
       "file": "server/httpSafety.test.ts",
@@ -1395,15 +1407,15 @@
     },
     {
       "file": "server/replit_integrations/auth/replitAuth.ts",
-      "sha256": "4a26c17adeb1286935146c97e834d22fded2664cdf900deb4f42be288548406f"
+      "sha256": "207efaf9ae7a62e9876cc0af5ffbbef630ce0f81331df5787ca2171bb9d98f40"
     },
     {
       "file": "server/replit_integrations/auth/routes.ts",
-      "sha256": "ee3e4bf25630de0bc8900e7e8d266866a91e15455234ca46b27ccb8695d97973"
+      "sha256": "6cf7390e37172910523355f8fb5ca81f20746f2837b5b92e4e8f985490ffbcec"
     },
     {
       "file": "server/replit_integrations/auth/storage.ts",
-      "sha256": "35c6934b05f00125a4a2299f628a4071c13d2c443448168494aed7db09ee60ba"
+      "sha256": "29478336e92b66a57196614398bcab07983a0a68603c9241e3a4aeaa6cd79e57"
     },
     {
       "file": "server/resend.ts",
@@ -1531,7 +1543,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "5fca42c1d993e371d9fe5c9e431aa6c1800ee776be8a769ae6ef392f69778ce2"
+      "sha256": "c763cc6aea89caf63c2acfc959fa44d9d3a943b75780b4023e17e1b0d6a1fcf6"
     },
     {
       "file": "shared/support.ts",
@@ -1618,6 +1630,10 @@
       "sha256": "b69c8c62760b25c49916fb9019f2bd94f0db2708931a516a9d04da65d3ef4a8f"
     },
     {
+      "file": "migrations/0012_google_account_links.sql",
+      "sha256": "3697406ada26980dcdaa285f38a30ffff52ca1fb4d20af247158659d44f89225"
+    },
+    {
       "file": "migrations/meta/0000_snapshot.json",
       "sha256": "1976122184ff987e42ad9ff2c4569c3d3dc8a8c81a2be264f8968d41372eda93"
     },
@@ -1627,7 +1643,7 @@
     },
     {
       "file": "migrations/meta/_journal.json",
-      "sha256": "5079e44a6752838754669a264a32f71887733559a9a3cf726e093a49bd8bfc53"
+      "sha256": "2f1e7d571c3a30040dca30982e66e4d57bf9546288ea635e18a73ceb23f909d3"
     },
     {
       "file": "scripts/backup-envelope.mjs",
@@ -1683,7 +1699,7 @@
     },
     {
       "file": "scripts/railway-staging.mjs",
-      "sha256": "e7ffb803627c28340f11a7a410142660c1c5ebbd60365cf7ac44ae9100dd3fa1"
+      "sha256": "da12f100425c3d37b6cac81e211cd28a57507bf3dc65133b58acf5224828eb4d"
     },
     {
       "file": "scripts/record-staging-release.mjs",
@@ -1712,6 +1728,10 @@
     {
       "file": "scripts/verify-draft-browser.mjs",
       "sha256": "611ebf14c149f1d8d17ced8e978dec2d1bde50780f44daf8dec4cca9a18c32fb"
+    },
+    {
+      "file": "scripts/verify-google-identity.ts",
+      "sha256": "edd994680e70c1466b9d86c9054fff9832b850b6f3a7b46619971db36c643675"
     },
     {
       "file": "scripts/verify-integrated-browser.mjs",
@@ -1758,8 +1778,12 @@
       "sha256": "28d119c44a2e9409f75a0736ba724581d4571b1e67c1027a82289a364d401b44"
     },
     {
+      "file": "scripts/verify-staging-google.mjs",
+      "sha256": "71611d159a9dc5f16e52f55d75ec86fc98fa7f90e8c31179430a402bfeb6c5b5"
+    },
+    {
       "file": "scripts/verify-staging-live.mjs",
-      "sha256": "08e1260eb9b39ad583ae7827d964825e10f5ea2764eefdad2c7ba39e81e813bc"
+      "sha256": "6d5d3188909ab2f76c8930477c0354756718a56238fb11dda995a2173fc89476"
     },
     {
       "file": "scripts/verify-staging-restore.mjs",

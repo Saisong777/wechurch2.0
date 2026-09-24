@@ -45,3 +45,15 @@ GitHub 保存程式與安全的版本指紋；不保存 OAuth JSON、session、�
 此次備份在本機私密目錄，尚不能稱為異地耐久備份。
 回退程式須同時評估 Google-only 設定；不得刪除已建立的 Google 身分對照或覆寫新會員資料。
 尚未執行 Firebase 資料匯入、A/B 會員移轉或 A 正式發布。
+
+## 本次驗收
+
+- B deployment：`c4349339-c0f7-45af-ab19-6c853fc2c3ac`，Railway SUCCESS。
+- 449 檔指紋：`af365247ca206fdace53ffecaa20508895b234f51457999ce9cc34d1b10cbe58`，線上容器與來源提交一致。
+- 型別、346 項測試、部署檢查、隔離 HTTP／DB 完整性、Google 身分 DB 演練及 build 通過。
+- Lint 0 errors、339 個既有 warnings，未宣稱全專案無警告。
+- B 無假會員驗證通過；真實 Google 首次登入、登出、再次登入及返回 `/groups` 通過。
+- 登入前 0 個 auth 帳號；兩次登入後仍為 1 個帳號、1 筆 Google 對照、0 筆角色。66 篇教會靈修保留。
+- 桌機及 320/390 px 登入頁已截圖檢查，兩種手機寬度無水平溢出；未代替真實 iPhone 測試。
+- A deployment 仍為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`。
+- 注意：既有首頁桌機選單仍向一般會員顯示「管理後台」入口；本次未更改此獨立 UI 問題，沒有授予角色。
