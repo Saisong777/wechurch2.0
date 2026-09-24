@@ -1,5 +1,5 @@
 {
-  "fingerprint": "884d4f1cfad63f7514cab31aecadefe096a399e4caaf09980fb16c278d3536b4",
+  "fingerprint": "5c34b770b44dfe88adadd583a500f6d2a843db50881e69854949d5c5b7db6f28",
   "files": [
     {
       "file": "Dockerfile",
@@ -444,6 +444,10 @@
     {
       "file": "src/components/scripture/FloatingToolbar.tsx",
       "sha256": "c1ad4b9b7bdbce68424d90a1a728e10dc4ffcbaa22c6a608162d75efb1fdbed9"
+    },
+    {
+      "file": "src/components/scripture/ImportedReadingHistory.tsx",
+      "sha256": "c85e5527977eefdd3fb74862fd0ea984919681e53f38cbb2da984fa5956655a5"
     },
     {
       "file": "src/components/scripture/NoteConflictReview.test.tsx",
@@ -1075,11 +1079,11 @@
     },
     {
       "file": "src/pages/MyNotesPage.test.tsx",
-      "sha256": "f4b91e66ba0c713cf7497bef2049512ea9cb4184db2ba445feee6118fc556622"
+      "sha256": "11f35a60cd8154640bcce7510297c88d8ce46e78dee0afa78d8875be83fb5b57"
     },
     {
       "file": "src/pages/MyNotesPage.tsx",
-      "sha256": "8561233d9b21909b4b7ab76168705c10c3ef8499379d33194441b46cc337578e"
+      "sha256": "8d45b8a8fa3eeef076f31d8bdec9b36e76f2a81a31de6b36b24099d2581380c0"
     },
     {
       "file": "src/pages/MySharingPage.tsx",
@@ -1443,7 +1447,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "0722a82b7b357e99e5b5d7021c444b77aebc83158537a58c78f09b50dd62674b"
+      "sha256": "670798be9a4b84eaec0ed0d17b1b916aae800a45dda4ecab82f3cef2793579b9"
     },
     {
       "file": "server/securityPolicies.test.ts",
@@ -1483,7 +1487,7 @@
     },
     {
       "file": "server/storage.ts",
-      "sha256": "e780780d1c46d6e1a2b39484f1da1bc04ecc146cbc2acac266294896205284f2"
+      "sha256": "fdd9aafc1880076c0ef88392d35ca71d9457ab2b03362dce93277ff8c20714fe"
     },
     {
       "file": "server/studySessionPolicy.test.ts",
@@ -1559,7 +1563,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "c763cc6aea89caf63c2acfc959fa44d9d3a943b75780b4023e17e1b0d6a1fcf6"
+      "sha256": "ee13fcd2973662dc68e028b85f74d374f23c93b2d7b23416efeef97172f6be19"
     },
     {
       "file": "shared/support.ts",
@@ -1654,6 +1658,10 @@
       "sha256": "3697406ada26980dcdaa285f38a30ffff52ca1fb4d20af247158659d44f89225"
     },
     {
+      "file": "migrations/0013_im_bible_import.sql",
+      "sha256": "846a190ed11c22b3430be007abf023192edec7d4f85fbaa84784644ad2aefd1a"
+    },
+    {
       "file": "migrations/meta/0000_snapshot.json",
       "sha256": "1976122184ff987e42ad9ff2c4569c3d3dc8a8c81a2be264f8968d41372eda93"
     },
@@ -1663,7 +1671,7 @@
     },
     {
       "file": "migrations/meta/_journal.json",
-      "sha256": "2f1e7d571c3a30040dca30982e66e4d57bf9546288ea635e18a73ceb23f909d3"
+      "sha256": "79298d1541d4df21e17ff43a97a7dbce087443bac9165c5d1b1316bcb654cf4b"
     },
     {
       "file": "scripts/backup-envelope.mjs",
@@ -1672,6 +1680,10 @@
     {
       "file": "scripts/backup-envelope.test.mjs",
       "sha256": "c74599e306c975528c026c005d16be9f50629fb9cd865265ebd268d8f002795a"
+    },
+    {
+      "file": "scripts/check-im-bible.mjs",
+      "sha256": "7038b5f3fabfcee55f5d5ec1e9d44a1b7fca7e5e5800684b10cdec3e598bf8e7"
     },
     {
       "file": "scripts/content-export.cjs",
@@ -1694,6 +1706,50 @@
       "sha256": "b85f1fff257d668eba5053ad857e9125e54b9c219a0760e8c6b390c3afaff834"
     },
     {
+      "file": "scripts/dry-run-im-bible.mjs",
+      "sha256": "a984b3ff2df46a6673ef7f2281a470aa6cad580ea190a2243334d0dcc15055d3"
+    },
+    {
+      "file": "scripts/export-im-bible.mjs",
+      "sha256": "94e081f143868ccd5f51fda08334afecf785abd35f60e33f6cff14310f9fad33"
+    },
+    {
+      "file": "scripts/im-bible-calendar.mjs",
+      "sha256": "3120b5df8a6938adf0b1da8a07156e2896f3dd9499e58e0c3d7fe5dd5ac06bcd"
+    },
+    {
+      "file": "scripts/im-bible-calendar.test.mjs",
+      "sha256": "1504f2fc800ce0fc3d90c86bcac2675505e0ac569797ca0a0002892fb6cabfd3"
+    },
+    {
+      "file": "scripts/im-bible-import-plan.mjs",
+      "sha256": "145145d3ab5d439fa4f6c265ea429d1bf8f562503aa3855eb7dc2911dfd0e96f"
+    },
+    {
+      "file": "scripts/im-bible-import-plan.test.mjs",
+      "sha256": "cd00e86cd058bdedaaa5672bd0a75b205fba6fdb9279e2a4e4e437b20e97c336"
+    },
+    {
+      "file": "scripts/im-bible-migration.mjs",
+      "sha256": "3416355721ad08e051f0151493f0ec86bab7536b557b14cbf1631c6f2dc26d0c"
+    },
+    {
+      "file": "scripts/im-bible-migration.test.mjs",
+      "sha256": "b2a0158d3696ca8b7630d2d9853e3c4ef3cc27a5142e5ed5572c9cf6f3d7d053"
+    },
+    {
+      "file": "scripts/im-bible-reconcile.mjs",
+      "sha256": "19f0911df4e245a5f08281e3947ccccbe58a670ec1a6bc3bb33a1a718a268c81"
+    },
+    {
+      "file": "scripts/im-bible-reconcile.test.mjs",
+      "sha256": "a0c4c571b3f34e2067b1795da4dbb39c32d13e12aab5b7d86b6059bebe6cf79e"
+    },
+    {
+      "file": "scripts/im-bible-writer.mjs",
+      "sha256": "21f977d7cc362a07748d0f6fd720b26ef3aeb5870ece3cc0c6494570809ccbf8"
+    },
+    {
       "file": "scripts/local-admin-password.cjs",
       "sha256": "0a2972bdfe324324bb9b67712c8afd6206c3f16bf31a8faf29ef3523213266b6"
     },
@@ -1704,6 +1760,14 @@
     {
       "file": "scripts/mentoring-preview-login.mjs",
       "sha256": "19272e69efec7fafcb6b0ff71bfabb1a8723faf88066e7ac2750c3fe03583ce7"
+    },
+    {
+      "file": "scripts/prepare-im-bible.mjs",
+      "sha256": "57b09d9886ca1fcc34ef4cdadb734d9e1e66138ddc80b3628105d383363cd304"
+    },
+    {
+      "file": "scripts/prepare-im-bible.test.mjs",
+      "sha256": "290eaa6cee47c3200b4fd115bac1cb34b5d5c2094e11abd702b7d631f13d116e"
     },
     {
       "file": "scripts/quality-audit.mjs",
@@ -1724,6 +1788,14 @@
     {
       "file": "scripts/record-staging-release.mjs",
       "sha256": "72b533ba82b6174705d784970f9662ad01a3b59ed65c5a240b3153e80ec3b2dc"
+    },
+    {
+      "file": "scripts/rehearse-im-import.mjs",
+      "sha256": "39b741ee31950e637bb7add9fb0369dd8b9b2e9f1403b124f0958d4f5069624d"
+    },
+    {
+      "file": "scripts/run-im-import.mjs",
+      "sha256": "dee32f6f5633c21da35464198839d7ca0370451f0da60fd7ed70bcf7079b2fe1"
     },
     {
       "file": "scripts/seal-staging-backup.mjs",
@@ -1754,12 +1826,16 @@
       "sha256": "edd994680e70c1466b9d86c9054fff9832b850b6f3a7b46619971db36c643675"
     },
     {
+      "file": "scripts/verify-im-import-http.ts",
+      "sha256": "fd5de37f2344c305c836d363cdec49cdba982122c30d82040dbf09244a9ec921"
+    },
+    {
       "file": "scripts/verify-integrated-browser.mjs",
       "sha256": "a8b96435794a026ff5c3b5c1eb553555bac04c1e48ba6e877eeffe3da3208914"
     },
     {
       "file": "scripts/verify-integrity-worker.ts",
-      "sha256": "c3f9398443a8e96e687698092ad0bd25ba545cc80c227600a8c57a750a6e0434"
+      "sha256": "615a2fe3b1c090622dbb829ab6e3ce0cdc5b04baddaaca2080fa39d56d4d3e2a"
     },
     {
       "file": "scripts/verify-integrity.mjs",
