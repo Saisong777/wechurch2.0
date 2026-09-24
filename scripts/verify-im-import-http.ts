@@ -76,6 +76,11 @@ export async function verifyImImportHttp(pool: Pool,a: Client,b: Client,guest: C
   assert.equal((await pool.query('SELECT observation FROM devotional_notes WHERE id=$1',[note.id])).rows[0].observation,'Edited after migration');
   await assert.rejects(rollbackBatch(pool,again.batchId),/TARGET_CHANGED_ROLLBACK_BLOCKED/);
   const verification=await verifyImported(pool,prepared);assert.equal(verification.mismatches,0);assert.equal(verification.editedNotes,1);
+  const newer=structuredClone(source);
+  Object.assign(newer.documents[0],{updateTime:'2026-09-25T00:00:00Z'});
+  const refreshed={...prepared,bundle:prepareImportBundle(newer,calendar).bundle};
+  assert.equal((await importPrepared(pool,refreshed,{dryRun:false})).committed,true);
+  assert.equal((await verifyImported(pool,refreshed)).mismatches,0);
   const changed=structuredClone(source);changed.documents[0].fields.notes.mapValue.fields['july-0'].stringValue='Source changed';
   assert.equal((await importPrepared(pool,{...prepared,bundle:prepareImportBundle(changed,calendar).bundle},{dryRun:false})).ready,false);
   const collision=structuredClone(source);collision.members[0].providerData[0].uid='999999999';

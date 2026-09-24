@@ -5,7 +5,12 @@ import { randomUUID } from 'node:crypto';
 const digest = value => sha256(JSON.stringify(value));
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value==='object'
   ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])) : value;
-const sameRecord = (a,b) => digest(canonical(a))===digest(canonical(b));
+const sameRecord = (a,b) => {
+  // Firestore's document timestamp changes even when this particular note did not.
+  const { documentUpdatedAt: leftTime, ...left } = a;
+  const { documentUpdatedAt: rightTime, ...right } = b;
+  return digest(canonical(left))===digest(canonical(right));
+};
 export class ImportError extends Error {
   constructor(code) { super(code); this.code = code; }
 }
