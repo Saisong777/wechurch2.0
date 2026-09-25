@@ -4,7 +4,7 @@
 
 程式整合與獨立資料上傳完成，**B 線上驗收尚未完成**。
 Railway 兩次停在 `Creating containers`，沒有新應用程式啟動紀錄，B 回應 502。
-兩個卡住的部署已中止，已對上一個可用版本發出重新啟動；恢復結果需另行回讀。
+兩個卡住的部署已中止，上一版重啟未恢復，另已重建上一個可用版本；恢復仍未完成。
 目前不發布到 A，也不把本機畫面當作 B 驗收證據。
 
 - 候選來源提交：`8f7cdf9ada6a6cb0f56adbb580c4751cbb5fbab7`
@@ -14,12 +14,21 @@ Railway 兩次停在 `Creating containers`，沒有新應用程式啟動紀錄�
 - 通過型別檢查、406 項功能測試、7 項部署測試、DB/HTTP 完整性測試及 build。
 - 卡住並中止的部署：`bcb241cc-3419-44af-8ae4-aeb1175d117c`、`c2ac7531-1c72-4e42-8ed4-d5aa5d3f3e60`。
 - 上一版：`6f2da44e-0757-4b1f-bcfb-c1ea04a7f110`；沒有建立本次成功發布紀錄。
+- 舊版恢復工作：`2428f4f2-8cbe-4a55-96d8-9b7ed09371b2`，沿用舊指紋 `be78c5e3595537e2`。
+  22:42 左右 Railway 畫面顯示 build 35 秒完成，Creating containers 已超過 7 分鐘，
+  Network/healthchecks 尚未開始。不能將控制台的舊版 Active/Online 標籤當作服務已恢復。
+- 22:39:15 B `__healthcheck` 仍回應 Railway 502，request id `GhJGrPUMQQe3gCXUmrpb1w`。
+  新版與舊版皆遇到同階段阻擋，需查 Railway 容器建立／volume 掛載；根因未證實。
+- A 部署已再次讀回為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`、SUCCESS、沒有變更。
 - 根目錄 `release-manifest.json` 保存候選版 487 個程式檔案的校驗值，重建檢查通過；
   它是候選版證據，不代表線上發布成功。資料校驗清單亦只保存名稱與 hash，不含 DB。
 
 恢復後先查 B health 與實際版本，再處理容器建立問題。只有新版真正啟動後，才跑
 `ops/verify-bible-staging.mjs`、手機／桌面 UI 驗收與成功發布紀錄。不移除 volume，
 不重建會員 DB，不為繞過問題關閉登入／健康檢查或改動 A。
+若恢復工作持續卡住，提供上述 deployment IDs、request id、區域
+`asia-southeast1-eqsg3a` 與 volume `cbbf9530-1d9d-45ab-9e1b-f575a8d3b0aa`
+請 Railway 查容器與儲存掛載。不要刪除或重建 volume；其中包含既有上傳檔及已驗證研經資料。
 
 ## 已確認範圍
 
