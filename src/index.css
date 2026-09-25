@@ -121,6 +121,7 @@
 
   html {
     min-height: 100%;
+    overflow-x: clip;
     overscroll-behavior: none;
   }
 
@@ -128,7 +129,8 @@
     @apply text-foreground antialiased;
     font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Inter', sans-serif;
     min-height: 100%;
-    overflow-x: hidden;
+    /* Do not create a second scroll container around sticky mobile navigation. */
+    overflow-x: clip;
     overscroll-behavior: none;
     font-size: 16px;
   }
@@ -161,6 +163,11 @@
 }
 
 @layer components {
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
 
   /* New gradient utilities */
   .gradient-sky {
@@ -1117,6 +1124,11 @@
 }
 
 @media (max-width: 767px) {
+  /* The shell owns viewport sizing; routed pages size to their content. */
+  .mobile-page-content > .min-h-screen {
+    min-height: 0;
+  }
+
   .mobile-page-content .dashboard-header {
     display: none;
   }

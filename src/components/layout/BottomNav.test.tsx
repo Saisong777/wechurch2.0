@@ -49,6 +49,17 @@ it('dismisses on outside interaction and keeps the existing destination order', 
   expect(screen.queryByRole('navigation')).toBeNull();
 });
 
+it('puts all appearance choices first in the mobile menu without removing navigation', () => {
+  render(<MemoryRouter><MobileNavigation /></MemoryRouter>);
+  fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
+  const menu = screen.getByRole('navigation', { name: '行動導覽選單' });
+  const appearance = within(menu).getByRole('region', { name: '外觀' });
+  expect(menu.firstElementChild).toBe(appearance);
+  expect(within(appearance).getAllByRole('radio').map(el => el.textContent)).toEqual(['明亮', '深色', '跟隨系統']);
+  expect(within(menu).getAllByRole('group', { name: '顯示模式' })).toHaveLength(1);
+  expect(within(menu).getAllByRole('link')).toHaveLength(8);
+});
+
 it('navigates, closes the menu and marks the active destination', () => {
   function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
   render(<MemoryRouter><AppLayout><Location /></AppLayout></MemoryRouter>);

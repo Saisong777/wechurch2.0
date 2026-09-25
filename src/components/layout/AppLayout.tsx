@@ -23,7 +23,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   return (
     <MobileHeaderContext.Provider value={showNav ? mobileHeader : null}>
-    <div className="min-h-screen flex flex-col bg-brand-warm">
+    <div className="app-shell flex flex-col bg-brand-warm">
       <ReadingScrollRestoration />
       <NetworkStatusBanner />
       {showNav && <MobileNavigation key={location.key} />}

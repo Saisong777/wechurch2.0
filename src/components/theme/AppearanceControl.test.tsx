@@ -26,11 +26,11 @@ const select = (name: string) => fireEvent.click(screen.getByRole('radio', { nam
 it('defaults to light and remembers an explicit dark choice across remounts', () => {
   const view = mount();
   expect(document.documentElement).toHaveClass('light');
-  select('暗色');
+  select('深色');
   expect(document.documentElement).toHaveClass('dark');
   expect(localStorage.getItem('wechurch-theme')).toBe('dark');
   expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute('content', '#151819');
-  expect(screen.getByRole('button', { name: '顯示模式：暗色' })).toBeVisible();
+  expect(screen.getByRole('button', { name: '顯示模式：深色' })).toBeVisible();
   view.unmount();
   mount();
   expect(document.documentElement).toHaveClass('dark');
@@ -41,7 +41,7 @@ it('defaults to light and remembers an explicit dark choice across remounts', ()
 
 it('only follows device changes when system is selected', () => {
   mount();
-  select('跟隨裝置');
+  select('跟隨系統');
   act(() => { systemDark = true; listeners.forEach(fn => fn({ matches: true })); });
   expect(document.documentElement).toHaveClass('dark');
   expect(localStorage.getItem('wechurch-theme')).toBe('system');
@@ -54,13 +54,13 @@ it('synchronizes the selection from another tab', () => {
   mount();
   act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'wechurch-theme', newValue: 'dark' })));
   expect(document.documentElement).toHaveClass('dark');
-  expect(screen.getByRole('radio', { name: '暗色' })).toHaveAttribute('aria-checked', 'true');
+  expect(screen.getByRole('radio', { name: '深色' })).toHaveAttribute('aria-checked', 'true');
 });
 
 it('still switches in memory when browser storage is blocked', () => {
   vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
   mount();
-  select('暗色');
+  select('深色');
   expect(document.documentElement).toHaveClass('dark');
 });

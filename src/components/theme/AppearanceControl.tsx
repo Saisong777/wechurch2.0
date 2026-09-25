@@ -7,8 +7,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadio
 
 const choices = [
   { value: 'light', label: '明亮', icon: Sun },
-  { value: 'dark', label: '暗色', icon: Moon },
-  { value: 'system', label: '跟隨裝置', icon: Monitor },
+  { value: 'dark', label: '深色', icon: Moon },
+  { value: 'system', label: '跟隨系統', icon: Monitor },
 ];
 
 export function AppearanceControl({ inline = false }: { inline?: boolean }) {

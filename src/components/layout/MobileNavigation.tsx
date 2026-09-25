@@ -47,6 +47,10 @@ export function MobileNavigation() {
       </button>
     </div>
     <nav id={menuId} aria-label="行動導覽選單" hidden={!open} className="mobile-navigation-menu absolute inset-x-0 top-full overflow-y-auto overscroll-contain border-y border-border bg-background shadow-md">
+      <section aria-label="外觀" className="mx-auto max-w-xl border-b border-border p-3">
+        <h2 className="mb-2 text-sm font-medium">外觀</h2>
+        <AppearanceControl inline />
+      </section>
       <div ref={mobileHeader?.setActionsTarget} data-testid="mobile-page-actions" className="[&_button]:min-h-11 [&_button]:min-w-11" />
       <MobileNavLinks placement="header" onNavigate={() => setOpen(false)} />
       <div className="mx-auto grid max-w-xl grid-cols-3 gap-1 border-t border-border p-2">
@@ -57,7 +61,6 @@ export function MobileNavigation() {
         </Link>)}
       </div>
       <MobileAccountActions close={() => setOpen(false)} />
-      <div className="mx-auto max-w-xl border-t border-border p-3"><AppearanceControl inline /></div>
     </nav>
   </div>;
 }
