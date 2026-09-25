@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { devotionDate } from './churchDevotion';
 
 const title = z.string().trim().min(1, '請填標題').max(160);
-const body = z.string().trim().min(1, '請填內容').max(12000);
+export const GROUP_SHARE_MAX_LENGTH = 12000;
+const body = z.string().trim().min(1, '請填內容').max(GROUP_SHARE_MAX_LENGTH);
 export const groupCreateInput = z.object({ name: title });
 export const shareInput = z.object({
   kind: z.enum(['note', 'prayer']), title, body,

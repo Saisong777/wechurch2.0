@@ -5,6 +5,7 @@ import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {MemoryRouter} from 'react-router-dom';
 import {DevotionWallShareDialog} from './DevotionWallShareDialog';
 import {DEVOTION_SHARE_MAX_LENGTH,devotionDayWindow,type DevotionShareDraft} from '@shared/devotionWall';
+import {GROUP_SHARE_MAX_LENGTH} from '@shared/lifeGroup';
 vi.mock('@/contexts/AuthContext',()=>({useAuth:()=>({user:{id:'actor'}})}));
 const clients:QueryClient[]=[];let payload:any;let fail=false;
 let groupFail=false;let groupLoadFail=false;
@@ -152,4 +153,17 @@ it('keeps failed group previews and retries with the same operation ID',async()=
   groupFail=false;fireEvent.click(screen.getByRole('button',{name:'確認分享至小組'}));
   await waitFor(()=>expect(close).toHaveBeenCalledOnce());
   expect(groupWrites).toHaveLength(2);expect(groupWrites[0]).toEqual(groupWrites[1]);expect(payload).toBeUndefined();
+});
+
+it('applies the selected destination length limit without truncating the preview',async()=>{
+  show({sections},true);await chooseGroup();
+  const content='長'.repeat(GROUP_SHARE_MAX_LENGTH+1);
+  fireEvent.change(screen.getByRole('textbox',{name:'領受內容'}),{target:{value:content}});
+  fireEvent.click(groupConsent());expect(screen.getByRole('button',{name:'確認分享至小組'})).toBeDisabled();
+  expect(screen.getByRole('alert')).toHaveTextContent('超過字數上限');
+  fireEvent.click(screen.getByRole('radio',{name:'所有人・靈修牆'}));
+  await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
+  expect(screen.getByRole('textbox',{name:'領受內容'})).toHaveValue(content);
+  fireEvent.click(consent());expect(screen.getByRole('button',{name:'確認公開分享'})).toBeEnabled();
+  expect(payload).toBeUndefined();expect(groupWrites).toHaveLength(0);
 });

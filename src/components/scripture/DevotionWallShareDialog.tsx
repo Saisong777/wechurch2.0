@@ -13,7 +13,7 @@ import type { DevotionShareDraft } from '@shared/devotionWall';
 import { DEVOTION_SHARE_MAX_LENGTH } from '@shared/devotionWall';
 import { composeDevotionShare } from '@/lib/devotionShareDraft';
 import { useAuth } from '@/contexts/AuthContext';
-import type { GroupSummary } from '@shared/lifeGroup';
+import { GROUP_SHARE_MAX_LENGTH,type GroupSummary } from '@shared/lifeGroup';
 
 async function groupRequest<T>(path='',method='GET',body?:unknown):Promise<T> {
   const response=await fetch(`/api/life-groups${path}`,{method,credentials:'include',...(body===undefined?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})});
@@ -28,6 +28,7 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
   const [groupId,setGroupId]=useState('');
   const groupMutationIds=useRef<Record<string,string>>({});
   const isWall=audience==='wall';
+  const maxLength=isWall?DEVOTION_SHARE_MAX_LENGTH:GROUP_SHARE_MAX_LENGTH;
   const [title,setTitle]=useState(draft.title || '今日靈修心得');const [legacyBody,setLegacyBody]=useState(draft.body);
   const [sections] = useState(draft.sections || []);
   const [selected,setSelected] = useState(sections.filter(section=>section.key.startsWith('insight:')).map(section=>section.key));
@@ -40,7 +41,7 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
   const selectedGroup=groups.data?.groups.find(group=>group.id===groupId);
   const destinationReady=isWall ? window.data && !window.expired && !window.isError : selectedGroup && !groups.isError;
   useEffect(()=>{setConsent(false);},[window.data?.day,window.expired]);
-  const valid=title.trim() && title.length<=160 && body.trim() && body.length<=DEVOTION_SHARE_MAX_LENGTH && reference.trim() && reference.length<=200 && consent && destinationReady;
+  const valid=title.trim() && title.length<=160 && body.trim() && body.length<=maxLength && reference.trim() && reference.length<=200 && consent && destinationReady;
   return <Dialog open onOpenChange={open=>{if(!open && !busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl [overflow-wrap:anywhere] [&>button:last-child]:right-2 [&>button:last-child]:top-2 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center">
     <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{isWall?'全站登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小組成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
     <form onSubmit={async e=>{
@@ -81,9 +82,9 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
         </fieldset>
         {sections.filter(section=>selected.includes(section.key)).map(section=><label key={section.key} className="block space-y-1 text-sm"><span>{section.label}內容</span><Textarea rows={3} value={texts[section.key]} onChange={e=>{setTexts(current=>({...current,[section.key]:e.target.value}));setConsent(false);}} /></label>)}
         <section aria-label={isWall?'公開內容預覽':'小組分享預覽'} className="space-y-2 border-y py-3"><h3 className="text-sm font-medium">{isWall?'公開內容預覽':'小組分享預覽'}</h3><div className="max-h-60 overflow-y-auto whitespace-pre-wrap text-sm leading-7">{body || '尚未選擇分享內容'}</div></section>
-      </> : <label className="block space-y-1 text-sm"><span>{isWall?'公開心得':'分享心得'}</span><Textarea required rows={6} maxLength={DEVOTION_SHARE_MAX_LENGTH} value={body} onChange={e=>{setLegacyBody(e.target.value);setConsent(false);}} /></label>}
-      <p className={`text-right text-xs ${body.length>DEVOTION_SHARE_MAX_LENGTH?'text-destructive':'text-muted-foreground'}`}>{body.length} / {DEVOTION_SHARE_MAX_LENGTH}</p>
-      {body.length>DEVOTION_SHARE_MAX_LENGTH && <p role="alert" className="text-sm text-destructive">內容超過字數上限，請減少段落或縮短內容。尚未送出，原始筆記不受影響。</p>}
+      </> : <label className="block space-y-1 text-sm"><span>{isWall?'公開心得':'分享心得'}</span><Textarea required rows={6} maxLength={maxLength} value={body} onChange={e=>{setLegacyBody(e.target.value);setConsent(false);}} /></label>}
+      <p className={`text-right text-xs ${body.length>maxLength?'text-destructive':'text-muted-foreground'}`}>{body.length} / {maxLength}</p>
+      {body.length>maxLength && <p role="alert" className="text-sm text-destructive">內容超過字數上限，請減少段落或縮短內容。尚未送出，原始筆記不受影響。</p>}
       {isWall && <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={anonymous} onChange={e=>{setAnonymous(e.target.checked);setConsent(false);}} />匿名分享</label>}
       {isWall && anonymous && <p className="text-sm text-muted-foreground">牆上不顯示姓名；系統仍保留作者供本人管理。請移除內文中可辨識自己或他人的細節。</p>}
       {!isWall && selectedGroup && <p className="text-sm font-medium">分享對象：{selectedGroup.name} 全體成員</p>}
