@@ -81,6 +81,25 @@
 .note-editor-scripture[open] summary > svg { transform: rotate(180deg); }
 .note-editor-scripture > p { padding-block: 12px 20px; overflow-wrap: anywhere; }
 
+.devotional-note-inline {
+  margin-top: 24px;
+  border-top: 1px solid hsl(var(--border));
+}
+.devotional-note-inline .note-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+}
+.devotional-note-inline h2 { scroll-margin-top: calc(88px + env(safe-area-inset-top, 0px)); }
+.devotional-note-inline .note-editor-body {
+  overflow: visible;
+  overscroll-behavior: auto;
+  padding: 0 0 24px;
+}
+.devotional-note-inline .note-editor-footer { padding: 16px 0 0; }
+
 @media (max-width: 639px) {
   .devotional-note-editor[role='dialog'] {
     inset: 0;

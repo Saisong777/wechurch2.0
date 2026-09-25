@@ -26,13 +26,60 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-async function show() {
-  function Note() { const [open, setOpen] = useState(true); return <DevotionalNoteDialog open={open} onOpenChange={setOpen} verseReference="以賽亞書 43" verseText="經文" />; }
+async function show(inline = false) {
+  function Note() { const [open, setOpen] = useState(true); return <main><DevotionalNoteDialog inline={inline} open={open} onOpenChange={setOpen} verseReference="以賽亞書 43" verseText="經文" /></main>; }
   const router = createMemoryRouter([{ path: '/', element: <h1>首頁</h1> }, { path: '/note', element: <Note /> }], { initialEntries: ['/', '/note'], initialIndex: 1 });
   render(<RouterProvider router={router} />);
   await screen.findByRole('textbox', { name: '看見' });
   return router;
 }
+
+it('renders inline in the page without a dialog, portal or scroll lock', async () => {
+  await show(true);
+  const editor = screen.getByRole('region', { name: '靈修筆記' });
+  expect(editor.closest('main')).toBeTruthy();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.body).not.toHaveAttribute('data-scroll-locked');
+  expect(screen.getByRole('heading', { name: '靈修筆記' })).toHaveFocus();
+  expect(screen.getByRole('button', { name: '儲存（自己看）' }).closest('footer')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '分享' }).closest('footer')).toBeTruthy();
+});
+
+it('keeps the inline editor and private text in place after saving', async () => {
+  vi.mocked(saveDevotionalNote).mockImplementation(async (_, note) => ({ note, status: 'synced' }));
+  const router = await show(true);
+  fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '同頁筆記' } });
+  fireEvent.click(screen.getByRole('button', { name: '儲存（自己看）' }));
+  await waitFor(() => expect(saveDevotionalNote).toHaveBeenCalledOnce());
+  expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('同頁筆記');
+  expect(router.state.location.pathname).toBe('/note');
+  expect(preview).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '收起筆記' }));
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+  expect(screen.queryByTestId('devotional-note-inline')).toBeNull();
+});
+
+it('protects inline unsaved input when collapsing or navigating away', async () => {
+  const router = await show(true);
+  fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '不可遺失' } });
+  fireEvent.click(screen.getByRole('button', { name: '收起筆記' }));
+  fireEvent.click(await screen.findByRole('button', { name: '繼續編輯' }));
+  expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('不可遺失');
+  await act(async () => { await router.navigate(-1); });
+  fireEvent.click(await screen.findByRole('button', { name: '繼續編輯' }));
+  expect(router.state.location.pathname).toBe('/note');
+  expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('不可遺失');
+});
+
+it('keeps inline writing mounted while showing explicit sharing confirmation', async () => {
+  vi.mocked(saveDevotionalNote).mockImplementation(async (_, note) => ({ note, status: 'synced' }));
+  await show(true);
+  fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '先確認再分享' } });
+  fireEvent.click(screen.getByRole('button', { name: '分享' }));
+  await screen.findByTestId('share-preview');
+  expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('先確認再分享');
+  expect(preview).toHaveBeenCalledWith(expect.objectContaining({ allowGroup: true }));
+});
 
 it('closes an unchanged note without asking to discard it', async () => {
   await show();

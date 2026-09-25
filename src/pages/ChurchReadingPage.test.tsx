@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({ data: undefined as ChurchReadingSummary | unde
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => state }));
 vi.mock('@/components/layout/Header', () => ({ Header: () => <header>每日靈修</header> }));
 vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: () => <p>每日靈修 beta 測試中</p> }));
-vi.mock('@/components/scripture/DevotionalNoteDialog', () => ({ DevotionalNoteDialog: ({ open }: { open: boolean }) => open ? <div role="dialog">個人筆記</div> : null }));
+vi.mock('@/components/scripture/DevotionalNoteDialog', () => ({ DevotionalNoteDialog: ({ open, inline }: { open: boolean; inline?: boolean }) => open ? <section aria-label="個人筆記" data-inline={inline}><h2 tabIndex={-1}>個人筆記</h2></section> : null }));
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
@@ -24,7 +24,24 @@ it('renders published daily reading even when the legacy beta gate is closed', (
   expect(screen.getByText('今日已發佈短文')).toBeTruthy();
   expect(screen.queryByText(/beta 測試中/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '寫靈修筆記' }));
-  expect(screen.getByRole('dialog')).toHaveTextContent('個人筆記');
+  const note = screen.getByRole('region', { name: '個人筆記' });
+  expect(note).toHaveAttribute('data-inline', 'true');
+  expect(note.closest('main')).toBeTruthy();
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('returns to the same inline note without resetting the reading tab', () => {
+  show();
+  fireEvent.mouseDown(screen.getByRole('tab', { name: '靈修' }), { button: 0, ctrlKey: false });
+  fireEvent.click(screen.getByRole('button', { name: '寫下今天的領受' }));
+  const note = screen.getByRole('region', { name: '個人筆記' });
+  const heading = screen.getByRole('heading', { name: '個人筆記' });
+  heading.scrollIntoView = vi.fn();
+  fireEvent.click(screen.getByRole('button', { name: '寫靈修筆記' }));
+  expect(screen.getByRole('region', { name: '個人筆記' })).toBe(note);
+  expect(heading).toHaveFocus();
+  expect(heading.scrollIntoView).toHaveBeenCalledOnce();
+  expect(screen.getByRole('tab', { name: '靈修' })).toHaveAttribute('aria-selected', 'true');
 });
 
 it('restores expanded scripture when the same history entry is revisited', () => {

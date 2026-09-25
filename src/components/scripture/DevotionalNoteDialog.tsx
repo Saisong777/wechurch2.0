@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useId, type ReactNode } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,7 @@ import {
   Check,
   BookMarked,
   ChevronDown,
+  ChevronUp,
   Save,
 } from 'lucide-react';
 import { parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
@@ -43,6 +44,52 @@ interface DevotionalNoteDialogProps {
   verseReference: string;
   verseText: string;
   noteId?: string;
+  inline?: boolean;
+}
+
+function NoteEditorSurface({ open, inline, sharing, onOpenChange, children }: {
+  open: boolean;
+  inline: boolean;
+  sharing: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode;
+}) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    if (!inline || !open) return;
+    titleRef.current?.focus({ preventScroll: true });
+    titleRef.current?.scrollIntoView?.({ block: 'start' });
+  }, [inline, open]);
+
+  if (inline) return open ? (
+    <section className="devotional-note-inline" aria-labelledby={titleId} data-testid="devotional-note-inline">
+      <header className="note-editor-header">
+        <h2 id={titleId} ref={titleRef} tabIndex={-1} className="flex items-center gap-2 text-base font-semibold outline-none">
+          <BookMarked className="h-5 w-5 shrink-0 text-primary" />靈修筆記
+        </h2>
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="收起筆記" title="收起筆記" onClick={() => onOpenChange(false)}>
+          <ChevronUp className="h-5 w-5" />
+        </Button>
+      </header>
+      {children}
+    </section>
+  ) : null;
+
+  return <Dialog open={open && !sharing} onOpenChange={onOpenChange}>
+    <DialogContent className="devotional-note-editor" data-testid="devotional-note-sheet"
+      onOpenAutoFocus={event => { event.preventDefault(); titleRef.current?.focus(); }}>
+      <DialogHeader className="note-editor-header">
+        <div className="min-w-0">
+          <DialogTitle ref={titleRef} tabIndex={-1} className="flex items-center gap-2 text-base outline-none">
+            <BookMarked className="w-5 h-5 text-primary shrink-0" />靈修筆記
+          </DialogTitle>
+          <DialogDescription className="sr-only">個人靈修筆記，分享前會先確認對象與內容。</DialogDescription>
+        </div>
+      </DialogHeader>
+      {children}
+    </DialogContent>
+  </Dialog>;
 }
 
 interface FormFields {
@@ -103,8 +150,8 @@ export function DevotionalNoteDialog({
   verseReference,
   verseText,
   noteId,
+  inline = false,
 }: DevotionalNoteDialogProps) {
-  const titleRef = useRef<HTMLHeadingElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const userId = user?.id || '';
@@ -232,7 +279,7 @@ export function DevotionalNoteDialog({
       if (result.status === 'synced') {
         discardDraft();
         if(share)setShareDraft(createDevotionShareDraft(savedNote));
-        else onOpenChange(false);
+        else if (!inline) onOpenChange(false);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '儲存失敗';
@@ -265,22 +312,7 @@ export function DevotionalNoteDialog({
   return (
     <><UnsavedChangesGuard dirty={dirty || (open && isSaving)} onDiscard={discardDraft} />
     <LeaveConfirmation open={confirmClose} onStay={() => setConfirmClose(false)} onLeave={() => { discardDraft(); setConfirmClose(false); onOpenChange(false); }} />
-    <Dialog open={open && !shareDraft} onOpenChange={requestOpenChange}>
-      <DialogContent
-        className="devotional-note-editor"
-        data-testid="devotional-note-sheet"
-        onOpenAutoFocus={event => { event.preventDefault(); titleRef.current?.focus(); }}
-      >
-        <DialogHeader className="note-editor-header">
-          <div className="min-w-0">
-          <DialogTitle ref={titleRef} tabIndex={-1} className="flex items-center gap-2 text-base outline-none">
-            <BookMarked className="w-5 h-5 text-primary shrink-0" />
-            靈修筆記
-          </DialogTitle>
-          <DialogDescription className="sr-only">個人靈修筆記，分享前會先確認對象與內容。</DialogDescription>
-          </div>
-        </DialogHeader>
-
+    <NoteEditorSurface open={open} inline={inline} sharing={!!shareDraft} onOpenChange={requestOpenChange}>
         {isLoading ? (
           <div className="flex min-h-0 flex-1 items-center justify-center py-16">
             <Loader2 className="w-7 h-7 animate-spin text-primary" data-testid="loading-spinner" />
@@ -384,8 +416,7 @@ export function DevotionalNoteDialog({
             <Share2 className="h-4 w-4 shrink-0" /><span>分享<span className="block text-xs font-normal text-muted-foreground">小組／靈修牆</span></span>
           </Button>
         </footer>
-      </DialogContent>
-    </Dialog>
+    </NoteEditorSurface>
     {shareDraft && <DevotionWallShareDialog draft={shareDraft} allowGroup close={()=>setShareDraft(null)} />}</>
   );
 }

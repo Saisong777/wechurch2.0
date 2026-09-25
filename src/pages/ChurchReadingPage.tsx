@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
@@ -19,6 +19,19 @@ const ChurchReadingPage = () => {
   });
   const reading = syncedReading || fallbackReading;
   const [noteOpen, setNoteOpen] = useState(false);
+  const noteSectionRef = useRef<HTMLDivElement>(null);
+  const noteTriggerRef = useRef<HTMLElement | null>(null);
+  const openNote = () => {
+    noteTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setNoteOpen(true);
+    const heading = noteSectionRef.current?.querySelector('h2');
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView?.({ block: 'start' });
+  };
+  const changeNoteOpen = (open: boolean) => {
+    setNoteOpen(open);
+    if (!open) noteTriggerRef.current?.focus();
+  };
   const verseText = reading.scriptureText || reading.previewVerses.map((verse) => `${verse.verse} ${verse.text}`).join('\n');
   const displayedDate = reading.date
     ? new Date(`${reading.date}T00:00:00`).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' })
@@ -34,15 +47,18 @@ const ChurchReadingPage = () => {
           <div className="space-y-3 py-8"><h1 className="text-xl font-semibold">{reading.devotionalTitle}</h1><p className="text-sm text-muted-foreground">{displayedDate}</p><Button asChild variant="outline"><Link to="/learn/bible">閱讀聖經</Link></Button></div>
         ) : <>
           {reading.sourceStatus === 'fallback' && <p role="status" className="mb-4 text-sm text-muted-foreground">目前顯示備用內容，非已發佈的教會課表。</p>}
-          <DevotionalReader key={`${reading.date}:${reading.scriptureReference}`} reading={reading} retry={() => refetch()} onNote={() => setNoteOpen(true)} />
+          <DevotionalReader key={`${reading.date}:${reading.scriptureReference}`} reading={reading} retry={() => refetch()} onNote={openNote} />
         </>}
-      </main>
+      <div ref={noteSectionRef}>
       <DevotionalNoteDialog
+        inline
         open={noteOpen && !isError && reading.sourceStatus !== 'unpublished'}
-        onOpenChange={setNoteOpen}
+        onOpenChange={changeNoteOpen}
         verseReference={reading.scriptureReference}
         verseText={verseText}
       />
+      </div>
+      </main>
     </div>
   );
 };

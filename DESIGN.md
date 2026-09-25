@@ -52,7 +52,14 @@ Data, routes, sharing and note persistence are unchanged. Scope and evidence:
 
 ## Note Editor Added 2026-09-25
 
-Devotional writing uses a centered 800px dialog on desktop and a full-height
+On `/learn/church-reading`, devotional writing now expands inline after the
+reader in the same column. No portal, overlay, height lock, or nested scrolling
+body. Opening focuses the heading without activating the keyboard. Private save
+keeps the editor open; collapse preserves the unsaved-changes confirmation and
+returns focus to its entry button. Save / Share remain at the end of the form.
+See `design/inline-note-audit-2026-09-25.md` for this superseding reader layout.
+
+Other note contexts retain a centered 800px dialog on desktop and a full-height
 editor on phones, not a right sheet. Keep close in the top header and private
 Save / Share in the bottom footer, outside the scrollable writing body. Sharing
 requires choosing an own group or the public wall and confirming selected content;
