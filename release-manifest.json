@@ -1,5 +1,5 @@
 {
-  "fingerprint": "1d580cca251911c0cfb2fc93429b651af4821148d5cf47b942fb264dfca33663",
+  "fingerprint": "aaf67719382db8aa432cc798dd796cc8151e97e885431f67b91ef9a09d37866b",
   "files": [
     {
       "file": "Dockerfile",
@@ -423,11 +423,11 @@
     },
     {
       "file": "src/components/scripture/BibleStudyReader.test.tsx",
-      "sha256": "88face6ef1ac17bece2439d9694a9d6df123fab41877251a191b1366598c387e"
+      "sha256": "8d75468df8cd164d0b7067135f484f15f48786aa7c7e96712df45b52adc319fb"
     },
     {
       "file": "src/components/scripture/BibleStudyReader.tsx",
-      "sha256": "41100411ee6cd972598bfb8f547ba2ee1759cf60bf28ed319935dd7d4049112c"
+      "sha256": "af0799bbf548eaaa640b9af0baf81b75bf0b67bf1fe862bad0c229bd85ba5afe"
     },
     {
       "file": "src/components/scripture/ChurchScriptureSection.tsx",
@@ -1207,11 +1207,11 @@
     },
     {
       "file": "server/bibleStudy/core.mjs",
-      "sha256": "aa8e0db70a562f9c59e25b92ac536750c1b02e5458c3c8849da1b9d231daf936"
+      "sha256": "70b29bba7a4d3092559fa8fcd99c327cf8a2a5ee1086808ee7aacab582b2bc07"
     },
     {
       "file": "server/bibleStudy/core.test.ts",
-      "sha256": "99884e7e9d25617472fd2a4c97484d57199ed94f3aa6a8d27061cd41e4622696"
+      "sha256": "6d966d24da3f873002fb4f8353efe78757a04ed8aaa87dfd19eb73b70193f2e7"
     },
     {
       "file": "server/bibleStudy/routes.ts",
@@ -1735,7 +1735,7 @@
     },
     {
       "file": "scripts/bible-study-assets.mjs",
-      "sha256": "7d3985a4b02fff48097c48c8f2fbe90098d19261fc5d122365e3088ff6ffa0c6"
+      "sha256": "b5c0471aff3f0a0afa7619393f506ee80492d38b56aacb7fefe62515dc0f4641"
     },
     {
       "file": "scripts/check-im-bible.mjs",

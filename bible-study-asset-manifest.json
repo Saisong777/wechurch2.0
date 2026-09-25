@@ -1,27 +1,31 @@
 {
-  "releaseId": "public-20260926-v2",
-  "databaseHash": "eade3bb78bae619e8e14f8d89cd045f935e569e85add871b01b4b72ecf436f92",
-  "inventoryHash": "1beb864453f46862cdd846f5343fa6004139aedc5ba9328c60107979a80f5f95",
+  "releaseId": "public-20260926-v3",
+  "databaseHash": "c2bbdf5f4bb7b9cc809472515f6070c432061d87382a20d95971eb68df55313f",
+  "inventoryHash": "769fc01eab03cbe891e1540eeffd7cae53c30336353bbbc2b54e22ae33b8a68a",
   "files": [
     {
       "file": "NOTICE.md",
-      "sha256": "866c3d4ea1a8a24d6f0320c270aff1ff78ed684ccf06952d845b7305c833cb62"
+      "sha256": "3e83a967a2eda0d3e86e86e7bbd801ad03f0e80ddc1a7d89fad41b51e824e54a"
     },
     {
       "file": "VALIDATION.json",
-      "sha256": "6aad1e930d38fb4359da2a7a1d0412d987737196e1bd1620f11e1c023773785d"
+      "sha256": "3cea904f0050771e8a5b7d623ccb7923411b357c7f88452f72df18d3383140f7"
     },
     {
       "file": "data/cmn-cu89t-source.zip",
       "sha256": "49aca5dffaeeb27c24f05ec30a7e64080f36c0e132095b83f2773b2c9b4455b7"
     },
     {
+      "file": "data/cmnfeb-source.zip",
+      "sha256": "0d241664fdfdbbbd12c61f7b6df876d5b0bba3f6f558d2b31d0d3d823bb0a510"
+    },
+    {
       "file": "data/core.sqlite",
-      "sha256": "eade3bb78bae619e8e14f8d89cd045f935e569e85add871b01b4b72ecf436f92"
+      "sha256": "c2bbdf5f4bb7b9cc809472515f6070c432061d87382a20d95971eb68df55313f"
     },
     {
       "file": "data/release.json",
-      "sha256": "15047cecbccac2f889c5ff743b1042c758bb80dc2db8e5dbdc4341a938218a2f"
+      "sha256": "d1b7d36d1744608fdc86709c7ae5e3342310c9f7e0525f7ff4043e87cae32a91"
     },
     {
       "file": "licenses/abbott-smith-readme.txt",
@@ -68,6 +72,10 @@
       "sha256": "14bb3304cb3fce153f710e1fbadc634a2ef98738886bb48a26b2e1b37f40f6bc"
     },
     {
+      "file": "licenses/cmnfeb-about.html",
+      "sha256": "245b97b1022764efb566ded265b170837bee3bd898c48f03761962b7649f8761"
+    },
+    {
       "file": "licenses/openbible.txt",
       "sha256": "0326c53da406ba4f04eccf553e438ee329b79741d9d58171fbf952159219b22f"
     },
@@ -109,7 +117,7 @@
     },
     {
       "file": "web/licenses.html",
-      "sha256": "f50def9a14255d3d75853cb2b187a295fb8aa9037fe6ca92623851ec1911586f"
+      "sha256": "67e91f8f456bab3e6afe588e7a70974ad873b9c62b5fbedcf98dcae7c3ec5d89"
     },
     {
       "file": "web/style.css",
