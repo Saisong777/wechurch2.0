@@ -4,6 +4,7 @@
 .study-reader select { display: block; width: 100%; min-height: 44px; margin-top: 6px; border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 8px; background: hsl(var(--background)); color: hsl(var(--foreground)); font-size: 16px; }
 .study-controls { display: grid; grid-template-columns: minmax(140px,1fr) 80px minmax(200px,2fr) auto auto; gap: 16px; align-items: end; padding-bottom: 20px; border-bottom: 1px solid hsl(var(--border)); }
 .study-controls .study-check { display: flex; gap: 8px; min-height: 44px; align-items: center; color: hsl(var(--foreground)); }
+.study-comparison { grid-column: 3 / -1; }
 .study-check input { width: 20px; height: 20px; accent-color: hsl(var(--primary)); }
 .study-heading, .study-actions, .study-bottom, .study-footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .study-heading { justify-content: space-between; padding: 20px 0 12px; }

@@ -3,6 +3,7 @@ import { Worker } from 'node:worker_threads';
 import path from 'node:path';
 import fs from 'node:fs';
 import { actions } from './core.mjs';
+import { releaseId } from '../../scripts/bible-study-assets.mjs';
 
 const directory = path.resolve(process.env.BIBLE_STUDY_DIR || 'bible-study-data');
 const available = () => fs.existsSync(path.join(directory, 'data/core.sqlite'));
@@ -46,7 +47,7 @@ export function bibleStudyRoutes() {
     if (req.originalUrl.length > 2048) { res.status(414).json({ error: '查詢過長' }); return; }
     next();
   });
-  router.get('/status', (_req, res) => res.json({ enabled: available(), releaseId: 'public-20260925-v1' }));
+  router.get('/status', (_req, res) => res.json({ enabled: available(), releaseId }));
   router.get('/:action', async (req, res) => {
     if (!actions.includes(req.params.action)) { res.status(404).json({ error: '找不到此功能' }); return; }
     if (!available()) { res.status(503).json({ error: '研經資料尚未就緒' }); return; }

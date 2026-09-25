@@ -4,6 +4,7 @@ import { execFileSync,spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { inspectStaging,railway,root,target,verifyRemoteBibleAssets } from './railway-staging.mjs';
+import { releaseId } from './bible-study-assets.mjs';
 
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const sha=z.string().regex(/^[a-f0-9]{64}$/);
@@ -46,7 +47,7 @@ const safe=z.object({format:z.literal(1),environment:z.literal('staging'),origin
   sourceCommit:z.string().regex(/^[a-f0-9]{40}$/).nullable(),baseCommit:z.string().regex(/^[a-f0-9]{40}$/),sourceMatchesCommit:z.boolean(),productionApproved:z.literal(false),
   migrations:z.array(z.object({file:z.string().regex(/^migrations\/[^/]+\.sql$/),sha256:sha}).strict()),
   checks:z.object({railwaySuccess:z.literal(true),health:z.literal(true),liveFingerprintMatches:z.literal(true),uiAcceptance:z.literal('separate evidence required')}).strict(),
-  productionDeploymentObserved:z.string().uuid(),referenceAssets:z.object({releaseId:z.literal('public-20260925-v1'),databaseHash:sha,inventoryHash:sha,liveVerified:z.literal(true)}).strict().optional()}).strict().parse(record);
+  productionDeploymentObserved:z.string().uuid(),referenceAssets:z.object({releaseId:z.literal(releaseId),databaseHash:sha,inventoryHash:sha,liveVerified:z.literal(true)}).strict().optional()}).strict().parse(record);
 const destination=path.join(root,'design/releases');fs.mkdirSync(destination,{recursive:true});
 fs.writeFileSync(path.join(destination,`b-${live.id}.json`),JSON.stringify(safe,null,2)+'\n',{flag:'wx'});
 console.log({recorded:true,sourceMatchesCommit:!!commit,productionApproved:false});

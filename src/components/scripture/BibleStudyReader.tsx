@@ -18,7 +18,7 @@ import './bible-study.css';
 type Attribution = { source_id: string; source_name: string; license: string; metadata: Record<string, string> };
 type Entry = Attribution & { id: string; body: string; title?: string; preview?: string; definition?: string; word?: string; pronunciation?: string; gloss?: string; original_url?: string; extra?: Record<string, unknown> };
 type Verse = Entry & { verse: number; end_verse: number; reference?: string };
-type Info = { books: { id: number; name: string; chapters: number }[]; translations: Record<string, string>; sources: { id: string; name: string; license: string; metadata: Record<string, string> }[]; note_sources: string[] };
+type Info = { books: { id: number; name: string; chapters: number }[]; translations: Record<string, string>; default_translation: string; release_id: string; sources: { id: string; name: string; license: string; metadata: Record<string, string> }[]; note_sources: string[] };
 type TokenData = { tokens: { word: string; gloss: string; pronunciation: string; morph: string; terms: string[] }[]; language: string; note: string; attributions: Attribution[] };
 type Saved = { id: string; verseReference: string };
 type Popup = { action: string; title: string; query: Record<string, string | number> };
@@ -36,10 +36,10 @@ function useStudy<T>(action: string, params: Record<string, string | number> = {
   return useQuery<T>({ queryKey: ['bible-study', action, params], queryFn: ({ signal }) => studyFetch<T>(action, params, signal), enabled, staleTime: 3600000 });
 }
 function safeLink(url?: string) { return url && /^https?:\/\//i.test(url) ? url : undefined; }
-function quoteCredit(value: Attribution) {
+export function quoteCredit(value: Attribution) {
   const copyright = value.source_id === 'cmncbt'
     ? 'Copyright © 1979, 2005, 2007, 2012, 2023 by Biblica, Inc.'
-    : 'World English Bible · Public Domain';
+    : value.source_id === 'engwebp' ? 'World English Bible · Public Domain' : value.metadata.attribution;
   return `${value.source_name}\n${copyright}\n${value.license} · ${value.metadata.license_url}`;
 }
 function Credit({ value }: { value: Attribution }) {
@@ -155,8 +155,12 @@ function ReadingSurface({ info }: { info: Info }) {
   const [url, setUrl] = useSearchParams();
   const validInt = (text: string | null, max: number) => Number.isInteger(Number(text)) ? Math.max(1, Math.min(max, Number(text) || 1)) : 1;
   const book = validInt(url.get('book'), 66), chapter = validInt(url.get('chapter'), info.books[book - 1].chapters);
-  const [translation, setTranslation] = useState('cmncbt');
+  const [translation, setTranslation] = useState(() => {
+    try { const saved = localStorage.getItem('study-translation'); if (saved && Object.keys(info.translations).includes(saved)) return saved; } catch { /* Storage is optional. */ }
+    return info.default_translation;
+  });
   const [compare, setCompare] = useState(false);
+  const [comparison, setComparison] = useState('cmncbt');
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [paragraph, setParagraph] = useState(false);
   const [verse, setVerse] = useState(validInt(url.get('verse'), 176));
@@ -170,7 +174,8 @@ function ReadingSurface({ info }: { info: Info }) {
   const { toast } = useToast();
   const client = useQueryClient();
   const primary = useStudy<Verse[]>('chapter', { book, chapter, translation });
-  const other = translation === 'cmncbt' ? 'engwebp' : 'cmncbt';
+  const other = comparison !== translation && Object.keys(info.translations).includes(comparison)
+    ? comparison : Object.keys(info.translations).find(id => id !== translation)!;
   const parallel = useStudy<Verse[]>('chapter', { book, chapter, translation: other }, compare);
   const saved = useQuery<Saved[]>({ queryKey: ['/api/saved-verses'], enabled: !!user });
   const chosen = primary.data?.find(v => v.verse <= verse && v.end_verse >= verse) || primary.data?.[0];
@@ -190,6 +195,7 @@ function ReadingSurface({ info }: { info: Info }) {
   }, onSuccess: () => { void client.invalidateQueries({ queryKey: ['/api/saved-verses'] }); toast({ title: currentSaved ? '已取消收藏' : '已收藏' }); }, onError: () => toast({ title: '收藏未完成，請重試', variant: 'destructive' }) });
   useEffect(() => { setVerse(validInt(url.get('verse'), 176)); }, [url]);
   useEffect(() => { setSelection(new Set()); }, [book, chapter, translation]);
+  useEffect(() => { try { localStorage.setItem('study-translation', translation); } catch { /* Reading still works without storage. */ } }, [translation]);
   useEffect(() => { try { localStorage.setItem('study-font-size', String(fontSize)); } catch { /* Reading still works without storage. */ } }, [fontSize]);
   const navigate = (b: number, ch: number) => {
     setUrl({ book: String(b), chapter: String(ch) }); setVerse(1); window.scrollTo({ top: 0 });
@@ -213,6 +219,7 @@ function ReadingSurface({ info }: { info: Info }) {
       <label className="study-translation">譯本<select value={translation} aria-label="譯本" onChange={e => setTranslation(e.target.value)}>{Object.entries(info.translations).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label className="study-check"><input type="checkbox" checked={compare} onChange={e => setCompare(e.target.checked)} />譯本對照</label>
       <div className="study-actions"><Button variant="ghost" size="icon" title="縮小字體" aria-label="縮小字體" disabled={fontSize <= 16} onClick={() => setFontSize(f => f - 2)}><Minus /></Button><span>{fontSize}</span><Button variant="ghost" size="icon" title="放大字體" aria-label="放大字體" disabled={fontSize >= 30} onClick={() => setFontSize(f => f + 2)}><Plus /></Button></div>
+      {compare && <label className="study-translation study-comparison">對照譯本<select aria-label="對照譯本" value={other} onChange={e => setComparison(e.target.value)}>{Object.entries(info.translations).filter(([id]) => id !== translation).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>}
     </div>
     <div className="study-heading"><h1>{info.books[book - 1].name} {chapter}</h1><div className="study-actions">
       <Button variant="outline" size="icon" aria-label="上一章" disabled={book === 1 && chapter === 1} onClick={() => next(-1)}><ChevronLeft /></Button>
@@ -261,7 +268,7 @@ function ReadingSurface({ info }: { info: Info }) {
     </div>
     <div className="study-bottom"><Button variant="outline" disabled={book === 1 && chapter === 1} onClick={() => next(-1)}><ChevronLeft size={18} />上一章</Button><Button variant="outline" disabled={book === 66 && chapter === info.books[65].chapters} onClick={() => next(1)}>下一章<ChevronRight size={18} /></Button></div>
     {note && <div id="study-note"><DevotionalNoteDialog inline open onOpenChange={open => { if (!open) setNote(null); }} verseReference={note.reference} verseText={note.text} /></div>}
-    <footer className="study-footer"><Link to="/learn/my-notes">我的筆記</Link><a href="/open/licenses" target="_blank" rel="noreferrer">來源與授權</a><span>public-20260925-v1</span></footer>
+    <footer className="study-footer"><Link to="/learn/my-notes">我的筆記</Link><a href="/open/licenses" target="_blank" rel="noreferrer">來源與授權</a><span>{info.release_id}</span></footer>
     <Preview popup={popup} close={() => setPopup(null)} />
     <ScriptureCardCreator open={!!card} onOpenChange={open => { if (!open) setCard(null); }} verse={card || { reference: '', text: '' }} />
   </>;

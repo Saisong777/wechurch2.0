@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import BibleStudyReader from './BibleStudyReader';
+import BibleStudyReader, { quoteCredit } from './BibleStudyReader';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'member-a' } }) }));
 vi.mock('@/components/layout/Header', () => ({ Header: () => <header>聖經</header> }));
@@ -14,7 +14,7 @@ vi.mock('./ScriptureCardCreator', () => ({ ScriptureCardCreator: () => null }));
 vi.mock('./ScriptureTTS', () => ({ ScriptureTTS: () => null }));
 const credit = { source_id: 'cmncbt', source_name: '當代譯本', license: 'CC-BY-SA-4.0', metadata: { attribution: 'Biblica', license_url: 'https://creativecommons.org/licenses/by-sa/4.0/' } };
 const verse = { ...credit, id: 'v1', verse: 1, end_verse: 2, body: '測試合併經文' };
-const info = { books: Array.from({ length: 66 }, (_, i) => ({ id: i + 1, name: `書卷${i + 1}`, chapters: 3 })), translations: { cmncbt: '當代譯本', engwebp: 'WEB' }, note_sources: ['notes'], sources: [{ id: 'notes', name: '註釋', license: credit.license, metadata: credit.metadata }] };
+const info = { books: Array.from({ length: 66 }, (_, i) => ({ id: i + 1, name: `書卷${i + 1}`, chapters: 3 })), translations: { 'cmn-cu89t': '新標點和合本（繁體）', cmncbt: '當代譯本', engwebp: 'WEB' }, default_translation: 'cmn-cu89t', release_id: 'public-20260926-v2', note_sources: ['notes'], sources: [{ id: 'notes', name: '註釋', license: credit.license, metadata: credit.metadata }] };
 function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, queryFn: async () => [] } } });
   const fetcher = vi.fn(async (input: string | URL | Request) => {
@@ -29,7 +29,38 @@ function mount() {
   render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
   return { client, router, fetcher };
 }
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it('attributes copied CUV verses to their own source, not WEB', () => {
+  const citation = quoteCredit({ source_id: 'cmn-cu89t', source_name: '新標點和合本（繁體）', license: 'Public-Domain', metadata: { attribution: 'Electronic source: eBible.org', license_url: 'https://ebible.org/cmn-cu89t/copyright.htm' } });
+  expect(citation).toContain('eBible.org');
+  expect(citation).toContain('新標點和合本');
+  expect(citation).not.toContain('World English Bible');
+});
+
+it('defaults to CUV, remembers a valid selection and offers both comparison versions', async () => {
+  mount();
+  await screen.findByText('測試合併經文');
+  expect(screen.getByLabelText('譯本', { exact: true })).toHaveValue('cmn-cu89t');
+  fireEvent.click(screen.getByLabelText('譯本對照'));
+  expect(screen.getByLabelText('對照譯本')).toHaveValue('cmncbt');
+  fireEvent.change(screen.getByLabelText('對照譯本'), { target: { value: 'engwebp' } });
+  expect(screen.getByLabelText('對照譯本')).toHaveValue('engwebp');
+  fireEvent.change(screen.getByLabelText('譯本', { exact: true }), { target: { value: 'engwebp' } });
+  expect(screen.getByLabelText('對照譯本')).not.toHaveValue('engwebp');
+  expect(localStorage.getItem('study-translation')).toBe('engwebp');
+  cleanup();
+  mount();
+  await screen.findByText('測試合併經文');
+  expect(screen.getByLabelText('譯本', { exact: true })).toHaveValue('engwebp');
+});
+
+it('ignores obsolete or unapproved saved translations', async () => {
+  localStorage.setItem('study-translation', 'cuv1919');
+  mount();
+  await screen.findByText('測試合併經文');
+  expect(screen.getByLabelText('譯本', { exact: true })).toHaveValue('cmn-cu89t');
+});
 
 it('keeps notes inline and freezes their scripture when the reader moves', async () => {
   mount();

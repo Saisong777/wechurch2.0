@@ -22,13 +22,27 @@ describe.skipIf(!fs.existsSync(filename))('delivered Bible study database accept
     const info = query('info');
     expect(info.books).toHaveLength(66);
     expect(info.sources.map((s: { id: string }) => s.id).sort()).toEqual([...sourceIds].sort());
-    expect(Object.keys(info.translations)).toEqual(['cmncbt', 'engwebp']);
+    expect(Object.keys(info.translations)).toEqual(['cmn-cu89t', 'cmncbt', 'engwebp']);
+    expect(info.default_translation).toBe('cmn-cu89t');
   });
   it('retains merged verses and attribution', () => {
-    const verses = query('chapter', { book: 43, chapter: 3 });
+    const verses = query('chapter', { book: 43, chapter: 3, translation: 'cmncbt' });
     expect(verses.find((v: { verse: number }) => v.verse === 23).end_verse).toBe(24);
     expect(verses.find((v: { verse: number }) => v.verse === 16).metadata.license_url).toContain('https://');
     expect(query('chapter', { book: 43, chapter: 3, translation: 'engwebp' })).toHaveLength(36);
+  });
+  it('defaults to the attributed CUV and preserves its merged verse ranges', () => {
+    const first = query('chapter', { book: 1, chapter: 1 })[0];
+    expect(first.body).toBe('起初，上帝創造天地。');
+    expect(first.source_id).toBe('cmn-cu89t');
+    expect(first.license).toBe('Public-Domain');
+    expect(first.metadata.download_sha256).toBe('49aca5dffaeeb27c24f05ec30a7e64080f36c0e132095b83f2773b2c9b4455b7');
+    const merged = query('chapter', { book: 1, chapter: 24 }).find((v: { verse: number }) => v.verse === 29);
+    expect(merged.end_verse).toBe(30);
+    expect(query('preview', { q: '創24:30' }).verses[0].body).toBe(merged.body);
+    const results = query('search', { q: '創造天地', source: 'cmn-cu89t' });
+    expect(results.length).toBeGreaterThan(0);
+    expect(query('item', { id: results[0].id }).source_id).toBe('cmn-cu89t');
   });
   it('returns Chinese commentaries from each allowed reference source', () => {
     for (const source of query('info').note_sources) {

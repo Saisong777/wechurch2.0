@@ -13,9 +13,39 @@ const source = path.join(root, 'bible-study-data');
 const proof = verifyAssets(source);
 const evidence = path.join(root, 'artifacts/railway-staging');
 fs.mkdirSync(evidence, { recursive: true, mode: 0o700 });
-const archive = path.join(evidence, `${releaseId}.tar.gz`);
-if (!fs.existsSync(archive)) execFileSync('tar', ['-czf', archive, '--options', 'gzip:compression-level=1', '-C', source, 'SHA256SUMS', ...proof.files.map(f => f.file)], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
-const expectedFiles = ['SHA256SUMS', ...proof.files.map(f => f.file)].sort();
+const deltaBase = process.env.WECHURCH_BIBLE_DELTA_BASE;
+const baseHash = '595e942f856a8fd5aa536606c059afcb73a8292bcdd37a454476f038a54e365c';
+const baseRemote = '/data/.bible-study/public-20260925-v1/data/core.sqlite';
+let packageDirectory = source;
+let expectedFiles = ['SHA256SUMS', ...proof.files.map(f => f.file)];
+let targetSize = 0;
+if (deltaBase) {
+  if (releaseId !== 'public-20260926-v2') throw new Error('Delta mode is pinned to the v1 to v2 reference upgrade');
+  const original = fs.readFileSync(path.join(path.resolve(deltaBase), 'data/core.sqlite'));
+  if (createHash('sha256').update(original).digest('hex') !== baseHash) throw new Error('Delta base hash mismatch');
+  const next = fs.readFileSync(path.join(source, 'data/core.sqlite'));
+  targetSize = next.length;
+  packageDirectory = path.join(evidence, `${releaseId}-delta`);
+  fs.mkdirSync(packageDirectory, { recursive: true, mode: 0o700 });
+  expectedFiles = expectedFiles.filter(f => f !== 'data/core.sqlite');
+  for (const file of expectedFiles) {
+    const dest = path.join(packageDirectory, file);
+    fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(path.join(source, file), dest);
+  }
+  const patch = fs.openSync(path.join(packageDirectory, 'core.delta'), 'w', 0o600);
+  try {
+    for (let offset = 0; offset < next.length; offset += 65536) {
+      const block = next.subarray(offset, offset + 65536);
+      if (block.equals(original.subarray(offset, offset + block.length))) continue;
+      const header = Buffer.alloc(12); header.writeBigUInt64BE(BigInt(offset)); header.writeUInt32BE(block.length, 8);
+      fs.writeSync(patch, header); fs.writeSync(patch, block);
+    }
+  } finally { fs.closeSync(patch); }
+  expectedFiles.push('core.delta');
+}
+expectedFiles.sort();
+const archive = path.join(evidence, `${releaseId}${deltaBase ? '-delta' : ''}.tar.gz`);
+if (!fs.existsSync(archive)) execFileSync('tar', ['-czf', archive, '--options', 'gzip:compression-level=1', '-C', packageDirectory, ...expectedFiles], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
 const archivedFiles = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n').sort();
 const archiveTypes = execFileSync('tar', ['-tvzf', archive], { encoding: 'utf8' }).trim().split('\n');
 if (JSON.stringify(archivedFiles) !== JSON.stringify(expectedFiles) || archiveTypes.some(line => !line.startsWith('-'))) throw new Error('Transfer archive contains unexpected paths or links');
@@ -44,6 +74,20 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data',chunk=>{line+=chunk; let i; while((i=line.indexOf('\\n'))>=0){const packet=JSON.parse(line.slice(0,i));line=line.slice(i+1);
 if(packet.finish){fs.closeSync(fd);if(count!==${bytes.length}||hash.digest('hex')!==${JSON.stringify(digest)})throw Error('Archive checksum mismatch');
 cp.execFileSync('tar',['-xzf',file,'-C',temp]);
+${deltaBase ? `
+const original=fs.readFileSync(${JSON.stringify(baseRemote)});
+if(crypto.createHash('sha256').update(original).digest('hex')!==${JSON.stringify(baseHash)})throw Error('Remote delta base mismatch');
+const output=temp+'/data/core.sqlite'; fs.copyFileSync(${JSON.stringify(baseRemote)},output);
+const patch=fs.readFileSync(temp+'/core.delta'), database=fs.openSync(output,'r+');
+let cursor=0,lastEnd=0;
+try { while(cursor<patch.length){
+if(cursor+12>patch.length)throw Error('Truncated patch header');
+const offset=Number(patch.readBigUInt64BE(cursor)), length=patch.readUInt32BE(cursor+8);cursor+=12;
+if(!Number.isSafeInteger(offset)||offset<lastEnd||offset%65536!==0||length<1||length>65536||offset+length>${targetSize}||cursor+length>patch.length)throw Error('Invalid patch block');
+fs.writeSync(database,patch.subarray(cursor,cursor+length),0,length,offset);cursor+=length;lastEnd=offset+length;
+} fs.ftruncateSync(database,${targetSize}); } finally { fs.closeSync(database); }
+fs.unlinkSync(temp+'/core.delta');
+` : ''}
 fs.writeFileSync(temp+'/verify.mjs',Buffer.from(${JSON.stringify(Buffer.from(verifier).toString('base64'))},'base64'),{mode:0o600});
 const checked=JSON.parse(cp.execFileSync('node',[temp+'/verify.mjs','--verify',temp],{encoding:'utf8'}));
 fs.unlinkSync(file);fs.unlinkSync(temp+'/verify.mjs');fs.renameSync(temp,dest);
