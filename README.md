@@ -3,11 +3,14 @@
 ## 目前分支狀態：聖經整合待線上驗收
 
 `codex/bible-study-integration` 包含新的聖經整合候選版。程式測試已通過、研經資料
-已送達 B 專用 volume 並逐檔校驗，但 Railway 部署停在建立容器，尚未完成 B 線上驗收。
+已送達 B 專用 volume 並逐檔校驗。整合版曾於 B 成功運行並通過手機尺寸／桌面操作測試；
+最後的隱藏路徑 404 修正版再次遇到 Railway 建立容器阻擋，目前仍待恢復及最終線上驗收。
 不可把下方上一版的線上驗收結果套用到本分支。`release-manifest.json` 是候選版的
 487 個程式檔案指紋，`bible-study-asset-manifest.json` 只保存資料資產名稱與校驗值，
 不包含資料內容；兩者可用於重建及核對，但不代表 B 已發布成功。
 本次候選指紋與阻擋紀錄見 [聖經整合紀錄](design/bible-integration-2026-09-25.md)。
+已完成的操作見 [UI 驗收](design/bible-ui-acceptance-2026-09-25.md)；
+平台求助資料見 [支援草稿](design/railway-container-support-2026-09-25.md)，尚未送出。
 
 下方保留上一個 Railway B 已驗收版本的基準紀錄。不是 A 正式發布，也不包含資料庫、上傳檔案或密碼。原工作目錄中未整理的其他資料沒有被刪除。
 
