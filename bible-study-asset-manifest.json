@@ -1,0 +1,111 @@
+{
+  "releaseId": "public-20260925-v1",
+  "databaseHash": "595e942f856a8fd5aa536606c059afcb73a8292bcdd37a454476f038a54e365c",
+  "inventoryHash": "9a4dfde32edc7ce78ec25fbd4f31d15a8a9e6d7e1fa19411e3a93d1d8773db6a",
+  "files": [
+    {
+      "file": "NOTICE.md",
+      "sha256": "f31f8f3bc9d8681aad89d140c83baeab5c9c07fa7bc5e9e1dd3afb044603d47a"
+    },
+    {
+      "file": "VALIDATION.json",
+      "sha256": "d024bb6cf2d14cc4f9fc7242f61341919868702a502d54a3196c3c8702157cb2"
+    },
+    {
+      "file": "data/core.sqlite",
+      "sha256": "595e942f856a8fd5aa536606c059afcb73a8292bcdd37a454476f038a54e365c"
+    },
+    {
+      "file": "data/release.json",
+      "sha256": "738f4fd236d1d745dc40c04b71955bfa20466ae07207c0686d3039b85099ab82"
+    },
+    {
+      "file": "licenses/abbott-smith-readme.txt",
+      "sha256": "8c67a8c904d8cbf2b66a9a6eaaed19cc5462b24edec3dc07ee689d30140f2c59"
+    },
+    {
+      "file": "licenses/aquiferopenbibledictionary-zht-metadata.txt",
+      "sha256": "00ffc1850b6e0e2353cc24b31e2f635347b23aad06240b5184d6a0f072992256"
+    },
+    {
+      "file": "licenses/aquiferopenbibledictionary-zht-readme.txt",
+      "sha256": "1a9e401beff7e8c7fd15a25a46206cb0ed35029dea45a5d1768b80af0943c75c"
+    },
+    {
+      "file": "licenses/aquiferopenstudynotes-zht-metadata.txt",
+      "sha256": "f2155ff30a1b191ae108e08442bf6d9067540630e0d7c082da25c02a0df02c2e"
+    },
+    {
+      "file": "licenses/aquiferopenstudynotes-zht-readme.txt",
+      "sha256": "2b8e4f905ed70cc6cb6d4a4cb55eb9a236559c9c02825268637b8fb4c1ebfc8c"
+    },
+    {
+      "file": "licenses/biblicastudynotes-zht-metadata.txt",
+      "sha256": "8f6ee4477dd794b6f0a17911c252b6f6d3e09e9b9e86ed54a75f58f88d7ef48c"
+    },
+    {
+      "file": "licenses/biblicastudynotes-zht-readme.txt",
+      "sha256": "9baaa1e85ea764a137687ae7111875a6e0b8a10f6f61963a1b68780c7d852abd"
+    },
+    {
+      "file": "licenses/cc-by-sa.txt",
+      "sha256": "b903aecb7891ae0e0cbc50f12ac8068fd89c630cfeeb858ed19b9d376a69fc07"
+    },
+    {
+      "file": "licenses/cc-by.txt",
+      "sha256": "4942cb3b416a10adc5c46d397fa5d5dcdc1c6646ab7472325dda6eaff1d19df3"
+    },
+    {
+      "file": "licenses/cmncbt.txt",
+      "sha256": "14bb3304cb3fce153f710e1fbadc634a2ef98738886bb48a26b2e1b37f40f6bc"
+    },
+    {
+      "file": "licenses/openbible.txt",
+      "sha256": "0326c53da406ba4f04eccf553e438ee329b79741d9d58171fbf952159219b22f"
+    },
+    {
+      "file": "licenses/oshb-pinned.txt",
+      "sha256": "131507d14e62c36c42ba0315a0cb681b76a893886065650f69d1f778ed861a6b"
+    },
+    {
+      "file": "licenses/sbl-pinned.txt",
+      "sha256": "ae671ba74e61fc314bb56c0f8ce4c1021f6ff67f413fe1f2b336601589a5d3d6"
+    },
+    {
+      "file": "licenses/sbl-readme.txt",
+      "sha256": "7ae1dc2622a8dafe55cf8b17d4935c3e39a70c46636277dd0fc46fe8b7464721"
+    },
+    {
+      "file": "licenses/step-pinned.txt",
+      "sha256": "bdeff3f76567d0a88df992ba5143c491bca0a12bafe5b907dbc82ea5ad431bca"
+    },
+    {
+      "file": "licenses/uwtranslationnotes-zht-metadata.txt",
+      "sha256": "5b0a015ade7f1761dc230dbcb68b4198b78a77949618fd082c2feecef78cdc25"
+    },
+    {
+      "file": "licenses/uwtranslationnotes-zht-readme.txt",
+      "sha256": "1921c6456e34115044ccbd2e70c011136686f8f83b9c6dfca80e02115082d937"
+    },
+    {
+      "file": "licenses/uwtranslationwords-zht-metadata.txt",
+      "sha256": "08c5aa60fdfd88797d6cdf2e199955d53133414aa104b9f11072dcebd54c593b"
+    },
+    {
+      "file": "licenses/uwtranslationwords-zht-readme.txt",
+      "sha256": "9b1d14f469027af89b44f6c8c638f3d376314fd2081c4774c2bdf8ca2deda60f"
+    },
+    {
+      "file": "licenses/web.txt",
+      "sha256": "c4a282bb726979f70ac2a9168473e21159ec408e0bdaefeafa35399df5008f12"
+    },
+    {
+      "file": "web/licenses.html",
+      "sha256": "fbe1425baea759470b0c49a73ab410ac6d29271e0aac8ddca28287864ac0d870"
+    },
+    {
+      "file": "web/style.css",
+      "sha256": "4d607f9613bda3e130e60e1aaa03b6046ae6adc0c669a97d8d15a1970f45ce09"
+    }
+  ]
+}
