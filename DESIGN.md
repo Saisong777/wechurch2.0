@@ -40,6 +40,15 @@ line-start headings format imported prose; unknown prose remains complete.
 Data, routes, sharing and note persistence are unchanged. Scope and evidence:
 `design/reader-audit-2026-09-25.md`.
 
+## Note Editor Added 2026-09-25
+
+Devotional writing uses a centered 800px dialog on desktop and a full-height
+editor on phones, not a right sheet. Keep save and close in the top header, with
+one scrollable body and an optional scripture disclosure. Use unframed sections,
+16px inputs and 44px controls. Retain local drafts, conflict recovery and explicit
+share preview. Scoped styles must not change other dialogs or note storage.
+See `design/note-editor-audit-2026-09-25.md`.
+
 The sections below are historical experiments, not current navigation or palette.
 
 ---

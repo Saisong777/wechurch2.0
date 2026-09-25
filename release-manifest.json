@@ -1,5 +1,5 @@
 {
-  "fingerprint": "7963b669b8c970adcb8eebc1481ef95e05b1d50e8c00bf94583bc016e90926f4",
+  "fingerprint": "9315fbf1a29b5c34109dca11cca4834abb952978bfb8001d39f694529c5a4cbf",
   "files": [
     {
       "file": "Dockerfile",
@@ -435,11 +435,11 @@
     },
     {
       "file": "src/components/scripture/DevotionalNoteDialog.test.tsx",
-      "sha256": "6e4502a7c83d14f2034b6b6c4d0fa06a4a3db7247003d6b55208a0504766e43c"
+      "sha256": "e206ecbabb8e1ed8d58e713573c5caabef8481f00933e886d33d9ffb73be26d3"
     },
     {
       "file": "src/components/scripture/DevotionalNoteDialog.tsx",
-      "sha256": "436939e11864fb7fa94afef55dd22d88aa0693e417c5a80e594ed6d6586d85bd"
+      "sha256": "a9854f3c9849f68468d349c6aacf15c883f39f6c78b4a6daf50eb89d17a58a12"
     },
     {
       "file": "src/components/scripture/DevotionalReader.tsx",
@@ -476,6 +476,10 @@
     {
       "file": "src/components/scripture/ScriptureViewer.tsx",
       "sha256": "fd2975b288b47007f619c35b4f439bb4cb85f8543068bfcc6c69bf8966cc74f2"
+    },
+    {
+      "file": "src/components/scripture/devotional-note-editor.css",
+      "sha256": "71fcc889873ce94bd3d160de633b5553c7573cd97267d93c5ae32c4b75d2d7b2"
     },
     {
       "file": "src/components/scripture/devotional-reader.css",
