@@ -2,7 +2,13 @@
 
 Status: draft, not submitted. Obtain approval before posting. Refresh the latest deployment state before submission.
 
-Our staging web service repeatedly stalls at CREATE_CONTAINER after successful builds. It currently cannot serve requests. This is staging, not a production outage.
+Update at 2026-09-25 16:21 UTC: staging is restored using replacement service
+`fef7af7c-e3c3-4977-8294-c3a123a4242e`, retaining the original database, volume and hostname.
+Normal release `729f62d8-6556-4456-a5e1-5abee0442588` is successful, with live API and asset verification.
+The old service no longer receives the original hostname's traffic. Its inconsistent instance state
+remains unresolved; a platform root cause is not established. Details below describe the historical outage.
+
+Our old staging web service repeatedly stalled at CREATE_CONTAINER after successful builds. This was staging, not a production outage.
 
 - Project: `9371f53f-3043-4a19-b25f-a55d891fb46a`
 - Environment: staging, `ae398a3f-4f0e-4617-8c55-838d1c5b47d9`
@@ -33,8 +39,8 @@ At 15:40:05Z we collected the available build/runtime logs and deployment events
 
 The evidence establishes inconsistent deployment/instance state and failure before application startup. A stuck volume attachment or scheduler state is a hypothesis, not a confirmed root cause. The public status page was operational when checked; it explicitly excludes smaller isolated incidents.
 
-The application closes HTTP/DB connections on SIGTERM, as confirmed in the prior deployment logs. We have not deleted/detached the volume, recreated the database, disabled authentication/healthchecks, or changed production. We cannot establish the exact scheduling/mounting cause from available events.
+The application closes HTTP/DB connections on SIGTERM, as confirmed in the prior deployment logs. During the initial incident we did not detach the volume. Subsequently, with owner approval, we moved the same volume attachment to the replacement service and verified all 26 reference files. No volume was deleted, database recreated, authentication/healthchecks disabled, or production deployment changed. We cannot establish the exact scheduling/mounting cause from available events.
 
-Please reconcile/remove the stale `6f2da44e` / `a9afec60` instance state, inspect the CREATE_CONTAINER failure for `4c53d64f`, and check scheduler and persistent-volume attachment events. Help restore the existing service without deleting its volume or database. We need host/control-plane evidence that is not exposed through the available application logs.
+Please reconcile the stale `6f2da44e` / `a9afec60` instance state, inspect the CREATE_CONTAINER failure for `4c53d64f`, and check scheduler and persistent-volume attachment events. Do not modify the replacement service, its original hostname, database or volume attachment. We need host/control-plane evidence that is not exposed through the available application logs.
 
 No credentials, environment-variable values, database content, or member data are included in this draft.

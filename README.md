@@ -1,16 +1,22 @@
 # WeChurch B 站可重建版本
 
-## 目前分支狀態：聖經整合待線上驗收
+## 目前分支狀態：B 已恢復，聖經整合可預覽
 
-`codex/bible-study-integration` 包含新的聖經整合候選版。程式測試已通過、研經資料
-已送達 B 專用 volume 並逐檔校驗。整合版曾於 B 成功運行並通過手機尺寸／桌面操作測試；
-最後的隱藏路徑 404 修正版再次遇到 Railway 建立容器阻擋，目前仍待恢復及最終線上驗收。
-不可把下方上一版的線上驗收結果套用到本分支。`release-manifest.json` 是候選版的
-487 個程式檔案指紋，`bible-study-asset-manifest.json` 只保存資料資產名稱與校驗值，
-不包含資料內容；兩者可用於重建及核對，但不代表 B 已發布成功。
-本次候選指紋與阻擋紀錄見 [聖經整合紀錄](design/bible-integration-2026-09-25.md)。
-已完成的操作見 [UI 驗收](design/bible-ui-acceptance-2026-09-25.md)；
-平台求助資料見 [支援草稿](design/railway-container-support-2026-09-25.md)，尚未送出。
+2026-09-26 已將原 B 網址切至替代執行服務，保留原資料庫、檔案 volume、
+登入設定與會員內容。正常發布流程亦已驗證成功，A 未發布。
+
+- 現役 B 服務：`fef7af7c-e3c3-4977-8294-c3a123a4242e`。
+- 已驗收部署：`729f62d8-6556-4456-a5e1-5abee0442588`。
+- 487 檔指紋：`34c72177c8b07be6033774e3fbf4401d2df6f120b7f32bffea02039fa68df821`。
+- 原網址、16 組研經 API、26 個資料／授權檔校驗、隱藏路徑 404、私人資料權限及 Google 安全流程已驗證。
+- [精確來源與發布紀錄](design/releases/b-729f62d8-6556-4456-a5e1-5abee0442588.json)
+  與 [恢復及後續發布方式](design/railway-b-recovery-2026-09-26.md)。
+
+`release-manifest.json` 保存程式指紋，`bible-study-asset-manifest.json` 只保存
+資料資產名稱與校驗值，不含資料內容。沿革見 [聖經整合紀錄](design/bible-integration-2026-09-25.md)，
+手機尺寸／桌面操作範圍見 [UI 驗收](design/bible-ui-acceptance-2026-09-25.md)。
+實體手機及 Sai 最終預覽確認仍待完成。舊服務的底層異常未由 Railway 證實；
+[支援草稿](design/railway-container-support-2026-09-25.md) 尚未送出。
 
 下方保留上一個 Railway B 已驗收版本的基準紀錄。不是 A 正式發布，也不包含資料庫、上傳檔案或密碼。原工作目錄中未整理的其他資料沒有被刪除。
 
@@ -18,7 +24,7 @@
 
 保留同工測試邀請與小組邀請跨登入返回；2026-09-24 改為 Google 註冊／登入，真實登入已驗收。見 [Google 登入紀錄](google-staging-registration-2026-09-24.md)。LINE 未啟用，沒有將 B 會員搬到 A。
 
-## 上次已驗收版本
+## 歷史基準版本（不是目前部署）
 
 - B 網址：https://wechurch-staging-staging.up.railway.app
 - B 部署：`6f2da44e-0757-4b1f-bcfb-c1ea04a7f110`
