@@ -1,5 +1,5 @@
 {
-  "fingerprint": "2c14a63ea9a661c3be1c9eec1eece930ec7e475849ab4a4c5c2bb24b58f23be6",
+  "fingerprint": "1705add25f4cb368e75405f2dd50a1a7e47829eae571972e27b44314fa1c5f02",
   "files": [
     {
       "file": "Dockerfile",
@@ -19,7 +19,7 @@
     },
     {
       "file": "index.html",
-      "sha256": "ad58763f4c5c4839255987b9724afdaf392d772c710a46ac3fbcce1ee7fda9c9"
+      "sha256": "eb451021840eaf37a39129e6871f36c4238d8c4432f2393e74a6189c46077f60"
     },
     {
       "file": "components.json",
@@ -299,11 +299,11 @@
     },
     {
       "file": "src/components/layout/AppLayout.tsx",
-      "sha256": "b061b0cba65cfd587ad2452b8c4ebd004073ba0e7ac0392ad90feab6e3642941"
+      "sha256": "6c7ef26ac00cd4816122dede9fb28a862fca8e2f91ba5d9e3e4d2bb24cdf6715"
     },
     {
       "file": "src/components/layout/BottomNav.test.tsx",
-      "sha256": "ea1aa9fa9ce2a8ac749ac549ebabb3376a95ee84fa050505280f5f0ccd7ce611"
+      "sha256": "fadaa7deddb41543f4f9d21846f912bb6e42f3695d5ac6a07e952c069875a759"
     },
     {
       "file": "src/components/layout/BottomNav.tsx",
@@ -339,7 +339,7 @@
     },
     {
       "file": "src/components/layout/MobileNavigation.tsx",
-      "sha256": "215c1c339082dc91501e33c43d3902e735606750d28819e3596fe8d0709e322a"
+      "sha256": "9b3c33ed7b0af7bee30c59f2857daf218bd8f7a05a341d0e9bb3a29bf72d860e"
     },
     {
       "file": "src/components/layout/NetworkStatusBanner.tsx",
@@ -360,6 +360,10 @@
     {
       "file": "src/components/layout/UnsavedChangesGuard.tsx",
       "sha256": "13b7593bf8344ceaaf181b3cd5cd4baada1d9b13182e9ddbf491e1a3af395079"
+    },
+    {
+      "file": "src/components/layout/mobile-scroll.test.ts",
+      "sha256": "c5d71f209289db4be2de7082c55f4b5aaf54ba4516f2a53faec84289d78ea26f"
     },
     {
       "file": "src/components/play/DiscipleQuiz.tsx",
@@ -503,11 +507,11 @@
     },
     {
       "file": "src/components/theme/AppearanceControl.test.tsx",
-      "sha256": "e9f642ed2e178bb52e6063f976cefc93a8dc849665496c32e2cf701ae811ddd5"
+      "sha256": "1bca08b5d5a27cd978b4b9de99f1187d4201f8d3f68c3507a517356b7aa316f1"
     },
     {
       "file": "src/components/theme/AppearanceControl.tsx",
-      "sha256": "2553cbd3314ea5ad21ca1004fefad98c62e484c38c62cc22969e37369410e117"
+      "sha256": "4e1e9d2e650a91ab45167ded763baa4d60f3322f5bab91725dbd99912ffe59d7"
     },
     {
       "file": "src/components/theme/AppearanceProvider.tsx",
@@ -839,7 +843,7 @@
     },
     {
       "file": "src/index.css",
-      "sha256": "bdbc50574d4fc333fd651757ad18da4fcad630590c86214a57d2b79cfdba6e84"
+      "sha256": "bd37577362e0e9bd1fb0d647b754472a2e7141307c85f1c4d385a3d36df1fc27"
     },
     {
       "file": "src/lib/admin-helpers.ts",

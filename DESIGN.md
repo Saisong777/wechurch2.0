@@ -24,6 +24,16 @@ Use semantic tokens for reading, forms, popovers, and management surfaces.
 Keep QR canvases, photos, and exported media in their original colors.
 See `design/appearance-2026-09-25.md` for B release evidence and limitations.
 
+## Mobile Scroll and Appearance Repair 2026-09-25
+
+Use document scrolling, not a viewport-height body with its own overflow:auto.
+Horizontal clipping must not create another scroll container. The app shell owns
+the small-viewport minimum; shared mobile pages must not add another viewport of
+minimum height. Keep sticky navigation and native window-based Back restoration.
+Place the labeled appearance selector first in the existing mobile menu:
+明亮 / 深色 / 跟隨系統. No additional navigation bar or touch-scroll interception.
+See `design/mobile-scroll-audit-2026-09-25.md` for scope and iOS acceptance limits.
+
 ## Daily Reader Added 2026-09-25
 
 The daily devotion uses the scoped `church-reader` surface: a 672px reading
