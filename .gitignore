@@ -13,6 +13,7 @@ uploads/
 *.backup
 *.sqlite
 *.sqlite3
+bible-study-data/
 public/message-cards/
 *.pem
 *.key

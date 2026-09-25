@@ -16,6 +16,7 @@ import { FeatureGate } from '@/components/ui/feature-gate';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { vibrate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import BibleStudyReader, { studyFetch } from '@/components/scripture/BibleStudyReader';
 import {
   getLocalBibleBooks,
   getLocalBibleChapters,
@@ -86,6 +87,10 @@ type BibleView = { book: string | null; chapter: number | null; search: string; 
 const bibleViews = new Map<string, BibleView>();
 const BiblePage = () => {
   const location = useLocation();
+  const study = useQuery<{ enabled: boolean }>({ queryKey: ['bible-study', 'status'], queryFn: ({ signal }) => studyFetch('status', {}, signal) });
+  if (study.isPending) return <><Header variant="compact" title="聖經" backTo="/learn" /><p role="status" className="container py-8">載入聖經…</p></>;
+  if (study.isError) return <><Header variant="compact" title="聖經" backTo="/learn" /><div className="container py-8" role="alert"><p>聖經暫時無法載入</p><Button onClick={() => study.refetch()}>重試</Button></div></>;
+  if (study.data?.enabled) return <BibleStudyReader />;
   return <BibleReader key={location.key} entryKey={location.key} />;
 };
 

@@ -66,6 +66,15 @@ try {
   const noteBody={verseReference:'以賽亞書 43',verseText:'Fixture scripture',observation:'original',clientMutationId:mutationId};
   const created=await b('/api/devotional-notes','POST',noteBody); assert.equal(created.status,201);
   const note=await created.json();assert.equal(note.version,1);
+  const savedBible=await b('/api/saved-verses','POST',{userId:ids[0],verseReference:'創世記 1:1（Biblica® 當代譯本開放資源（繁體））',verseText:'Fixture text',bookName:'創世記',chapter:1,verseStart:1,notes:'Fixture attribution'});
+  assert.equal(savedBible.status,201);
+  const savedBibleId=(await savedBible.json()).id;
+  assert((await (await b('/api/saved-verses')).json()).some((v:{id:string})=>v.id===savedBibleId));
+  assert(!(await (await a('/api/saved-verses')).json()).some((v:{id:string})=>v.id===savedBibleId));
+  assert.equal((await guest('/api/saved-verses')).status,401);
+  assert.equal((await a(`/api/saved-verses/${savedBibleId}`,'DELETE')).status,200);
+  assert((await (await b('/api/saved-verses')).json()).some((v:{id:string})=>v.id===savedBibleId));
+  assert.equal((await b(`/api/saved-verses/${savedBibleId}`,'DELETE')).status,200);
   assert.equal((await b('/api/devotional-notes','POST',noteBody)).status,201);
   assert.equal((await b(`/api/devotional-notes/${note.id}`,'PATCH',{observation:'missing version'})).status,428);
   assert.equal((await b(`/api/devotional-notes/${note.id}`,'PATCH',{observation:'updated',version:1})).status,200);

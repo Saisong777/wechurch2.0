@@ -19,6 +19,7 @@ import { soulGymAccess, visibleSubmissions, browserIdentity } from './soulGymAcc
 import { pool, getPoolStats } from "./db";
 import type { AppRole, DevotionalNote } from '@shared/schema';
 import { bibleCache, timelineCache, apiCache, sessionCache, prayerCache, cacheKeys } from "./cache";
+import { bibleStudyRoutes, bibleStudyCreditsRoutes } from './bibleStudy/routes';
 import { getKnownChurchOptions, normalizeChurch, UNASSIGNED_CHURCH_ID, getChurchAliases } from "./churches";
 import {
   canAssignCrmScopes,
@@ -871,6 +872,10 @@ export async function registerRoutes(app: Express) {
   // Health check endpoint - detailed with database
   app.use('/api/admin/church-devotions', churchDevotionRoutes(requireCrmDirector));
   app.use('/api/life-groups', lifeGroupRoutes(resolveUserId));
+  app.use('/api/bible-study', bibleStudyRoutes());
+  app.use('/open/api', (req, res) => res.redirect(308, `/api/bible-study${req.url.startsWith('/') ? req.url : '/'}`));
+  app.use('/open', bibleStudyCreditsRoutes());
+  app.use(['/library', '/data/core.sqlite', '/bible-study-data', '/api/info', '/api/reference', '/COBSGreek.ttf', '/cobsh.ttf'], (_req, res) => res.sendStatus(404));
   app.use('/api/support', supportRoutes(resolveUserId));
   app.use('/api/mentoring', mentoringRoutes(resolveUserId));
 

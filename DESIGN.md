@@ -13,6 +13,18 @@ tokens live in `src/index.css`. Controls default to at least 44px, card radius 8
 Reading width 672px, body 18px/32px. Admin uses compact task-first lists.
 No oversized explanation panels above content. Secondary help lives in disclosures.
 See `design/ui-ux-refresh-2026-09-13.md` for scope and verification.
+## Bible Integration Added 2026-09-25
+
+Merge the supplied study reader into the existing `/learn/bible` and `/bible`
+function, not a separate advanced-study destination. Keep the daily devotion
+unchanged. Reuse the shared header, Together tokens and member authentication.
+Scripture stays primary; comparison is two columns on desktop, paired blocks
+on phones. Reference tools use a desktop side column and an explicit mobile
+reading/reference switch. Inline verse actions remain reachable mid-chapter.
+Cross references and dictionaries use bounded accessible dialogs; private notes
+expand inline. Personal records remain separate from the read-only study DB.
+See `design/bible-integration-2026-09-25.md` for scope and acceptance evidence.
+
 ## Appearance Added 2026-09-25
 
 Default to light; offer explicit light, dark, and system choices through one

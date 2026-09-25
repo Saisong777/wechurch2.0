@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { readBackupKey, unseal } from './backup-envelope.mjs';
+import { copyAssets } from './bible-study-assets.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'cf36df49-a0f4-4224-80f2-4d0e4d1c1194', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
@@ -140,6 +141,11 @@ function snapshot() {
     }
   }
   for (const entry of entries) copy(entry);
+  // Large read-only reference assets are delivered separately, never committed to Git.
+  if (fs.existsSync(path.join(root, 'bible-study-data'))) {
+    const assets = copyAssets(path.join(root, 'bible-study-data'), path.join(release, 'bible-study-data'));
+    fs.writeFileSync(path.join(release, 'bible-study-asset-manifest.json'), JSON.stringify(assets, null, 2));
+  }
   const fingerprint = sha(JSON.stringify(manifest));
   fs.writeFileSync(path.join(release, 'release-manifest.json'), JSON.stringify({ fingerprint, files: manifest }, null, 2));
   save('release.json', { directory: release, fingerprint, createdAt: new Date().toISOString(), target, files: manifest.length });
