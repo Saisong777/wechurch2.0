@@ -1,5 +1,5 @@
 {
-  "fingerprint": "0b689a324f42db4bd807d8891e56a39ad6c5e441f0501e143151687008974905",
+  "fingerprint": "390b8bad31f3b36ac3cafa10fca4172f5d6cc9f6d23508940124b2d4da7aef83",
   "files": [
     {
       "file": "Dockerfile",
@@ -1499,7 +1499,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "c2c40176c529ca744972c004df7de6e9acffeaa9f6649bcc26ec32e9defd0ce2"
+      "sha256": "a511f556839c7c50e6e7ed49be8622e0fff5e44bdd8c3a661a41162f0849cdf0"
     },
     {
       "file": "server/securityPolicies.test.ts",
@@ -1891,7 +1891,7 @@
     },
     {
       "file": "scripts/verify-integrity-worker.ts",
-      "sha256": "190b83d1596c16e25034bc661c63e118af1ad87c7722794ef64f261a0d54780e"
+      "sha256": "9c794db5363c2f29d4c693d4f37e0bdc56060f5e480baadd9289103ce24cc087"
     },
     {
       "file": "scripts/verify-integrity.mjs",
