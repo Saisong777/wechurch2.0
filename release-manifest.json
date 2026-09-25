@@ -1,5 +1,5 @@
 {
-  "fingerprint": "5c34b770b44dfe88adadd583a500f6d2a843db50881e69854949d5c5b7db6f28",
+  "fingerprint": "7963b669b8c970adcb8eebc1481ef95e05b1d50e8c00bf94583bc016e90926f4",
   "files": [
     {
       "file": "Dockerfile",
@@ -419,7 +419,7 @@
     },
     {
       "file": "src/components/scripture/ChurchScriptureSection.tsx",
-      "sha256": "587a0390ff9c6457c192b716c1a8471ef62a347fae1b0cb3581421b63884bd5f"
+      "sha256": "f3ada7994f76144e7180181ebe968971adc318073c76c2d4b15343d1e51f1c84"
     },
     {
       "file": "src/components/scripture/DevotionWallShareDialog.test.tsx",
@@ -440,6 +440,10 @@
     {
       "file": "src/components/scripture/DevotionalNoteDialog.tsx",
       "sha256": "436939e11864fb7fa94afef55dd22d88aa0693e417c5a80e594ed6d6586d85bd"
+    },
+    {
+      "file": "src/components/scripture/DevotionalReader.tsx",
+      "sha256": "ddcc65774a0430bcc353c386d85789dfbef4db9e4ca4c697aa9740ef03161807"
     },
     {
       "file": "src/components/scripture/FloatingToolbar.tsx",
@@ -472,6 +476,10 @@
     {
       "file": "src/components/scripture/ScriptureViewer.tsx",
       "sha256": "fd2975b288b47007f619c35b4f439bb4cb85f8543068bfcc6c69bf8966cc74f2"
+    },
+    {
+      "file": "src/components/scripture/devotional-reader.css",
+      "sha256": "6005cd9b8e3a0fd65bf79321c627b82032aadbb17c97ddf7cb3bf61c558602ac"
     },
     {
       "file": "src/components/support/MentoringPanel.test.tsx",
@@ -874,6 +882,14 @@
       "sha256": "6a8e9f0810af5753762be795376d8871b5e673192dd843c041e9799342ad117f"
     },
     {
+      "file": "src/lib/devotionalSections.test.ts",
+      "sha256": "7931532831b34ce0288e500fadb8ae2d8f0c0d42d7f681d2a2470cbd4dd52443"
+    },
+    {
+      "file": "src/lib/devotionalSections.ts",
+      "sha256": "6430f2f7955350d2c7d4ff7db8fb0e70ea8dced789789d4489d06ab37cdd8ca7"
+    },
+    {
       "file": "src/lib/groupInvitation.test.ts",
       "sha256": "1bcd9e6eb074dfd5832fefea343679f5156f50d1059acad9a25ebbdc5e72a4e8"
     },
@@ -991,11 +1007,11 @@
     },
     {
       "file": "src/pages/ChurchReadingPage.test.tsx",
-      "sha256": "a4f44cc4e50690bd32e5e545002a331403c7a9bf6a22d95f6e034bedb32fa159"
+      "sha256": "de342c23bfc761d21d7d2623b5a1e80e7771f04bf962abed62a92904b10130ec"
     },
     {
       "file": "src/pages/ChurchReadingPage.tsx",
-      "sha256": "2263a78fa2a7a53aa5e0a5c1e08c9d981ce69473095a1982c94f9ec79d509ba8"
+      "sha256": "0cf57f18147e2784fed022f7e284c3fff5d4e81598f677df235c5f0705c067e3"
     },
     {
       "file": "src/pages/DailyPortals.test.tsx",

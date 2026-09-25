@@ -9,9 +9,10 @@
 ## 版本識別
 
 - B 網址：https://wechurch-staging-staging.up.railway.app
-- B 部署：`feb6b612-9c65-47bb-a3a3-746092663a0c`
-- 程式指紋：`5c34b770b44dfe88adadd583a500f6d2a843db50881e69854949d5c5b7db6f28`
-- `release-manifest.json` 列出實際 B 部署的 473 個檔案與 SHA-256。
+- B 部署：`451069db-38f3-4a05-aa29-8f1628e47247`
+- 程式指紋：`7963b669b8c970adcb8eebc1481ef95e05b1d50e8c00bf94583bc016e90926f4`
+- `release-manifest.json` 列出實際 B 部署的 477 個檔案與 SHA-256。
+- 2026-09-25 每日靈修改為經文／靈修／禱告分頁、可調字級及分段原文；見 [閱讀頁驗收](reader-audit-2026-09-25.md)。
 - 2026-09-25 已將 9/24 快照的 62 位舊會員、105 篇筆記與 1,114 筆打卡匯入 B；見 [匯入與剩餘門檻](im-bible-b-import-2026-09-25.md)。A 尚未切換。
 - 2026-09-25 新增明亮／暗色／跟隨裝置，見 [外觀驗收](appearance-2026-09-25.md)。
 - `node ops/verify-b-checkpoint.mjs` 可以逐檔核對版本；不需要資料庫或密碼。
