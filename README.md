@@ -1,16 +1,16 @@
 # WeChurch B 站可重建版本
 
-## 目前分支狀態：B 已恢復，聖經整合可預覽
+## 目前分支狀態：B 已補上和合本，可預覽
 
 2026-09-26 已將原 B 網址切至替代執行服務，保留原資料庫、檔案 volume、
 登入設定與會員內容。正常發布流程亦已驗證成功，A 未發布。
 
 - 現役 B 服務：`fef7af7c-e3c3-4977-8294-c3a123a4242e`。
-- 已驗收部署：`729f62d8-6556-4456-a5e1-5abee0442588`。
-- 487 檔指紋：`34c72177c8b07be6033774e3fbf4401d2df6f120b7f32bffea02039fa68df821`。
-- 原網址、16 組研經 API、26 個資料／授權檔校驗、隱藏路徑 404、私人資料權限及 Google 安全流程已驗證。
-- [精確來源與發布紀錄](design/releases/b-729f62d8-6556-4456-a5e1-5abee0442588.json)
-  與 [恢復及後續發布方式](design/railway-b-recovery-2026-09-26.md)。
+- 已驗收部署：`d21c8707-81a1-4dfd-95d4-1b5e215fa1ad`。
+- 487 檔指紋：`1d580cca251911c0cfb2fc93429b651af4821148d5cf47b942fb264dfca33663`。
+- 預設新標點和合本（繁體），保留當代譯本及 WEB；20 組研經 API、28 個資料／授權檔校驗、隱藏路徑 404、私人資料權限通過。
+- [和合本來源及本輪驗收](design/bible-cuv-2026-09-26.md)、[精確來源與發布紀錄](design/releases/b-d21c8707-81a1-4dfd-95d4-1b5e215fa1ad.json)
+  與 [先前恢復及後續發布方式](design/railway-b-recovery-2026-09-26.md)。Google 登入安全流程沿用先前驗收，本輪未重作 Google 授權。
 
 `release-manifest.json` 保存程式指紋，`bible-study-asset-manifest.json` 只保存
 資料資產名稱與校驗值，不含資料內容。沿革見 [聖經整合紀錄](design/bible-integration-2026-09-25.md)，

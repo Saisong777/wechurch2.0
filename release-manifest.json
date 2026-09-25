@@ -1,5 +1,5 @@
 {
-  "fingerprint": "34c72177c8b07be6033774e3fbf4401d2df6f120b7f32bffea02039fa68df821",
+  "fingerprint": "1d580cca251911c0cfb2fc93429b651af4821148d5cf47b942fb264dfca33663",
   "files": [
     {
       "file": "Dockerfile",
@@ -423,11 +423,11 @@
     },
     {
       "file": "src/components/scripture/BibleStudyReader.test.tsx",
-      "sha256": "ac97b17c832add7c6f1294a842211f323e1fcf805c65c246ccee5176b9e32e0c"
+      "sha256": "88face6ef1ac17bece2439d9694a9d6df123fab41877251a191b1366598c387e"
     },
     {
       "file": "src/components/scripture/BibleStudyReader.tsx",
-      "sha256": "b27d184d7d8db8dc3e4025ea4395943e844013089dc160219cd52d15313b5b7e"
+      "sha256": "41100411ee6cd972598bfb8f547ba2ee1759cf60bf28ed319935dd7d4049112c"
     },
     {
       "file": "src/components/scripture/ChurchScriptureSection.tsx",
@@ -491,7 +491,7 @@
     },
     {
       "file": "src/components/scripture/bible-study.css",
-      "sha256": "64ddf52ffd1fbb3f6c69e1305d5099f82434b90b2e1f2e6aa5f4f149104706cf"
+      "sha256": "0e5804c10e663c3593d6c2ea19b37fd1c6deba6d00a68184cf5f4b48d9be30a6"
     },
     {
       "file": "src/components/scripture/devotional-note-editor.css",
@@ -1207,15 +1207,15 @@
     },
     {
       "file": "server/bibleStudy/core.mjs",
-      "sha256": "0d9b03f2a88e4900c0a37880eaaeae398a4116c08803409c92e9dee7c73b2fcf"
+      "sha256": "aa8e0db70a562f9c59e25b92ac536750c1b02e5458c3c8849da1b9d231daf936"
     },
     {
       "file": "server/bibleStudy/core.test.ts",
-      "sha256": "46f90bcc5133de4653f10f791a2fc90603430135c7b9c1ad07fe58f688601f5d"
+      "sha256": "99884e7e9d25617472fd2a4c97484d57199ed94f3aa6a8d27061cd41e4622696"
     },
     {
       "file": "server/bibleStudy/routes.ts",
-      "sha256": "e42317a5f5967986fa4ba0eed6d4a7116e4ba28cac2fecafe640b6d3f15c565b"
+      "sha256": "21123917cde79d38c20429a2f5b7f578362d46eb43a84ca8d450a5fa10273c84"
     },
     {
       "file": "server/bibleStudy/worker.mjs",
@@ -1735,7 +1735,7 @@
     },
     {
       "file": "scripts/bible-study-assets.mjs",
-      "sha256": "d184d177283adb6d5ec8674de3e7348c42f925c1e50cb180af1d286942ca1de8"
+      "sha256": "7d3985a4b02fff48097c48c8f2fbe90098d19261fc5d122365e3088ff6ffa0c6"
     },
     {
       "file": "scripts/check-im-bible.mjs",
@@ -1843,7 +1843,7 @@
     },
     {
       "file": "scripts/record-staging-release.mjs",
-      "sha256": "2c6ca0666614e8b084933aa76f5e95529f6e131ed0f68a604781d6ffef7883a2"
+      "sha256": "e53fa1770bad27bd307ba62b6adfd8badc81c9d41ffa8173ee1dd5c998b5dbcd"
     },
     {
       "file": "scripts/rehearse-im-import.mjs",

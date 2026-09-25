@@ -1,23 +1,27 @@
 {
-  "releaseId": "public-20260925-v1",
-  "databaseHash": "595e942f856a8fd5aa536606c059afcb73a8292bcdd37a454476f038a54e365c",
-  "inventoryHash": "9a4dfde32edc7ce78ec25fbd4f31d15a8a9e6d7e1fa19411e3a93d1d8773db6a",
+  "releaseId": "public-20260926-v2",
+  "databaseHash": "eade3bb78bae619e8e14f8d89cd045f935e569e85add871b01b4b72ecf436f92",
+  "inventoryHash": "1beb864453f46862cdd846f5343fa6004139aedc5ba9328c60107979a80f5f95",
   "files": [
     {
       "file": "NOTICE.md",
-      "sha256": "f31f8f3bc9d8681aad89d140c83baeab5c9c07fa7bc5e9e1dd3afb044603d47a"
+      "sha256": "866c3d4ea1a8a24d6f0320c270aff1ff78ed684ccf06952d845b7305c833cb62"
     },
     {
       "file": "VALIDATION.json",
-      "sha256": "d024bb6cf2d14cc4f9fc7242f61341919868702a502d54a3196c3c8702157cb2"
+      "sha256": "6aad1e930d38fb4359da2a7a1d0412d987737196e1bd1620f11e1c023773785d"
+    },
+    {
+      "file": "data/cmn-cu89t-source.zip",
+      "sha256": "49aca5dffaeeb27c24f05ec30a7e64080f36c0e132095b83f2773b2c9b4455b7"
     },
     {
       "file": "data/core.sqlite",
-      "sha256": "595e942f856a8fd5aa536606c059afcb73a8292bcdd37a454476f038a54e365c"
+      "sha256": "eade3bb78bae619e8e14f8d89cd045f935e569e85add871b01b4b72ecf436f92"
     },
     {
       "file": "data/release.json",
-      "sha256": "738f4fd236d1d745dc40c04b71955bfa20466ae07207c0686d3039b85099ab82"
+      "sha256": "15047cecbccac2f889c5ff743b1042c758bb80dc2db8e5dbdc4341a938218a2f"
     },
     {
       "file": "licenses/abbott-smith-readme.txt",
@@ -54,6 +58,10 @@
     {
       "file": "licenses/cc-by.txt",
       "sha256": "4942cb3b416a10adc5c46d397fa5d5dcdc1c6646ab7472325dda6eaff1d19df3"
+    },
+    {
+      "file": "licenses/cmn-cu89t-about.html",
+      "sha256": "67b67cbbebad8b3d6d12182693a120468655c01e512db96239a6c2e84b200454"
     },
     {
       "file": "licenses/cmncbt.txt",
@@ -101,7 +109,7 @@
     },
     {
       "file": "web/licenses.html",
-      "sha256": "fbe1425baea759470b0c49a73ab410ac6d29271e0aac8ddca28287864ac0d870"
+      "sha256": "f50def9a14255d3d75853cb2b187a295fb8aa9037fe6ca92623851ec1911586f"
     },
     {
       "file": "web/style.css",
