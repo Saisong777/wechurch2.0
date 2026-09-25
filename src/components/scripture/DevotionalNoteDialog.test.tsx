@@ -6,6 +6,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DevotionalNoteDialog } from './DevotionalNoteDialog';
 import { saveDevotionalNote } from '@/lib/saveDevotionalNote';
 import type { LocalDevotionalNote } from '@/lib/localDevotionalNotes';
+import type { DevotionShareDraft } from '@shared/devotionWall';
+
+const preview=vi.hoisted(()=>vi.fn());
+vi.mock('./DevotionWallShareDialog',()=>({DevotionWallShareDialog:(props:{draft:DevotionShareDraft;allowGroup?:boolean})=>{
+  preview(props);return <div data-testid="share-preview">分享預覽</div>;
+}}));
 
 vi.mock('@/lib/saveDevotionalNote', () => ({ saveDevotionalNote: vi.fn(), noteSaveMessage: () => '儲存狀態' }));
 
@@ -15,6 +21,7 @@ vi.mock('@/lib/localDevotionalNotes', () => ({ findLocalDevotionalNoteById: () =
 beforeEach(() => {
   localStorage.clear();
   vi.mocked(saveDevotionalNote).mockReset();
+  preview.mockClear();
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -55,12 +62,15 @@ it('protects an open note from browser-back navigation', async () => {
   expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('保留筆記');
 });
 
-it('uses a wide editor with save outside the scrolling body and collapsed scripture', async () => {
+it('uses a wide editor with bottom save outside the scrolling body and collapsed scripture', async () => {
   await show();
   const editor = screen.getByRole('dialog', { name: '靈修筆記' });
   expect(editor).toHaveClass('devotional-note-editor');
-  expect(screen.getByTestId('button-save-devotional-note').closest('.note-editor-header')).toBeTruthy();
+  expect(screen.getByTestId('button-save-devotional-note').closest('.note-editor-footer')).toBeTruthy();
   expect(screen.getByTestId('button-save-devotional-note').closest('.note-editor-body')).toBeNull();
+  expect(screen.getByTestId('button-save-devotional-note').closest('.note-editor-header')).toBeNull();
+  expect(screen.getByRole('button',{name:'分享'}).closest('.note-editor-footer')).toBeTruthy();
+  expect(screen.queryByText('儲存並預覽公開分享')).toBeNull();
   const disclosure = screen.getByTestId('text-verse-text').closest('details')!;
   expect(disclosure.open).toBe(false);
   fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '留下觀察' } });
@@ -78,33 +88,34 @@ it('saves all three sections and closes only after synchronization succeeds', as
   for (const [name, value] of [['看見', '觀察'], ['領受', '領受內容'], ['回應', '回應內容']]) {
     fireEvent.change(screen.getByRole('textbox', { name }), { target: { value } });
   }
-  fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+  fireEvent.click(screen.getByRole('button', { name: '儲存（自己看）' }));
   await waitFor(() => expect(screen.queryByTestId('devotional-note-sheet')).toBeNull());
   expect(saveDevotionalNote).toHaveBeenCalledWith('test-owner', expect.objectContaining({
     observation: '觀察', heartbeatVerse: '領受內容', actionPlan: '回應內容',
     coreInsightNote: JSON.stringify({ GOD_ATTRIBUTE: '領受內容' }),
     verseReference: '以賽亞書 43', verseText: '經文',
   }));
+  expect(preview).not.toHaveBeenCalled();
 });
 
 it.each(['pending', 'blocked'] as const)('keeps the editor and text open for a %s save', async status => {
   vi.mocked(saveDevotionalNote).mockImplementation(async (_, note) => ({ note, status }));
   await show();
   fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '尚未同步' } });
-  fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+  fireEvent.click(screen.getByRole('button', { name: '儲存（自己看）' }));
   await waitFor(() => expect(saveDevotionalNote).toHaveBeenCalledOnce());
   expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('尚未同步');
-  expect(screen.getByRole('button', { name: '儲存' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '儲存（自己看）' })).toBeEnabled();
 });
 
 it('preserves input and restores save after an unexpected error', async () => {
   vi.mocked(saveDevotionalNote).mockRejectedValue(new Error('Storage unavailable'));
   await show();
   fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '不能丟失' } });
-  fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+  fireEvent.click(screen.getByRole('button', { name: '儲存（自己看）' }));
   await waitFor(() => expect(saveDevotionalNote).toHaveBeenCalledOnce());
   expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('不能丟失');
-  expect(screen.getByRole('button', { name: '儲存' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '儲存（自己看）' })).toBeEnabled();
 });
 
 it('prevents closing or editing while a save is in flight', async () => {
@@ -112,7 +123,7 @@ it('prevents closing or editing while a save is in flight', async () => {
   vi.mocked(saveDevotionalNote).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
   await show();
   fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '等待同步' } });
-  fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+  fireEvent.click(screen.getByRole('button', { name: '儲存（自己看）' }));
   expect(screen.getByRole('textbox', { name: '看見' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Close' }));
   expect(screen.getByTestId('devotional-note-sheet')).toBeTruthy();
@@ -133,9 +144,31 @@ it('retains legacy fields when editing an existing note', async () => {
   vi.mocked(saveDevotionalNote).mockImplementation(async (_, saved) => ({ note: saved, status: 'synced' }));
   await show();
   expect(screen.getByRole('textbox', { name: '領受' })).toHaveValue('應許');
+  expect(screen.queryByTestId('button-analyze-devotional-note')).toBeNull();
+  expect(screen.queryByText('AI 整理分析')).toBeNull();
   fireEvent.change(screen.getByRole('textbox', { name: '看見' }), { target: { value: '新觀察' } });
-  fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+  fireEvent.click(screen.getByRole('button', { name: '儲存（自己看）' }));
   await waitFor(() => expect(saveDevotionalNote).toHaveBeenCalledWith('test-owner', expect.objectContaining({
     ...note, observation: '新觀察', updatedAt: expect.any(String),
   })));
+});
+
+it('opens audience selection only after saving the private note',async()=>{
+  vi.mocked(saveDevotionalNote).mockImplementation(async(_,note)=>({note:{...note,id:'saved-note'},status:'synced'}));
+  await show();
+  fireEvent.change(screen.getByRole('textbox',{name:'看見'}),{target:{value:'我的觀察'}});
+  fireEvent.click(screen.getByRole('button',{name:'分享'}));
+  await screen.findByTestId('share-preview');
+  expect(saveDevotionalNote).toHaveBeenCalledOnce();
+  expect(preview).toHaveBeenCalledWith(expect.objectContaining({allowGroup:true,draft:expect.objectContaining({sourceId:'saved-note'})}));
+});
+
+it.each(['pending','blocked'] as const)('never opens sharing when private save is %s',async status=>{
+  vi.mocked(saveDevotionalNote).mockImplementation(async(_,note)=>({note,status}));
+  await show();
+  fireEvent.change(screen.getByRole('textbox',{name:'看見'}),{target:{value:'尚未同步'}});
+  fireEvent.click(screen.getByRole('button',{name:'分享'}));
+  await waitFor(()=>expect(saveDevotionalNote).toHaveBeenCalledOnce());
+  expect(preview).not.toHaveBeenCalled();
+  expect(screen.getByRole('textbox',{name:'看見'})).toHaveValue('尚未同步');
 });

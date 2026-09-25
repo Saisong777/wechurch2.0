@@ -26,6 +26,23 @@
 }
 
 .note-editor-header > * + * { margin-top: 0; }
+.note-editor-header { min-height: 76px; }
+.note-editor-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  flex-shrink: 0;
+  border-top: 1px solid hsl(var(--border));
+  padding: 12px 28px;
+}
+.note-editor-footer .note-editor-action {
+  height: auto;
+  min-height: 56px;
+  gap: 8px;
+  padding: 8px 12px;
+  line-height: 1.5;
+  white-space: normal;
+}
 .devotional-note-editor > button:last-child {
   top: 16px;
   right: 12px;
@@ -84,5 +101,8 @@
   }
   .note-editor-body {
     padding: 16px max(16px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  }
+  .note-editor-footer {
+    padding: 12px max(16px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   }
 }

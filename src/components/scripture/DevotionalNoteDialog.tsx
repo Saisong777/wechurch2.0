@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveDevotionalNote, noteSaveMessage } from '@/lib/saveDevotionalNote';
 import {
@@ -17,7 +17,7 @@ import {
   Eye,
   Heart,
   Target,
-  Sparkles,
+  Share2,
   Loader2,
   Check,
   BookMarked,
@@ -117,8 +117,6 @@ export function DevotionalNoteDialog({
   const [loadedNote, setLoadedNote] = useState<LocalDevotionalNote | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [displayReference, setDisplayReference] = useState(verseReference);
   const [displayText, setDisplayText] = useState(verseText);
   const [shareDraft,setShareDraft] = useState<DevotionShareDraft|null>(null);
@@ -244,25 +242,6 @@ export function DevotionalNoteDialog({
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!existingId) {
-      toast({ title: '請先儲存', description: '請先儲存靈修筆記後再進行 AI 分析', variant: 'destructive' });
-      return;
-    }
-    setIsAnalyzing(true);
-    setAnalysisResult(null);
-    try {
-      const res = await apiRequest('POST', '/api/devotional-notes/analyze', { noteId: existingId });
-      const data = await res.json();
-      setAnalysisResult(data.analysis);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'AI 分析失敗';
-      toast({ title: '分析失敗', description: message, variant: 'destructive' });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   const receivingValue =
     form.coreInsightNote[RECEIVE_KEY] ||
     Object.values(form.coreInsightNote).filter(Boolean).join('\n') ||
@@ -298,21 +277,12 @@ export function DevotionalNoteDialog({
             <BookMarked className="w-5 h-5 text-primary shrink-0" />
             靈修筆記
           </DialogTitle>
-          <DialogDescription className="mt-1 text-xs">只有自己可見</DialogDescription>
+          <DialogDescription className="sr-only">個人靈修筆記，分享前會先確認對象與內容。</DialogDescription>
           </div>
-          <Button
-            onClick={() => handleSave()}
-            disabled={isSaving || isLoading}
-            className="min-h-11 shrink-0 gap-2"
-            data-testid="button-save-devotional-note"
-          >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {isSaving ? '儲存中...' : '儲存'}
-          </Button>
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
+          <div className="flex min-h-0 flex-1 items-center justify-center py-16">
             <Loader2 className="w-7 h-7 animate-spin text-primary" data-testid="loading-spinner" />
           </div>
         ) : (
@@ -403,45 +373,19 @@ export function DevotionalNoteDialog({
               />
             </section>
 
-            <Button variant="outline" className="w-full min-h-11" disabled={isSaving} onClick={()=>handleSave(true)}>儲存並預覽公開分享</Button>
-
-            {existingId && (
-              <Button
-                onClick={handleAnalyze}
-                disabled={isAnalyzing}
-                variant="outline"
-                className="w-full"
-                data-testid="button-analyze-devotional-note"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    AI 分析中...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    AI 整理分析
-                  </>
-                )}
-              </Button>
-            )}
-
-            {analysisResult && (
-              <div className="rounded-md bg-muted/50 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-                  <Sparkles className="w-4 h-4" />
-                  AI 分析結果
-                </div>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-xs leading-relaxed whitespace-pre-wrap" data-testid="text-analysis-result">
-                  {analysisResult}
-                </div>
-              </div>
-            )}
           </div>
         )}
+        <footer className="note-editor-footer">
+          <Button onClick={() => handleSave()} disabled={isSaving || isLoading} className="note-editor-action" aria-label="儲存（自己看）" data-testid="button-save-devotional-note">
+            {isSaving ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Save className="h-4 w-4 shrink-0" />}
+            <span>{isSaving ? '儲存中...' : '儲存'}<span className="block text-xs font-normal">自己看</span></span>
+          </Button>
+          <Button variant="outline" onClick={() => handleSave(true)} disabled={isSaving || isLoading} className="note-editor-action" aria-label="分享" data-testid="button-share-devotional-note">
+            <Share2 className="h-4 w-4 shrink-0" /><span>分享<span className="block text-xs font-normal text-muted-foreground">小組／靈修牆</span></span>
+          </Button>
+        </footer>
       </DialogContent>
     </Dialog>
-    {shareDraft && <DevotionWallShareDialog draft={shareDraft} close={()=>setShareDraft(null)} />}</>
+    {shareDraft && <DevotionWallShareDialog draft={shareDraft} allowGroup close={()=>setShareDraft(null)} />}</>
   );
 }
