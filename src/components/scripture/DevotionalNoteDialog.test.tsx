@@ -45,6 +45,18 @@ it('renders inline in the page without a dialog, portal or scroll lock', async (
   expect(screen.getByRole('button', { name: '分享' }).closest('footer')).toBeTruthy();
 });
 
+it('positions the inline heading after asynchronous note loading expands the page', async () => {
+  let finish!: (value: Response) => void;
+  vi.mocked(fetch).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const shown = show(true);
+  const heading = screen.getByRole('heading', { name: '靈修筆記' });
+  heading.scrollIntoView = vi.fn();
+  await act(async () => { finish({ ok: false } as Response); });
+  await shown;
+  expect(heading.scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+  expect(heading).toHaveFocus();
+});
+
 it('keeps the inline editor and private text in place after saving', async () => {
   vi.mocked(saveDevotionalNote).mockImplementation(async (_, note) => ({ note, status: 'synced' }));
   const router = await show(true);

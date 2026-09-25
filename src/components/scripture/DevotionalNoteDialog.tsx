@@ -47,20 +47,21 @@ interface DevotionalNoteDialogProps {
   inline?: boolean;
 }
 
-function NoteEditorSurface({ open, inline, sharing, onOpenChange, children }: {
+function NoteEditorSurface({ open, inline, sharing, loading, onOpenChange, children }: {
   open: boolean;
   inline: boolean;
   sharing: boolean;
+  loading: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   useEffect(() => {
-    if (!inline || !open) return;
+    if (!inline || !open || loading) return;
     titleRef.current?.focus({ preventScroll: true });
     titleRef.current?.scrollIntoView?.({ block: 'start' });
-  }, [inline, open]);
+  }, [inline, open, loading]);
 
   if (inline) return open ? (
     <section className="devotional-note-inline" aria-labelledby={titleId} data-testid="devotional-note-inline">
@@ -312,7 +313,7 @@ export function DevotionalNoteDialog({
   return (
     <><UnsavedChangesGuard dirty={dirty || (open && isSaving)} onDiscard={discardDraft} />
     <LeaveConfirmation open={confirmClose} onStay={() => setConfirmClose(false)} onLeave={() => { discardDraft(); setConfirmClose(false); onOpenChange(false); }} />
-    <NoteEditorSurface open={open} inline={inline} sharing={!!shareDraft} onOpenChange={requestOpenChange}>
+    <NoteEditorSurface open={open} inline={inline} sharing={!!shareDraft} loading={isLoading} onOpenChange={requestOpenChange}>
         {isLoading ? (
           <div className="flex min-h-0 flex-1 items-center justify-center py-16">
             <Loader2 className="w-7 h-7 animate-spin text-primary" data-testid="loading-spinner" />
