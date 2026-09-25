@@ -40,7 +40,7 @@ try {
     assert.deepEqual(await response.json(), reader.query(action, query), action);
     times.push({ action, milliseconds: Date.now() - start });
   }
-  for (const route of ['/uploads/.bible-study/public-20260925-v1/data/core.sqlite', '/uploads/%2ebible-study/public-20260925-v1/NOTICE.md', '/open/data/core.sqlite', '/library', '/api/bible-study/private']) assert.equal((await call(route)).status, 404, route);
+  for (const route of ['/uploads/.bible-study/public-20260925-v1/data/core.sqlite', '/uploads/%2ebible-study/public-20260925-v1/NOTICE.md', '/uploads/%2Ebible-study/public-20260925-v1/data/core.sqlite', '/uploads/%252ebible-study/public-20260925-v1/NOTICE.md', '/uploads/missing-file.png', '/open/data/core.sqlite', '/library', '/api/bible-study/private']) assert.equal((await call(route)).status, 404, route);
   assert.equal((await call('/api/bible-study/chapter?book=1&book=2')).status, 400);
   assert.equal((await call('/api/bible-study/chapter', 'POST', {})).status, 405);
   assert.equal((await call('/api/devotional-notes')).status, 401);

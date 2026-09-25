@@ -25,6 +25,8 @@ try {
   const app = express(); app.use(express.json());
   const { registerRoutes } = await import('../server/routes');
   await registerRoutes(app);
+  // Production serves the SPA for unmatched paths; uploads must not fall through.
+  app.use((_req, res) => res.status(200).type('html').send('<main>WeChurch</main>'));
   await new Promise<void>(resolve => { server = app.listen(0,'127.0.0.1',resolve); });
   const address = server!.address(); assert(address && typeof address !== 'string');
   const origin = `http://127.0.0.1:${address.port}`;
@@ -37,7 +39,7 @@ try {
     };
   };
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
-  for (const hidden of ['/uploads/.bible-study/public-20260925-v1/data/core.sqlite', '/uploads/%2ebible-study/public-20260925-v1/NOTICE.md']) {
+  for (const hidden of ['/uploads/.bible-study/public-20260925-v1/data/core.sqlite', '/uploads/%2ebible-study/public-20260925-v1/NOTICE.md', '/uploads/%2Ebible-study/public-20260925-v1/data/core.sqlite', '/uploads/%252ebible-study/public-20260925-v1/NOTICE.md', '/uploads/missing-file.png']) {
     assert.equal((await guest(hidden)).status, 404);
   }
   for(const client of [a,b]) {

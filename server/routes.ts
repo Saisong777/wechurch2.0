@@ -588,7 +588,7 @@ export async function registerRoutes(app: Express) {
   });
 
   app.use('/uploads/.bible-study', (_req, res) => res.sendStatus(404));
-  app.use('/uploads', express.static(uploadRoot, { dotfiles: 'ignore' }));
+  app.use('/uploads', express.static(uploadRoot, { dotfiles: 'ignore' }), (_req, res) => res.sendStatus(404));
 
   async function resolveUserId(req: any): Promise<string | null> {
     const user = req.user;
