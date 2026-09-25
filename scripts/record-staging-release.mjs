@@ -3,8 +3,7 @@ import path from 'node:path';
 import { execFileSync,spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { inspectStaging,railway,root,target } from './railway-staging.mjs';
-import { verifyAssets } from './bible-study-assets.mjs';
+import { inspectStaging,railway,root,target,verifyRemoteBibleAssets } from './railway-staging.mjs';
 
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const sha=z.string().regex(/^[a-f0-9]{64}$/);
@@ -23,9 +22,9 @@ if(live?.status!=='SUCCESS')throw new Error('Latest B deployment is not successf
 const remote=snapshotSchema.parse(JSON.parse(railway(['ssh','-p',target.project,'-e',target.environment,'-s',target.app,'--','cat','/app/release-manifest.json'])));
 if(remote.fingerprint!==snapshot.fingerprint)throw new Error('B is not running this snapshot');
 let referenceAssets;
-if(fs.existsSync(path.join(release.directory,'bible-study-data'))){
-  const assets=verifyAssets(path.join(release.directory,'bible-study-data'));
-  const liveAssets=JSON.parse(railway(['ssh','-p',target.project,'-e',target.environment,'-s',target.app,'--','node','scripts/bible-study-assets.mjs','--verify','bible-study-data']));
+if(fs.existsSync(path.join(release.directory,'bible-study-asset-manifest.json'))){
+  const assets=JSON.parse(fs.readFileSync(path.join(release.directory,'bible-study-asset-manifest.json'),'utf8'));
+  const liveAssets=verifyRemoteBibleAssets(state.app.BIBLE_STUDY_DIR);
   if(JSON.stringify(liveAssets)!==JSON.stringify(assets))throw new Error('Live reference assets differ from snapshot');
   referenceAssets={releaseId:assets.releaseId,databaseHash:assets.databaseHash,inventoryHash:assets.inventoryHash,liveVerified:true};
 }

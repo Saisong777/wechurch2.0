@@ -5,10 +5,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { readBackupKey, unseal } from './backup-envelope.mjs';
-import { copyAssets } from './bible-study-assets.mjs';
+import { verifyAssets, releaseId as bibleReleaseId } from './bible-study-assets.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'cf36df49-a0f4-4224-80f2-4d0e4d1c1194', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
+export const bibleVolumePath = `/data/.bible-study/${bibleReleaseId}`;
 const production = { environment: 'f4b11351-cf4c-4a95-a3c0-45b195e9a0e0', app: 'a4f9d0c6-991c-41b0-8859-3b498b077b03' };
 const evidence = path.join(root, 'artifacts', 'railway-staging');
 const sha = data => createHash('sha256').update(data).digest('hex');
@@ -17,6 +18,12 @@ export function railway(args, options = {}) {
 }
 const json = args => JSON.parse(railway(args));
 const vars = (environment, service) => json(['variable', 'list', '-e', environment, '-s', service, '--json']);
+export function verifyRemoteBibleAssets(directory) {
+  if (directory !== bibleVolumePath) throw new Error('Unexpected B reference asset location');
+  const module = Buffer.from(fs.readFileSync(path.join(root, 'scripts/bible-study-assets.mjs'))).toString('base64');
+  const code = `const {verifyAssets}=await import("data:text/javascript;base64,${module}");console.log(JSON.stringify(verifyAssets(${JSON.stringify(directory)})))`;
+  return JSON.parse(railway(['ssh', '-p', target.project, '-e', target.environment, '-s', target.app, '--', 'node', '--input-type=module', '-e', `'${code}'`]));
+}
 function save(name, value) {
   fs.mkdirSync(evidence, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(evidence, name), typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
@@ -120,7 +127,7 @@ async function migrate(database) {
   finally { await client.end(); }
 }
 
-function snapshot() {
+function snapshot(referenceAssets) {
   const release = path.join(evidence, `release-${Date.now()}`);
   fs.mkdirSync(release, { recursive: true, mode: 0o700 });
   const entries = ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json', 'index.html', 'components.json', 'vite.config.ts', 'vitest.config.ts', 'tailwind.config.ts', 'postcss.config.js', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'drizzle.config.ts', 'eslint.config.js', 'nixpacks.toml', 'src', 'server', 'shared', 'public', 'migrations', 'scripts'];
@@ -142,10 +149,7 @@ function snapshot() {
   }
   for (const entry of entries) copy(entry);
   // Large read-only reference assets are delivered separately, never committed to Git.
-  if (fs.existsSync(path.join(root, 'bible-study-data'))) {
-    const assets = copyAssets(path.join(root, 'bible-study-data'), path.join(release, 'bible-study-data'));
-    fs.writeFileSync(path.join(release, 'bible-study-asset-manifest.json'), JSON.stringify(assets, null, 2));
-  }
+  if (referenceAssets) fs.writeFileSync(path.join(release, 'bible-study-asset-manifest.json'), JSON.stringify(referenceAssets, null, 2));
   const fingerprint = sha(JSON.stringify(manifest));
   fs.writeFileSync(path.join(release, 'release-manifest.json'), JSON.stringify({ fingerprint, files: manifest }, null, 2));
   save('release.json', { directory: release, fingerprint, createdAt: new Date().toISOString(), target, files: manifest.length });
@@ -177,7 +181,12 @@ async function main() {
       const result = spawnSync('npm', ['run', step], { cwd: root, stdio: 'inherit' });
       if (result.status !== 0) throw new Error(`Release check failed: ${step}`);
     }
-    const { release, fingerprint } = snapshot();
+    let referenceAssets;
+    if (fs.existsSync(path.join(root, 'bible-study-data'))) {
+      referenceAssets = verifyAssets(path.join(root, 'bible-study-data'));
+      if (JSON.stringify(verifyRemoteBibleAssets(app.BIBLE_STUDY_DIR)) !== JSON.stringify(referenceAssets)) throw new Error('B volume does not contain the verified reference assets');
+    } else if (app.BIBLE_STUDY_DIR) throw new Error('Local reference assets required to verify this release');
+    const { release, fingerprint } = snapshot(referenceAssets);
     save('production-before.json', { deployment: productionDeployment });
     const output = railway(['up', release, '--path-as-root', '-p', target.project, '-e', target.environment, '-s', target.app, '--detach', '--message', `B staging ${fingerprint.slice(0, 16)}`]);
     console.log(output);

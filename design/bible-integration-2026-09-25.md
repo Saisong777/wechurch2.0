@@ -20,7 +20,13 @@
 註釋／原文／串珠就所選經節展開，不另設頁面或重複導覽。
 串珠、查字用小視窗，返回仍在原處；筆記留在頁面內。
 保留既有朗讀、複製、圖卡、個人筆記、收藏入口與權限。
-個人記錄寫入 WeChurch PostgreSQL，研究資料只讀獨立 SQLite。
+個人記錄寫入 WeChurch PostgreSQL，研經資料只讀獨立 SQLite。
+
+執行位置全部是 Railway：既有 Node 22 容器處理 UI/API，worker 讀取容器內
+`/data/.bible-study/public-20260925-v1/data/core.sqlite`。MacBook 只作開發及上傳；
+不依賴 Mac mini、Tailscale、8879 或本機服務。唯讀資料在 Railway 持久 volume
+的獨立隱藏目錄，B 設定 `BIBLE_STUDY_DIR` 指向固定版本，不放在暫存 `/tmp`。
+上傳檔案服務拒絕此目錄，DB 原檔不提供 HTTP 下載；會員內容仍在既有 PostgreSQL。
 
 預設 cmncbt，可對照 engwebp；不將舊 CUV 電子檔加到本包。
 經文合節須保留起訖節號，原文不假裝已與中文對齊。
@@ -32,11 +38,27 @@ GitHub 倉庫為公開；部署包／資料庫／交付程式不得整包提交�
 原包及校驗值另存於本機交付位置。B 部署另帶已驗證唯讀資料資產；
 程式指紋和資料資產指紋分開記錄。先 B 預覽，A 須 Sai 再確認。
 
+### 重建與大檔上傳
+
+1. 從獨立保存的 `bible-study-public-v1.zip` 解開原包，保留原檔。
+2. 執行 `node scripts/bible-study-assets.mjs <解開的包目錄> bible-study-data`，
+   校驗版本與每個納入檔案。此目錄被 Git 排除，不可 `git add -f`。
+3. `node ops/upload-bible-assets-b.mjs` 使用 Railway 官方登入的 terminal relay
+   分段傳輸，只寫 B 的新版本目錄，每段確認接收、整包 hash 與逐檔 hash 通過後
+   才原子啟用；原版本不覆寫。將 B 的 `BIBLE_STUDY_DIR` 設為上述固定路徑。
+4. `npm run staging:deploy` 執行完整測試，重新比對本機與 Railway 的資料指紋，
+   再建立只含程式與資產清單的小型快照。CLI 30 秒及上傳端 524 的兩次大檔
+   失敗均未改動舊站；不再走整份 DB 隨程式上傳的路徑。
+5. 等 Railway SUCCESS 後執行 `npm run staging:release:record`，從線上容器
+   回讀程式及資料指紋，再做真實 B 網址的 UI 驗收。單純上傳成功不算完成。
+
+大型研經包的異地耐久備份仍需另外保管；公開 GitHub 不保存資料庫。
+
 ## 驗收清單
 
 - [x] 原包檔案校驗與原有測試
-- [ ] 整合 API 輸入檢查、只讀、來源白名單及私人路徑拒絕
+- [x] 整合 API 輸入檢查、只讀、來源白名單及私人路徑拒絕
 - [ ] 雙譯本、合節、註釋切換、原文查字、串珠、搜尋
-- [ ] 個人笔記與收藏沿用會員隔離
+- [x] 個人筆記與收藏沿用會員隔離（本機隔離資料庫 HTTP 測試）
 - [ ] 手機及桌面、明暗模式、鍵盤及錯誤狀態
 - [ ] B 部署與版本讀回，A 不變

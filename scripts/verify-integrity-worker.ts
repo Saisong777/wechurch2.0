@@ -37,6 +37,9 @@ try {
     };
   };
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
+  for (const hidden of ['/uploads/.bible-study/public-20260925-v1/data/core.sqlite', '/uploads/%2ebible-study/public-20260925-v1/NOTICE.md']) {
+    assert.equal((await guest(hidden)).status, 404);
+  }
   for(const client of [a,b]) {
     const email=`integrity-${randomUUID()}@example.test`;
     const response=await client('/api/auth/register','POST',{email,password:randomUUID(),displayName:'Integrity fixture'});
