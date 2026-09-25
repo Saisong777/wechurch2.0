@@ -20,6 +20,9 @@ Railway 兩次停在 `Creating containers`，沒有新應用程式啟動紀錄�
 - 22:39:15 B `__healthcheck` 仍回應 Railway 502，request id `GhJGrPUMQQe3gCXUmrpb1w`。
   新版與舊版皆遇到同階段阻擋，需查 Railway 容器建立／volume 掛載；根因未證實。
 - A 部署已再次讀回為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`、SUCCESS、沒有變更。
+- 22:48:07 最後健康檢查仍為 502，request id `E_Rbbz6QRkWKCyOtV7rehQ`；
+  舊版恢復仍是 DEPLOYING，畫面顯示 Creating containers 13:08，Network 尚未開始。
+  有限次數的狀態觀察已結束；Railway 恢復工作仍保留，未再中止或新增部署。
 - 根目錄 `release-manifest.json` 保存候選版 487 個程式檔案的校驗值，重建檢查通過；
   它是候選版證據，不代表線上發布成功。資料校驗清單亦只保存名稱與 hash，不含 DB。
 
