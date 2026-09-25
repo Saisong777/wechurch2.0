@@ -8,6 +8,8 @@
   height: min(900px, calc(100dvh - 48px));
   padding: 0;
   overflow: hidden;
+  /* Focus scrolling belongs to the body, never to the dialog header. */
+  overflow: clip;
   letter-spacing: 0;
 }
 
