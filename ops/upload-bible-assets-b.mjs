@@ -48,6 +48,7 @@ fs.writeSync(fd,data,0,data.length,count);hash.update(data);count+=data.length;c
 if (process.env.RAILWAY_ENV && process.env.RAILWAY_ENV !== 'production') throw new Error('Only official Railway API supported');
 const token = process.env.RAILWAY_TOKEN || process.env.RAILWAY_API_TOKEN || JSON.parse(fs.readFileSync(path.join(os.homedir(), '.railway/config.json'), 'utf8')).user?.token;
 if (!token) throw new Error('Railway login required');
+async function transfer() {
 const socket = new WebSocket('wss://backboard.railway.com/relay', { handshakeTimeout: 30000, headers: {
   [process.env.RAILWAY_TOKEN ? 'project-access-token' : 'Authorization']: process.env.RAILWAY_TOKEN ? token : `Bearer ${token}`,
   'X-Railway-Project-Id': target.project, 'X-Railway-Environment-Id': target.environment, 'X-Railway-Service-Id': target.app,
@@ -68,8 +69,8 @@ await new Promise((resolve, reject) => {
   const deadline = setTimeout(() => { socket.terminate(); reject(new Error('Transfer deadline reached; partial assets were not activated')); }, 30 * 60_000);
   const ping = setInterval(() => { if (socket.readyState === WebSocket.OPEN) socket.ping(); }, 15000);
   const stop = error => { clearTimeout(deadline); clearInterval(ping); socket.close(); error ? reject(error) : resolve(); };
-  socket.on('error', () => stop(new Error('Railway transfer connection failed')));
-  socket.on('close', () => { clearTimeout(deadline); clearInterval(ping); reject(new Error('Transfer closed before verified completion')); });
+  socket.on('error', () => stop(Object.assign(new Error('Railway transfer connection failed'), { retryable: true })));
+  socket.on('close', () => { clearTimeout(deadline); clearInterval(ping); reject(Object.assign(new Error('Transfer closed before verified completion'), { retryable: true })); });
   socket.on('message', raw => {
     try {
       const message = JSON.parse(raw.toString());
@@ -114,3 +115,12 @@ await new Promise((resolve, reject) => {
     } catch (error) { stop(error); }
   });
 });
+}
+for (let attempt = 1; attempt <= 16; attempt++) {
+  try { await transfer(); break; }
+  catch (error) {
+    if (!error.retryable || attempt === 16) throw error;
+    console.log(`Relay disconnected; resuming verified partial transfer (attempt ${attempt + 1}/16)`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+}

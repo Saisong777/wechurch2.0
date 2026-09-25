@@ -62,6 +62,7 @@
 @media(max-width: 767px) {
   .study-reader { padding: 16px; }
   .study-controls { grid-template-columns: minmax(0,1fr) 80px; gap: 12px; }
+  .study-controls > .study-actions { width: max-content; justify-self: end; flex-wrap: nowrap; }
   .study-translation { grid-column: 1 / -1; }
   .study-layout.with-tools { grid-template-columns: minmax(0,1fr); }
   .study-scripture.mobile-hidden { display: none; }
