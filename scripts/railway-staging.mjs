@@ -8,7 +8,7 @@ import { readBackupKey, unseal } from './backup-envelope.mjs';
 import { verifyAssets, releaseId as bibleReleaseId } from './bible-study-assets.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'cf36df49-a0f4-4224-80f2-4d0e4d1c1194', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
+export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'fef7af7c-e3c3-4977-8294-c3a123a4242e', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
 export const bibleVolumePath = `/data/.bible-study/${bibleReleaseId}`;
 const production = { environment: 'f4b11351-cf4c-4a95-a3c0-45b195e9a0e0', app: 'a4f9d0c6-991c-41b0-8859-3b498b077b03' };
 const evidence = path.join(root, 'artifacts', 'railway-staging');
@@ -186,10 +186,11 @@ async function main() {
       referenceAssets = verifyAssets(path.join(root, 'bible-study-data'));
       if (JSON.stringify(verifyRemoteBibleAssets(app.BIBLE_STUDY_DIR)) !== JSON.stringify(referenceAssets)) throw new Error('B volume does not contain the verified reference assets');
     } else if (app.BIBLE_STUDY_DIR) throw new Error('Local reference assets required to verify this release');
-    const { release, fingerprint } = snapshot(referenceAssets);
+    const { fingerprint } = snapshot(referenceAssets);
     save('production-before.json', { deployment: productionDeployment });
-    const output = railway(['up', release, '--path-as-root', '-p', target.project, '-e', target.environment, '-s', target.app, '--detach', '--message', `B staging ${fingerprint.slice(0, 16)}`]);
-    console.log(output);
+    // The CLI's 30-second upload deadline is too short for this verified snapshot.
+    const upload = spawnSync(process.execPath, [path.join(root, 'ops/upload-verified-b-snapshot.mjs')], { cwd: root, stdio: 'inherit' });
+    if (upload.status !== 0) throw new Error('Snapshot upload failed; inspect Railway deployment state before retrying.');
     console.log(`Uploaded immutable staging snapshot ${fingerprint}. Verify deployment and live flows before reporting completion.`);
   }
 }

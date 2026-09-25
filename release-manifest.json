@@ -1,5 +1,5 @@
 {
-  "fingerprint": "390b8bad31f3b36ac3cafa10fca4172f5d6cc9f6d23508940124b2d4da7aef83",
+  "fingerprint": "34c72177c8b07be6033774e3fbf4401d2df6f120b7f32bffea02039fa68df821",
   "files": [
     {
       "file": "Dockerfile",
@@ -1839,7 +1839,7 @@
     },
     {
       "file": "scripts/railway-staging.mjs",
-      "sha256": "e02a5d8e4f5f0c9d2e0b1843271afae8a43f64ca4f7e20c8dba2f5961089a5e5"
+      "sha256": "8873c6fff519262a5aa0ec07b9a254b7c06103406b6f9180829044ea744a97d9"
     },
     {
       "file": "scripts/record-staging-release.mjs",
