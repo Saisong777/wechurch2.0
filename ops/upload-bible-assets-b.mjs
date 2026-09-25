@@ -15,6 +15,10 @@ const evidence = path.join(root, 'artifacts/railway-staging');
 fs.mkdirSync(evidence, { recursive: true, mode: 0o700 });
 const archive = path.join(evidence, `${releaseId}.tar.gz`);
 if (!fs.existsSync(archive)) execFileSync('tar', ['-czf', archive, '--options', 'gzip:compression-level=1', '-C', source, 'SHA256SUMS', ...proof.files.map(f => f.file)], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
+const expectedFiles = ['SHA256SUMS', ...proof.files.map(f => f.file)].sort();
+const archivedFiles = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n').sort();
+const archiveTypes = execFileSync('tar', ['-tvzf', archive], { encoding: 'utf8' }).trim().split('\n');
+if (JSON.stringify(archivedFiles) !== JSON.stringify(expectedFiles) || archiveTypes.some(line => !line.startsWith('-'))) throw new Error('Transfer archive contains unexpected paths or links');
 fs.chmodSync(archive, 0o600);
 const bytes = fs.readFileSync(archive);
 const digest = createHash('sha256').update(bytes).digest('hex');
@@ -26,7 +30,11 @@ const fs=require('fs'), crypto=require('crypto'), cp=require('child_process');
 if(process.env.RAILWAY_ENVIRONMENT_ID!==${JSON.stringify(target.environment)}||process.env.RAILWAY_SERVICE_ID!==${JSON.stringify(target.app)})throw Error('Wrong Railway target');
 const base='/data/.bible-study', dest=${JSON.stringify(destination)}, temp=base+'/.incoming-'+${JSON.stringify(digest)};
 fs.mkdirSync(base,{recursive:true,mode:0o700}); fs.chmodSync(base,0o700);
-if(fs.existsSync(dest))throw Error('Version already installed; verify existing assets instead');
+if(fs.existsSync(dest)){
+const check=base+'/verify-'+${JSON.stringify(digest)}+'.mjs';
+fs.writeFileSync(check,Buffer.from(${JSON.stringify(Buffer.from(verifier).toString('base64'))},'base64'),{mode:0o600});
+const checked=cp.execFileSync('node',[check,'--verify',dest],{encoding:'utf8'});fs.unlinkSync(check);console.log('WC_DONE '+checked.trim());process.exit(0);
+}
 fs.mkdirSync(temp,{recursive:true,mode:0o700});
 const file=temp+'/assets.tar.gz'; let count=fs.existsSync(file)?fs.statSync(file).size:0, line='';
 if(count>${bytes.length}||(count!==${bytes.length}&&count%65536!==0))throw Error('Invalid partial transfer');
