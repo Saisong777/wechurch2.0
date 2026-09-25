@@ -29,6 +29,11 @@ const cases = [
   ['chapter', { book: 1, chapter: 24, translation: 'cmn-cu89t' }],
   ['preview', { q: '創24:30', translation: 'cmn-cu89t' }],
   ['search', { q: '創造天地', source: 'cmn-cu89t' }],
+  ['chapter', { book: 40, chapter: 1, translation: 'cmnfeb' }],
+  ['chapter', { book: 66, chapter: 22, translation: 'cmnfeb' }],
+  ['chapter', { book: 1, chapter: 1, translation: 'cmnfeb' }],
+  ['preview', { q: '太17:21', translation: 'cmnfeb' }],
+  ['search', { q: '亚伯拉罕', source: 'cmnfeb' }],
   ['chapter', { book: 66, chapter: 22 }],
   ...noteSources.map(source => ['notes', { book: 43, chapter: 3, verse: 16, source }]),
   ['tokens', { book: 1, chapter: 1, verse: 1 }], ['tokens', { book: 43, chapter: 3, verse: 16 }],
@@ -54,6 +59,8 @@ try {
   const licenseText = await license.text();
   assert.match(licenseText, /Biblica/);
   assert.match(licenseText, /新標點和合本/);
+  assert.match(licenseText, /Free Bible Ministry/);
+  assert.match(licenseText, /新約 27 卷/);
   assert.match(licenseText, /https:\/\/ebible.org\/cmn-cu89t\/copyright.htm/);
   const result = { verifiedAt: new Date().toISOString(), origin: target.origin, cases: times, databaseHash: assets.databaseHash, fileHashesMatch: true, privatePathsBlocked: true, memberLoginRequired: true, productionDeploymentObserved: productionDeployment };
   fs.writeFileSync(path.join(root, 'artifacts/railway-staging/bible-live-verification.json'), JSON.stringify(result, null, 2), { mode: 0o600 });

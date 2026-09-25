@@ -3,9 +3,9 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-export const releaseId = 'public-20260926-v2';
-export const databaseHash = 'eade3bb78bae619e8e14f8d89cd045f935e569e85add871b01b4b72ecf436f92';
-const inventoryHash = '1beb864453f46862cdd846f5343fa6004139aedc5ba9328c60107979a80f5f95';
+export const releaseId = 'public-20260926-v3';
+export const databaseHash = 'c2bbdf5f4bb7b9cc809472515f6070c432061d87382a20d95971eb68df55313f';
+const inventoryHash = '769fc01eab03cbe891e1540eeffd7cae53c30336353bbbc2b54e22ae33b8a68a';
 const hash = file => {
   const digest = createHash('sha256'), buffer = Buffer.allocUnsafe(1024 * 1024);
   const fd = fs.openSync(file, 'r');

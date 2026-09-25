@@ -14,13 +14,13 @@ const proof = verifyAssets(source);
 const evidence = path.join(root, 'artifacts/railway-staging');
 fs.mkdirSync(evidence, { recursive: true, mode: 0o700 });
 const deltaBase = process.env.WECHURCH_BIBLE_DELTA_BASE;
-const baseHash = '595e942f856a8fd5aa536606c059afcb73a8292bcdd37a454476f038a54e365c';
-const baseRemote = '/data/.bible-study/public-20260925-v1/data/core.sqlite';
+const baseHash = 'eade3bb78bae619e8e14f8d89cd045f935e569e85add871b01b4b72ecf436f92';
+const baseRemote = '/data/.bible-study/public-20260926-v2/data/core.sqlite';
 let packageDirectory = source;
 let expectedFiles = ['SHA256SUMS', ...proof.files.map(f => f.file)];
 let targetSize = 0;
 if (deltaBase) {
-  if (releaseId !== 'public-20260926-v2') throw new Error('Delta mode is pinned to the v1 to v2 reference upgrade');
+  if (releaseId !== 'public-20260926-v3') throw new Error('Delta mode is pinned to the v2 to v3 reference upgrade');
   const original = fs.readFileSync(path.join(path.resolve(deltaBase), 'data/core.sqlite'));
   if (createHash('sha256').update(original).digest('hex') !== baseHash) throw new Error('Delta base hash mismatch');
   const next = fs.readFileSync(path.join(source, 'data/core.sqlite'));

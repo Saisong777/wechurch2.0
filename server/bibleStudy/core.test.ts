@@ -22,7 +22,7 @@ describe.skipIf(!fs.existsSync(filename))('delivered Bible study database accept
     const info = query('info');
     expect(info.books).toHaveLength(66);
     expect(info.sources.map((s: { id: string }) => s.id).sort()).toEqual([...sourceIds].sort());
-    expect(Object.keys(info.translations)).toEqual(['cmn-cu89t', 'cmncbt', 'engwebp']);
+    expect(Object.keys(info.translations)).toEqual(['cmn-cu89t', 'cmncbt', 'cmnfeb', 'engwebp']);
     expect(info.default_translation).toBe('cmn-cu89t');
   });
   it('retains merged verses and attribution', () => {
@@ -43,6 +43,17 @@ describe.skipIf(!fs.existsSync(filename))('delivered Bible study database accept
     const results = query('search', { q: '創造天地', source: 'cmn-cu89t' });
     expect(results.length).toBeGreaterThan(0);
     expect(query('item', { id: results[0].id }).source_id).toBe('cmn-cu89t');
+  });
+  it('serves the attributed FEB New Testament without inventing absent verses', () => {
+    const first = query('chapter', { book: 40, chapter: 1, translation: 'cmnfeb' })[0];
+    expect(first.body).toContain('亚伯拉罕');
+    expect(first.license).toBe('CC-BY-SA-4.0');
+    expect(first.metadata.attribution).toContain('2022 Free Bible Ministry');
+    expect(first.metadata.empty_source_references).toHaveLength(17);
+    expect(query('chapter', { book: 1, chapter: 1, translation: 'cmnfeb' })).toEqual([]);
+    expect(query('preview', { q: '太17:21', translation: 'cmnfeb' }).verses).toEqual([]);
+    expect(query('search', { q: '亚伯拉罕', source: 'cmnfeb' }).length).toBeGreaterThan(0);
+    expect(query('chapter', { book: 66, chapter: 22, translation: 'cmnfeb' }).length).toBeGreaterThan(0);
   });
   it('returns Chinese commentaries from each allowed reference source', () => {
     for (const source of query('info').note_sources) {

@@ -6,7 +6,7 @@ export const names = '創世記 出埃及記 利未記 民數記 申命記 約�
 const shorts = '創 出 利 民 申 書 士 得 撒上 撒下 王上 王下 代上 代下 拉 尼 斯 伯 詩 箴 傳 歌 賽 耶 哀 結 但 何 珥 摩 俄 拿 彌 鴻 哈 番 該 亞 瑪 太 可 路 約 徒 羅 林前 林後 加 弗 腓 西 帖前 帖後 提前 提後 多 門 來 雅 彼前 彼後 約一 約二 約三 猶 啟'.split(' ');
 const osis = 'Gen Exod Lev Num Deut Josh Judg Ruth 1Sam 2Sam 1Kgs 2Kgs 1Chr 2Chr Ezra Neh Esth Job Ps Prov Eccl Song Isa Jer Lam Ezek Dan Hos Joel Amos Obad Jonah Mic Nah Hab Zeph Hag Zech Mal Matt Mark Luke John Acts Rom 1Cor 2Cor Gal Eph Phil Col 1Thess 2Thess 1Tim 2Tim Titus Phlm Heb Jas 1Pet 2Pet 1John 2John 3John Jude Rev'.split(' ');
 const aliases = new Map(names.flatMap((name, i) => [name, shorts[i], osis[i]].map(n => [n.toLowerCase(), i + 1])));
-export const translations = { 'cmn-cu89t': '新標點和合本（繁體）', cmncbt: 'Biblica® 當代譯本開放資源（繁體）', engwebp: 'World English Bible' };
+export const translations = { 'cmn-cu89t': '新標點和合本（繁體）', cmncbt: 'Biblica® 當代譯本開放資源（繁體）', cmnfeb: '免費易讀聖經（簡體・新約）', engwebp: 'World English Bible' };
 export const noteSources = ['aquiferopenstudynotes-zht', 'uwtranslationnotes-zht', 'biblicastudynotes-zht', 'aquiferopenbibledictionary-zht', 'uwtranslationwords-zht'];
 export const sourceIds = [...Object.keys(translations), ...noteSources, 'oshb', 'sblgnt', 'step-abbott-smith', 'step-hebrew-forms', 'openbible-crossrefs'];
 export const actions = ['info', 'chapter', 'notes', 'tokens', 'dictionary', 'xrefs', 'preview', 'search', 'item'];

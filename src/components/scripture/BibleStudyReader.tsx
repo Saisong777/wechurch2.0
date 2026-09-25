@@ -173,9 +173,10 @@ function ReadingSurface({ info }: { info: Info }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const client = useQueryClient();
-  const primary = useStudy<Verse[]>('chapter', { book, chapter, translation });
-  const other = comparison !== translation && Object.keys(info.translations).includes(comparison)
-    ? comparison : Object.keys(info.translations).find(id => id !== translation)!;
+  const available = translation !== 'cmnfeb' || book >= 40;
+  const primary = useStudy<Verse[]>('chapter', { book, chapter, translation }, available);
+  const comparisonIds = Object.keys(info.translations).filter(id => id !== translation && (id !== 'cmnfeb' || book >= 40));
+  const other = comparisonIds.includes(comparison) ? comparison : comparisonIds[0];
   const parallel = useStudy<Verse[]>('chapter', { book, chapter, translation: other }, compare);
   const saved = useQuery<Saved[]>({ queryKey: ['/api/saved-verses'], enabled: !!user });
   const chosen = primary.data?.find(v => v.verse <= verse && v.end_verse >= verse) || primary.data?.[0];
@@ -219,7 +220,7 @@ function ReadingSurface({ info }: { info: Info }) {
       <label className="study-translation">譯本<select value={translation} aria-label="譯本" onChange={e => setTranslation(e.target.value)}>{Object.entries(info.translations).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label className="study-check"><input type="checkbox" checked={compare} onChange={e => setCompare(e.target.checked)} />譯本對照</label>
       <div className="study-actions"><Button variant="ghost" size="icon" title="縮小字體" aria-label="縮小字體" disabled={fontSize <= 16} onClick={() => setFontSize(f => f - 2)}><Minus /></Button><span>{fontSize}</span><Button variant="ghost" size="icon" title="放大字體" aria-label="放大字體" disabled={fontSize >= 30} onClick={() => setFontSize(f => f + 2)}><Plus /></Button></div>
-      {compare && <label className="study-translation study-comparison">對照譯本<select aria-label="對照譯本" value={other} onChange={e => setComparison(e.target.value)}>{Object.entries(info.translations).filter(([id]) => id !== translation).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>}
+      {compare && <label className="study-translation study-comparison">對照譯本<select aria-label="對照譯本" value={other} onChange={e => setComparison(e.target.value)}>{comparisonIds.map(id => <option key={id} value={id}>{info.translations[id]}</option>)}</select></label>}
     </div>
     <div className="study-heading"><h1>{info.books[book - 1].name} {chapter}</h1><div className="study-actions">
       <Button variant="outline" size="icon" aria-label="上一章" disabled={book === 1 && chapter === 1} onClick={() => next(-1)}><ChevronLeft /></Button>
@@ -241,14 +242,15 @@ function ReadingSurface({ info }: { info: Info }) {
     </div>
     <div className={`study-layout ${tools ? 'with-tools' : ''}`}>
       <section className={`study-scripture ${tools ? 'mobile-hidden' : ''} ${paragraph && !compare ? 'paragraph' : ''}`} aria-label="經文" style={{ fontSize }}>
-        <LoadState loading={primary.isPending} error={primary.error} retry={primary.refetch} />
+        <LoadState loading={available && primary.isPending} error={primary.error} retry={primary.refetch} />
+        {!available && <div role="status"><p>免費易讀聖經目前僅收錄新約。</p><div className="study-actions"><Button variant="outline" onClick={() => navigate(40, 1)}>讀馬太福音</Button><Button variant="outline" onClick={() => setTranslation(info.default_translation)}>使用和合本</Button></div></div>}
         {compare && <LoadState loading={parallel.isPending} error={parallel.error} retry={parallel.refetch} />}
         {primary.data && primary.data.length === 0 && <p>目前沒有本章的經文。</p>}
         {primary.data?.map(v => <div className={`study-verse ${compare ? 'compare' : ''}`} key={v.id}>
           <button ref={el => { if (el) verseRefs.current.set(v.verse, el); else verseRefs.current.delete(v.verse); }} aria-pressed={selection.has(v.verse)} data-current={chosen?.id === v.id} className="study-verse-text" onClick={() => { setVerse(v.verse); setSelection(previous => { const next = new Set(previous); if (next.has(v.verse)) next.delete(v.verse); else next.add(v.verse); return next; }); }}>
             <sup>{label(v)}</sup><span>{v.body}</span>
           </button>
-          {compare && <div className="study-parallel" lang={other === 'engwebp' ? 'en' : 'zh-Hant'}>{parallel.data?.filter(p => p.verse <= v.end_verse && p.end_verse >= v.verse).map(p => <p key={p.id}><sup>{label(p)}</sup>{p.body}</p>)}</div>}
+          {compare && <div className="study-parallel" lang={other === 'engwebp' ? 'en' : other === 'cmnfeb' ? 'zh-Hans' : 'zh-Hant'}>{parallel.data?.filter(p => p.verse <= v.end_verse && p.end_verse >= v.verse).map(p => <p key={p.id}><sup>{label(p)}</sup>{p.body}</p>)}{parallel.data && !parallel.data.some(p => p.verse <= v.end_verse && p.end_verse >= v.verse) && <p className="text-muted-foreground">此譯本未收錄本節</p>}</div>}
           {chosen?.id === v.id && selection.has(v.verse) && <div className="study-actions study-verse-actions">
             <Button variant="outline" onClick={() => { setTools(true); requestAnimationFrame(() => document.getElementById('study-references')?.scrollIntoView({ block: 'start' })); }}>查考此節</Button>
             {user && <Button variant="outline" onClick={openNote}><PenLine size={18} className="mr-2" />寫下筆記</Button>}

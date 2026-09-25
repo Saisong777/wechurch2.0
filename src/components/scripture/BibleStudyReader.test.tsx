@@ -16,11 +16,12 @@ const credit = { source_id: 'cmncbt', source_name: '當代譯本', license: 'CC-
 const verse = { ...credit, id: 'v1', verse: 1, end_verse: 2, body: '測試合併經文' };
 const info = { books: Array.from({ length: 66 }, (_, i) => ({ id: i + 1, name: `書卷${i + 1}`, chapters: 3 })), translations: { 'cmn-cu89t': '新標點和合本（繁體）', cmncbt: '當代譯本', engwebp: 'WEB' }, default_translation: 'cmn-cu89t', release_id: 'public-20260926-v2', note_sources: ['notes'], sources: [{ id: 'notes', name: '註釋', license: credit.license, metadata: credit.metadata }] };
 function mount() {
+  const extendedInfo = { ...info, translations: { ...info.translations, cmnfeb: '免費易讀聖經（簡體・新約）' } };
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, queryFn: async () => [] } } });
   const fetcher = vi.fn(async (input: string | URL | Request) => {
     const url = new URL(String(input), 'http://localhost');
     const action = url.pathname.split('/').at(-1);
-    const data = action === 'info' ? info : action === 'chapter' ? [verse] : action === 'xrefs' ? [{ start: 45005008, end: 45005008, label: '羅5:8' }] : action === 'preview' ? { verses: [{ ...verse, reference: '羅5:8' }] } : [];
+    const data = action === 'info' ? extendedInfo : action === 'chapter' ? [verse] : action === 'xrefs' ? [{ start: 45005008, end: 45005008, label: '羅5:8' }] : action === 'preview' ? { verses: [{ ...verse, reference: '羅5:8' }] } : [];
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
   vi.stubGlobal('fetch', fetcher);
@@ -53,6 +54,22 @@ it('defaults to CUV, remembers a valid selection and offers both comparison vers
   mount();
   await screen.findByText('測試合併經文');
   expect(screen.getByLabelText('譯本', { exact: true })).toHaveValue('engwebp');
+});
+
+it('handles a New Testament-only translation explicitly on Old Testament routes', async () => {
+  const { fetcher } = mount();
+  await screen.findByText('測試合併經文');
+  fireEvent.click(screen.getByLabelText('譯本對照'));
+  expect([...screen.getByLabelText<HTMLSelectElement>('對照譯本').options].some(o => o.value === 'cmnfeb')).toBe(false);
+  fireEvent.change(screen.getByLabelText('譯本', { exact: true }), { target: { value: 'cmnfeb' } });
+  expect(await screen.findByText('免費易讀聖經目前僅收錄新約。')).toBeInTheDocument();
+  expect(fetcher.mock.calls.map(call => String(call[0])).some(url => url.includes('translation=cmnfeb'))).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: '讀馬太福音' }));
+  expect(await screen.findByRole('heading', { name: '書卷40 1' })).toBeInTheDocument();
+  expect(screen.getByLabelText('譯本', { exact: true })).toHaveValue('cmnfeb');
+  fireEvent.change(screen.getByLabelText('書卷'), { target: { value: '1' } });
+  fireEvent.click(await screen.findByRole('button', { name: '使用和合本' }));
+  expect(screen.getByLabelText('譯本', { exact: true })).toHaveValue('cmn-cu89t');
 });
 
 it('ignores obsolete or unapproved saved translations', async () => {
