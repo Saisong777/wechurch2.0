@@ -56,10 +56,11 @@ const socket = new WebSocket('wss://backboard.railway.com/relay', { handshakeTim
 } });
 const send = (type, payload) => socket.send(JSON.stringify({ type, payload }));
 let started = false, output = '', offset = 0, sent = 0, reported = -1;
+const chunkSize = 262144;
 function next() {
   if (offset === bytes.length) { send('session_data', { data: JSON.stringify({ finish: true }) + '\n' }); return; }
-  while (sent < bytes.length && sent - offset < 16 * 65536) {
-    const chunk = bytes.subarray(sent, sent + 65536);
+  while (sent < bytes.length && sent - offset < 16 * chunkSize) {
+    const chunk = bytes.subarray(sent, sent + chunkSize);
     send('session_data', { data: JSON.stringify({ offset: sent, data: chunk.toString('base64') }) + '\n' });
     sent += chunk.length;
   }
@@ -96,7 +97,7 @@ await new Promise((resolve, reject) => {
           }
           if (line.startsWith('WC_ACK ')) {
             const acknowledged = Number(line.slice(7));
-            if (acknowledged !== Math.min(offset + 65536, bytes.length)) throw new Error('Transfer acknowledgement mismatch');
+            if (acknowledged !== Math.min(offset + chunkSize, bytes.length)) throw new Error('Transfer acknowledgement mismatch');
             offset = acknowledged;
             const percent = Math.floor(offset / bytes.length * 10) * 10;
             if (percent !== reported) { reported = percent; console.log(`Reference asset transfer ${percent}%`); }
