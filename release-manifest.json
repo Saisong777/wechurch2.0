@@ -1,5 +1,5 @@
 {
-  "fingerprint": "1705add25f4cb368e75405f2dd50a1a7e47829eae571972e27b44314fa1c5f02",
+  "fingerprint": "be78c5e3595537e23186b9db465f0ffaf2a74bc69a47f8abdc5d79d1e3dff1d1",
   "files": [
     {
       "file": "Dockerfile",
@@ -439,11 +439,11 @@
     },
     {
       "file": "src/components/scripture/DevotionalNoteDialog.test.tsx",
-      "sha256": "3c890be7bf83057373c8e3007097b8e0bfbcbe29f5a5a8524ac22890343b3aa8"
+      "sha256": "ab2efde2f58361bbf0a4ac6b5ea9255edbfcefece9b65ce18757f85f223c8fc9"
     },
     {
       "file": "src/components/scripture/DevotionalNoteDialog.tsx",
-      "sha256": "1f8f5671de37c0cc5d4dceb4ebc0b4a80101f6473619f809a11ad70d9f11a4c0"
+      "sha256": "606d8691eaeecd508d2b285230a943b7548583679f291aebc01daf95288757b5"
     },
     {
       "file": "src/components/scripture/DevotionalReader.tsx",
@@ -483,7 +483,7 @@
     },
     {
       "file": "src/components/scripture/devotional-note-editor.css",
-      "sha256": "8376344a44ae06b020545937a32e246c58eb6ad5cf402bef2633016226e81e01"
+      "sha256": "68d36bce95828655cbb29f8d0848bac5b3258b0cde775710bd587106bb9a8a31"
     },
     {
       "file": "src/components/scripture/devotional-reader.css",
@@ -1015,11 +1015,11 @@
     },
     {
       "file": "src/pages/ChurchReadingPage.test.tsx",
-      "sha256": "de342c23bfc761d21d7d2623b5a1e80e7771f04bf962abed62a92904b10130ec"
+      "sha256": "63126e774de09a47b3280aa530e3a84fc3da274939ff48d5639734e683b3c0f7"
     },
     {
       "file": "src/pages/ChurchReadingPage.tsx",
-      "sha256": "0cf57f18147e2784fed022f7e284c3fff5d4e81598f677df235c5f0705c067e3"
+      "sha256": "7c90b67598b845adcb3b37ede24c3c40c2b5a03eadccb34cf26c5d3df3f2a984"
     },
     {
       "file": "src/pages/DailyPortals.test.tsx",
