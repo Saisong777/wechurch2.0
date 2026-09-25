@@ -43,11 +43,14 @@ Data, routes, sharing and note persistence are unchanged. Scope and evidence:
 ## Note Editor Added 2026-09-25
 
 Devotional writing uses a centered 800px dialog on desktop and a full-height
-editor on phones, not a right sheet. Keep save and close in the top header, with
-one scrollable body and an optional scripture disclosure. Use unframed sections,
+editor on phones, not a right sheet. Keep close in the top header and private
+Save / Share in the bottom footer, outside the scrollable writing body. Sharing
+requires choosing an own group or the public wall and confirming selected content;
+the editor has no AI analysis action. Keep an optional scripture disclosure and unframed sections,
 16px inputs and 44px controls. Retain local drafts, conflict recovery and explicit
 share preview. Scoped styles must not change other dialogs or note storage.
-See `design/note-editor-audit-2026-09-25.md`.
+See `design/note-sharing-audit-2026-09-25.md` for the latest actions, superseding
+the top-save layout in `design/note-editor-audit-2026-09-25.md`.
 
 The sections below are historical experiments, not current navigation or palette.
 

@@ -1,5 +1,5 @@
 {
-  "fingerprint": "9315fbf1a29b5c34109dca11cca4834abb952978bfb8001d39f694529c5a4cbf",
+  "fingerprint": "2c14a63ea9a661c3be1c9eec1eece930ec7e475849ab4a4c5c2bb24b58f23be6",
   "files": [
     {
       "file": "Dockerfile",
@@ -423,11 +423,11 @@
     },
     {
       "file": "src/components/scripture/DevotionWallShareDialog.test.tsx",
-      "sha256": "2432b8d927cd4a21fc93a130a01a5cf89d0d7afea84300ffd3d80483e54e1c90"
+      "sha256": "d58a6cbfe9e84f29ba791a4e985cb7be5b99b01248ea8aa8e9fecef42ee562dc"
     },
     {
       "file": "src/components/scripture/DevotionWallShareDialog.tsx",
-      "sha256": "964923cfb8e960bf2b1863ecaf876ca8688f69d43502c823297776f97c36a0ff"
+      "sha256": "eddec4e6291d58a1991b44b653e6f01b6e3c4737d687f4abcfdc9e8c89e6433a"
     },
     {
       "file": "src/components/scripture/DevotionalAnalysisBatchDialog.tsx",
@@ -435,11 +435,11 @@
     },
     {
       "file": "src/components/scripture/DevotionalNoteDialog.test.tsx",
-      "sha256": "e206ecbabb8e1ed8d58e713573c5caabef8481f00933e886d33d9ffb73be26d3"
+      "sha256": "3c890be7bf83057373c8e3007097b8e0bfbcbe29f5a5a8524ac22890343b3aa8"
     },
     {
       "file": "src/components/scripture/DevotionalNoteDialog.tsx",
-      "sha256": "a9854f3c9849f68468d349c6aacf15c883f39f6c78b4a6daf50eb89d17a58a12"
+      "sha256": "1f8f5671de37c0cc5d4dceb4ebc0b4a80101f6473619f809a11ad70d9f11a4c0"
     },
     {
       "file": "src/components/scripture/DevotionalReader.tsx",
@@ -479,7 +479,7 @@
     },
     {
       "file": "src/components/scripture/devotional-note-editor.css",
-      "sha256": "71fcc889873ce94bd3d160de633b5553c7573cd97267d93c5ae32c4b75d2d7b2"
+      "sha256": "8376344a44ae06b020545937a32e246c58eb6ad5cf402bef2633016226e81e01"
     },
     {
       "file": "src/components/scripture/devotional-reader.css",
@@ -759,11 +759,11 @@
     },
     {
       "file": "src/hooks/useDevotionWall.test.tsx",
-      "sha256": "06247cf1b3efb58bbf5c31ab0a08f0f9ba18653dab73dd75b51d72ba4aadad72"
+      "sha256": "faf772ac2a206b0f76471c35ceb9c65ede9ec6eb2985596004262acacba71a92"
     },
     {
       "file": "src/hooks/useDevotionWall.ts",
-      "sha256": "075b0665aaeebcaae6bac0a7f909f85d08fb37e23e9be8ad8ad6af5b1d3035fa"
+      "sha256": "667e6a435a9600589eabd7feb986031a663d408600715d59c07899f4492ab397"
     },
     {
       "file": "src/hooks/useFeatureToggles.ts",
@@ -1555,7 +1555,7 @@
     },
     {
       "file": "shared/lifeGroup.ts",
-      "sha256": "1470823b3df1970db37f2f2f2a5fb70f5fc5fb4166ccba0855c3853490dd8560"
+      "sha256": "18b3dae27f42c4de01bbefd6051a47130328d0e0dfba34ff62437b543754460e"
     },
     {
       "file": "shared/mentoring.ts",
@@ -1855,7 +1855,7 @@
     },
     {
       "file": "scripts/verify-integrity-worker.ts",
-      "sha256": "615a2fe3b1c090622dbb829ab6e3ce0cdc5b04baddaaca2080fa39d56d4d3e2a"
+      "sha256": "6923e8daa9f7a94bdf136c91f7048ff919c476fa4998271b0113f9e5b83409a5"
     },
     {
       "file": "scripts/verify-integrity.mjs",
