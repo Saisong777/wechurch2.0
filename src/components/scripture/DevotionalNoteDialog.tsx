@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
@@ -21,6 +21,8 @@ import {
   Loader2,
   Check,
   BookMarked,
+  ChevronDown,
+  Save,
 } from 'lucide-react';
 import { parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';
 import type { InsightCategory } from '@/types/spiritual-fitness';
@@ -32,6 +34,8 @@ import { DeviceDraft } from '@/components/layout/DeviceDraft';
 import { clearDeviceDraft } from '@/lib/deviceDraft';
 import { z } from 'zod';
 import { NoteConflictReview } from './NoteConflictReview';
+import { formatScriptureText } from '@/lib/scriptureDisplay';
+import './devotional-note-editor.css';
 
 interface DevotionalNoteDialogProps {
   open: boolean;
@@ -100,6 +104,7 @@ export function DevotionalNoteDialog({
   verseText,
   noteId,
 }: DevotionalNoteDialogProps) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const userId = user?.id || '';
@@ -277,31 +282,41 @@ export function DevotionalNoteDialog({
     receivingValue,
     form.actionPlan,
   ].filter(Boolean).length;
-  const progressPercent = Math.round((filledFields / 3) * 100);
 
   return (
     <><UnsavedChangesGuard dirty={dirty || (open && isSaving)} onDiscard={discardDraft} />
     <LeaveConfirmation open={confirmClose} onStay={() => setConfirmClose(false)} onLeave={() => { discardDraft(); setConfirmClose(false); onOpenChange(false); }} />
-    <Sheet open={open && !shareDraft} onOpenChange={requestOpenChange}>
-      <SheetContent
-        side="right"
-        className="w-full sm:w-[500px] sm:max-w-[500px] overflow-y-auto"
+    <Dialog open={open && !shareDraft} onOpenChange={requestOpenChange}>
+      <DialogContent
+        className="devotional-note-editor"
         data-testid="devotional-note-sheet"
+        onOpenAutoFocus={event => { event.preventDefault(); titleRef.current?.focus(); }}
       >
-        <SheetHeader className="pb-3">
-          <SheetTitle className="flex items-center gap-2 text-base">
+        <DialogHeader className="note-editor-header">
+          <div className="min-w-0">
+          <DialogTitle ref={titleRef} tabIndex={-1} className="flex items-center gap-2 text-base outline-none">
             <BookMarked className="w-5 h-5 text-primary shrink-0" />
             靈修筆記
-          </SheetTitle>
-          <SheetDescription className="sr-only">個人靈修筆記；只有確認分享的內容才會公開。</SheetDescription>
-        </SheetHeader>
+          </DialogTitle>
+          <DialogDescription className="mt-1 text-xs">只有自己可見</DialogDescription>
+          </div>
+          <Button
+            onClick={() => handleSave()}
+            disabled={isSaving || isLoading}
+            className="min-h-11 shrink-0 gap-2"
+            data-testid="button-save-devotional-note"
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isSaving ? '儲存中...' : '儲存'}
+          </Button>
+        </DialogHeader>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-7 h-7 animate-spin text-primary" data-testid="loading-spinner" />
           </div>
         ) : (
-          <div className="space-y-4 pb-24">
+          <div className="note-editor-body">
             {loadedNote && <NoteConflictReview key={`${userId}:${loadedNote.id}`} note={loadedNote} owner={userId} busy={isSaving} onRebase={cloud => {
               setLoadedNote({ ...cloud, syncStatus: 'synced' });
               setExistingId(cloud.id);
@@ -309,28 +324,23 @@ export function DevotionalNoteDialog({
               toast({ title: '目前輸入已保留，請再次儲存以同步' });
             }} />}
             <DeviceDraft<FormFields> key={`${userId}:${draftScope}`} owner={userId} scope={draftScope} revision={loadedNote?.version ?? null} value={form} dirty={dirty} busy={isSaving} schema={formSchema} restore={value=>setForm(value)} preview={value => <>{value.observation}{'\n\n'}{Object.values(value.coreInsightNote).join('\n')}{'\n\n'}{value.actionPlan}</>} />
-            <div className="rounded-md bg-muted/50 p-3 space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">經文</p>
-              <p className="font-serif font-semibold text-sm" data-testid="text-verse-reference">
-                {displayReference}
+            <details className="note-editor-scripture">
+              <summary>
+                <span className="min-w-0 flex-1" data-testid="text-verse-reference">{displayReference}</span>
+                <span className="text-xs text-muted-foreground">經文</span>
+                <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </summary>
+              <p className="whitespace-pre-wrap text-base leading-8" data-testid="text-verse-text">
+                {formatScriptureText(displayText)}
               </p>
-              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4" data-testid="text-verse-text">
-                {displayText}
-              </p>
-            </div>
+            </details>
 
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>三步驟筆記</span>
               <span>{filledFields}/3</span>
             </div>
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden -mt-2">
-              <div
-                className="h-full bg-gradient-to-r from-emerald-500 via-sky-500 to-amber-500 transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
 
-            <section className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3 space-y-2 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+            <section className="note-editor-field">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                 <Eye className="w-4 h-4 shrink-0" />
                 1. 看見
@@ -345,13 +355,13 @@ export function DevotionalNoteDialog({
                 value={form.observation}
                 onChange={(e) => updateField('observation', e.target.value)}
                 placeholder="例如：人物、場景、重複的詞、讓你注意到的細節..."
-                minRows={4}
-                maxRows={8}
-                className="text-base md:text-sm"
+                minRows={3}
+                maxRows={12}
+                className="text-base md:text-base leading-7 overflow-y-auto"
               />
             </section>
 
-            <section className="rounded-2xl border border-sky-100 bg-sky-50/40 p-3 space-y-2 dark:border-sky-900/50 dark:bg-sky-950/20">
+            <section className="note-editor-field">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-sky-700 dark:text-sky-400">
                 <Heart className="w-4 h-4 shrink-0" />
                 2. 領受
@@ -366,13 +376,13 @@ export function DevotionalNoteDialog({
                 value={receivingValue}
                 onChange={(e) => handleReceivingChange(e.target.value)}
                 placeholder="例如：我對神有什麼新的認識？哪句話觸動我？我被提醒、安慰或光照的是什麼？"
-                minRows={4}
-                maxRows={8}
-                className="text-base md:text-sm"
+                minRows={3}
+                maxRows={12}
+                className="text-base md:text-base leading-7 overflow-y-auto"
               />
             </section>
 
-            <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-3 space-y-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <section className="note-editor-field">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-400">
                 <Target className="w-4 h-4 shrink-0" />
                 3. 回應
@@ -387,29 +397,13 @@ export function DevotionalNoteDialog({
                 value={form.actionPlan}
                 onChange={(e) => updateField('actionPlan', e.target.value)}
                 placeholder="例如：今天或這週的一個具體行動、我要如何禱告或調整生活..."
-                minRows={4}
-                maxRows={8}
-                className="text-base md:text-sm"
+                minRows={3}
+                maxRows={12}
+                className="text-base md:text-base leading-7 overflow-y-auto"
               />
             </section>
 
-            <Button
-              onClick={()=>handleSave()}
-              disabled={isSaving}
-              className="w-full"
-              data-testid="button-save-devotional-note"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  儲存中...
-                </>
-              ) : (
-                '儲存'
-              )}
-            </Button>
-
-            <Button variant="outline" className="w-full" disabled={isSaving} onClick={()=>handleSave(true)}>儲存並預覽公開分享</Button>
+            <Button variant="outline" className="w-full min-h-11" disabled={isSaving} onClick={()=>handleSave(true)}>儲存並預覽公開分享</Button>
 
             {existingId && (
               <Button
@@ -446,8 +440,8 @@ export function DevotionalNoteDialog({
             )}
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
     {shareDraft && <DevotionWallShareDialog draft={shareDraft} close={()=>setShareDraft(null)} />}</>
   );
 }

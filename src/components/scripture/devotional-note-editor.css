@@ -1,0 +1,86 @@
+.devotional-note-editor[role='dialog'] {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(800px, calc(100% - 48px));
+  max-width: none;
+  height: min(900px, calc(100vh - 48px));
+  height: min(900px, calc(100dvh - 48px));
+  padding: 0;
+  overflow: hidden;
+  letter-spacing: 0;
+}
+
+.devotional-note-editor .note-editor-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
+  padding: 16px 72px 16px 28px;
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+}
+
+.note-editor-header > * + * { margin-top: 0; }
+.devotional-note-editor > button:last-child {
+  top: 16px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.note-editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 20px;
+  padding: 20px 28px 28px;
+}
+
+.note-editor-body > * + * { margin-top: 20px; }
+.note-editor-field > * + * { margin-top: 8px; }
+.note-editor-field textarea { scroll-margin-block: 20px; }
+.note-editor-scripture { border-bottom: 1px solid hsl(var(--border)); }
+.note-editor-scripture summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding-block: 8px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.note-editor-scripture summary::-webkit-details-marker { display: none; }
+.note-editor-scripture summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.note-editor-scripture[open] summary > svg { transform: rotate(180deg); }
+.note-editor-scripture > p { padding-block: 12px 20px; overflow-wrap: anywhere; }
+
+@media (max-width: 639px) {
+  .devotional-note-editor[role='dialog'] {
+    inset: 0;
+    transform: none;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    animation: none;
+  }
+  .devotional-note-editor .note-editor-header {
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 64px 12px max(16px, env(safe-area-inset-left, 0px));
+  }
+  .devotional-note-editor > button:last-child {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+  }
+  .note-editor-body {
+    padding: 16px max(16px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  }
+}
