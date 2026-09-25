@@ -1,0 +1,70 @@
+.church-reader {
+  min-width: 0;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.church-reader .reader-font-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-block: 8px;
+  border-block: 1px solid hsl(var(--border));
+}
+
+.reader-font-control input[type='range'] {
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+  accent-color: hsl(var(--primary));
+  cursor: pointer;
+}
+
+.reader-tabs-anchor { scroll-margin-top: 100px; }
+.church-reader .reader-tabs {
+  border-radius: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0;
+  background: transparent;
+}
+.reader-tabs [role='tab'] {
+  min-height: 48px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  padding-inline: 8px;
+  box-shadow: none;
+}
+.reader-tabs [role='tab'][data-state='active'] {
+  color: hsl(var(--primary));
+  border-bottom-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.06);
+}
+.church-reader [role='tabpanel'][hidden] { display: none; }
+.church-reader [data-testid='daily-scripture-full'] { border-block: 0; }
+.church-reader .reader-prose,
+.church-reader .reader-scripture-text {
+  font-size: var(--reader-font-size, 20px);
+  line-height: 1.9;
+  letter-spacing: 0;
+}
+.reader-section { padding-block: 24px; }
+.reader-section + .reader-section { border-top: 1px solid hsl(var(--border)); }
+.reader-section-title {
+  margin-bottom: 16px;
+  color: hsl(var(--primary));
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.reader-next {
+  display: flex;
+  justify-content: flex-end;
+  padding-block: 20px;
+  border-top: 1px solid hsl(var(--border));
+}
+@media (prefers-reduced-motion: reduce) {
+  .church-reader *, .church-reader *::before, .church-reader *::after {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

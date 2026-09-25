@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import type { ChurchReadingSummary } from '@/lib/churchReading';
 import { formatScriptureText } from '@/lib/scriptureDisplay';
 
-export function ScriptureSection({ reading, retry }: { reading: ChurchReadingSummary; retry: () => void }) {
+export function ScriptureSection({ reading, retry, defaultExpanded = false }: { reading: ChurchReadingSummary; retry: () => void; defaultExpanded?: boolean }) {
   const location = useLocation();
   const expansionKey = `wechurch:reading-expanded:${location.key}:${reading.date}:${reading.scriptureReference}`;
   const [expanded, setExpanded] = useState(() => {
-    try { return sessionStorage.getItem(expansionKey) === 'true'; } catch { return false; }
+    try { const saved = sessionStorage.getItem(expansionKey); return saved === null ? defaultExpanded : saved === 'true'; } catch { return defaultExpanded; }
   });
   useEffect(() => {
     try { sessionStorage.setItem(expansionKey, String(expanded)); } catch { /* Storage may be disabled. */ }
@@ -35,10 +35,10 @@ export function ScriptureSection({ reading, retry }: { reading: ChurchReadingSum
       </div>
       {reading.scriptureStatus === 'unavailable' && <div role="status" className="flex flex-wrap items-center gap-2 text-sm"><p>經文暫時無法載入。</p><Button variant="outline" size="sm" onClick={retry}>重新載入經文</Button></div>}
       <div id={contentId} className="space-y-2">
-        {reading.scriptureText && <p className={`whitespace-pre-wrap text-lg leading-8 text-foreground ${expanded ? '' : 'line-clamp-4'}`}>{formatScriptureText(reading.scriptureText)}</p>}
+        {reading.scriptureText && <p className={`reader-scripture-text whitespace-pre-wrap text-lg leading-8 text-foreground ${expanded ? '' : 'line-clamp-4'}`}>{formatScriptureText(reading.scriptureText)}</p>}
         {!reading.scriptureText && !reading.previewVerses.length && <Link to="/learn/bible" className="text-sm font-medium text-primary">在聖經中閱讀：{reading.scriptureReference}</Link>}
         {verses.map((verse) => (
-          <p key={verse.verse} className="text-lg leading-8 text-foreground" data-testid={`daily-verse-${verse.verse}`}>
+          <p key={verse.verse} className="reader-scripture-text text-lg leading-8 text-foreground" data-testid={`daily-verse-${verse.verse}`}>
             <sup className="mr-2 text-xs text-muted-foreground">{verse.verse}</sup>{formatScriptureText(verse.text)}
           </p>
         ))}

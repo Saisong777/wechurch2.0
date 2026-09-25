@@ -24,6 +24,22 @@ Use semantic tokens for reading, forms, popovers, and management surfaces.
 Keep QR canvases, photos, and exported media in their original colors.
 See `design/appearance-2026-09-25.md` for B release evidence and limitations.
 
+## Daily Reader Added 2026-09-25
+
+The daily devotion uses the scoped `church-reader` surface: a 672px reading
+column, Scripture reference as the headline, compact date/day context and an
+optional plan disclosure. Scripture, devotion and prayer are separate tabs;
+the full passage opens by default, with the existing collapse preference kept.
+Use 16-26px user-selected body type (20px default, line-height 1.9), retaining
+fixed-size controls. Keep a note action before the content and next-step actions
+after it. No second sticky bar or bottom navigation is introduced.
+
+Inspiration: the user-selected iM Bible app's focused reading tabs and font
+adjustment, translated into Together's existing tokens and brand. Explicit
+line-start headings format imported prose; unknown prose remains complete.
+Data, routes, sharing and note persistence are unchanged. Scope and evidence:
+`design/reader-audit-2026-09-25.md`.
+
 The sections below are historical experiments, not current navigation or palette.
 
 ---

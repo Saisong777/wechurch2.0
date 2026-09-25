@@ -12,6 +12,7 @@ vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: () => <p>每日靈
 vi.mock('@/components/scripture/DevotionalNoteDialog', () => ({ DevotionalNoteDialog: ({ open }: { open: boolean }) => open ? <div role="dialog">個人筆記</div> : null }));
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear();
   state.isLoading = false; state.isError = false; state.refetch.mockReset();
   state.data = { id: 'published-day', date: '2026-09-12', planName: '教會課表', dayNumber: 43, scriptureReference: '以賽亞書 43:1-全', devotionalTitle: '今日已發佈標題', devotionalText: '今日已發佈短文', previewVerses: [], sourceStatus: 'church-schedule' };
 });
@@ -29,6 +30,7 @@ it('renders published daily reading even when the legacy beta gate is closed', (
 it('restores expanded scripture when the same history entry is revisited', () => {
   state.data!.previewVerses = Array.from({ length: 28 }, (_, i) => ({ verse: i + 1, text: `經文 ${i + 1}` }));
   const first = show();
+  fireEvent.click(screen.getAllByRole('button', { name: '收起經文' })[0]);
   fireEvent.click(screen.getByRole('button', { name: '展開經文' }));
   first.unmount();
   show();
@@ -54,9 +56,11 @@ it('keeps loading separate from unpublished and hides cached content on errors',
   fireEvent.click(screen.getByRole('button', { name: '重新載入' }));
   expect(state.refetch).toHaveBeenCalledOnce();
 });
-it('previews two verses and expands or collapses the complete passage', () => {
+it('opens the complete passage and allows a two-verse preview', () => {
   state.data!.previewVerses = Array.from({ length: 28 }, (_, index) => ({ verse: index + 1, text: `第 ${index + 1} 節經文` }));
   show();
+  expect(screen.getByTestId('daily-verse-28')).toBeTruthy();
+  fireEvent.click(screen.getAllByRole('button', { name: '收起經文' })[0]);
   expect(screen.queryByTestId('daily-verse-28')).toBeNull();
   expect(screen.getByTestId('daily-verse-2')).toBeTruthy();
   const toggle = screen.getByRole('button', { name: '展開經文' });
@@ -74,24 +78,23 @@ it('previews two verses and expands or collapses the complete passage', () => {
 it('collapses from the end and returns keyboard focus to the top control', () => {
   state.data!.previewVerses = Array.from({ length: 3 }, (_, index) => ({ verse: index + 1, text: `經文 ${index + 1}` }));
   show();
-  const toggle = screen.getByRole('button', { name: '展開經文' });
+  const toggle = screen.getAllByRole('button', { name: '收起經文' })[0];
   toggle.scrollIntoView = vi.fn();
-  fireEvent.click(toggle);
   fireEvent.click(screen.getAllByRole('button', { name: '收起經文' })[1]);
   expect(toggle).toHaveFocus();
   expect(toggle.scrollIntoView).toHaveBeenCalledOnce();
   expect(screen.queryByTestId('daily-verse-3')).toBeNull();
 });
-it('preserves expansion on background refresh but resets it for a different day', () => {
+it('preserves collapsed reading on refresh but opens a different day', () => {
   state.data!.previewVerses = Array.from({ length: 3 }, (_, index) => ({ verse: index + 1, text: `經文 ${index + 1}` }));
   const view = show();
-  fireEvent.click(screen.getByRole('button', { name: '展開經文' }));
+  fireEvent.click(screen.getAllByRole('button', { name: '收起經文' })[0]);
   state.data = { ...state.data! };
   view.rerender(<MemoryRouter><ChurchReadingPage /></MemoryRouter>);
-  expect(screen.getByTestId('daily-verse-3')).toBeTruthy();
+  expect(screen.queryByTestId('daily-verse-3')).toBeNull();
   state.data = { ...state.data!, date: '2026-09-13' };
   view.rerender(<MemoryRouter><ChurchReadingPage /></MemoryRouter>);
-  expect(screen.queryByTestId('daily-verse-3')).toBeNull();
+  expect(screen.getByTestId('daily-verse-3')).toBeTruthy();
 });
 it('does not add a toggle for a short or unavailable passage', () => {
   state.data!.previewVerses = [{ verse: 1, text: '短經文' }];
@@ -106,6 +109,7 @@ it('expands manually supplied scripture without changing its text', () => {
   state.data!.scriptureText = '完整手動經文\n'.repeat(20);
   show();
   const content = screen.getByText(/完整手動經文/);
+  fireEvent.click(screen.getAllByRole('button', { name: '收起經文' })[0]);
   expect(content).toHaveClass('line-clamp-4');
   fireEvent.click(screen.getByRole('button', { name: '展開經文' }));
   expect(content).not.toHaveClass('line-clamp-4');
@@ -117,4 +121,52 @@ it('offers scripture retry without hiding the devotional article', () => {
   expect(screen.getByText('今日已發佈短文')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: '重新載入經文' }));
   expect(state.refetch).toHaveBeenCalledOnce();
+});
+
+it('separates scripture, devotion and prayer without changing their text', () => {
+  state.data!.devotionalText = '前言保留\n\n真理導航：閱讀的領受\n\n生活練習：\n【愛神】安靜\n【愛人】關心\n\n今日禱告：禱告原文\n\n今日金句卡：金句原文';
+  show();
+  expect(screen.getByRole('tab', { name: '經文' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByText('禱告原文')).not.toBeVisible();
+  fireEvent.mouseDown(screen.getByRole('tab', { name: '靈修' }), { button: 0, ctrlKey: false });
+  expect(screen.getByText('前言保留')).toBeVisible();
+  expect(screen.getByText('閱讀的領受')).toBeVisible();
+  expect(screen.getByText('【愛神】安靜 【愛人】關心')).toBeVisible();
+  expect(screen.getByText('禱告原文')).not.toBeVisible();
+  fireEvent.mouseDown(screen.getByRole('tab', { name: '禱告' }), { button: 0, ctrlKey: false });
+  expect(screen.getByText('禱告原文')).toBeVisible();
+  expect(screen.getByText('金句原文')).toBeVisible();
+  expect(screen.getByText('閱讀的領受')).not.toBeVisible();
+});
+
+it('keeps notes and group routes available and omits an empty prayer tab', () => {
+  show();
+  expect(screen.queryByRole('tab', { name: '禱告' })).toBeNull();
+  expect(screen.getByRole('link', { name: '回看筆記' })).toHaveAttribute('href', '/learn/my-notes');
+  expect(screen.getByRole('link', { name: '與小組一起讀經' })).toHaveAttribute('href', '/groups');
+});
+
+it('remembers the reading font size, resets it, and rejects invalid saved values', () => {
+  localStorage.setItem('wechurch-devotion-font-size', '999');
+  const first = show();
+  const slider = screen.getByRole('slider', { name: '字級' });
+  expect(slider).toHaveValue('20');
+  fireEvent.change(slider, { target: { value: '26' } });
+  expect(localStorage.getItem('wechurch-devotion-font-size')).toBe('26');
+  expect(document.querySelector('article')).toHaveStyle('--reader-font-size: 26px');
+  first.unmount();
+  show();
+  expect(screen.getByRole('slider', { name: '字級' })).toHaveValue('26');
+  fireEvent.click(screen.getByRole('button', { name: '重設閱讀字級' }));
+  expect(screen.getByRole('slider', { name: '字級' })).toHaveValue('20');
+});
+
+it('retains scripture expansion when switching reading tabs', () => {
+  state.data!.previewVerses = Array.from({ length: 3 }, (_, index) => ({ verse: index + 1, text: `經文 ${index + 1}` }));
+  show();
+  fireEvent.click(screen.getAllByRole('button', { name: '收起經文' })[0]);
+  fireEvent.mouseDown(screen.getByRole('tab', { name: '靈修' }), { button: 0, ctrlKey: false });
+  fireEvent.mouseDown(screen.getByRole('tab', { name: '經文' }), { button: 0, ctrlKey: false });
+  expect(screen.queryByTestId('daily-verse-3')).toBeNull();
+  expect(screen.getByRole('button', { name: '展開經文' })).toHaveAttribute('aria-expanded', 'false');
 });
