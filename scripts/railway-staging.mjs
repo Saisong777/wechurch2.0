@@ -3,7 +3,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
 import { readBackupKey, unseal } from './backup-envelope.mjs';
 import { verifyAssets, releaseId as bibleReleaseId } from './bible-study-assets.mjs';
 
@@ -16,6 +15,15 @@ const sha = data => createHash('sha256').update(data).digest('hex');
 export function railway(args, options = {}) {
   return execFileSync('railway', args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, ...options });
 }
+// Maintenance travels through Railway's authenticated encrypted exec channel, not the public TCP proxy.
+export function stagingSql(sql) {
+  if (typeof sql !== 'string' || Buffer.byteLength(sql) > 1024 * 1024) throw new Error('Invalid maintenance request');
+  const encoded = Buffer.from(sql).toString('base64');
+  const command = `printf %s ${encoded} | base64 -d | psql -X -qAt -v ON_ERROR_STOP=1 -U "$PGUSER" -d "$PGDATABASE"`;
+  try { return railway(['ssh', '-p', target.project, '-e', target.environment, '-s', target.database, '--', 'sh', '-c', `'${command}'`], { timeout: 180000 }).trim(); }
+  catch { throw new Error('Encrypted B database maintenance failed; no credentials or SQL are logged'); }
+}
+const sqlLiteral = value => `'${String(value).replaceAll("'", "''")}'`;
 const json = args => JSON.parse(railway(args));
 const vars = (environment, service) => json(['variable', 'list', '-e', environment, '-s', service, '--json']);
 export function verifyRemoteBibleAssets(directory) {
@@ -38,7 +46,11 @@ export function inspectStaging() {
   const database = vars(target.environment, target.database);
   const live = vars(production.environment, production.app);
   if (app.RAILWAY_ENVIRONMENT_ID !== target.environment || database.RAILWAY_ENVIRONMENT_ID !== target.environment || app.RAILWAY_SERVICE_ID !== target.app || database.RAILWAY_SERVICE_ID !== target.database) throw new Error('Service identity mismatch.');
-  if (!app.DATABASE_URL || app.DATABASE_URL !== database.DATABASE_URL) throw new Error('App is not connected to the staging database service.');
+  const appDb = new URL(app.DATABASE_URL || 'invalid:');
+  const ownerDb = new URL(database.DATABASE_URL || 'invalid:');
+  if (!['postgres:', 'postgresql:'].includes(appDb.protocol) ||
+      appDb.hostname !== ownerDb.hostname || appDb.port !== ownerDb.port || appDb.pathname !== ownerDb.pathname ||
+      ![ownerDb.username, 'wechurch_app'].includes(appDb.username)) throw new Error('App is not connected to the staging database service.');
   if (new URL(app.DATABASE_URL).hostname === new URL(live.DATABASE_URL).hostname || app.SESSION_SECRET === live.SESSION_SECRET) throw new Error('Staging isolation failed.');
   if (app.PUBLIC_BASE_URL !== target.origin) throw new Error('Unexpected staging origin.');
   if (app.STAGING_GOOGLE_LOGIN_ENABLED === '1') {
@@ -99,32 +111,30 @@ async function migrate(database) {
     const b = JSON.parse(fs.readFileSync(path.join(evidence, 'backup.json'), 'utf8'));
     if (b.environment !== target.environment || Date.now() - Date.parse(b.createdAt) > 3600_000 || sha(fs.readFileSync(path.join(evidence, b.file))) !== b.sha256) throw new Error('A verified staging backup from the last hour is required.');
   }
-  const client = new pg.Client({ connectionString: database.DATABASE_PUBLIC_URL, connectionTimeoutMillis: 10000 });
-  await client.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL lock_timeout = '5s'");
-    await client.query("SET LOCAL statement_timeout = '60s'");
-    await client.query('SELECT pg_advisory_xact_lock(937153)');
-    const applied = (await client.query('SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at')).rows;
+    const applied = JSON.parse(stagingSql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT hash,created_at FROM drizzle.__drizzle_migrations ORDER BY created_at) t"));
     const journal = JSON.parse(fs.readFileSync(path.join(root, 'migrations/meta/_journal.json'), 'utf8')).entries;
     const changed = [];
+    const statements = ["BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='60s'; SELECT pg_advisory_xact_lock(937153);"];
     for (const entry of journal) {
       const sql = fs.readFileSync(path.join(root, 'migrations', `${entry.tag}.sql`), 'utf8');
       const hash = sha(sql);
       const existing = applied.find(row => Number(row.created_at) === entry.when);
-      if (existing) { if (existing.hash !== hash) throw new Error(`Migration drift: ${entry.tag}`); continue; }
+      if (existing) {
+        if (existing.hash !== hash) throw new Error(`Migration drift: ${entry.tag}`);
+        statements.push(`DO $wc$ BEGIN IF NOT EXISTS(SELECT 1 FROM drizzle.__drizzle_migrations WHERE created_at=${Number(entry.when)} AND hash=${sqlLiteral(hash)}) THEN RAISE EXCEPTION 'Migration drift'; END IF; END $wc$;`);
+        continue;
+      }
       if (applied.some(row => Number(row.created_at) > entry.when)) throw new Error(`Migration history gap: ${entry.tag}`);
       if (entry.idx < 2) throw new Error('Unexpected missing baseline. Refusing automatic bootstrap.');
-      for (const statement of sql.split('--> statement-breakpoint')) if (statement.trim()) await client.query(statement);
-      await client.query('INSERT INTO drizzle.__drizzle_migrations(hash, created_at) VALUES ($1,$2)', [hash, entry.when]);
+      statements.push(`DO $wc$ BEGIN IF EXISTS(SELECT 1 FROM drizzle.__drizzle_migrations WHERE created_at>=${Number(entry.when)}) THEN RAISE EXCEPTION 'Migration history changed; retry after inspection'; END IF; END $wc$;`);
+      statements.push(sql);
+      statements.push(`INSERT INTO drizzle.__drizzle_migrations(hash,created_at) VALUES(${sqlLiteral(hash)},${Number(entry.when)});`);
       changed.push(entry.tag);
     }
-    await client.query('COMMIT');
+    statements.push('COMMIT;');
+    stagingSql(statements.join('\n'));
     save('migrations.json', { at: new Date().toISOString(), environment: target.environment, applied: changed });
     console.log({ stagingMigrationsApplied: changed });
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
-  finally { await client.end(); }
 }
 
 function snapshot(referenceAssets) {
@@ -170,13 +180,9 @@ async function main() {
     const config = json(['environment', 'config', '-e', target.environment, '--json']);
     const source = config.services[target.app]?.source;
     if (source?.branch && source.branch !== 'integration') throw new Error('B must not auto-deploy from the production branch.');
-    const client = new pg.Client({ connectionString: database.DATABASE_PUBLIC_URL, connectionTimeoutMillis: 10000 });
-    await client.connect();
-    try {
-      const applied = (await client.query('SELECT hash, created_at FROM drizzle.__drizzle_migrations')).rows;
+      const applied = JSON.parse(stagingSql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT hash,created_at FROM drizzle.__drizzle_migrations) t"));
       const journal = JSON.parse(fs.readFileSync(path.join(root, 'migrations/meta/_journal.json'), 'utf8')).entries;
       for (const entry of journal) if (!applied.some(row => Number(row.created_at) === entry.when && row.hash === sha(fs.readFileSync(path.join(root, 'migrations', `${entry.tag}.sql`))))) throw new Error(`Run staging:backup and staging:migrate first: ${entry.tag}`);
-    } finally { await client.end(); }
     for (const step of ['typecheck', 'test', 'test:deployment', 'test:integrity', 'build']) {
       const result = spawnSync('npm', ['run', step], { cwd: root, stdio: 'inherit' });
       if (result.status !== 0) throw new Error(`Release check failed: ${step}`);

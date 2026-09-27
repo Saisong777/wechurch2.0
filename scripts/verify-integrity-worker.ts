@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import express from 'express';
 
@@ -26,14 +27,20 @@ try {
   const { registerRoutes } = await import('../server/routes');
   await registerRoutes(app);
   // Production serves the SPA for unmatched paths; uploads must not fall through.
-  app.use((_req, res) => res.status(200).type('html').send('<main>WeChurch</main>'));
+  if (process.env.RUN_SECURITY_BROWSER === '1') {
+    assert(fs.existsSync('dist/public/index.html'), 'Build the frontend before browser acceptance');
+    app.use(express.static(path.resolve('dist/public')));
+    app.use((_req, res) => res.sendFile('index.html', { root: path.resolve('dist/public') }));
+  } else app.use((_req, res) => res.status(200).type('html').send('<main>WeChurch</main>'));
   await new Promise<void>(resolve => { server = app.listen(0,'127.0.0.1',resolve); });
   const address = server!.address(); assert(address && typeof address !== 'string');
   const origin = `http://127.0.0.1:${address.port}`;
+  process.env.PUBLIC_BASE_URL = origin;
   const makeClient = () => {
     const cookies = new Map<string,string>();
     return async (path: string, method='GET', body?: unknown) => {
-      const response = await fetch(origin+path,{method, headers:{'Content-Type':'application/json',origin,cookie:[...cookies].map(([key,value])=>`${key}=${value}`).join('; ')},body:body===undefined?undefined:JSON.stringify(body),redirect:'manual'});
+      const multipart = body instanceof FormData;
+      const response = await fetch(origin+path,{method, headers:{...(!multipart ? {'Content-Type':'application/json'} : {}),origin,cookie:[...cookies].map(([key,value])=>`${key}=${value}`).join('; ')},body:body===undefined?undefined:multipart?body:JSON.stringify(body),redirect:'manual'});
       for(const cookie of response.headers.getSetCookie()) { const value=cookie.split(';')[0]; const split=value.indexOf('='); cookies.set(value.slice(0,split),value.slice(split+1)); }
       return response;
     };
@@ -129,6 +136,20 @@ try {
   assert.equal(deliveries.find((item:{prayerId:string})=>item.prayerId===prayer.id)?.content,'Shared title\n\nShared excerpt');
   assert(!JSON.stringify(await (await a('/api/prayer-sharing')).json()).includes(prayer.id));
   console.log('PASS fresh migrations, real HTTP permissions, mentoring, LINE identity, empty schedule and version restore');
+  const { verifyBoundarySecurity } = await import('./verify-boundary-security');
+  await verifyBoundarySecurity(pool, a, b, guest, makeClient, ids);
+  const { runSecurityAccessRegressions } = await import('./security-access-regressions');
+  await runSecurityAccessRegressions();
+  const { verifyAuthSecurityHttp } = await import('./verify-auth-security-http');
+  console.log(await verifyAuthSecurityHttp(pool, origin, makeClient));
+  if (process.env.RUN_CAPACITY_BENCHMARK === '1') {
+    const { benchmarkCapacity } = await import('./benchmark-capacity');
+    await benchmarkCapacity(pool, origin);
+  }
+  if (process.env.RUN_SECURITY_BROWSER === '1') {
+    const { verifySecurityBrowser } = await import('./verify-security-browser');
+    await verifySecurityBrowser(pool, origin, ids[0]);
+  }
 } finally {
   if(server) await new Promise<void>(resolve=>server!.close(()=>resolve()));
   await pool.end();

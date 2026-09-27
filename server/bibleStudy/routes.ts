@@ -4,8 +4,10 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { actions } from './core.mjs';
 import { releaseId } from '../../scripts/bible-study-assets.mjs';
+import { PublicReferenceCache } from './referenceCache';
 
 const directory = path.resolve(process.env.BIBLE_STUDY_DIR || 'bible-study-data');
+const referenceCache = new PublicReferenceCache(JSON.stringify([directory, releaseId]));
 const available = () => fs.existsSync(path.join(directory, 'data/core.sqlite'));
 let worker: Worker | undefined;
 let nextId = 0;
@@ -58,8 +60,12 @@ export function bibleStudyRoutes() {
       if (!allowed.includes(key) || Object.hasOwn(parameters, key)) { res.status(400).json({ error: '查詢格式不正確' }); return; }
       parameters[key] = value;
     }
-    try { res.json(await query(req.params.action, parameters)); }
-    catch (error) { res.status((error as { status?: number }).status || 503).json({ error: (error as Error).message }); }
+    try { res.json(await referenceCache.load(req.params.action, parameters, () => query(req.params.action, parameters))); }
+    catch (error) {
+      const status = (error as { status?: number }).status || 503;
+      if (status === 429) res.set('Retry-After', '1');
+      res.status(status).json({ error: (error as Error).message });
+    }
   });
   router.use((_req, res) => res.status(404).json({ error: '找不到此功能' }));
   return router;

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Undo2 } from 'lucide-react';
+import { Undo2,ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ export default function MySharingPage() {
       <section className="space-y-3 border-b pb-5"><h2 className="text-lg font-semibold">今日公開靈修分享</h2>
         {wall.isError ? <div role="alert"><p>無法載入今日分享。</p><Button variant="outline" onClick={()=>wall.refetch()}>重新載入</Button></div> : wall.isPending ? <p role="status">載入中…</p> : !wall.posts.length ? <p className="text-sm text-muted-foreground">目前沒有今日公開分享。</p> : <ul className="divide-y">{wall.posts.map(post=><li key={post.id} className="space-y-2 py-4"><p className="font-medium">{post.title}</p><p className="text-sm text-muted-foreground">全站登入成員可見 · {post.anonymous?'匿名':'具名'}</p><details><summary className="min-h-11 cursor-pointer py-3 text-sm">查看分享內容</summary><p className="whitespace-pre-wrap leading-7">{post.body}</p></details><Button variant="outline" disabled={withdraw.isPending} onClick={()=>{if(window.confirm('撤回這則公開分享？私人筆記仍保留。'))withdraw.mutate(post.id);}}><Undo2 className="mr-2 h-4 w-4" />撤回分享</Button></li>)}</ul>}
       </section>
+      {wall.hasNextPage && <Button variant="outline" disabled={wall.isFetching} onClick={()=>wall.fetchNextPage()}><ChevronDown className="mr-2 h-4 w-4" />{wall.isFetchingNextPage?'載入中…':'載入更多靈修分享'}</Button>}
       <Link to="/groups" className="inline-flex min-h-11 items-center text-sm text-primary">查看小組內的筆記與代禱</Link>
     </>}
   </main></>;

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Loader2, Mail, FileDown, Send, Copy, Paperclip, X, Image, File, Clock, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { serializeCsv } from '@/lib/csv-export';
 
 interface Download {
   id: string;
@@ -273,10 +274,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
       format(new Date(g.lastDownloadAt), 'yyyy/MM/dd HH:mm'),
     ]);
     
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
-    ].join('\n');
+    const csvContent = serializeCsv([headers, ...rows]);
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

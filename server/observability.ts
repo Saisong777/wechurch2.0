@@ -3,6 +3,7 @@ import type { Request } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { aiUsageEvents, appErrorEvents, appEvents } from "@shared/schema";
+import { scrubTelemetryText, telemetryMetadata, telemetryPath } from '@shared/telemetryPrivacy';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -11,19 +12,12 @@ function hashIp(ip?: string | null) {
   return crypto.createHash("sha256").update(`${ip}:${process.env.SESSION_SECRET || "local"}`).digest("hex").slice(0, 24);
 }
 
-function compactMetadata(value?: JsonRecord | null): JsonRecord | null {
-  if (!value) return null;
-  const json = JSON.stringify(value);
-  if (json.length <= 3000) return value;
-  return { truncated: true, preview: json.slice(0, 3000) };
-}
-
 export function requestContext(req: Request) {
   const body = req.body || {};
   const query = req.query || {};
   const user = req.user as { claims?: { email?: string; sub?: string } } | undefined;
   return {
-    path: req.originalUrl?.split("?")[0] || req.path,
+    path: telemetryPath(req.originalUrl || req.path),
     method: req.method,
     userAgent: req.get("user-agent") || null,
     ipHash: hashIp(req.ip),
@@ -60,18 +54,18 @@ export async function recordAppEvent(input: {
 }) {
   try {
     await db.insert(appEvents).values({
-      eventName: input.eventName,
-      source: input.source || "server",
-      path: input.path || null,
+      eventName: scrubTelemetryText(input.eventName, 100),
+      source: scrubTelemetryText(input.source || "server", 100),
+      path: telemetryPath(input.path),
       sessionId: input.sessionId || null,
       participantId: input.participantId || null,
       userEmail: input.userEmail || null,
-      metadata: compactMetadata(input.metadata),
-      userAgent: input.userAgent || null,
+      metadata: telemetryMetadata(input.metadata),
+      userAgent: scrubTelemetryText(input.userAgent, 500) || null,
       ipHash: input.ipHash || null,
     });
   } catch (error) {
-    console.error("[observability] failed to record app event:", error);
+    console.error("[observability] failed to record app event");
   }
 }
 
@@ -91,21 +85,21 @@ export async function recordErrorEvent(input: {
 }) {
   try {
     await db.insert(appErrorEvents).values({
-      source: input.source || "server",
-      level: input.level || "error",
-      message: input.message.slice(0, 2000),
-      stack: input.stack?.slice(0, 6000) || null,
-      path: input.path || null,
-      method: input.method || null,
+      source: scrubTelemetryText(input.source || "server", 100),
+      level: scrubTelemetryText(input.level || "error", 100),
+      message: scrubTelemetryText(input.message),
+      stack: scrubTelemetryText(input.stack, 6000) || null,
+      path: telemetryPath(input.path),
+      method: scrubTelemetryText(input.method, 20) || null,
       statusCode: input.statusCode || null,
       sessionId: input.sessionId || null,
       participantId: input.participantId || null,
-      metadata: compactMetadata(input.metadata),
-      userAgent: input.userAgent || null,
+      metadata: telemetryMetadata(input.metadata),
+      userAgent: scrubTelemetryText(input.userAgent, 500) || null,
       ipHash: input.ipHash || null,
     });
   } catch (error) {
-    console.error("[observability] failed to record error event:", error);
+    console.error("[observability] failed to record error event");
   }
 }
 
@@ -145,10 +139,10 @@ export async function recordAiUsage(input: {
       qualityScore: input.qualityScore ?? null,
       retryCount: input.retryCount || 0,
       estimatedCostUnits: Math.ceil(inputChars / 1000) + Math.ceil(outputChars / 1000),
-      errorMessage: input.errorMessage?.slice(0, 1000) || null,
+      errorMessage: scrubTelemetryText(input.errorMessage, 1000) || null,
     });
   } catch (error) {
-    console.error("[observability] failed to record ai usage:", error);
+    console.error("[observability] failed to record ai usage");
   }
 }
 

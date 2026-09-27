@@ -2,7 +2,7 @@ import { Router, type Request, type ErrorRequestHandler } from 'express';
 import { z } from 'zod';
 import { pool } from './db';
 import { GroupError } from './lifeGroupRepository';
-import { devotionDayWindow, devotionWallShareInput } from '../shared/devotionWall';
+import { devotionDayWindow, devotionWallShareInput, devotionWallPageInput, devotionWallCursor } from '../shared/devotionWall';
 
 async function windowNow() {
   return devotionDayWindow((await pool.query('SELECT clock_timestamp() AS now')).rows[0].now);
@@ -21,13 +21,25 @@ export function devotionWallRoutes(resolveUserId:(req:Request)=>Promise<string|n
   });
   router.get('/window',async(_req,res)=>{res.json(await windowNow());});
   router.get(['/', '/mine'],async(req,res)=>{
+    const {limit,cursor}=devotionWallPageInput.parse(req.query);
     const window=await windowNow();
+    if(cursor && cursor.day!==window.day)return void res.json({...window,posts:[],nextCursor:null});
+    const values:unknown[]=[res.locals.actor,window.day];
+    const mine=req.path==='/mine'?' AND p.user_id=$1':'';
+    const seek=cursor?' AND (p.created_at<$3::timestamptz OR (p.created_at=$3::timestamptz AND p.id>$4::uuid))':'';
+    if(cursor)values.push(cursor.createdAt,cursor.id);
+    values.push(limit+1);
     const posts=(await pool.query(`SELECT p.id,p.title,p.body,p.reference,p.is_anonymous AS anonymous,p.user_id=$1 AS "isOwner",
       CASE WHEN p.is_anonymous THEN '匿名' ELSE COALESCE(NULLIF(u.display_name,''),'教會成員') END AS "authorName",
-      p.created_at AS "createdAt",p.expires_at AS "expiresAt" FROM devotion_wall_posts p JOIN users u ON u.id=p.user_id
+      p.created_at AS "createdAt",p.expires_at AS "expiresAt",
+      to_char(p.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
+      FROM devotion_wall_posts p JOIN users u ON u.id=p.user_id
       WHERE p.published_day=$2::date AND p.expires_at>clock_timestamp() AND p.withdrawn_at IS NULL
-      AND (NOT $3::boolean OR p.user_id=$1) ORDER BY p.created_at DESC,p.id`,[res.locals.actor,window.day,req.path === '/mine'])).rows;
-    res.json({...window,posts});
+      ${mine}${seek} ORDER BY p.created_at DESC,p.id ASC LIMIT $${values.length}`,values)).rows;
+    const page=posts.slice(0,limit);const last=page.at(-1);
+    // Keep PostgreSQL microseconds in the cursor; JS Dates truncate them.
+    const nextCursor=posts.length>limit && last?devotionWallCursor(window.day,last.cursorCreatedAt,last.id):null;
+    res.json({...window,posts:page.map(({cursorCreatedAt:_cursor,...post})=>post),nextCursor});
   });
   router.post('/',async(req,res)=>{
     const input=devotionWallShareInput.parse(req.body); const actor=res.locals.actor;

@@ -4,7 +4,7 @@ import path from "path";
 
 export default defineConfig({
   server: {
-    allowedHosts: true,
+    allowedHosts: [],
   },
   esbuild: {
     target: "esnext",

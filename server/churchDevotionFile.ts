@@ -1,14 +1,27 @@
 import ExcelJS from 'exceljs';
 import { Readable } from 'node:stream';
+import { validateXlsxArchive } from './xlsxArchive';
 import { detectDevotionHeaderRow, devotionFields, MAX_DEVOTION_HEADER_ROWS, type DevotionEntry, type ImportSheet } from '../shared/churchDevotion';
 
 export const MAX_DEVOTION_FILE_BYTES = 3 * 1024 * 1024;
+let parsing = false;
 
 export async function readDevotionFile(buffer: Buffer, filename: string): Promise<ImportSheet[]> {
   if (!buffer.length || buffer.length > MAX_DEVOTION_FILE_BYTES) throw new Error('檔案不可為空，且須小於 3 MB。');
+  if (parsing) throw new Error('目前正在處理匯入檔案，請稍後再試。');
+  parsing = true;
+  try {
+    return await parseDevotionFile(Buffer.from(buffer), filename);
+  } finally {
+    parsing = false;
+  }
+}
+
+async function parseDevotionFile(buffer: Buffer, filename: string): Promise<ImportSheet[]> {
   const workbook = new ExcelJS.Workbook();
   if (/\.xlsx$/i.test(filename)) {
-    await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+    const validated = await validateXlsxArchive(buffer);
+    await workbook.xlsx.load(validated as unknown as ExcelJS.Buffer);
   } else if (/\.csv$/i.test(filename)) {
     let text: string;
     try { text = new TextDecoder('utf-8', { fatal: true }).decode(buffer); }

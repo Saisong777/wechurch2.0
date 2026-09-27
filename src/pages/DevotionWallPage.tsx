@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BookOpen,RefreshCw,Undo2 } from 'lucide-react';
+import { BookOpen,RefreshCw,Undo2,ChevronDown } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ export default function DevotionWallPage() {
           <h2 className="text-lg font-semibold">{post.title}</h2><p className="mt-1 text-sm text-teal-700">{post.reference}</p><p className="mt-4 whitespace-pre-wrap text-base leading-7">{post.body}</p>
           {post.isOwner && <div className="mt-4 flex justify-end border-t pt-3"><Button variant="ghost" size="sm" className="gap-2" disabled={withdraw.isPending} onClick={()=>{if(window.confirm('撤回這篇公開分享？個人筆記不受影響。'))withdraw.mutate(post.id);}}><Undo2 className="h-4 w-4" />撤回分享</Button></div>}
         </article>)}</div>
+        {wall.hasNextPage && <Button variant="outline" disabled={wall.isFetching} onClick={()=>wall.fetchNextPage()}><ChevronDown className="mr-2 h-4 w-4" />{wall.isFetchingNextPage?'載入中…':'載入更多分享'}</Button>}
       </>}
     </section></main></div></FeatureGate>;
 }

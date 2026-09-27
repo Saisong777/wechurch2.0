@@ -13,7 +13,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest } from '@/lib/queryClient';
 
-type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'prayer-meeting' | 'mail' | 'inbox' | 'create' | 'waiting' | 'monitor';
+type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'mail' | 'inbox' | 'create' | 'waiting' | 'monitor';
 
 const hostFlowSteps: Array<{ step: AdminStep; label: string; hint: string }> = [
   { step: 'create', label: '建立聚會', hint: '設定經文' },
@@ -70,7 +70,6 @@ const HistoryBrowser = lazyAdminComponent(() => import('@/components/admin/Histo
 const CardQuestionManager = lazyAdminComponent(() => import('@/components/admin/CardQuestionManager'), 'CardQuestionManager');
 const MessageCardManager = lazyAdminComponent(() => import('@/components/admin/MessageCardManager'), 'MessageCardManager');
 const FeatureToggleManager = lazyAdminComponent(() => import('@/components/admin/FeatureToggleManager'), 'FeatureToggleManager');
-const PrayerMeetingAdmin = lazyAdminComponent(() => import('@/components/admin/PrayerMeetingAdmin'), 'PrayerMeetingAdmin');
 const AdminMailComposer = lazyAdminComponent(() => import('@/components/admin/AdminMailComposer'), 'AdminMailComposer');
 const AdminInbox = lazyAdminComponent(() => import('@/components/admin/AdminInbox'), 'AdminInbox');
 const PlatformMaturityPanel = lazyAdminComponent(() => import('@/components/admin/PlatformMaturityPanel'), 'PlatformMaturityPanel');
@@ -232,7 +231,7 @@ export const AdminPage: React.FC = () => {
                 { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
                 { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
                 { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
-                { icon: Crown, label: '禱告會管理', desc: '建立與管理禱告會', action: () => setStep('prayer-meeting'), testId: 'button-prayer-meeting-admin' },
+                { icon: Crown, label: '公共禱告牆', desc: '查看與分享代禱', action: () => navigate('/prayer-wall'), testId: 'button-prayer-meeting-admin' },
                 { icon: Sparkles, label: '真心話題庫', desc: '管理破冰遊戲題目', action: () => setStep('cards'), testId: 'button-cards' },
                 { icon: Image, label: '信息卡片', desc: '上傳管理信息卡片', action: () => setStep('message-cards'), testId: 'button-message-cards' },
                 { icon: ToggleLeft, label: '功能開關', desc: '啟用或停用系統功能', action: () => setStep('feature-toggles'), testId: 'button-feature-toggles' },
@@ -349,12 +348,6 @@ export const AdminPage: React.FC = () => {
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
             <FeatureToggleManager onBack={handleBackToDashboard} />
-          </div>
-        );
-      case 'prayer-meeting':
-        return (
-          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            <PrayerMeetingAdmin onBack={handleBackToDashboard} />
           </div>
         );
       case 'mail':

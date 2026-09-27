@@ -7,14 +7,17 @@ import { pool } from "../../db";
 import { isTestDeployment } from '../../deploymentSafety';
 import { GoogleIdentityError, resolveGoogleIdentity } from '../../googleIdentityRepository';
 import { googleLoginConfig, googleOnlyRegistration } from '../../googleLoginPolicy';
+import { authStorage } from './storage';
+import { createSessionVersionGuard } from '../../authSessionVersion';
+import { authErrorMetadata } from '../../authLogging';
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+  const sessionTtlSeconds = 7 * 24 * 60 * 60;
   const pgStore = connectPg(session);
-  const sessionStore = new pgStore({ conString: process.env.DATABASE_URL, createTableIfMissing: false, ttl: sessionTtl, tableName: "auth_sessions" });
+  const sessionStore = new pgStore({ pool, createTableIfMissing: false, ttl: sessionTtlSeconds, tableName: "auth_sessions" });
   const isDev = process.env.NODE_ENV === "development";
   const allowInsecureLocalCookies = process.env.LOCAL_INSECURE_COOKIES === "1";
-  return session({ secret: process.env.SESSION_SECRET!, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: !(isDev || allowInsecureLocalCookies), sameSite: "lax", maxAge: sessionTtl } });
+  return session({ secret: process.env.SESSION_SECRET!, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: !(isDev || allowInsecureLocalCookies), sameSite: "lax", maxAge: sessionTtlSeconds * 1000 } });
 }
 
 export async function setupAuth(app: Express) {
@@ -22,13 +25,23 @@ export async function setupAuth(app: Express) {
   app.get('/api/auth/options', (_req, res) => res.set('Cache-Control', 'no-store').json({
     google: google.enabled, emailRegistration: !googleOnlyRegistration(), staging: isTestDeployment(),
   }));
-  app.set("trust proxy", true);
+  const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT_ID || process.env.RAILWAY_ENVIRONMENT_NAME);
+  app.set("trust proxy", onRailway ? 1 : false);
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
-  if (process.env.NODE_ENV === "development" && !process.env.RAILWAY_ENVIRONMENT_NAME) {
+  const versions = createSessionVersionGuard(authStorage, async memberId => {
+    const result = await pool.query('SELECT session_version FROM users WHERE id = $1', [memberId]);
+    return result.rows[0]?.session_version;
+  });
+  passport.serializeUser((user: Express.User, cb) => {
+    versions.serialize(user).then(verified => verified
+      ? cb(null, verified) : cb(new Error('Authentication changed; please sign in again')), cb);
+  });
+  passport.deserializeUser((user: Express.User, cb) => {
+    versions.deserialize(user).then(verified => cb(null, verified), cb);
+  });
+  if (process.env.NODE_ENV === "development" && !onRailway) {
     app.get("/api/dev-login", async (req, res) => {
       const devEmail = "saisong@gmail.com";
       try {
@@ -50,7 +63,7 @@ export async function setupAuth(app: Express) {
           if (err) return res.status(500).json({ message: "Login failed" });
           req.session.save(() => res.redirect("/"));
         });
-      } catch (e) { console.error("[Dev Login]", e); return res.status(500).json({ message: "Dev login error" }); }
+      } catch (e) { console.error("[Dev Login]", authErrorMetadata(e)); return res.status(500).json({ message: "Dev login error" }); }
     });
   }
   app.get("/api/logout", (req, res) => { req.logout(() => res.redirect("/")); });

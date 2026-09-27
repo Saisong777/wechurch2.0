@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import pg from 'pg';
+import { encryptedDatabaseSnapshot } from './b-database-snapshot.mjs';
 import { inspectStaging, railway, root, target, verifyRemoteBibleAssets } from '../scripts/railway-staging.mjs';
 import { verifyAssets } from '../scripts/bible-study-assets.mjs';
 import { readBackupKey, seal, unseal, hash } from '../scripts/backup-envelope.mjs';
@@ -31,7 +31,6 @@ async function main() {
   const directory = path.join(destination,`b-recovery-${Date.now()}`);
   fs.mkdirSync(directory,{mode:0o700});
   const key = readBackupKey(process.env.WECHURCH_BACKUP_KEY_FILE,root);
-  const client = new pg.Client({connectionString:state.database.DATABASE_PUBLIC_URL,connectionTimeoutMillis:10000});
   const manifest = {format:2,environment:target.environment,createdAt:new Date().toISOString(),referenceRelease:assets.releaseId,sourceCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files:[],complete:false};
   const save = (name,bytes) => {
     const encrypted = seal(bytes,key);
@@ -46,17 +45,10 @@ async function main() {
     catch { throw new Error('B backup transport failed; no partial backup is marked complete'); }
   };
   try {
-    await client.connect();
-    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    const snapshot = (await client.query('SELECT pg_export_snapshot() AS id')).rows[0].id;
-    if (!/^[0-9A-F-]+$/.test(snapshot)) throw new Error('Invalid snapshot id');
-    const tables = await tableProof(client);
+    const {snapshot,tables,dump} = encryptedDatabaseSnapshot();
     const id = randomUUID();
-    const temp = `/tmp/wechurch-recovery-${id}.dump`;
-    const dump = Buffer.from(remote(target.database,`trap 'rm -f ${temp}' EXIT; pg_dump --snapshot=${snapshot} -U "$PGUSER" -d "$PGDATABASE" -Fc -f ${temp} && pg_restore -l ${temp} >/dev/null && base64 ${temp}`).replace(/\s/g,''),'base64');
     if (dump.subarray(0,5).toString() !== 'PGDMP') throw new Error('Invalid DB dump');
     save('database.dump',dump);
-    await client.query('COMMIT');
     console.log('Consistent B database snapshot encrypted and verified.');
     const inventoryCode = `const fs=require('fs'),p=require('path'),c=require('crypto');const result=[];function walk(dir){for(const n of fs.readdirSync(dir).sort()){if(dir==='/data'&&n==='.bible-study')continue;const f=p.join(dir,n),s=fs.lstatSync(f);if(s.isSymbolicLink())throw Error('Links rejected');if(s.isDirectory())walk(f);else if(s.isFile())result.push({file:p.relative('/data',f),sha256:c.createHash('sha256').update(fs.readFileSync(f)).digest('hex')});else throw Error('Unsupported file');}}walk('/data');console.log(JSON.stringify(result));`;
     const inventoryCommand = `node -e 'eval(Buffer.from("${Buffer.from(inventoryCode).toString('base64')}","base64").toString())'`;
@@ -73,6 +65,6 @@ async function main() {
     manifest.complete=true;
     fs.writeFileSync(path.join(directory,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{flag:'wx',mode:0o600});
     console.log(JSON.stringify({complete:true,directory,encryptedFiles:manifest.files.length,referenceRelease:assets.releaseId,productionUnchanged:true}));
-  } finally {key.fill(0);await client.end();}
+  } finally {key.fill(0);}
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) main().catch(()=>{console.error('Recovery backup did not complete. Inspect only sanitized progress; partial folders are not valid backups.');process.exitCode=1;});

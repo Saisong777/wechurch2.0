@@ -1,4 +1,5 @@
 import { Session, User, StudySubmission, GroupingSettings, Group } from "@/types/bible-study";
+import { serializeCsv } from './csv-export';
 
 // Generic error message for client-side display
 const GENERIC_ERROR = "An error occurred. Please try again.";
@@ -690,7 +691,7 @@ export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string =
     s.factsDiscovered, s.traditionalExegesis, s.inspirationFromGod,
     s.applicationInLife, s.others, s.submittedAt.toISOString(),
   ]);
-  const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+  const csvContent = serializeCsv([headers, ...rows]);
   return csvContent;
 };
 
@@ -698,6 +699,6 @@ export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string =
 export const exportStudyResponsesAsCSV = (responses: any[]): string => {
   const headers = ["User ID", "Response", "Created At"];
   const rows = responses.map(r => [r.userId, r.response, r.createdAt]);
-  const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+  const csvContent = serializeCsv([headers, ...rows]);
   return csvContent;
 };

@@ -5,17 +5,40 @@ const path = require("node:path");
 const pg = require("pg");
 const { isLocalDatabase, pgConfig } = require("./content-tables.cjs");
 
-const databaseUrl = process.env.DATABASE_URL || "postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev";
-const execute = process.argv.includes("--execute");
-const dryRun = !execute;
+const backupDir = path.resolve(__dirname, "..", "exports", "data-hygiene");
+const targetKeys = ["sessionIds", "participantIds", "potentialMemberIds", "personIds"];
 
-if (!isLocalDatabase(databaseUrl) && process.env.ALLOW_NON_LOCAL_IMPORT !== "1") {
-  console.error("[member-data-hygiene] Refusing to modify a non-local database.");
-  console.error("[member-data-hygiene] Export production first, test locally, then run reviewed migrations intentionally.");
-  process.exit(1);
+function validateManifest(input, execute = false) {
+  if (!input || input.version !== 1 || typeof input.reviewed !== "boolean" ||
+      Object.keys(input).some(key => !["version", "reviewed", ...targetKeys].includes(key))) {
+    throw new Error("Expected a version 1 cleanup manifest with reviewed and explicit target ID arrays");
+  }
+  for (const key of targetKeys) {
+    const ids = input[key];
+    if (!Array.isArray(ids) || ids.length > 1000 || ids.some(id => typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) ||
+        new Set(ids.map(id => id.toLowerCase())).size !== ids.length) throw new Error(`Invalid ${key}`);
+  }
+  if (execute && (!input.reviewed || !targetKeys.some(key => input[key].length))) {
+    throw new Error("Execute requires a reviewed, non-empty target manifest");
+  }
+  return Object.fromEntries([ ["version", 1], ["reviewed", input.reviewed], ...targetKeys.map(key => [key, input[key].map(id => id.toLowerCase())]) ]);
 }
 
-const backupDir = path.resolve(__dirname, "..", "exports", "data-hygiene");
+function loadOptions(args, env = process.env) {
+  const execute = args.includes("--execute");
+  const manifestIndex = args.indexOf("--manifest");
+  if (manifestIndex < 0 || !args[manifestIndex + 1] ||
+      args.filter(arg => arg === "--manifest").length !== 1 ||
+      args.some((arg, i) => i !== manifestIndex + 1 && !["--manifest", "--execute"].includes(arg))) {
+    throw new Error("Use --manifest <reviewed-targets.json> [--execute]; no automatic cleanup targets are selected");
+  }
+  const manifestPath = args[manifestIndex + 1];
+  if (fs.statSync(manifestPath).size > 256 * 1024) throw new Error("Cleanup manifest is too large");
+  const manifest = validateManifest(JSON.parse(fs.readFileSync(manifestPath, "utf8")), execute);
+  const databaseUrl = env.DATABASE_URL || "postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev";
+  if (!isLocalDatabase(databaseUrl) && env.ALLOW_NON_LOCAL_IMPORT !== "1") throw new Error("Refusing non-local database without explicit override");
+  return { execute, databaseUrl, manifest };
+}
 
 function timestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
@@ -30,80 +53,22 @@ async function count(client, sql, params = []) {
   return Number(result.rows[0]?.count || 0);
 }
 
-async function createCandidateTables(client) {
-  await client.query(`
-    CREATE TEMP TABLE cleanup_fake_sessions ON COMMIT DROP AS
-    WITH session_stats AS (
-      SELECT
-        s.id,
-        s.church_unit,
-        s.verse_reference,
-        COUNT(p.*)::int AS participants,
-        COUNT(*) FILTER (
-          WHERE p.email ~ '^load-[0-9]+-[0-9]+@example\\.com$'
-             OR p.name LIKE '壓測成員%'
-        )::int AS load_count,
-        COUNT(*) FILTER (
-          WHERE p.email ~ '^[0-9]+@(gmail|hotmail|outlook|yahoo)\\.com(\\.tw)?$'
-        )::int AS numeric_count,
-        COUNT(*) FILTER (WHERE p.email LIKE '%@example.com')::int AS example_count
-      FROM sessions s
-      LEFT JOIN participants p ON p.session_id = s.id
-      GROUP BY s.id
-    )
-    SELECT id
-      FROM session_stats
-     WHERE church_unit IN ('Automated Load Test', 'Local Stress Test', 'Codex Flow Test', 'Manual Flow Test', 'test', '測試')
-        OR load_count > 0
-        OR (participants >= 20 AND participants = numeric_count)
-  `);
-
-  await client.query(`
-    CREATE TEMP TABLE cleanup_fake_participants ON COMMIT DROP AS
-    SELECT p.id
-      FROM participants p
-      LEFT JOIN sessions s ON s.id = p.session_id
-     WHERE p.session_id IN (SELECT id FROM cleanup_fake_sessions)
-        OR p.email ~ '^load-[0-9]+-[0-9]+@example\\.com$'
-        OR p.name LIKE '壓測成員%'
-  `);
-
-  await client.query(`
-    CREATE TEMP TABLE cleanup_fake_potential_members ON COMMIT DROP AS
-    SELECT pm.id
-      FROM potential_members pm
-     WHERE pm.user_id IS NULL
-       AND (
-          pm.email ~ '^load-[0-9]+-[0-9]+@example\\.com$'
-          OR pm.name LIKE '壓測成員%'
-          OR EXISTS (
-            SELECT 1
-              FROM participants p
-              JOIN cleanup_fake_participants fp ON fp.id = p.id
-             WHERE lower(trim(p.email)) = lower(trim(pm.email))
-          )
-       )
-  `);
-
-  await client.query(`
-    CREATE TEMP TABLE cleanup_fake_persons ON COMMIT DROP AS
-    SELECT DISTINCT p.id
-      FROM persons p
-      LEFT JOIN person_identity_links l ON l.person_id = p.id
-     WHERE NOT EXISTS (
-             SELECT 1
-               FROM person_identity_links user_link
-              WHERE user_link.person_id = p.id
-                AND user_link.user_id IS NOT NULL
-           )
-       AND (
-          p.primary_email ~ '^load-[0-9]+-[0-9]+@example\\.com$'
-          OR p.display_name LIKE '壓測成員%'
-          OR p.church IN ('test', '測試')
-          OR l.participant_id IN (SELECT id FROM cleanup_fake_participants)
-          OR l.potential_member_id IN (SELECT id FROM cleanup_fake_potential_members)
-       )
-  `);
+async function createCandidateTables(client, manifest) {
+  validateManifest(manifest);
+  const targets = [
+    ["sessions", "sessionIds", ""],
+    ["participants", "participantIds", ""],
+    ["potential_members", "potentialMemberIds", "AND user_id IS NULL"],
+    ["persons", "personIds", "AND NOT EXISTS (SELECT 1 FROM person_identity_links l WHERE l.person_id = persons.id AND l.user_id IS NOT NULL)"],
+  ];
+  for (const [table, key, guard] of targets) {
+    // Lock explicit parents before inspecting dependent rows; new FK references must wait.
+    const selected = await rows(client, `SELECT id FROM ${table} WHERE id = ANY($1::uuid[]) ${guard} FOR UPDATE`, [manifest[key]]);
+    if (selected.length !== manifest[key].length) throw new Error(`Missing or protected targets in ${key}`);
+    await client.query(`CREATE TEMP TABLE cleanup_fake_${table} ON COMMIT DROP AS SELECT id FROM ${table} WHERE id = ANY($1::uuid[])`, [manifest[key]]);
+  }
+  const unreviewed = await rows(client, `SELECT id FROM participants WHERE session_id = ANY($1::uuid[]) AND NOT (id = ANY($2::uuid[])) LIMIT 1`, [manifest.sessionIds, manifest.participantIds]);
+  if (unreviewed.length) throw new Error("Every participant in a selected session must be explicitly reviewed in participantIds");
 }
 
 async function collectBackup(client) {
@@ -111,6 +76,7 @@ async function collectBackup(client) {
   const tableQueries = {
     sessions: "SELECT * FROM sessions WHERE id IN (SELECT id FROM cleanup_fake_sessions) ORDER BY created_at, id",
     participants: "SELECT * FROM participants WHERE id IN (SELECT id FROM cleanup_fake_participants) ORDER BY joined_at, id",
+    participant_access: "SELECT * FROM participant_access WHERE participant_id IN (SELECT id FROM cleanup_fake_participants) ORDER BY participant_id",
     potential_members: "SELECT * FROM potential_members WHERE id IN (SELECT id FROM cleanup_fake_potential_members) ORDER BY created_at, id",
     persons: "SELECT * FROM persons WHERE id IN (SELECT id FROM cleanup_fake_persons) ORDER BY created_at, id",
     person_identity_links: `
@@ -195,7 +161,9 @@ async function collectBackup(client) {
   };
 
   for (const [table, sql] of Object.entries(tableQueries)) {
-    backup[table] = await rows(client, sql);
+    // Hold every backed-up row through deletion. A concurrent change since the
+    // serializable snapshot raises 40001 here, before any destructive statement.
+    backup[table] = await rows(client, `${sql} FOR UPDATE`);
   }
   return backup;
 }
@@ -209,36 +177,7 @@ async function summarize(client) {
     users: 0,
   };
 
-  const reviewSessions = await rows(client, `
-    WITH session_stats AS (
-      SELECT
-        s.id,
-        s.church_unit,
-        s.verse_reference,
-        COUNT(p.*)::int AS participants,
-        COUNT(*) FILTER (
-          WHERE p.email ~ '^[0-9]+@(gmail|hotmail|outlook|yahoo)\\.com(\\.tw)?$'
-        )::int AS numeric_count,
-        COUNT(*) FILTER (WHERE p.email LIKE '%@example.com')::int AS example_count
-      FROM sessions s
-      LEFT JOIN participants p ON p.session_id = s.id
-      GROUP BY s.id
-    )
-    SELECT id, church_unit, verse_reference, participants, numeric_count, example_count
-      FROM session_stats
-     WHERE id NOT IN (SELECT id FROM cleanup_fake_sessions)
-       AND participants > 0
-       AND (
-          numeric_count >= 10
-          OR example_count > 0
-          OR lower(coalesce(verse_reference, '')) LIKE '%test%'
-          OR lower(coalesce(verse_reference, '')) IN ('abcd')
-       )
-     ORDER BY participants DESC, church_unit NULLS LAST
-     LIMIT 20
-  `);
-
-  return { cleanup, reviewSessions };
+  return { cleanup };
 }
 
 async function deleteCandidates(client) {
@@ -304,8 +243,8 @@ async function deleteCandidates(client) {
      WHERE session_id IN (SELECT id FROM cleanup_fake_sessions)
         OR participant_id IN (SELECT id FROM cleanup_fake_participants)
   `);
-  await client.query("DELETE FROM ai_reports WHERE session_id IN (SELECT id FROM cleanup_fake_sessions)");
   await client.query("DELETE FROM ai_usage_events WHERE session_id IN (SELECT id FROM cleanup_fake_sessions)");
+  await client.query("DELETE FROM ai_reports WHERE session_id IN (SELECT id FROM cleanup_fake_sessions)");
   await client.query("DELETE FROM icebreaker_players WHERE participant_id IN (SELECT id FROM cleanup_fake_participants)");
   await client.query("DELETE FROM icebreaker_games WHERE bible_study_session_id IN (SELECT id FROM cleanup_fake_sessions)");
 
@@ -315,13 +254,18 @@ async function deleteCandidates(client) {
   await client.query("DELETE FROM sessions WHERE id IN (SELECT id FROM cleanup_fake_sessions)");
 }
 
-async function main() {
-  const pool = new pg.Pool(pgConfig(databaseUrl));
+async function main(options = loadOptions(process.argv.slice(2)), dependencies = {}) {
+  const { databaseUrl, execute, manifest } = options;
+  validateManifest(manifest, execute);
+  const dryRun = !execute;
+  const pool = dependencies.pool || new pg.Pool(pgConfig(databaseUrl));
   const client = await pool.connect();
 
   try {
-    await client.query("BEGIN");
-    await createCandidateTables(client);
+    await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    await client.query("SET LOCAL statement_timeout = '30s'");
+    await createCandidateTables(client, manifest);
     const summaryBefore = await summarize(client);
     const backup = await collectBackup(client);
 
@@ -331,26 +275,33 @@ async function main() {
       databaseUrl: isLocalDatabase(databaseUrl) ? "local" : "non-local",
       summary: summaryBefore,
       backup,
+      manifest,
     };
 
     let backupPath = null;
     if (execute) {
-      fs.mkdirSync(backupDir, { recursive: true });
-      backupPath = path.join(backupDir, `member-cleanup-${timestamp()}.json`);
-      fs.writeFileSync(backupPath, JSON.stringify(backupPayload, null, 2));
+      const destination = dependencies.backupDir || backupDir;
+      fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+      backupPath = path.join(destination, `member-cleanup-${timestamp()}.json`);
+      fs.writeFileSync(backupPath, JSON.stringify(backupPayload, null, 2), { flag: "wx", mode: 0o600 });
       await deleteCandidates(client);
       await client.query("COMMIT");
     } else {
       await client.query("ROLLBACK");
     }
 
-    console.log(JSON.stringify({
+    const result = {
       mode: dryRun ? "dry-run" : "execute",
       backupPath,
       ...summaryBefore,
-    }, null, 2));
+    };
+    if (!dependencies.pool) console.log(JSON.stringify(result, null, 2));
+    return result;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
+    if (error.code === '40001' || error.code === '40P01' || error.code === '55P03') {
+      throw Object.assign(new Error("Cleanup aborted due to concurrent changes or locked rows; no deletion committed. Run a fresh dry-run and review the targets before retrying."), { code: error.code });
+    }
     throw error;
   } finally {
     client.release();
@@ -358,7 +309,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+module.exports = { validateManifest, loadOptions, createCandidateTables, main };
+
+if (require.main === module) main().catch((error) => {
   console.error("[member-data-hygiene] failed:", error.message);
   process.exit(1);
 });

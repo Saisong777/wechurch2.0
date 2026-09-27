@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type { CareContact, DevotionalNote, Prayer, User } from "@shared/schema";
-import { careContacts, userEmailPreferences } from "@shared/schema";
+import { careContacts, prayers, userEmailPreferences } from "@shared/schema";
 import { getManagedChurchDevotion } from './churchDevotionRepository';
 import { managedDevotionBrief } from './churchDevotionPublic';
 import { withDevotionScripture } from './devotionScripture';
@@ -76,14 +76,10 @@ async function getCareContactsForEmail(userId: string): Promise<CareContact[]> {
 }
 
 async function getPrayerWallItems(): Promise<Prayer[]> {
-  const allPrayers = await storage.getPrayers();
-  return allPrayers
-    .filter((prayer) => !prayer.isAnswered)
-    .sort((a, b) => {
-      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    })
-    .slice(0, 3);
+  return db.select().from(prayers)
+    .where(and(isNull(prayers.closedAt), eq(prayers.isAnswered, false)))
+    .orderBy(desc(prayers.isPinned), desc(prayers.createdAt))
+    .limit(3);
 }
 
 export interface DailyFollowEmail {

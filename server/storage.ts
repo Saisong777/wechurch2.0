@@ -82,7 +82,7 @@ export interface IStorage {
   updateFeatureToggle(id: string, data: Partial<FeatureToggle>): Promise<FeatureToggle | undefined>;
 
   getPotentialMembers(church?: string | null): Promise<PotentialMember[]>;
-  upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<PotentialMember>;
+  upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<void>;
   updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined>;
   deletePotentialMember(id: string): Promise<void>;
 
@@ -290,17 +290,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSession(id: string): Promise<void> {
-    const sessionGames = await db.select({ id: icebreakerGames.id }).from(icebreakerGames).where(eq(icebreakerGames.bibleStudySessionId, id));
-    if (sessionGames.length > 0) {
-      const gameIds = sessionGames.map(g => g.id);
-      await db.delete(icebreakerPlayers).where(inArray(icebreakerPlayers.gameId, gameIds));
-      await db.delete(icebreakerGames).where(inArray(icebreakerGames.id, gameIds));
-    }
-    await db.delete(aiReports).where(eq(aiReports.sessionId, id));
-    await db.delete(submissions).where(eq(submissions.sessionId, id));
-    await db.delete(studyResponses).where(eq(studyResponses.sessionId, id));
-    await db.delete(participants).where(eq(participants.sessionId, id));
-    await db.delete(sessions).where(eq(sessions.id, id));
+    await db.transaction(async tx => {
+      const sessionGames = await tx.select({ id: icebreakerGames.id }).from(icebreakerGames).where(eq(icebreakerGames.bibleStudySessionId, id));
+      if (sessionGames.length > 0) {
+        const gameIds = sessionGames.map(g => g.id);
+        await tx.delete(icebreakerPlayers).where(inArray(icebreakerPlayers.gameId, gameIds));
+        await tx.delete(icebreakerGames).where(inArray(icebreakerGames.id, gameIds));
+      }
+      await tx.delete(aiReports).where(eq(aiReports.sessionId, id));
+      await tx.delete(submissions).where(eq(submissions.sessionId, id));
+      await tx.delete(studyResponses).where(eq(studyResponses.sessionId, id));
+      await tx.delete(participants).where(eq(participants.sessionId, id));
+      await tx.delete(sessions).where(eq(sessions.id, id));
+    });
   }
 
   async getParticipants(sessionId: string, filters?: { groupNumber?: number }): Promise<Participant[]> {
@@ -674,24 +676,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(potentialMembers);
   }
 
-  async upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<PotentialMember> {
-    const church = normalizeChurch(data.church);
-    const existing = await db.select().from(potentialMembers).where(eq(potentialMembers.email, data.email)).limit(1);
-    if (existing.length > 0) {
-      const [updated] = await db.update(potentialMembers)
-        .set({
-          name: data.name,
-          gender: data.gender,
-          church: church ?? existing[0].church,
-          lastSessionAt: new Date(),
-          sessionsCount: sql`${potentialMembers.sessionsCount} + 1`,
-        })
-        .where(eq(potentialMembers.email, data.email))
-        .returning();
-      return updated;
-    }
-    const [newMember] = await db.insert(potentialMembers).values({ ...data, church }).returning();
-    return newMember;
+  async upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<void> {
+    const email = data.email.trim().toLowerCase();
+    await db.transaction(async tx => {
+      // Public intake and guest participation must never update or disclose an existing CRM record.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`potential-member:${email}`},0))`);
+      const existing = await tx.select({ id: potentialMembers.id }).from(potentialMembers)
+        .where(sql`lower(trim(${potentialMembers.email})) = ${email}`).limit(1);
+      if (existing.length) return;
+      await tx.insert(potentialMembers).values({
+        email, name: data.name.trim(), gender: data.gender, church: normalizeChurch(data.church),
+      }).onConflictDoNothing({ target: potentialMembers.email });
+    });
   }
 
   async updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined> {

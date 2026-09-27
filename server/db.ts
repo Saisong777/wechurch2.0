@@ -27,6 +27,8 @@ const poolConfig = {
   idleTimeoutMillis: envNumber("DB_POOL_IDLE_TIMEOUT_MS", 30000, 5000, 120000),
   connectionTimeoutMillis: envNumber("DB_POOL_CONNECTION_TIMEOUT_MS", 5000, 1000, 30000),
   maxUses: envNumber("DB_POOL_MAX_USES", 5000, 500, 20000),
+  statement_timeout: envNumber("DB_STATEMENT_TIMEOUT_MS", 15000, 1000, 120000),
+  idle_in_transaction_session_timeout: 30000,
 };
 
 export const pool = new Pool(poolConfig);

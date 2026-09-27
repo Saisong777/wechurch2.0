@@ -1,6 +1,15 @@
+import { scrubTelemetryText, telemetryMetadata, telemetryPath } from '@shared/telemetryPrivacy';
+
 type TelemetryPayload = Record<string, unknown>;
 
 function postTelemetry(endpoint: string, payload: TelemetryPayload) {
+  payload = {
+    ...(typeof payload.eventName === 'string' ? { eventName: scrubTelemetryText(payload.eventName, 100) } : {}),
+    ...(typeof payload.message === 'string' ? { message: scrubTelemetryText(payload.message) } : {}),
+    ...(typeof payload.stack === 'string' ? { stack: scrubTelemetryText(payload.stack, 6000) } : {}),
+    path: telemetryPath(payload.path) || '/',
+    metadata: telemetryMetadata(payload.metadata) || {},
+  };
   if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     if (navigator.sendBeacon(endpoint, blob)) return;
@@ -21,7 +30,6 @@ function trackPageView() {
     eventName: 'page_view',
     path: window.location.pathname,
     metadata: {
-      search: window.location.search,
       referrer: document.referrer || null,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
     },

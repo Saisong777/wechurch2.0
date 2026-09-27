@@ -2,6 +2,7 @@
 
 import { GroupReport } from './parse';
 import PptxGenJS from 'pptxgenjs';
+import { escapeHtml } from '@/lib/html-escape';
 
 const reportDate = () => new Date().toLocaleDateString('zh-TW', {
   year: 'numeric',
@@ -369,15 +370,15 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
       || section.topic || section.theology || section.highlights || section.divergence || section.soulGym || section.summary;
 
     const renderSection = (cls: string, title: string, content?: string) =>
-      content ? `<div class="section ${cls}"><h3>${title}</h3><div class="section-content">${content}</div></div>` : '';
+      content ? `<div class="section ${escapeHtml(cls)}"><h3>${escapeHtml(title)}</h3><div class="section-content">${escapeHtml(content)}</div></div>` : '';
 
     return `
       <div class="group-section">
-        ${section.groupInfo ? `<div class="group-header"><h2>📚 ${section.groupInfo}</h2></div>` : ''}
+        ${section.groupInfo ? `<div class="group-header"><h2>📚 ${escapeHtml(section.groupInfo)}</h2></div>` : ''}
         ${(section.members || section.verse) ? `
           <div class="group-meta">
-            ${section.members ? `<p><strong>👥 組員：</strong>${section.members}</p>` : ''}
-            ${section.verse ? `<p><strong>📖 經文：</strong>${section.verse}</p>` : ''}
+            ${section.members ? `<p><strong>👥 組員：</strong>${escapeHtml(section.members)}</p>` : ''}
+            ${section.verse ? `<p><strong>📖 經文：</strong>${escapeHtml(section.verse)}</p>` : ''}
           </div>
         ` : ''}
         ${hasStructuredContent ? (isNewFmt ? `
@@ -395,7 +396,7 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
           ${renderSection('insights', '💡 獨特亮光 Unique Insights', section.insights)}
           ${renderSection('applications', '🎯 如何應用 Applications', section.applications)}
           ${renderSection('contributions', '👤 個人貢獻摘要', section.contributions)}
-        `) : `<div class="section"><div class="section-content">${section.raw}</div></div>`}
+        `) : `<div class="section"><div class="section-content">${escapeHtml(section.raw)}</div></div>`}
       </div>
     `;
   }).join('');
@@ -409,18 +410,18 @@ export function generatePrintHTML(sections: GroupReport[], verseReference?: stri
     <html>
       <head>
         <meta charset="UTF-8">
-        <title>${title} - ${verseReference || '靈魂健身房'}</title>
+        <title>${escapeHtml(title)} - ${escapeHtml(verseReference || '靈魂健身房')}</title>
         ${styles}
       </head>
       <body>
         <div class="print-header">
-          <h1>🧠 ${title}</h1>
-          <p>${verseReference || ''} | ${new Date().toLocaleDateString('zh-TW')}</p>
+          <h1>🧠 ${escapeHtml(title)}</h1>
+          <p>${escapeHtml(verseReference || '')} | ${escapeHtml(new Date().toLocaleDateString('zh-TW'))}</p>
         </div>
         ${groupsHTML}
         <div class="footer">
           <p>此報告由 靈魂健身房 AI 分析助理 生成</p>
-          <p>${new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</p>
+          <p>${escapeHtml(new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }))}</p>
         </div>
       </body>
     </html>
@@ -467,8 +468,8 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
     <div class="slide title-slide">
       <div class="slide-content">
         <h1 class="main-title">查經分析報告</h1>
-        <h2 class="subtitle">${verseReference || '靈魂健身房'}</h2>
-        <p class="date">${new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <h2 class="subtitle">${escapeHtml(verseReference || '靈魂健身房')}</h2>
+        <p class="date">${escapeHtml(new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' }))}</p>
       </div>
     </div>
   `);
@@ -477,7 +478,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
   function generateSlideBoxes(s: GroupReport): string {
     const isNewFmt = !!(s.topic || s.theology || s.highlights || s.divergence || s.soulGym || s.summary);
     const box = (cls: string, emoji: string, label: string, content?: string) =>
-      content ? `<div class="content-box ${cls}"><h3 class="box-title">${emoji} ${label}</h3><div class="box-content">${formatForSlide(content, 5)}</div></div>` : '';
+      content ? `<div class="content-box ${escapeHtml(cls)}"><h3 class="box-title">${escapeHtml(emoji)} ${escapeHtml(label)}</h3><div class="box-content">${escapeHtml(formatForSlide(content, 5))}</div></div>` : '';
 
     if (isNewFmt) {
       return `
@@ -501,7 +502,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
         ${box('insights-box', '💡', '獨特亮光', s.insights)}
         ${box('applications-box', '🎯', '如何應用', s.applications)}
       </div>
-      ${s.contributions ? `<div class="contributions-section"><h3 class="contributions-title">👤 個人貢獻摘要</h3><div class="contributions-content">${formatForSlide(s.contributions, 4)}</div></div>` : ''}`;
+      ${s.contributions ? `<div class="contributions-section"><h3 class="contributions-title">👤 個人貢獻摘要</h3><div class="contributions-content">${escapeHtml(formatForSlide(s.contributions, 4))}</div></div>` : ''}`;
   }
 
   // Overall report slide
@@ -524,8 +525,8 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
       <div class="slide content-slide group-slide">
         <div class="slide-content">
           <div class="slide-header">
-            <h2 class="slide-title">第 ${section.groupNumber} 組</h2>
-            ${section.members ? `<span class="members-badge">${section.members}</span>` : ''}
+            <h2 class="slide-title">第 ${escapeHtml(section.groupNumber)} 組</h2>
+            ${section.members ? `<span class="members-badge">${escapeHtml(section.members)}</span>` : ''}
           </div>
           ${generateSlideBoxes(section)}
         </div>
@@ -757,7 +758,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
     <html>
       <head>
         <meta charset="UTF-8">
-        <title>查經報告簡報 - ${verseReference || '靈魂健身房'}</title>
+        <title>查經報告簡報 - ${escapeHtml(verseReference || '靈魂健身房')}</title>
         ${styles}
       </head>
       <body>

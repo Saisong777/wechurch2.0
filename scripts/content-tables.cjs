@@ -99,18 +99,33 @@ const TABLES = [
   },
 ];
 
-function pgConfig(connectionString) {
+function pgConfig(connectionString, { ca = process.env.PG_CA_CERT } = {}) {
   const url = new URL(connectionString);
-  const isLocal = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  if (!["postgres:", "postgresql:"].includes(url.protocol)) throw new Error("Expected a PostgreSQL URL");
+  const isLocal = isLocalDatabase(connectionString);
+  for (const [key, value] of url.searchParams) {
+    const normalized = key.toLowerCase();
+    if (["host", "hostaddr", "port"].includes(normalized)) throw new Error("Database endpoint overrides are not allowed");
+    if (!isLocal && (normalized.startsWith("ssl") || normalized === "uselibpqcompat")) {
+      if (key !== "sslmode" || value !== "verify-full") {
+        throw new Error("Remote database TLS must verify the server; configure PG_CA_CERT for a private CA");
+      }
+    }
+  }
+  // node-postgres URL options otherwise replace the explicit SSL object.
+  if (!isLocal) url.searchParams.delete("sslmode");
+  if (ca !== undefined && (typeof ca !== "string" || !ca.includes("-----BEGIN CERTIFICATE-----"))) {
+    throw new Error("PG_CA_CERT must contain a PEM CA certificate");
+  }
   return {
-    connectionString,
-    ssl: isLocal ? undefined : { rejectUnauthorized: false },
+    connectionString: url.toString(),
+    ssl: isLocal ? undefined : { rejectUnauthorized: true, ...(ca ? { ca } : {}) },
   };
 }
 
 function isLocalDatabase(connectionString) {
   const url = new URL(connectionString);
-  return ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  return ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
 }
 
 module.exports = {

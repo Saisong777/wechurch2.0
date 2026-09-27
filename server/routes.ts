@@ -6,7 +6,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { uploadRoot, messageCardRoot } from './uploadPaths';
-import { randomBytes } from "crypto";
+import { rasterExtension, rasterOnly, setMediaHeaders } from './uploadSafety';
+import { apiIdentity, boundedWindowLimiter, clientAddress } from './requestLimits';
+import { randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { storage } from "./storage";
@@ -455,31 +457,9 @@ function prependReportDashboard(
 }
 
 // Configure multer for file uploads
-const messageCardStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = messageCardRoot;
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `${uniqueSuffix}${ext}`);
-  }
-});
-
 const uploadMessageCard = multer({
-  storage: messageCardStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'));
-    }
-  }
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 4 },
 });
 
 
@@ -498,97 +478,15 @@ export async function registerRoutes(app: Express) {
 
   app.use(compression());
 
-  const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-  const RATE_LIMIT_WINDOW_MS = 60000;
-  const RATE_LIMIT_MAX_REQUESTS = Number.parseInt(process.env.API_RATE_LIMIT_MAX || "200", 10);
-  const RATE_LIMIT_WRITE_MAX_REQUESTS = Number.parseInt(process.env.API_WRITE_RATE_LIMIT_MAX || "120", 10);
-  const RATE_LIMIT_LIVE_READ_MAX_REQUESTS = Number.parseInt(process.env.API_LIVE_READ_RATE_LIMIT_MAX || "2000", 10);
-
-  const rateLimitCleanup = setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of rateLimitMap.entries()) {
-      if (now > value.resetTime) {
-        rateLimitMap.delete(key);
-      }
-    }
-  }, 30000);
-  rateLimitCleanup.unref?.();
-
-  const getApiPath = (req: any) => req.originalUrl.split("?")[0];
-
-  const isLiveReadEndpoint = (req: any) => {
-    if (req.method !== "GET") return false;
-    const apiPath = getApiPath(req);
-    return (
-      /^\/api\/sessions\/[^/]+\/poll$/.test(apiPath) ||
-      /^\/api\/sessions\/[^/]+$/.test(apiPath) ||
-      /^\/api\/sessions\/by-code\/[^/]+$/.test(apiPath) ||
-      /^\/api\/sessions\/[^/]+\/participants(\/.*)?$/.test(apiPath) ||
-      /^\/api\/study-responses\/[^/]+\/[^/]+$/.test(apiPath) ||
-      apiPath === "/api/feature-toggles"
-    );
-  };
-
-  const decodePathValue = (value: string) => {
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
-  };
-
-  const getRateLimitIdentity = (req: any) => {
-    const apiPath = getApiPath(req);
-    const authUserId = req.user?.id || req.user?.claims?.sub;
-    const emailInPath = apiPath.match(/\/participants\/by-email\/([^/]+)$/)?.[1];
-    const participantInPath = apiPath.match(/\/participants\/([^/]+)$/)?.[1];
-    const headerParticipant = req.get?.("x-participant-id");
-    const ip = req.ip || "unknown";
-
-    const identity =
-      authUserId ||
-      headerParticipant ||
-      (emailInPath ? decodePathValue(emailInPath) : null) ||
-      (participantInPath && participantInPath !== "by-email" ? participantInPath : null) ||
-      ip ||
-      "unknown";
-
-    return `${ip}:${String(identity).trim().toLowerCase()}`;
-  };
-
-  app.use('/api/', (req, res, next) => {
-    res.setHeader("Cache-Control", "no-store");
-    const isLiveRead = isLiveReadEndpoint(req);
-    const isWrite = req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS";
-    const limit = isLiveRead
-      ? RATE_LIMIT_LIVE_READ_MAX_REQUESTS
-      : isWrite
-        ? RATE_LIMIT_WRITE_MAX_REQUESTS
-        : RATE_LIMIT_MAX_REQUESTS;
-    const scope = isLiveRead ? "live" : isWrite ? "write" : "read";
-    const clientId = `${scope}:${getRateLimitIdentity(req)}`;
-    const now = Date.now();
-
-    let entry = rateLimitMap.get(clientId);
-    if (!entry || now > entry.resetTime) {
-      entry = { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
-      rateLimitMap.set(clientId, entry);
-    }
-
-    entry.count++;
-
-    res.setHeader('X-RateLimit-Limit', limit.toString());
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, limit - entry.count).toString());
-
-    if (entry.count > limit) {
-      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
-    }
-
-    next();
-  });
+  app.use('/api', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+  app.use('/api', boundedWindowLimiter({ max: Number(process.env.API_INGRESS_RATE_LIMIT_MAX || 12000), key: clientAddress }));
+  app.use('/api/telemetry', boundedWindowLimiter({ max: 120, key: clientAddress }));
+  // Retired meeting APIs contain legacy anonymous identity links. Keep records private.
+  app.use('/api/prayer-meetings', (_req, res) => res.status(410).json({ error: '此舊版禱告會功能已停用，請使用禱告牆。' }));
 
   app.use('/uploads/.bible-study', (_req, res) => res.sendStatus(404));
-  app.use('/uploads', express.static(uploadRoot, { dotfiles: 'ignore' }), (_req, res) => res.sendStatus(404));
+  app.use('/uploads', rasterOnly, express.static(uploadRoot, { dotfiles: 'ignore' }), (_req, res) => res.sendStatus(404));
+  app.use('/message-cards', rasterOnly);
 
   async function resolveUserId(req: any): Promise<string | null> {
     const user = req.user;
@@ -649,15 +547,16 @@ export async function registerRoutes(app: Express) {
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
-      if (req.params[paramName] === userId) {
-        (req as any).legacyUserId = userId;
-        return next();
-      }
       const role = await storage.getUserRole(userId);
+      (req as any).legacyUserId = userId;
+      (req as any).userRole = role;
+      if (req.params[paramName] === userId) return next();
       if (role && roles.includes(role as AppRole)) {
-        (req as any).legacyUserId = userId;
-        (req as any).userRole = role;
-        return next();
+        const capability = req.method === 'GET' ? 'personal' : 'members';
+        const access = await getCrmAccessForRequest(req, capability);
+        const target = await storage.getUser(req.params[paramName]);
+        const permitted = capability === 'personal' ? access?.canViewPersonal : access?.canManageMembers;
+        if (target && access?.canEnterCrm && permitted && filterUsersForCrmAccess([target], access).length) return next();
       }
       return res.status(403).json({ error: "Forbidden" });
     } catch (error) {
@@ -749,18 +648,20 @@ export async function registerRoutes(app: Express) {
   const canManageSession = async (req: any, explicitSessionId?: string): Promise<boolean> => {
     const role = await getRequestRole(req);
     if (!role || !sessionManagerRoles.includes(role)) return false;
-    if (role === 'admin') return true;
-    let sessionId = explicitSessionId || req.params?.sessionId || req.query?.sessionId;
+    let sessionId = explicitSessionId || req.params?.sessionId;
     if (!sessionId && req.params?.id) {
       if (req.path.includes('/participants/')) sessionId = (await storage.getParticipant(req.params.id))?.sessionId;
       else if (req.path.includes('/reports/')) sessionId = (await pool.query('SELECT session_id FROM ai_reports WHERE id=$1', [req.params.id])).rows[0]?.session_id;
       else if (req.path.includes('/sessions/')) sessionId = req.params.id;
     }
+    // Query parameters are only a target on collection routes, never an override for a path resource.
+    if (!sessionId && !req.params?.id) sessionId = req.query?.sessionId;
     if (!sessionId || !z.string().uuid().safeParse(sessionId).success) return false;
     const session = await storage.getSession(sessionId);
     const userId = await resolveUserId(req);
     if (!session || !userId) return false;
     const user = await storage.getUser(userId);
+    if (role !== 'admin' && normalizeChurch(user?.church) !== normalizeChurch(session.churchUnit)) return false;
     return mayManageStudySession(role, user, session);
   };
 
@@ -868,6 +769,20 @@ export async function registerRoutes(app: Express) {
   }
 
   const studyAccess = soulGymAccess({ pool, resolveUserId, canManageSession });
+  app.use('/api', (req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.path === '/webhooks/resend/inbound') return next();
+    let crossSite = req.get('sec-fetch-site') === 'cross-site';
+    const origin = req.get('origin');
+    if (origin) {
+      try { crossSite ||= new URL(origin).host !== req.get('host'); }
+      catch { crossSite = true; }
+    }
+    if (crossSite) return res.status(403).json({ error: '不接受跨網站寫入。' });
+    next();
+  });
+  const readLimit = boundedWindowLimiter({ max: Number(process.env.API_RATE_LIMIT_MAX || 600), key: apiIdentity });
+  const writeLimit = boundedWindowLimiter({ max: Number(process.env.API_WRITE_RATE_LIMIT_MAX || 120), key: apiIdentity });
+  app.use('/api', (req, res, next) => (['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? readLimit : writeLimit)(req, res, next));
   app.use('/api', studyAccess.router);
 
   // Health check endpoint - detailed with database
@@ -1426,11 +1341,21 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/sessions", requireSessionManager, async (req, res) => {
     try {
-      const parsed = insertSessionSchema.safeParse(req.body);
+      const parsed = insertSessionSchema.omit({ shortCode: true }).strict().safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid session data", details: parsed.error.issues });
       }
-      const session = await storage.createSession(parsed.data);
+      const actorId = (req as any).legacyUserId as string;
+      const actor = await storage.getUser(actorId);
+      const church = normalizeChurch(parsed.data.churchUnit);
+      const ownChurch = normalizeChurch(actor?.church);
+      if ((req as any).userRole !== 'admin' && ((church && church !== ownChurch) || (parsed.data.ownerId && parsed.data.ownerId !== actorId))) {
+        return res.status(403).json({ error: 'Session ownership and church must match the creator' });
+      }
+      const session = await storage.createSession({ ...parsed.data,
+        ownerId: (req as any).userRole === 'admin' ? parsed.data.ownerId || actorId : actorId,
+        churchUnit: (req as any).userRole === 'admin' ? church : ownChurch,
+      });
       res.status(201).json(session);
     } catch (error) {
       res.status(500).json({ error: "Failed to create session" });
@@ -1439,7 +1364,17 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/sessions/:id", requireSessionManager, async (req, res) => {
     try {
-      const session = await storage.updateSession(req.params.id, req.body);
+      const parsed = insertSessionSchema.omit({ shortCode: true }).partial().strict().safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'Invalid session fields' });
+      const existing = await storage.getSession(req.params.id);
+      if (!existing) return res.status(404).json({ error: 'Session not found' });
+      if ((req as any).userRole !== 'admin' && (
+        (parsed.data.ownerId !== undefined && parsed.data.ownerId !== existing.ownerId) ||
+        (parsed.data.churchUnit !== undefined && normalizeChurch(parsed.data.churchUnit) !== normalizeChurch(existing.churchUnit))
+      )) return res.status(403).json({ error: 'Only administrators may transfer session ownership or church' });
+      const updates = { ...parsed.data };
+      if (updates.churchUnit !== undefined) updates.churchUnit = normalizeChurch(updates.churchUnit);
+      const session = await storage.updateSession(req.params.id, updates);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
@@ -1450,7 +1385,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/sessions/:id", requireLeader, async (req, res) => {
+  app.delete("/api/sessions/:id", requireSessionManager, async (req, res) => {
     try {
       const session = await storage.getSession(req.params.id);
       if (!session) {
@@ -2545,6 +2480,9 @@ export async function registerRoutes(app: Express) {
 
   app.delete("/api/study-responses/:id", requireLeader, async (req, res) => {
     try {
+      const response = await storage.getStudyResponseWithOwner(req.params.id);
+      if (!response) return res.status(404).json({ error: 'Response not found' });
+      if (!await canManageSession(req, response.sessionId)) return res.status(403).json({ error: 'Session management access denied' });
       await storage.deleteStudyResponse(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -2893,15 +2831,59 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/potential-members", async (req, res) => {
     try {
-      const member = await storage.upsertPotentialMember({
-        ...req.body,
-        church: normalizeChurch(typeof req.body?.church === "string" ? req.body.church : null),
-      });
-      res.status(201).json(member);
+      const parsed = z.object({ email: z.string().trim().email().max(254), name: z.string().trim().min(1).max(160),
+        gender: z.string().trim().max(30).optional(), church: z.string().trim().max(120).nullable().optional(),
+      }).strict().safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'Invalid intake fields' });
+      await storage.upsertPotentialMember(parsed.data);
+      // Identical receipt whether the address is new or already known.
+      res.status(201).json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create potential member" });
     }
   });
+
+  const gameCreateInput = z.object({
+    mode: z.enum(['standalone', 'session', 'free']).default('standalone'),
+    currentLevel: z.enum(['L1', 'L2', 'L3']).default('L1'),
+    bibleStudySessionId: z.string().uuid().nullable().optional(),
+    groupNumber: z.coerce.number().int().positive().max(1000).nullable().optional(),
+    drawerOrder: z.array(z.string().uuid()).max(100).optional(),
+    currentDrawerId: z.string().uuid().nullable().optional(),
+    sharedMemberIds: z.array(z.string().uuid()).max(100).optional(),
+    sharingMode: z.boolean().optional(),
+  }).strict();
+  const gamePatchInput = z.object({
+    currentLevel: z.enum(['L1', 'L2', 'L3']).optional(),
+    passCount: z.number().int().min(0).max(2).optional(),
+    timerDuration: z.number().int().min(1).max(3600).optional(),
+    timerStartedAt: z.string().datetime().transform(value => new Date(value)).nullable().optional(),
+    timerRunning: z.boolean().optional(),
+    sharingMode: z.boolean().optional(),
+    sharedMemberIds: z.array(z.string().uuid()).max(100).optional(),
+    currentDrawerId: z.string().uuid().nullable().optional(),
+    currentDrawerCardId: z.string().max(100).nullable().optional(),
+    drawerOrder: z.array(z.string().uuid()).max(100).optional(),
+    status: z.enum(['waiting', 'active', 'completed']).optional(),
+  }).strict();
+  type GameScope = { id?: string; bibleStudySessionId?: string | null; groupNumber?: number | null };
+  const hostedGames = (req: express.Request): string[] => (req.session as any).hostedIcebreakerGames || [];
+  async function canAccessGame(req: express.Request, game: GameScope, write = false) {
+    if (game.bibleStudySessionId) {
+      if (await canManageSession(req, game.bibleStudySessionId)) return true;
+      const member = await studyAccess.owned(req, game.bibleStudySessionId);
+      return !!member && member.groupNumber !== null && member.groupNumber === game.groupNumber;
+    }
+    return !write || !!game.id && hostedGames(req).includes(game.id);
+  }
+  async function validGameMembers(game: GameScope, value: { drawerOrder?: string[]; sharedMemberIds?: string[]; currentDrawerId?: string | null }) {
+    const ids = [...(value.drawerOrder || []), ...(value.sharedMemberIds || []), ...(value.currentDrawerId ? [value.currentDrawerId] : [])];
+    if (!ids.length) return true;
+    if (!game.bibleStudySessionId) return false;
+    const members = await storage.getParticipants(game.bibleStudySessionId);
+    const allowed = new Set(members.filter(member => member.groupNumber === game.groupNumber).map(member => member.id));
+    return ids.every(id => allowed.has(id));
+  }
 
   app.get("/api/icebreaker/games/:roomCode", async (req, res) => {
     try {
@@ -2909,6 +2891,7 @@ export async function registerRoutes(app: Express) {
       if (!game) {
         return res.status(404).json({ error: "Game not found" });
       }
+      if (!await canAccessGame(req, game)) return res.status(403).json({ error: 'Forbidden' });
       res.json(game);
     } catch (error) {
       res.status(500).json({ error: "Failed to get game" });
@@ -2916,6 +2899,16 @@ export async function registerRoutes(app: Express) {
   });
 
   app.post("/api/icebreaker/games", async (req, res) => {
+    const parsed = gameCreateInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid game configuration' });
+    req.body = parsed.data;
+    if (req.body.mode === 'session') {
+      if (!req.body.bibleStudySessionId || !req.body.groupNumber || !await canAccessGame(req, req.body, true)
+          || !await validGameMembers(req.body, req.body)) return res.status(403).json({ error: 'Group membership required' });
+    } else {
+      if (req.body.bibleStudySessionId || req.body.groupNumber || !await validGameMembers({}, req.body)) return res.status(400).json({ error: 'Invalid standalone game' });
+      if (hostedGames(req).length >= 20) return res.status(429).json({ error: 'Game limit reached for this browser session' });
+    }
     const lockKey = req.body.bibleStudySessionId && req.body.groupNumber
       ? `${req.body.bibleStudySessionId}:${req.body.groupNumber}`
       : null;
@@ -2973,6 +2966,10 @@ export async function registerRoutes(app: Express) {
       } else {
         game = await findOrCreate();
       }
+      if (!game.bibleStudySessionId) {
+        (req.session as any).hostedIcebreakerGames = [...hostedGames(req), game.id];
+        await new Promise<void>((resolve, reject) => req.session.save(error => error ? reject(error) : resolve()));
+      }
       res.status(200).json(game);
     } catch (error) {
       if (req.body.bibleStudySessionId && req.body.groupNumber) {
@@ -2992,7 +2989,16 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/icebreaker/games/:id", async (req, res) => {
     try {
-      const game = await storage.updateIcebreakerGame(req.params.id, req.body);
+      if (!z.string().uuid().safeParse(req.params.id).success) return res.sendStatus(400);
+      const existing = await storage.getIcebreakerGame(req.params.id);
+      if (!existing) return res.status(404).json({ error: 'Game not found' });
+      if (!await canAccessGame(req, existing, true)) return res.status(403).json({ error: 'Forbidden' });
+      const parsed = gamePatchInput.safeParse(req.body);
+      if (!parsed.success || !await validGameMembers(existing, parsed.data)
+          || parsed.data.currentDrawerCardId && parsed.data.currentDrawerCardId !== existing.currentCardId) {
+        return res.status(400).json({ error: 'Invalid game update' });
+      }
+      const game = await storage.updateIcebreakerGame(req.params.id, parsed.data);
       if (!game) {
         return res.status(404).json({ error: "Game not found" });
       }
@@ -3004,6 +3010,10 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/icebreaker/games/:gameId/players", async (req, res) => {
     try {
+      if (!z.string().uuid().safeParse(req.params.gameId).success) return res.sendStatus(400);
+      const game = await storage.getIcebreakerGame(req.params.gameId);
+      if (!game) return res.sendStatus(404);
+      if (!await canAccessGame(req, game)) return res.sendStatus(403);
       const players = await storage.getIcebreakerPlayers(req.params.gameId);
       res.json(players);
     } catch (error) {
@@ -3013,8 +3023,15 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/icebreaker/games/:gameId/players", async (req, res) => {
     try {
+      if (!z.string().uuid().safeParse(req.params.gameId).success) return res.sendStatus(400);
+      const game = await storage.getIcebreakerGame(req.params.gameId);
+      if (!game || !await canAccessGame(req, game, true)) return res.sendStatus(403);
+      const parsed = z.object({ displayName: z.string().trim().min(1).max(100), gender: z.string().max(30).optional(), participantId: z.string().uuid().optional() }).strict().safeParse(req.body);
+      if (!parsed.success) return res.sendStatus(400);
+      if (parsed.data.participantId && (!game.bibleStudySessionId || !await studyAccess.owned(req, game.bibleStudySessionId, parsed.data.participantId))) return res.sendStatus(403);
+      if ((await storage.getIcebreakerPlayers(game.id)).length >= 100) return res.sendStatus(409);
       const player = await storage.createIcebreakerPlayer({
-        ...req.body,
+        ...parsed.data,
         gameId: req.params.gameId
       });
       res.status(201).json(player);
@@ -3058,6 +3075,7 @@ export async function registerRoutes(app: Express) {
       if (!game) {
         return res.status(404).json({ error: "Game not found" });
       }
+      if (!await canAccessGame(req, game)) return res.sendStatus(403);
       res.json(game);
     } catch (error) {
       res.status(500).json({ error: "Failed to get session game" });
@@ -3066,8 +3084,12 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/icebreaker/games/:gameId/draw-card", async (req, res) => {
     try {
-      const { level } = req.body;
-      const result = await storage.drawIcebreakerCard(req.params.gameId, level || 'L1');
+      if (!z.string().uuid().safeParse(req.params.gameId).success) return res.sendStatus(400);
+      const game = await storage.getIcebreakerGame(req.params.gameId);
+      if (!game || !await canAccessGame(req, game, true)) return res.sendStatus(403);
+      const level = z.enum(['L1', 'L2', 'L3']).safeParse(req.body?.level || 'L1');
+      if (!level.success) return res.sendStatus(400);
+      const result = await storage.drawIcebreakerCard(req.params.gameId, level.data);
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: "Failed to draw card" });
@@ -3076,6 +3098,9 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/icebreaker/games/:gameId/reset", async (req, res) => {
     try {
+      if (!z.string().uuid().safeParse(req.params.gameId).success) return res.sendStatus(400);
+      const game = await storage.getIcebreakerGame(req.params.gameId);
+      if (!game || !await canAccessGame(req, game, true)) return res.sendStatus(403);
       await storage.resetIcebreakerDeck(req.params.gameId);
       res.json({ success: true });
     } catch (error) {
@@ -4016,7 +4041,7 @@ export async function registerRoutes(app: Express) {
         }
       }
 
-      console.log("[PrayerMeeting] Prayer input for AI:", prayerInputText.substring(0, 500) + "...");
+      console.log("[PrayerMeeting] Categorizing prayer count:", prayerData.length);
 
       // Use the enhanced "Church Prayer Secretary" prompt
       const systemPrompt = `# Role
@@ -4397,6 +4422,7 @@ export async function registerRoutes(app: Express) {
     if (!/^[a-zA-Z0-9._-]+$/.test(filename)) {
       return res.status(400).json({ error: "Invalid filename" });
     }
+    if (!setMediaHeaders(res, filename)) return res.sendStatus(404);
 
     const filePath = path.join(messageCardRoot, filename);
 
@@ -4416,7 +4442,11 @@ export async function registerRoutes(app: Express) {
       if (!req.file) {
         return res.status(400).json({ error: "No image file provided" });
       }
-      const imagePath = req.file.filename;
+      const extension = rasterExtension(req.file.buffer);
+      if (!extension) return res.status(400).json({ error: '請上傳 JPG、PNG、GIF 或 WebP 圖片。' });
+      const imagePath = `${randomBytes(20).toString('hex')}${extension}`;
+      await fs.promises.mkdir(messageCardRoot, { recursive: true });
+      await fs.promises.writeFile(path.join(messageCardRoot, imagePath), req.file.buffer, { flag: 'wx' });
       res.json({ imagePath });
     } catch (error) {
       console.error("Failed to upload image:", error);
@@ -4506,20 +4536,21 @@ export async function registerRoutes(app: Express) {
 
   app.patch("/api/users/:id/profile", requireSelfOrRole("id", "admin", "senior_pastor", "pastor", "minister", "group_leader", "leader"), async (req, res) => {
     try {
-      const { displayName, avatarUrl, birthday, userGender, address, church } = req.body;
-
-      if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
-        return res.status(400).json({ error: "Display name is required" });
+      const parsed = z.object({
+        displayName: z.string().trim().min(1).max(160).optional(),
+        avatarUrl: z.string().max(2048).nullable().optional(),
+        birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+        userGender: z.enum(['male', 'female', 'other']).nullable().optional(),
+        address: z.string().trim().max(1000).nullable().optional(),
+        church: z.string().trim().max(120).nullable().optional(),
+      }).strict().safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'Invalid profile fields' });
+      if (parsed.data.church !== undefined && (req as any).userRole !== 'admin') {
+        return res.status(403).json({ error: 'Only administrators may change church membership' });
       }
-
-      const updated = await storage.updateUser(req.params.id, {
-        displayName: displayName.trim(),
-        avatarUrl,
-        birthday: birthday || null,
-        userGender: userGender || null,
-        address: address ? String(address).trim() : null,
-        church: normalizeChurch(church ? String(church) : null),
-      });
+      const updates = { ...parsed.data };
+      if (updates.church !== undefined) updates.church = normalizeChurch(updates.church);
+      const updated = await storage.updateUser(req.params.id, updates);
       if (!updated) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -4531,44 +4562,38 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/users/:id/avatar", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
     try {
-      const multer = (await import("multer")).default;
       const upload = multer({
         storage: multer.memoryStorage(),
-        limits: { fileSize: 5 * 1024 * 1024 }
+        limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2 }
       });
-
-      upload.single('avatar')(req, res, async (err) => {
-        if (err) {
-          return res.status(400).json({ error: "Upload failed" });
-        }
-
-        const file = (req as any).file;
-        if (!file) {
-          return res.status(400).json({ error: "No file provided" });
-        }
-
-        const fsP = await import("fs/promises");
-        const pathMod = await import("path");
-        const uploadDir = pathMod.default.join(uploadRoot, "avatars");
-        await fsP.mkdir(uploadDir, { recursive: true });
-
-        const filename = `${req.params.id}-${Date.now()}.jpg`;
-        const filepath = pathMod.default.join(uploadDir, filename);
-        await fsP.writeFile(filepath, file.buffer);
-
-        const avatarUrl = `/uploads/avatars/${filename}`;
-        await storage.updateUser(req.params.id, { avatarUrl });
-
-        res.json({ avatarUrl });
-      });
+      await new Promise<void>((resolve, reject) => upload.single('avatar')(req, res, err => err ? reject(err) : resolve()));
+      if (!req.file || rasterExtension(req.file.buffer) !== '.jpg') {
+        return res.status(400).json({ error: '請使用頭像裁切工具上傳 JPG 圖片。' });
+      }
+      const uploadDir = path.join(uploadRoot, 'avatars');
+      await fs.promises.mkdir(uploadDir, { recursive: true });
+      const filename = `${req.params.id}.jpg`;
+      const temporary = path.join(uploadDir, `.${filename}-${randomBytes(12).toString('hex')}`);
+      const previous = await storage.getUser(req.params.id);
+      try {
+        await fs.promises.writeFile(temporary, req.file.buffer, { flag: 'wx' });
+        await fs.promises.rename(temporary, path.join(uploadDir, filename));
+      } finally { await fs.promises.rm(temporary, { force: true }); }
+      const avatarUrl = `/uploads/avatars/${filename}?v=${randomBytes(8).toString('hex')}`;
+      await storage.updateUser(req.params.id, { avatarUrl });
+      // Only remove the old managed avatar belonging to this exact account.
+      const old = previous?.avatarUrl?.match(/^\/uploads\/avatars\/([a-f0-9-]+)-(\d+)\.jpg$/i);
+      if (old?.[1] === req.params.id) await fs.promises.rm(path.join(uploadDir, `${old[1]}-${old[2]}.jpg`), { force: true });
+      res.json({ avatarUrl });
     } catch (error) {
-      res.status(500).json({ error: "Failed to upload avatar" });
+      res.status(error instanceof multer.MulterError ? 400 : 500).json({ error: "Failed to upload avatar" });
     }
   });
 
   app.delete("/api/users/:id/avatar", requireSelfOrRole("id", "admin", "leader"), async (req, res) => {
     try {
       await storage.updateUser(req.params.id, { avatarUrl: null });
+      await fs.promises.rm(path.join(uploadRoot, 'avatars', `${req.params.id}.jpg`), { force: true });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to remove avatar" });
@@ -4583,7 +4608,12 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const users = await storage.getUsers(churchScope);
-      res.json(filterUsersForCrmAccess(users, access).map(sanitizeUserRecord));
+      const personal = access.personalAccess;
+      const privateIds = new Set(personal?.canViewPersonal ? filterUsersForCrmAccess(users, personal).map(user => user.id) : []);
+      res.json(filterUsersForCrmAccess(users, access).map(user => privateIds.has(user.id) ? sanitizeUserRecord(user) : {
+        id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, church: user.church,
+        createdAt: user.createdAt, updatedAt: user.updatedAt,
+      }));
     } catch (error) {
       res.status(500).json({ error: "Failed to get users" });
     }
@@ -5116,13 +5146,13 @@ export async function registerRoutes(app: Express) {
   // ============ Inbox / Inbound Email Routes ============
   app.post("/api/webhooks/resend/inbound", async (req, res) => {
     try {
-      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
-      if (webhookSecret) {
-        const providedSecret = req.headers['x-webhook-secret'] || req.query.secret;
-        if (providedSecret !== webhookSecret) {
-          console.warn('[Inbound] Invalid webhook secret');
-          return res.status(401).json({ error: "Invalid webhook secret" });
-        }
+      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET?.trim();
+      if (!webhookSecret) return res.status(503).json({ error: 'Webhook is not configured' });
+      const providedSecret = req.get('x-webhook-secret') || '';
+      const provided = Buffer.from(providedSecret);
+      const expected = Buffer.from(webhookSecret);
+      if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+        return res.status(401).json({ error: 'Invalid webhook secret' });
       }
 
       const body = req.body;
@@ -5165,7 +5195,7 @@ export async function registerRoutes(app: Express) {
         resendEmailId: null,
       });
 
-      console.log('[Inbound] Received email from:', fromEmail, 'subject:', subject);
+      console.log('[Inbound] Received verified email');
       res.status(200).json({ received: true });
     } catch (error: any) {
       console.error('[Inbound] Error processing inbound email:', error);

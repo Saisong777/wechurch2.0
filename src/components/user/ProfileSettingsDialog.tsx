@@ -185,7 +185,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
           birthday: birthday || null,
           userGender: userGender || null,
           address: address.trim() || null,
-          church: church.trim() || null,
+          ...(user.role === 'admin' ? { church: church.trim() || null } : {}),
         }),
       });
 
@@ -326,6 +326,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
               </Label>
               <Input
                 id="church"
+                disabled={user?.role !== 'admin'}
                 value={church}
                 onChange={(e) => setChurch(e.target.value)}
                 placeholder="輸入您所屬的教會"
