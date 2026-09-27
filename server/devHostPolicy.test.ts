@@ -9,7 +9,11 @@ describe('development host and CI security configuration', () => {
   });
   it('runs the project typecheck rather than the empty root project', () => {
     const source = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-    expect(source).toMatch(/name: Typecheck\s+run: npm run typecheck/);
-    expect(source).not.toMatch(/run: npx tsc --noEmit\s/);
+    const { scripts } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(source).toMatch(/run: npm test\s/);
+    expect(scripts.pretest).toBe('npm run typecheck');
+    expect(scripts.typecheck).toContain('tsc --noEmit -p tsconfig.app.json');
+    expect(scripts.typecheck).toContain('tsc --noEmit -p tsconfig.node.json');
+    expect(scripts.posttest).toBe('npm run test:deployment');
   });
 });
