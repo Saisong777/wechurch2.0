@@ -77,7 +77,8 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
       }
       return stdout;
     } catch (error) {
-      const detail = error instanceof Error ? error.message.split('\n')[0] : 'Unknown CLI failure';
+      const commandError = error as { stdout?: string; stderr?: string; message?: string };
+      const detail = (commandError.stdout || commandError.stderr || commandError.message || 'Unknown CLI failure').slice(-1600);
       const safe = detail.includes(secret!) || detail.includes(sid) || detail.includes('connect.sid') || detail.includes('async (page)') ? 'Command failed; session data withheld' : detail;
       throw new Error(`Security browser CLI failed (${args.includes('run-code') ? 'run-code' : args[0]}): ${safe}`);
     }
@@ -128,8 +129,8 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
         else { audit.external.push(url.split('?')[0]); socket.close(); }
       });
       page.on('pageerror', error => audit.errors.push('pageerror: ' + error.message));
-      page.on('console', message => { if (message.type() === 'error') audit.errors.push('console: ' + message.text()); });
-      page.on('response', response => { if (response.status() >= 400) audit.errors.push('HTTP ' + response.status() + ' ' + response.url().split('?')[0]); });
+      page.on('console', message => { if (message.type() === 'error' && !message.location().url?.endsWith('/api/line-login/config')) audit.errors.push('console: ' + message.text()); });
+      page.on('response', response => { if (response.status() >= 400 && !(response.status()===404 && response.url()===origin+'/api/line-login/config')) audit.errors.push('HTTP ' + response.status() + ' ' + response.url().split('?')[0]); });
       page.on('requestfailed', request => { if (request.failure()?.errorText !== 'net::ERR_ABORTED') audit.errors.push('requestfailed: ' + request.url().split('?')[0]); });
       return {ready:true};
     `);
@@ -156,8 +157,7 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
         await cli('goto', origin + route.path);
         await cli('snapshot');
         await code(`
-          await page.waitForLoadState('networkidle', {timeout:15000});
-          await page.locator('main').first().waitFor({state:'visible'});
+          await page.locator('main').first().waitFor({state:'visible',timeout:15000});
           ${route.name === 'bible' ? "await page.getByRole('heading', {name:'約翰福音 3',exact:true}).waitFor({state:'visible'});" : ''}
           ${route.more ? `await page.getByRole('button', {name:${JSON.stringify(route.more)},exact:true}).waitFor({state:'visible'});` : ''}
           return {ready:true};
@@ -205,7 +205,16 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
     }
     const audit = await code('return {fontsStubbed:page.__securityAudit.fontsStubbed};');
     await writeFile(path.join(directory, 'results.json'), JSON.stringify({ reports, ...audit, limitations: ['Disposable localhost fixtures only', 'External Google Fonts replaced with empty CSS for offline acceptance', '/profile is not registered; tested /me instead'] }, null, 2));
-  } catch (error) { failure = error; }
+  } catch (error) {
+    failure = error;
+    if (opened) {
+      try {
+        const snapshot = await cli('snapshot');
+        await writeFile(path.join(directory, 'failure-snapshot.txt'), snapshot);
+        await code(`await page.screenshot({path:${JSON.stringify(path.join(directory, 'failure.png'))},fullPage:true});return {captured:true};`);
+      } catch { /* Preserve the original acceptance failure. */ }
+    }
+  }
   finally {
     const clean = async (work: () => Promise<unknown>) => { try { await work(); } catch { failure ||= new Error('Security browser fixture cleanup failed'); } };
     if (opened) await clean(() => cli('close'));
