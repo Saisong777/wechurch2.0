@@ -76,6 +76,17 @@ Drive 上傳及下載後完整還原已通過：`2026-09-25T17:29:36.493Z`。
 
 ## 復原操作
 
+### 2026-09-27 B 發布後復原點
+
+- B deployment：`b98efa42-bc41-4a29-a3d8-d1e5c55be792`；執行來源 `a0031c135462111b9bcd071cc84c31bdf98c22e5`，Git-safe 發布紀錄見 `design/releases/b-b98efa42-bc41-4a29-a3d8-d1e5c55be792.json`。
+- 新備份集 `b-recovery-1790508601910`，manifest SHA-256 `5b0194f410140a8f4181d3373571a7b346590d8c29caa6af43c343d17c582993`。
+- [本次私人 Drive 資料夾](https://drive.google.com/drive/folders/1hA6k1bq1JbSsQm3xUpmiGUPLs5BdzgLj)：8 個檔案逐份讀回未分享、只有 owner，金鑰未上傳。五份加密 payload 中的 reference 因傳輸工具 100 MiB 限制拆為兩份，未解密或重加密。
+- 從 Drive 下載全部 8 檔到新私人目錄後，先執行 `node ops/transfer-recovery-reference.mjs join /absolute/private/download-directory`。工具按 `reference-transfer.json` 檢查兩份長度與 SHA-256，再按原 `manifest.json` 核對完整密文；拒絕覆寫既有檔案。
+- 接續執行下方標準還原步驟。2026-09-27T11:36:56.868Z 已用 Drive 下載檔完成實際還原：96 表筆數及內容摘要、uploads、reference、B 設定相符；此次解密暫存已移除。
+- 雲端下載還原證據位於 `~/.local/share/wechurch-migration/backups/drive-readback-1790508601910/restore-verification.json`；本機原始加密備份保留。此仍為單次快照，金鑰的獨立保管與定期排程限制維持不變。
+
+### 標準步驟
+
 1. 取回本 Git 版本，安裝 lockfile 依賴；使用 Node 22、Python 3.9+、Docker PostgreSQL 17。
 2. 將五份加密檔及 manifest 下載至 Git 工作區外的新私人目錄。
 3. 由保管者取回 32-byte 金鑰檔，權限 0600/0400，設 `WECHURCH_BACKUP_KEY_FILE` 為絕對路徑。不要把金鑰值寫入指令或紀錄。
