@@ -1,5 +1,5 @@
 {
-  "fingerprint": "0516c8f0e7e6a8028d5e57410fce36bac291d3a38974fb7159cb5ebff140229a",
+  "fingerprint": "de5fbc6b3a220bdde8490c76d4ae10520e961a9f60badd668ced5b91c14435ca",
   "files": [
     {
       "file": "Dockerfile",
@@ -19,7 +19,7 @@
     },
     {
       "file": "index.html",
-      "sha256": "5dafe4ee060522eee7b0c1099e7330b0fea4aa4046164d4087f85c25cb12976b"
+      "sha256": "a38f672f07d75359a8a28f3ed712c22f36a9f4fcf3286d0950695014c3719489"
     },
     {
       "file": "components.json",
@@ -291,7 +291,7 @@
     },
     {
       "file": "src/components/home/DailyHome.tsx",
-      "sha256": "f292dd5b329a556f4b84a6f2589b3d170195d99b92b66ad10ab772b1beedc48f"
+      "sha256": "14207026d13b4c94fe2a5b210b507cac614ca091b4113532a4f11c791f3a1e46"
     },
     {
       "file": "src/components/icebreaker/GameLobby.tsx",
@@ -323,7 +323,7 @@
     },
     {
       "file": "src/components/icons/WeChurchLogo.tsx",
-      "sha256": "f1e730f27d2de2c172a3c31dd62b77e469120eb372d2668fdca1030127a8c249"
+      "sha256": "0ecbf2ed0ba3a3c8da613165bc8fea6aee88c0feb8c4815f565b87128dc936ca"
     },
     {
       "file": "src/components/layout/AppLayout.tsx",
@@ -555,7 +555,7 @@
     },
     {
       "file": "src/components/theme/AppearanceControl.test.tsx",
-      "sha256": "1bca08b5d5a27cd978b4b9de99f1187d4201f8d3f68c3507a517356b7aa316f1"
+      "sha256": "30fa545f853350f11d60a4d6ac599ff4ba4573ff982806171a9503e490ef567b"
     },
     {
       "file": "src/components/theme/AppearanceControl.tsx",
@@ -563,11 +563,11 @@
     },
     {
       "file": "src/components/theme/AppearanceProvider.tsx",
-      "sha256": "d4b735a1343524d0c26671121b9b4f7d4baf2728342a56517bf85a8851bf356a"
+      "sha256": "a7b631c3c2d5508b996ce0f9aecc5ae4d9d6642d4a0cf9a57d61dec77b631454"
     },
     {
       "file": "src/components/theme/appearance-init.test.ts",
-      "sha256": "69959e13f2313fe86ef63bae3504e37a1e501e1b0644512c4a9396fe8eb3d4da"
+      "sha256": "12bdcdf1f738a4c6d643a4339ae6eaa0bcc8d8adb8de2d748d6ce8c8b76da389"
     },
     {
       "file": "src/components/ui/alert-dialog.tsx",
@@ -855,7 +855,7 @@
     },
     {
       "file": "src/hooks/useReadingReminder.ts",
-      "sha256": "b26d77120151d1a9057480f54619b367928d7a3a17ef496ed84b9b2a3e8aa70c"
+      "sha256": "7b442316e6d3e4d7f5cf15c3de6761c5c9aa5f986833c94da0f17bb6fa68f01b"
     },
     {
       "file": "src/hooks/useRealtime.ts",
@@ -895,7 +895,7 @@
     },
     {
       "file": "src/index.css",
-      "sha256": "bd37577362e0e9bd1fb0d647b754472a2e7141307c85f1c4d385a3d36df1fc27"
+      "sha256": "83e6696ecc237b4dec5f56fc08e503b5d504c552b29209b0916754093656fdba"
     },
     {
       "file": "src/lib/admin-helpers.ts",
@@ -1887,7 +1887,7 @@
     },
     {
       "file": "public/manifest.json",
-      "sha256": "a700dee6f837351d3056c893c54dbbec47b3ad4fb16a416c12f295ad4a0ecc0e"
+      "sha256": "5c2a56198282339712e18afc53cbc7864ee5d43d4e59db750be26e7096f9614c"
     },
     {
       "file": "public/robots.txt",
@@ -1895,7 +1895,15 @@
     },
     {
       "file": "public/theme-init.js",
-      "sha256": "0fa3836421cd6e5d396e3cdc064c387b9c3b859001627911cd436ded70ee4793"
+      "sha256": "313151d81728db241e3aa64b738d6aadf9e26c162001f831cabb73fe66520b81"
+    },
+    {
+      "file": "public/wechurch-handshake-app.png",
+      "sha256": "6d3f7d601d042eeb0bb927ebc8bb47e0ae98c2cdd19159cc8b4f0bcd5c68d3cb"
+    },
+    {
+      "file": "public/wechurch-handshake.png",
+      "sha256": "80d37c876f992ae61095148155adac5aff0a7895f63241ab0e23a54f4f4bb0b7"
     },
     {
       "file": "public/wechurch-together.png",
