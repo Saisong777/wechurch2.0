@@ -1,5 +1,5 @@
 {
-  "fingerprint": "2f1a34e49e5c7e8ddee19dcbcec4e5e590d0042e77468590b5c5d3e12028aad3",
+  "fingerprint": "452842a52bc5fdf6ac5b5ce3c43952e148a690ec79016d123e4f5de3a16c01fb",
   "files": [
     {
       "file": "Dockerfile",
@@ -414,16 +414,20 @@
       "sha256": "7f5114e7519d4090652c4818a7d072916f97a055bf322661088866c97fde0966"
     },
     {
+      "file": "src/components/prayer/PrayerCard.test.tsx",
+      "sha256": "dcaed32f85a200c240d796e460dcc58455bc33cd2cdaea381634289201658d50"
+    },
+    {
       "file": "src/components/prayer/PrayerCard.tsx",
-      "sha256": "3a248fb9f8c06ad91db090ed24a06913e54d659ed9333f05d7acaf653db13c32"
+      "sha256": "80f12e100691d3497ccebb78a1acab7c97f8477da3e2bb18198d95a9344fb82e"
     },
     {
       "file": "src/components/prayer/PrayerComments.test.tsx",
-      "sha256": "bbf0649c0cb233a6808daf2600e3fed06365b09d7c8320a8c387424cfaeb9dcc"
+      "sha256": "3455a1e9018b3e37038be59d9081f9e64351b7e3391a67e4c9b7ff6986363db9"
     },
     {
       "file": "src/components/prayer/PrayerComments.tsx",
-      "sha256": "7e899def25990de3240e9c7207a557aaf5f5e5d393e0a50d49d6431fb85282a6"
+      "sha256": "bfdf9ce4b6bf3b00903ef01275d4f9e0c19ddb20f4d6a4aa3de771a5cbb04795"
     },
     {
       "file": "src/components/prayer/PrayerWall.tsx",

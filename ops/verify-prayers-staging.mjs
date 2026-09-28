@@ -87,8 +87,8 @@ try {
       await wall.getByRole('button',{name:/已為你禱告/}).waitFor();
       await wall.getByRole('button',{name:/寫下鼓勵/}).click();
       await wall.getByRole('textbox',{name:'回應內容'}).fill('一起守望');
-      await wall.getByRole('radio',{name:'貼圖',exact:true}).check();
-      await wall.getByRole('radio',{name:'願你平安',exact:true}).check();
+      await wall.getByRole('radio',{name:'貼圖',exact:true}).locator('..').click();
+      await wall.getByRole('radio',{name:'願你平安',exact:true}).locator('..').click();
       if(await wall.locator('article').count()) throw Error('Sticker selection posted without submit');
       const stickerRows=await wall.getByRole('radiogroup',{name:'禱告貼圖'}).locator('label').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().top));
       if(Math.max(...stickerRows)-Math.min(...stickerRows)>1) throw Error('Stickers must fit on one row');
@@ -100,13 +100,13 @@ try {
       }
       await wall.getByRole('button',{name:/收起回應/}).click();
       await wall.getByRole('button',{name:/寫下鼓勵/}).click();
-      await wall.getByRole('radio',{name:'禱告',exact:true}).check();
-      await wall.getByRole('radio',{name:'經文',exact:true}).check();
-      await wall.getByRole('radio',{name:'鼓勵',exact:true}).check();
+      await wall.getByRole('radio',{name:'禱告',exact:true}).locator('..').click();
+      await wall.getByRole('radio',{name:'經文',exact:true}).locator('..').click();
+      await wall.getByRole('radio',{name:'鼓勵',exact:true}).locator('..').click();
       if(await wall.getByRole('textbox',{name:'回應內容'}).inputValue()!=='一起守望') throw Error('Switching mode lost draft');
       await wall.getByRole('button',{name:'送出回應'}).click();
       await wall.locator('article').getByText('一起守望',{exact:true}).waitFor();
-      await wall.getByRole('radio',{name:'貼圖',exact:true}).check();
+      await wall.getByRole('radio',{name:'貼圖',exact:true}).locator('..').click();
       await wall.getByRole('button',{name:'送出回應'}).click();
       await wall.locator('article').getByText('願你平安',{exact:true}).waitFor();
       await screenshot(width+'-wall');
@@ -114,7 +114,7 @@ try {
       await page.reload();
       await page.getByRole('searchbox',{name:'搜尋禱告牆'}).fill(shared);
       await wall.getByRole('button',{name:/寫下鼓勵/}).click();
-      await wall.getByRole('radio',{name:'貼圖',exact:true}).check();
+      await wall.getByRole('radio',{name:'貼圖',exact:true}).locator('..').click();
       await screenshot(width+'-dark-sticker-composer');
       await page.evaluate(()=>localStorage.setItem('wechurch-theme','light'));
       const copies=await (await page.context().request.get(origin+'/api/life-groups/'+group+'/shares?kind=prayer')).json();
