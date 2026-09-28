@@ -71,11 +71,27 @@ try {
       await screenshot(width+'-share-preview');
       await dialog.getByRole('button',{name:'確認分享'}).click();
       await dialog.waitFor({state:'hidden'});
+      const extra=await page.context().request.post(origin+'/api/prayers',{headers:{Origin:origin},data:{content:shared+'，這是一段較長的禱告需求，用來確認手機摘要不會撐開版面。',category:'supplication',isAnonymous:false}});
+      if(!extra.ok()) throw Error('Compact-list fixture failed');
       await page.goto(origin+'/prayer-wall');
       await page.getByRole('searchbox',{name:'搜尋禱告牆'}).fill(shared);
       const wall=page.getByRole('article',{name:'代禱：'+title,exact:true});
+      await wall.waitFor();
+      if(width===390){
+        if(await wall.getByRole('button',{name:/寫下鼓勵/}).isVisible()) throw Error('Mobile prayer must start collapsed');
+        await wall.getByRole('button',{name:/愛心/}).click();
+        await wall.getByRole('button',{name:/愛心/,pressed:true}).waitFor();
+        if(await wall.getByRole('button',{name:/展開代禱/}).getAttribute('aria-expanded')!=='false') throw Error('Reaction unexpectedly expanded prayer');
+        for(const narrow of [390,320]){
+          await page.setViewportSize({width:narrow,height:844});
+          if((await wall.boundingBox()).height>140) throw Error('Compact row too tall');
+          await screenshot(narrow+'-compact-list');
+        }
+        await page.setViewportSize({width,height:844});
+        await wall.getByRole('button',{name:/展開代禱/}).click();
+      } else if(await wall.getByRole('button',{name:/展開代禱/}).isVisible()) throw Error('Desktop must remain expanded');
       await wall.getByText('緊急代禱',{exact:true}).waitFor();
-      await wall.getByText('匿名',{exact:true}).waitFor();
+      if(!(await wall.innerText()).includes('匿名')) throw Error('Anonymous author absent');
       if((await wall.innerText()).includes('私人')) throw Error('Private text leaked');
       if(await page.getByRole('menuitem').count()) throw Error('Management should be collapsed');
       await wall.getByRole('button',{name:'管理禱告'}).click();
@@ -87,6 +103,15 @@ try {
       await wall.getByRole('button',{name:/已為你禱告/}).waitFor();
       await wall.getByRole('button',{name:/寫下鼓勵/}).click();
       await wall.getByRole('textbox',{name:'回應內容'}).fill('一起守望');
+      if(width===390){
+        await wall.getByRole('button',{name:/收合代禱/}).click();
+        if(await wall.getByRole('textbox',{name:'回應內容'}).isVisible()) throw Error('Collapsed composer remains visible');
+        await page.setViewportSize({width:1440,height:844});
+        if(!await wall.getByRole('textbox',{name:'回應內容'}).isVisible()) throw Error('Desktop inherited mobile collapse');
+        await page.setViewportSize({width,height:844});
+        await wall.getByRole('button',{name:/展開代禱/}).click();
+        if(await wall.getByRole('textbox',{name:'回應內容'}).inputValue()!=='一起守望') throw Error('Card collapse lost draft');
+      }
       await wall.getByRole('radio',{name:'貼圖',exact:true}).locator('..').click();
       await wall.getByRole('radio',{name:'願你平安',exact:true}).locator('..').click();
       if(await wall.locator('article').count()) throw Error('Sticker selection posted without submit');
@@ -113,6 +138,11 @@ try {
       await page.evaluate(()=>localStorage.setItem('wechurch-theme','dark'));
       await page.reload();
       await page.getByRole('searchbox',{name:'搜尋禱告牆'}).fill(shared);
+      if(width===390){
+        await wall.waitFor();
+        await screenshot('390-dark-compact-list');
+        await wall.getByRole('button',{name:/展開代禱/}).click();
+      }
       await wall.getByRole('button',{name:/寫下鼓勵/}).click();
       await wall.getByRole('radio',{name:'貼圖',exact:true}).locator('..').click();
       await screenshot(width+'-dark-sticker-composer');
@@ -179,7 +209,7 @@ try {
       await page.goto(origin+'/');
       await page.locator('main').getByRole('link',{name:'恩典記錄簿',exact:true}).click();
       await page.locator('main').getByRole('heading',{name:'恩典記錄簿',exact:true}).waitFor();
-      checks.push({width,inline:true,progress:true,anonymousFamily:true,urgentPublic:true,comment:true,close:true,history:true,dark:true,graceBook:true,privateDatedStory:true,graceEditPersisted:true,graceFilters:true,homeEntry:true,managementCollapsed:true,deleteCancelFocus:true,prayed:true,stickerSingleRow:true,explicitSubmit:true,draftPreserved:true,responseModes:true,darkComposer:true});
+      checks.push({width,inline:true,progress:true,anonymousFamily:true,urgentPublic:true,comment:true,close:true,history:true,dark:true,graceBook:true,privateDatedStory:true,graceEditPersisted:true,graceFilters:true,homeEntry:true,managementCollapsed:true,deleteCancelFocus:true,prayed:true,stickerSingleRow:true,explicitSubmit:true,draftPreserved:true,responseModes:true,darkComposer:true,...(width===390?{compactMobile:true,compactHeight:true,compactReaction:true,cardDraftPreserved:true,responsiveDisclosure:true}:{desktopExpanded:true})});
     }
     return {checks,fixtureSession:true,googleOAuthTested:false,physicalPhoneTested:false};
   }`;

@@ -415,6 +415,9 @@ Shared text stays separate from private notes. See `design/daily-public-walls-20
 - Owner management stays in the card's overflow menu; destructive actions require
   confirmation. Composer appears before reply history, with a full-width submit.
 - See `design/prayer-response-ux-2026-09-28.md` for the mobile response redesign.
+- Mobile prayers now default to compact author/summary rows with three reactions;
+  explicit expand reveals the unchanged details/actions without unmounting drafts.
+  Desktop stays expanded. See `design/prayer-mobile-list-2026-09-28.md`.
 - Anonymous authors stay anonymous in replies; collapsed posts fetch only counts.
 - Verified 320x568, 390x844, and 1280x900. See
   `design/prayer-wall-interactions-2026-09-11.md` for evidence and limits.

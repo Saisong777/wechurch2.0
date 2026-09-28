@@ -1,8 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, Trash2, User, Pin, Check, BookOpen, HandHeart, HeartHandshake, Sprout, AlertCircle, MoreHorizontal } from 'lucide-react';
+import { Heart, Trash2, User, Pin, Check, BookOpen, HandHeart, HeartHandshake, Sprout, AlertCircle, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { REACTION_LABELS, isUrgentPrayer, isClosedPrayer, type PrayerReaction } from '@shared/prayerInteraction';
 import { usePrayerReaction, useUrgentPrayer, useClosePrayer, type Prayer, useDeletePrayer, useToggleAmen, useTogglePinPrayer, useMarkPrayerAnswered, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { formatDistanceToNow } from 'date-fns';
@@ -30,20 +30,35 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
   const urgentMutation = useUrgentPrayer();
   const closeMutation = useClosePrayer();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const detailsId = useId();
+  const actionsId = useId();
   const managementTrigger = useRef<HTMLButtonElement>(null);
   const closed = isClosedPrayer(prayer);
   const canDelete = prayer.isOwner || isAdmin;
   const managementBusy = deleteMutation.isPending || togglePinMutation.isPending || markAnsweredMutation.isPending || urgentMutation.isPending || closeMutation.isPending;
+  const summary = prayer.content.trim().split(/\r?\n/)[0];
+  const timeAgo = formatDistanceToNow(new Date(prayer.createdAt), { addSuffix: true, locale: zhTW });
 
   return <article aria-label={`代禱：${prayer.content.split('\n')[0]}`} className="min-w-0 bg-card">
-    <div className="space-y-3 p-3 sm:p-4">
+    <div className="px-3 pt-2 md:hidden">
+      <button type="button" className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={mobileExpanded} aria-controls={`${detailsId} ${actionsId}`} aria-label={`${mobileExpanded ? '收合' : '展開'}代禱：${prayer.authorName}，${summary}`} onClick={() => setMobileExpanded(value => !value)}>
+        <span className="max-w-[28%] shrink-0 truncate text-sm font-semibold" title={prayer.authorName}>{prayer.authorName}</span>
+        {isUrgentPrayer(prayer) && <AlertCircle role="img" aria-label="緊急代禱" className="h-3.5 w-3.5 shrink-0 text-red-700 dark:text-red-300" />}
+        {prayer.isPinned && <Pin role="img" aria-label="置頂" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+        <span className="min-w-0 flex-1 truncate text-sm">{summary}</span>
+        <span className="flex shrink-0 items-center gap-0.5 text-xs text-primary">{mobileExpanded ? '收合' : '展開'}{mobileExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</span>
+      </button>
+    </div>
+    <div id={detailsId} className={cn('space-y-3 p-3 sm:p-4', !mobileExpanded && 'hidden md:block')}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <p className="min-w-0 self-center text-xs text-muted-foreground [overflow-wrap:anywhere] md:hidden">{prayer.authorName} · {timeAgo}</p>
+        <div className="hidden min-w-0 items-center gap-2 md:flex">
           <Avatar className="h-8 w-8 shrink-0">
             {prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt={prayer.authorName} />}
             <AvatarFallback className="bg-primary/10 text-xs text-primary">{prayer.isAnonymous ? <User className="h-4 w-4" /> : prayer.authorName.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <div className="min-w-0"><p className="break-words text-sm font-semibold">{prayer.authorName}</p><p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(prayer.createdAt), { addSuffix: true, locale: zhTW })}</p></div>
+          <div className="min-w-0"><p className="break-words text-sm font-semibold">{prayer.authorName}</p><p className="text-xs text-muted-foreground">{timeAgo}</p></div>
         </div>
         {canDelete && <DropdownMenu>
           <DropdownMenuTrigger asChild><Button ref={managementTrigger} variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="管理禱告" title="管理禱告"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
@@ -74,13 +89,13 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
       <p className="whitespace-pre-wrap text-sm leading-7 [overflow-wrap:anywhere]">{prayer.content}</p>
       {prayer.scriptureReference && <p className="flex items-start gap-2 text-sm text-primary"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" /><span className="[overflow-wrap:anywhere]">{prayer.scriptureReference}</span></p>}
     </div>
-    <div className="space-y-2 border-t px-3 py-3 sm:px-4">
+    <div className={cn('space-y-2 px-3 sm:px-4 md:border-t md:py-3', mobileExpanded ? 'border-t py-3' : 'pb-1')}>
       {!closed && <div className="grid grid-cols-3 gap-1" role="group" aria-label="關懷回應">{(Object.keys(REACTION_LABELS) as PrayerReaction[]).map(kind => {
         const reaction = prayer.reactions?.find(r => r.kind === kind);
         const Icon = { heart: Heart, support: HeartHandshake, strength: Sprout }[kind];
         return <Button key={kind} variant={reaction?.selected ? 'secondary' : 'ghost'} size="sm" className="min-h-11 min-w-0 gap-1 px-1 text-xs sm:text-sm" aria-pressed={!!reaction?.selected} title={`${reaction?.selected ? '撤回' : '送出'}${REACTION_LABELS[kind]}`} disabled={reactionMutation.isPending} onClick={() => reactionMutation.mutate({ prayerId: prayer.id, kind, selected: !reaction?.selected })}><Icon className={cn('h-4 w-4', kind === 'heart' ? 'text-rose-600 dark:text-rose-300' : kind === 'support' ? 'text-teal-700 dark:text-teal-300' : 'text-green-700 dark:text-green-300', reaction?.selected && kind === 'heart' && 'fill-current')} />{REACTION_LABELS[kind]}<span className="tabular-nums">{reaction?.count || 0}</span></Button>;
       })}</div>}
-      <div className="flex flex-wrap gap-2">
+      <div id={actionsId} className={cn('flex-wrap gap-2 md:flex', mobileExpanded ? 'flex' : 'hidden')}>
         {!closed && <Button variant="outline" className={cn('min-h-11 min-w-0 flex-1 gap-1.5 px-2', prayer.hasAmened && 'border-primary/30 bg-primary/10 text-primary disabled:opacity-100')} aria-pressed={prayer.hasAmened} disabled={toggleAmenMutation.isPending || prayer.hasAmened} onClick={() => { vibrate(50); toggleAmenMutation.mutate({ prayerId: prayer.id, hasAmened: prayer.hasAmened }); }}>
           {prayer.hasAmened ? <Check className="h-4 w-4" /> : <HandHeart className="h-4 w-4" />}{prayer.hasAmened ? '已為你禱告' : '為你禱告'}{prayer.amenCount > 0 && <span className="text-xs tabular-nums">{prayer.amenCount}</span>}
         </Button>}
