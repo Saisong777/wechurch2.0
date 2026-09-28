@@ -1,5 +1,5 @@
 {
-  "fingerprint": "871f3c71905294b4dcbf8843ed580a9775712b3213b86c623bfa6359f7b73af9",
+  "fingerprint": "f213fee42dc7d620830447a9badeaf897dac1e1f69ba4983fba305ccbde69c90",
   "files": [
     {
       "file": "Dockerfile",
@@ -99,7 +99,7 @@
     },
     {
       "file": "src/components/admin/CrmOperationalPanel.tsx",
-      "sha256": "f48e74dd323abfa03d90c38dde2662e42ac748ac83172b365a7a21d14def0a0f"
+      "sha256": "82a6f83bc15432c2e1a71bdd9ec5f96dd2c6b0ac74a109277c515099c359845f"
     },
     {
       "file": "src/components/admin/DownloadRecordsDialog.test.tsx",
@@ -219,7 +219,7 @@
     },
     {
       "file": "src/components/home/DailyHome.tsx",
-      "sha256": "14207026d13b4c94fe2a5b210b507cac614ca091b4113532a4f11c791f3a1e46"
+      "sha256": "fed8908f0245a41c4f80053dbe78dd34587e90506ba8f2de15f8331fd266f936"
     },
     {
       "file": "src/components/icebreaker/GameLobby.tsx",
@@ -283,15 +283,15 @@
     },
     {
       "file": "src/components/layout/MobileAccountActions.test.tsx",
-      "sha256": "c2e88e2e78b56c8efd1b78cd6cb2bf12ca1ead70a929a178bd8890a6eb87d552"
+      "sha256": "44477aecd83285187b38d22801d59259ccb64b8623ea5ff0361599ed88f8a0ee"
     },
     {
       "file": "src/components/layout/MobileAccountActions.tsx",
-      "sha256": "878893b614179a16c6dc2688ebb288241779962e5c7119abc4c52993622b075c"
+      "sha256": "f702cdee4b3de985ae7d1e223099c38d36933ba390550028c58767416a80dca2"
     },
     {
       "file": "src/components/layout/MobileHeader.test.tsx",
-      "sha256": "9f951f7207b840541f0acb6d2aef6f1a590d5abf48c061adee00e9ee11574235"
+      "sha256": "70171a5bfc67c45855c3265d711a42ba823843a90b4b9b98413f4020869f14d4"
     },
     {
       "file": "src/components/layout/MobileHeaderContext.tsx",
@@ -324,6 +324,14 @@
     {
       "file": "src/components/layout/mobile-scroll.test.ts",
       "sha256": "c5d71f209289db4be2de7082c55f4b5aaf54ba4516f2a53faec84289d78ea26f"
+    },
+    {
+      "file": "src/components/pastoral/LeaderDashboard.test.tsx",
+      "sha256": "a30ebd75c7eaa817ef95da52c0b7b704569873ebc485a9dfb3ab3d4f2e5354ef"
+    },
+    {
+      "file": "src/components/pastoral/LeaderDashboard.tsx",
+      "sha256": "b27d6ab5d63d820bb0c5de5ac42fe09a3b9510408f65b145cb5095aadbc6fce0"
     },
     {
       "file": "src/components/play/DiscipleQuiz.tsx",
@@ -750,6 +758,10 @@
       "sha256": "7ae3e4a33e77971abf9c0db8b2d18fa8bb6995ebe16c399f861c20d8162ccd87"
     },
     {
+      "file": "src/hooks/usePastoralAccess.ts",
+      "sha256": "e5446accd8ddb89e69ea47d16f8e53f25c2436a91d546f89f7811021cdde20c9"
+    },
+    {
       "file": "src/hooks/usePastoralFramework.ts",
       "sha256": "0c425bbe141ba00ccef83254f9de84ea14d2e61c5dab17aa9c6960252f73fb28"
     },
@@ -975,7 +987,7 @@
     },
     {
       "file": "src/pages/CRMPage.tsx",
-      "sha256": "b0141ec80309e18de3b918338e90b4b60c2b97dc8ece2145fce288e08c7890a5"
+      "sha256": "3acbc740f718eb7c86046077656ae96c18129dfbc18ee089b159467b2670288a"
     },
     {
       "file": "src/pages/CarePage.test.tsx",
@@ -1035,7 +1047,7 @@
     },
     {
       "file": "src/pages/Index.tsx",
-      "sha256": "a56e788ab59f1e20dee7fd3ce016bfeac5cadfbe8b819ded92bc6a871c398ffd"
+      "sha256": "2ee786b6c4a6fb123a1700d7c6271cadea68a48464d4f32e2ee6cc3f2dbb9bfd"
     },
     {
       "file": "src/pages/JesusTimelinePage.tsx",
@@ -1051,7 +1063,7 @@
     },
     {
       "file": "src/pages/LifeGroupsPage.tsx",
-      "sha256": "33d6d8841b05fc2f4243b966f3448fc81c4b2024502e6dee55ab0d8f63d37cb9"
+      "sha256": "c514a77028043fe03782c5547e7515d388a28d2b629cf46a58c87e18ad3bb1a5"
     },
     {
       "file": "src/pages/LoginPage.test.tsx",
@@ -1147,7 +1159,7 @@
     },
     {
       "file": "src/pages/SupportPage.tsx",
-      "sha256": "cd2c57a59ddd7615a8aafc70e68266c7fc338dbfa1220d4ad7274a1c08e39563"
+      "sha256": "bf6d7755dcdad02f3d2fa6e6420de0789eae66f137547c31a69a8777c8d00ba9"
     },
     {
       "file": "src/pages/WePlayPage.tsx",
@@ -1406,16 +1418,28 @@
       "sha256": "2ac3ed64a8c879e92daae253b71a70828b5232468b1d9d422e0067c2a92bfcd2"
     },
     {
+      "file": "server/leaderDashboard.test.ts",
+      "sha256": "49df6e2fd183177c2148b02f97ab6f152ea59d7502c62e493e58f6885de28d7d"
+    },
+    {
+      "file": "server/leaderDashboardRepository.ts",
+      "sha256": "0f2cc632cc039d41222485f014237dc1391897bbeee3a3bff97193c8c549af32"
+    },
+    {
+      "file": "server/leaderDashboardRoutes.ts",
+      "sha256": "ba667a2ab51803aafd1614e40498e9c5e85be36a3af4cd808b88f7b2dff73097"
+    },
+    {
       "file": "server/lifeGroup.test.ts",
       "sha256": "65454e6ee35303ad5da4a0b5cc330ec87dd293e4f671edb6a814d358f37287a0"
     },
     {
       "file": "server/lifeGroupRepository.ts",
-      "sha256": "2c53b9e5bdef8f26f2d4bd4c6d99c4ed8262ec63cb068aa7df10b77813e96710"
+      "sha256": "e51c3559fed93a5d3d3c2d6c4467729209b7347dcab7d0673d3694e6b597fa46"
     },
     {
       "file": "server/lifeGroupRoutes.ts",
-      "sha256": "ad60a8c1212dcc15aab508a5f64b5dba8a95d7ee1085af838495278891f18666"
+      "sha256": "eb8c493bf8d5c1138ae30044859afa5158c9fbe5e9df8eb879960f899261c9af"
     },
     {
       "file": "server/lineIntegrationRepository.ts",
@@ -1710,6 +1734,10 @@
       "sha256": "74df71bf36ae36134b47ce0714502f5008086e302a9a540abd04270dcc2f62fe"
     },
     {
+      "file": "shared/leaderDashboard.ts",
+      "sha256": "ffc90003466e6b4566dc825ff544a72de01304f46b042d0d6057f37c01bd23de"
+    },
+    {
       "file": "shared/lifeGroup.ts",
       "sha256": "333b15826e777cb23ad7a9d835dc226ad35126ab2975b2f1960f8995f55dffc2"
     },
@@ -1739,7 +1767,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "985903667687337016eb7ef87805af0adb71b630388da963e9f26551dca1602d"
+      "sha256": "2dd55c568d9a300d640748a9a399a5abb6b22e6252efef9047c681b588129554"
     },
     {
       "file": "shared/support.ts",
@@ -1882,6 +1910,10 @@
       "sha256": "e14571165e4590fed8b4c25a4d56793b389c972d7c3e83fd2a0337f29c0f13a9"
     },
     {
+      "file": "migrations/0019_leader_dashboard.sql",
+      "sha256": "ced7989da28f00257885990c29551eab10e5373877d11c956299e7c7b78342bc"
+    },
+    {
       "file": "migrations/meta/0000_snapshot.json",
       "sha256": "1976122184ff987e42ad9ff2c4569c3d3dc8a8c81a2be264f8968d41372eda93"
     },
@@ -1891,7 +1923,7 @@
     },
     {
       "file": "migrations/meta/_journal.json",
-      "sha256": "5b1831a755dc0799398ab84bf2c7eff9cd69f37a4046604913fc6328cb9ca6d6"
+      "sha256": "36c067a3f6549400b1eb5672898b206c9b205ebefb44c49dd45edda75fe9e4c0"
     },
     {
       "file": "scripts/backup-envelope.mjs",
@@ -2099,11 +2131,15 @@
     },
     {
       "file": "scripts/verify-integrity-worker.ts",
-      "sha256": "68b7e11d4fc1ebf3171188b378d077c425ed7dc409d331b44027df8793c7141a"
+      "sha256": "a339a9ed80449099dfef8ee1e3660ad19a6b44ce5a7971adbfff926c48f6779b"
     },
     {
       "file": "scripts/verify-integrity.mjs",
       "sha256": "4f87c21a05a1a14f29d6881900a3b06321726a5bc72b4ab21c4dda1d341426ea"
+    },
+    {
+      "file": "scripts/verify-leader-dashboard-http.ts",
+      "sha256": "6fa39b7351af55715fd23e7a288eec009c239f73c1725b3c8001d3766363c019"
     },
     {
       "file": "scripts/verify-line-identity.ts",
