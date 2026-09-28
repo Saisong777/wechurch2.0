@@ -472,3 +472,11 @@ Settings/tools are quieter secondary links; appearance stays visible below navig
 Staff links have their own labelled section and logout remains a separate action.
 Use semantic colors, 44px minimum controls and the existing bounded scroll panel.
 See `design/mobile-menu-2026-09-28.md`.
+
+## Simple Personal Care (2026-09-28)
+
+The ordinary care record is one note plus an optional reminder. Show the latest
+written record for continuity. Keep method classification and contact background
+optional, reuse the A palette, and retain 44px targets in both themes. Existing
+reminders remain visible and are only replaced or cancelled by explicit edits.
+Historical agreements remain readable. See `design/simple-care-flow-2026-09-28.md`.

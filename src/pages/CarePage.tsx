@@ -13,6 +13,7 @@ import { CareVisits, VisitComposer } from '@/components/care/CareVisits';
 import { useAuth } from '@/contexts/AuthContext';
 import { careActionLabels, careToday, needsCare } from '@shared/care';
 import { toast } from 'sonner';
+import { CareReminder } from '@/components/care/CareReminder';
 
 const blank: CareContactInput = { name: '', relationship: '', need: '', nextAction: '', prayer: '', nextCareDate: null };
 const selectClass = 'min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base';
@@ -75,8 +76,10 @@ function ContactEditor({ initial, editing, id, care, close }: { initial: CareCon
     <form onSubmit={e => { e.preventDefault(); if (busy) return; setError(''); const callbacks = { onSuccess: () => { close(); toast.success('已儲存關懷對象'); }, onError: () => setError('儲存失敗，內容仍保留在這裡，請重試。') }; if (id) care.updateContact({ id, input: draft }, callbacks); else care.createContact(draft, callbacks); }}>
       <fieldset disabled={busy} className="min-w-0 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="care-name">名字</Label><Input autoFocus id="care-name" maxLength={80} required value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></div><div className="space-y-2"><Label htmlFor="care-relationship">與我的關係</Label><Input id="care-relationship" maxLength={80} value={draft.relationship || ''} onChange={e => setDraft({ ...draft, relationship: e.target.value })} /></div></div>
-        {([{ key: 'need', label: '目前需要' }, { key: 'nextAction', label: '下一步' }, { key: 'prayer', label: '代禱方向' }] as const).map(f => <div key={f.key} className="space-y-2"><Label htmlFor={`care-${f.key}`}>{f.label}</Label><AutoResizeTextarea id={`care-${f.key}`} minRows={2} maxRows={5} maxLength={f.key === 'nextAction' ? 300 : 500} value={draft[f.key] || ''} onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} /></div>)}
-        <div className="space-y-2"><Label htmlFor="care-date">下次關心日期</Label><Input id="care-date" type="date" className="min-w-0" value={draft.nextCareDate || ''} onChange={e => setDraft({ ...draft, nextCareDate: e.target.value || null })} /></div>
+        <details className="space-y-4"><summary className="min-h-11 cursor-pointer py-3 text-sm text-muted-foreground">補充資料（選填）</summary>
+          {([{ key: 'need', label: '目前需要' }, { key: 'prayer', label: '代禱方向' }, ...(initial.nextAction ? [{ key: 'nextAction', label: '先前記下的約定' } as const] : [])] as const).map(f => <div key={f.key} className="space-y-2"><Label htmlFor={`care-${f.key}`}>{f.label}</Label><AutoResizeTextarea id={`care-${f.key}`} minRows={2} maxRows={5} maxLength={f.key === 'nextAction' ? 300 : 500} value={draft[f.key] || ''} onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} /></div>)}
+        </details>
+        <CareReminder value={draft.nextCareDate || ''} onChange={value => setDraft({ ...draft, nextCareDate: value || null })} />
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => dirty ? setConfirm(true) : close()}>取消</Button><Button type="submit" disabled={busy || !draft.name.trim()}>{busy ? '儲存中...' : '儲存'}</Button></div>
       </fieldset>
@@ -86,32 +89,49 @@ function ContactEditor({ initial, editing, id, care, close }: { initial: CareCon
 
 function ContactRow({ contact: c, care, locked, onRecord, edit, archive, visit }: { contact: CareContact; care: Care; locked: boolean; onRecord: (open: boolean) => void; edit: () => void; archive: () => void; visit: () => void }) {
   const [expanded, setExpanded] = useState(false), [recording, setRecording] = useState(false);
-  const history = useCareHistory(c.id, expanded), today = careToday();
+  const history = useCareHistory(c.id, expanded), today = care.today || careToday();
+  const latestNote = history.data?.pages.flatMap(p => p.actions).find(a => !!a.note?.trim());
   function record(open: boolean) { setRecording(open); onRecord(open); }
   return <li className="py-4" data-testid={`care-contact-${c.id}`}>
     <button className="flex min-h-11 w-full min-w-0 items-center gap-3 text-left" aria-expanded={expanded} aria-controls={`care-detail-${c.id}`} disabled={recording} onClick={() => setExpanded(!expanded)}><span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">{Array.from(c.name)[0]}</span><span className="min-w-0 flex-1"><span className="block font-semibold">{c.name}<span className="ml-2 text-xs font-normal text-muted-foreground">{c.relationship}</span></span><span className="mt-1 block truncate text-sm text-muted-foreground">{c.need || c.nextAction || '尚未填寫近況'}</span></span>{expanded ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}</button>
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className={`text-xs ${c.nextCareDate && c.nextCareDate < today ? 'text-destructive' : 'text-muted-foreground'}`}>{c.isArchived ? '已封存' : c.nextCareDate ? `${c.nextCareDate < today ? '已到期' : c.nextCareDate === today ? '今天關心' : '下次關心'} · ${c.nextCareDate}` : c.lastCaredAt ? `上次關心 ${time(c.lastCaredAt)}` : '尚未聯絡'}</p>{!c.isArchived && <div className="flex gap-1"><Button variant="ghost" className="min-h-11 gap-1 px-2 text-sm" disabled={locked || recording || care.isRecording} onClick={() => care.recordAction({ id: crypto.randomUUID(), contactId: c.id, actionType: 'prayer' }, { onSuccess: () => toast.success('已記下代禱'), onError: () => toast.error('尚未儲存成功，請重試') })}><Heart className="h-4 w-4" />代禱{c.prayerCount > 0 ? ` ${c.prayerCount}` : ''}</Button><Button variant="outline" className="min-h-11 gap-1 px-3 text-sm" disabled={locked || recording} onClick={() => { setExpanded(true); record(true); }}><Pencil className="h-4 w-4" />記錄關心</Button></div>}</div>
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className={`text-xs ${c.nextCareDate && c.nextCareDate < today ? 'text-destructive' : 'text-muted-foreground'}`}>{c.isArchived ? '已封存' : c.nextCareDate ? `${c.nextCareDate < today ? '提醒已到期' : c.nextCareDate === today ? '今天提醒' : '提醒我關心'} · ${c.nextCareDate}` : c.lastCaredAt ? `上次關心 ${time(c.lastCaredAt)}` : '尚未聯絡'}</p>{!c.isArchived && <div className="flex gap-1"><Button variant="ghost" className="min-h-11 gap-1 px-2 text-sm" disabled={locked || recording || care.isRecording} onClick={() => care.recordAction({ id: crypto.randomUUID(), contactId: c.id, actionType: 'prayer' }, { onSuccess: () => toast.success('已記下代禱'), onError: () => toast.error('尚未儲存成功，請重試') })}><Heart className="h-4 w-4" />代禱{c.prayerCount > 0 ? ` ${c.prayerCount}` : ''}</Button><Button variant="outline" className="min-h-11 gap-1 px-3 text-sm" disabled={locked || recording} onClick={() => { setExpanded(true); record(true); }}><Pencil className="h-4 w-4" />記錄關心</Button></div>}</div>
     <div id={`care-detail-${c.id}`} hidden={!expanded} className="mt-4 space-y-4 border-t pt-4">
-      {c.need && <p className="whitespace-pre-wrap text-sm leading-7">{c.need}</p>}{c.nextAction && <p className="whitespace-pre-wrap text-sm">下一步：{c.nextAction}</p>}{c.prayer && <p className="whitespace-pre-wrap text-sm text-muted-foreground">代禱：{c.prayer}</p>}
+      {recording && <>
+        {latestNote && <div className="border-l-2 border-primary/30 pl-3"><p className="text-xs text-muted-foreground">上次記下 · {time(latestNote.createdAt)}</p><p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-7">{latestNote.note}</p></div>}
+        <CareRecord contact={c} care={care} close={() => record(false)} />
+      </>}
+      {c.need && <p className="whitespace-pre-wrap text-sm leading-7">{c.need}</p>}{c.nextAction && <p className="whitespace-pre-wrap text-sm">先前記下的約定：{c.nextAction}</p>}{c.prayer && <p className="whitespace-pre-wrap text-sm text-muted-foreground">代禱：{c.prayer}</p>}
       <div className="flex flex-wrap gap-2">{c.isArchived ? <Button variant="outline" disabled={locked || care.isUpdating} onClick={() => care.updateContact({ id: c.id, input: { name: c.name, isArchived: false } }, { onSuccess: () => toast.success('已恢復關懷對象'), onError: () => toast.error('恢復失敗，請重試') })}><Undo2 className="mr-2 h-4 w-4" />恢復關懷</Button> : <><Button variant="outline" disabled={locked || recording} onClick={visit}><HandHeart className="mr-2 h-4 w-4" />請牧者協助探訪</Button><Button variant="ghost" size="icon" aria-label={`編輯${c.name}`} title="編輯" disabled={locked || recording} onClick={edit}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" aria-label={`封存${c.name}`} title="封存" disabled={locked || recording} onClick={archive}><Archive className="h-4 w-4" /></Button></>}</div>
-      {recording && <CareRecord contact={c} care={care} close={() => record(false)} />}
       <h3 className="text-sm font-semibold">關懷歷程</h3>
       {history.isPending ? <p role="status">載入中...</p> : history.isError ? <Button variant="outline" onClick={() => void history.refetch()}>重新載入歷程</Button> : <>{!history.data?.pages[0]?.actions.length && <p className="text-sm text-muted-foreground">還沒有關懷紀錄。</p>}<ol className="space-y-4">{history.data?.pages.flatMap(p => p.actions).map(a => <li key={a.id} className="border-l-2 border-primary/30 pl-3"><p className="text-xs text-muted-foreground">{careActionLabels[a.actionType as keyof typeof careActionLabels] || '關懷'} · {time(a.createdAt)}</p>{a.note && <p className="mt-1 whitespace-pre-wrap text-sm leading-7">{a.note}</p>}</li>)}</ol>{history.hasNextPage && <Button variant="outline" disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>較早的紀錄</Button>}</>}
     </div>
   </li>;
 }
 
-function CareRecord({ contact, care, close }: { contact: CareContact; care: Care; close: () => void }) {
-  const [actionType, setType] = useState<keyof typeof careActionLabels>('care'), [note, setNote] = useState(''), [date, setDate] = useState(''), [next, setNext] = useState(''), [error, setError] = useState(''), [confirm, setConfirm] = useState(false);
+export function CareRecord({ contact, care, close }: { contact: CareContact; care: Care; close: () => void }) {
+  const [actionType, setType] = useState<keyof typeof careActionLabels>('care');
+  const [note, setNote] = useState(''), [error, setError] = useState(''), [confirm, setConfirm] = useState(false);
+  const [initialDate] = useState(contact.nextCareDate || '');
+  const [date, setDate] = useState(initialDate);
   const [id] = useState(() => crypto.randomUUID());
-  const dirty = !!note || !!date || !!next || actionType !== 'care';
-  return <form className="space-y-4 border-y py-4" aria-label={`記錄${contact.name}的關心`} onSubmit={e => { e.preventDefault(); if (care.isRecording) return; setError(''); care.recordAction({ id, contactId: contact.id, actionType, note, ...(['note', 'prayer'].includes(actionType) ? {} : { nextCareDate: date || null, nextAction: next }) }, { onSuccess: () => { close(); toast.success('已記錄這次關心'); }, onError: () => setError('儲存失敗，輸入仍保留，請重試。') }); }}>
+  const dirty = !!note || date !== initialDate || actionType !== 'care';
+  return <form className="space-y-4 border-y py-5" aria-label={`記錄${contact.name}的關心`} onSubmit={e => {
+    e.preventDefault();
+    if (care.isRecording || !note.trim()) return;
+    setError('');
+    care.recordAction({ id, contactId: contact.id, actionType, note: note.trim(),
+      ...(date !== initialDate ? { nextCareDate: date || null } : {}),
+    }, { onSuccess: () => { close(); toast.success('已記錄這次關心'); }, onError: () => setError('儲存失敗，輸入仍保留，請重試。') });
+  }}>
     <UnsavedChangesGuard dirty={dirty} /><LeaveConfirmation open={confirm} onStay={() => setConfirm(false)} onLeave={close} />
     <fieldset disabled={care.isRecording} className="min-w-0 space-y-4">
-      <label className="block space-y-2"><span className="text-sm font-medium">這次如何關心</span><select className={selectClass} value={actionType} onChange={e => setType(e.target.value as keyof typeof careActionLabels)}>{Object.entries(careActionLabels).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
-      <label className="block space-y-2"><span className="text-sm font-medium">這次近況</span><AutoResizeTextarea autoFocus required minRows={3} maxRows={8} maxLength={2000} value={note} onChange={e => setNote(e.target.value)} /></label>
-      {!['note', 'prayer'].includes(actionType) && <div className="grid gap-4 sm:grid-cols-2"><label className="block space-y-2"><span className="text-sm font-medium">接下來想做什麼</span><Input maxLength={300} value={next} onChange={e => setNext(e.target.value)} /></label><label className="block min-w-0 space-y-2"><span className="text-sm font-medium">下次關心日期</span><Input type="date" value={date} onChange={e => setDate(e.target.value)} /></label></div>}
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}<div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => dirty ? setConfirm(true) : close()}>取消</Button><Button type="submit" disabled={care.isRecording || !note.trim()}>{care.isRecording ? '儲存中...' : '儲存紀錄'}</Button></div>
+      <div><h3 className="font-semibold">記錄這次關心</h3><p className="mt-1 text-xs text-muted-foreground">寫幾句就好，儲存時會記下時間。</p></div>
+      <label className="block space-y-2"><span className="text-sm font-medium">這次聊到什麼？</span><AutoResizeTextarea autoFocus required minRows={3} maxRows={8} maxLength={2000} placeholder="例如：最近工作很累，今天聽他聊了聊，約好週末再聯絡。" value={note} onChange={e => setNote(e.target.value)} /></label>
+      <CareReminder value={date} onChange={setDate} />
+      {initialDate && !date && <p className="text-xs text-muted-foreground" role="status">儲存後會取消原有提醒。</p>}
+      <details className="space-y-2"><summary className="min-h-11 cursor-pointer py-3 text-sm text-muted-foreground">{actionType === 'care' ? '補充關心方式（選填）' : `關心方式：${careActionLabels[actionType]}`}</summary><label className="block space-y-2"><span className="text-sm font-medium">這次如何關心</span><select className={selectClass} value={actionType} onChange={e => setType(e.target.value as keyof typeof careActionLabels)}>{Object.entries(careActionLabels).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label></details>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <div className="flex gap-3"><Button type="button" variant="outline" className="min-h-11" onClick={() => dirty ? setConfirm(true) : close()}>取消</Button><Button type="submit" className="min-h-11 flex-1" disabled={care.isRecording || !note.trim()}>{care.isRecording ? '儲存中...' : '儲存紀錄'}</Button></div>
     </fieldset>
   </form>;
 }
