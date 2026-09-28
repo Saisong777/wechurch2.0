@@ -1,5 +1,5 @@
 {
-  "fingerprint": "de5fbc6b3a220bdde8490c76d4ae10520e961a9f60badd668ced5b91c14435ca",
+  "fingerprint": "022460c3041684c5071d053713d608dc96be83234a8274c00fb16e7855690119",
   "files": [
     {
       "file": "Dockerfile",
@@ -331,11 +331,11 @@
     },
     {
       "file": "src/components/layout/BottomNav.test.tsx",
-      "sha256": "b55590637544485402fcae864a4b853f0134b56521b8a8b1617ff2a04e08955b"
+      "sha256": "3d97177090efeafb3ce9cfc954606ad68f27fac71497b89278edc0f55c54b5d8"
     },
     {
       "file": "src/components/layout/BottomNav.tsx",
-      "sha256": "c3556ee50244295869dc24a3fefd5c5ea36d399d7909b04c9c3835a98d1252a9"
+      "sha256": "9b47b01f9ca68b99e38655e8c438acbd572b7027c9adde667694d09e68b83c85"
     },
     {
       "file": "src/components/layout/DeploymentBanner.tsx",
@@ -354,8 +354,12 @@
       "sha256": "1df726f098b8822d0add4a225a0af5833f07b223d042d136df954dfa255b144e"
     },
     {
+      "file": "src/components/layout/MobileAccountActions.test.tsx",
+      "sha256": "c2e88e2e78b56c8efd1b78cd6cb2bf12ca1ead70a929a178bd8890a6eb87d552"
+    },
+    {
       "file": "src/components/layout/MobileAccountActions.tsx",
-      "sha256": "c3544808f9e2d1f0bf4227cb1397526f5ccbc0ed94437756b0f8823a241023ee"
+      "sha256": "878893b614179a16c6dc2688ebb288241779962e5c7119abc4c52993622b075c"
     },
     {
       "file": "src/components/layout/MobileHeader.test.tsx",
@@ -367,7 +371,7 @@
     },
     {
       "file": "src/components/layout/MobileNavigation.tsx",
-      "sha256": "9b3c33ed7b0af7bee30c59f2857daf218bd8f7a05a341d0e9bb3a29bf72d860e"
+      "sha256": "8b76889b912508191fc47dac61d0917f975f7a123b8069e27802dae3ed7bea2f"
     },
     {
       "file": "src/components/layout/NetworkStatusBanner.tsx",
@@ -895,7 +899,7 @@
     },
     {
       "file": "src/index.css",
-      "sha256": "83e6696ecc237b4dec5f56fc08e503b5d504c552b29209b0916754093656fdba"
+      "sha256": "7baedbe628ba0b29d4d9ffa906d45b482e68b8307346a3514e1bab562e6eccd3"
     },
     {
       "file": "src/lib/admin-helpers.ts",
