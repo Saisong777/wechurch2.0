@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import pg from 'pg';
-import { inspectStaging, target, root } from './railway-staging.mjs';
+import { inspectStaging, stagingSql, target, root } from './railway-staging.mjs';
 
-const { app, database, productionDeployment } = inspectStaging();
+const { app, productionDeployment } = inspectStaging();
 assert.equal(app.AUTH_REGISTRATION_MODE, 'google-only');
 assert.equal(app.STAGING_GOOGLE_LOGIN_ENABLED, '1');
-const client = new pg.Client({ connectionString: database.DATABASE_PUBLIC_URL, connectionTimeoutMillis: 10000 });
-await client.connect();
 let cookie = '';
 const checks = [];
 async function call(route, method = 'GET', body) {
@@ -24,11 +21,11 @@ async function call(route, method = 'GET', body) {
   return response;
 }
 async function counts() {
-  return (await client.query(`SELECT (SELECT count(*)::integer FROM users) AS members,
+  return JSON.parse(stagingSql(`SELECT row_to_json(t) FROM (SELECT (SELECT count(*)::integer FROM users) AS members,
     (SELECT count(*)::integer FROM auth_users) AS accounts,
-    (SELECT count(*)::integer FROM google_account_links) AS links`)).rows[0];
+    (SELECT count(*)::integer FROM google_account_links) AS links) t`));
 }
-try {
+{
   const before = await counts();
   assert.equal((await call('/api/login')).status, 401);
   assert.equal((await call('/__staging/access', 'POST', { code: app.STAGING_ACCESS_CODE })).status, 303);
@@ -60,11 +57,11 @@ try {
   assert.equal((await call('/api/auth/user')).status, 401);
   assert.deepEqual(await counts(), before);
   checks.push('Forged and cancelled callbacks cannot create accounts or login sessions');
-  const evidence = path.join(root, 'artifacts/railway-staging');
+  const evidence = process.env.WECHURCH_VERIFICATION_DIR || path.join(root, 'artifacts/railway-staging');
   fs.mkdirSync(evidence, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(evidence, 'google-verification.json'), JSON.stringify({
     at: new Date().toISOString(), origin: target.origin, checks, productionDeployment,
     realGoogleConsentVerified: false,
   }, null, 2), { mode: 0o600 });
   console.log({ checks, realGoogleConsentVerified: false });
-} finally { await client.end(); }
+}
