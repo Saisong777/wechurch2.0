@@ -54,6 +54,10 @@ try {
   if (process.env.RUN_CHURCH_SIMULATION === '1') {
     const { simulateChurch } = await import('./simulate-church');
     await simulateChurch(pool, origin);
+    if (process.env.RUN_CHURCH_HISTORY === '1') {
+      const { simulateChurchHistory } = await import('./simulate-church-history');
+      await simulateChurchHistory(pool, origin);
+    }
   } else {
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
   const { verifyCareHttp } = await import('./verify-care-http');
