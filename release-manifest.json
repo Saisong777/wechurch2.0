@@ -1,5 +1,5 @@
 {
-  "fingerprint": "7fb4e6225248201e49955604e0866b6a13fa779d619e95e822ff66ae3e0bae11",
+  "fingerprint": "a36c46e3e15051a9c2c0d7d44d1fe0b40859211903b286971952092609ed67bc",
   "files": [
     {
       "file": "Dockerfile",
@@ -415,11 +415,11 @@
     },
     {
       "file": "src/components/prayer/PrayerCard.test.tsx",
-      "sha256": "6dfe53bd2f912546a8002b2b63328e099fe0b5c0234a6d6b9741a310c74c6a8c"
+      "sha256": "b405ca446e9dfcc306e96f16720d83f50299a60ba27a99fda824788939b4740c"
     },
     {
       "file": "src/components/prayer/PrayerCard.tsx",
-      "sha256": "3c6ad6689168471f6d61c4964dd7700ef6c68cb3c2fc9a2505a9ad927ba07f43"
+      "sha256": "feb25e26ed1a1aa8314f8c16591dcc5e14fc71a2ffe74b32128f13d0330e4538"
     },
     {
       "file": "src/components/prayer/PrayerComments.test.tsx",

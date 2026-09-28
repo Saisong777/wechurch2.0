@@ -31,3 +31,13 @@ Sai 的手機截圖顯示每筆禱告同時展開作者、時間、標籤、全�
 - 本機證據：`output/playwright/prayers-b/ff235821-0dd9-47ce-919e-235f1f0bfc2b/results.json` 與同目錄截圖。
 - GitHub checkpoint tag：`b-2026-09-28-00b5d1ed`。不包含會員資料、備份金鑰或其他秘密。
 - 尚未驗收實體 iPhone；手機尺寸瀏覽器測試不替代實機。
+
+## 大頭貼回補版本
+
+- Runtime commit `b02cd3e`：手機姓名前恢復 32px 頭像；桌面保留原尺寸。匿名項目即使收到圖片網址也不建立圖片元素。
+- 109 檔／641 項測試、typecheck、33 部署測試、DB HTTP integrity、build 與修改檔 lint 通過。
+- B deployment `de14b05c-d5ea-4e20-be3f-b804ae7791d2` SUCCESS，558 runtime files；fingerprint `a36c46e3e15051a9c2c0d7d44d1fe0b40859211903b286971952092609ed67bc` 已與線上核對。
+- 無 migration，B 登入邊界檢查通過，A 不變。
+- B 線上 320／390px 實際圖片載入與 32px 尺寸斷言通過；匿名項目沒有圖片元素，精簡高度小於 140px，無橫向溢出。1440px 與明暗模式截圖已核對，原有回應及恩典記錄簿回歸通過。
+- 專用測試會員與資料已清除；證據為 `output/playwright/prayers-b/8da08887-774b-416f-811e-2e92205a11fe/results.json` 與同目錄截圖。實體 iPhone 尚待驗收。
+- Checkpoint tag：`b-2026-09-28-de14b05c`；僅保存程式與部署紀錄，不含會員資料或秘密。
