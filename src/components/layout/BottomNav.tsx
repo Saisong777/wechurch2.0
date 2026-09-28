@@ -22,8 +22,8 @@ export function MobileNavLinks({ onNavigate, placement = 'footer' }: {
           }
           vibrate(50); onNavigate?.();
         }}
-        className={cn('flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          placement === 'header' ? 'mobile-menu-destination' : 'flex-col gap-1', active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
+        className={cn('flex min-w-0 items-center font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          placement === 'header' ? 'mobile-menu-destination' : 'min-h-12 flex-col justify-center gap-1 rounded-md px-2 py-2 text-sm', active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
         <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
         <span>{item.shortLabel}</span>
       </Link>;
