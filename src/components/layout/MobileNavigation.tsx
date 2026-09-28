@@ -1,6 +1,6 @@
 import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Menu, X, HandHeart, UserRound, Wrench } from 'lucide-react';
+import { ChevronLeft, Menu, X, UserRound, Wrench } from 'lucide-react';
 import { mobilePageTitle } from '@/lib/navigation';
 import { MobileNavLinks } from './BottomNav';
 import { MobileHeaderContext } from './MobileHeaderContext';
@@ -46,21 +46,26 @@ export function MobileNavigation() {
         {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}選單
       </button>
     </div>
-    <nav id={menuId} aria-label="行動導覽選單" hidden={!open} className="mobile-navigation-menu absolute inset-x-0 top-full overflow-y-auto overscroll-contain border-y border-border bg-background shadow-md">
-      <section aria-label="外觀" className="mx-auto max-w-xl border-b border-border p-3">
-        <h2 className="mb-2 text-sm font-medium">外觀</h2>
-        <AppearanceControl inline />
-      </section>
-      <div ref={mobileHeader?.setActionsTarget} data-testid="mobile-page-actions" className="[&_button]:min-h-11 [&_button]:min-w-11" />
-      <MobileNavLinks placement="header" onNavigate={() => setOpen(false)} />
-      <div className="mx-auto grid max-w-xl grid-cols-3 gap-1 border-t border-border p-2">
-        {([{ href: '/care', label: '關懷', icon: HandHeart }, { href: '/me', label: '個人設定', icon: UserRound }, { href: '/play', label: '工具', icon: Wrench }]).map(item => <Link
-          key={item.href} to={item.href} data-testid={`mobile-menu-${item.href.slice(1)}`} onClick={() => setOpen(false)} aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? 'page' : undefined}
-          className="flex min-h-12 items-center justify-center gap-1 rounded-md text-sm text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring">
-          <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />{item.label}
-        </Link>)}
+    <nav id={menuId} aria-label="行動導覽選單" hidden={!open} className="mobile-navigation-menu absolute inset-x-0 top-full overflow-y-auto overscroll-contain border-t border-border bg-background shadow-md">
+      <div className="mobile-menu-content mx-auto max-w-xl">
+        <div ref={mobileHeader?.setActionsTarget} data-testid="mobile-page-actions" className="mobile-menu-page-actions [&_button]:min-h-11 [&_button]:min-w-11" />
+        <section aria-label="日常與同行">
+          <h2 className="mobile-menu-label">日常與同行</h2>
+          <MobileNavLinks placement="header" onNavigate={() => setOpen(false)} />
+        </section>
+        <div className="mobile-menu-utilities">
+          {([{ href: '/me', label: '個人設定', icon: UserRound }, { href: '/play', label: '工具', icon: Wrench }]).map(item => <Link
+            key={item.href} to={item.href} data-testid={`mobile-menu-${item.href.slice(1)}`} onClick={() => setOpen(false)} aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? 'page' : undefined}
+            className="mobile-menu-utility">
+            <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />{item.label}
+          </Link>)}
+        </div>
+        <section aria-label="外觀" className="mobile-menu-appearance">
+          <h2 className="mobile-menu-label">外觀</h2>
+          <AppearanceControl inline />
+        </section>
+        <MobileAccountActions close={() => setOpen(false)} />
       </div>
-      <MobileAccountActions close={() => setOpen(false)} />
     </nav>
   </div>;
 }

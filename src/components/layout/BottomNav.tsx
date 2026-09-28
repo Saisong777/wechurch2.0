@@ -1,3 +1,4 @@
+import { HandHeart } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn, vibrate } from '@/lib/utils';
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
@@ -7,8 +8,9 @@ export function MobileNavLinks({ onNavigate, placement = 'footer' }: {
   placement?: 'header' | 'footer';
 }) {
   const { pathname, search, hash } = useLocation();
-  return <div className={cn('mx-auto grid max-w-xl gap-1 p-2', placement === 'header' ? 'grid-cols-2' : 'grid-cols-5')}>
-    {appNavItems.map(item => {
+  const items = placement === 'header' ? [...appNavItems, { id: 'care', label: '關懷', shortLabel: '關懷', href: '/care', icon: HandHeart, match: ['/care'] }] : appNavItems;
+  return <div className={cn('mx-auto grid max-w-xl', placement === 'header' ? 'mobile-menu-destinations grid-cols-2' : 'grid-cols-5 gap-1 p-2')}>
+    {items.map(item => {
       const Icon = item.icon;
       const active = isNavItemActive(pathname, item);
       return <Link key={item.id} to={item.href} aria-current={active ? 'page' : undefined}
@@ -21,7 +23,7 @@ export function MobileNavLinks({ onNavigate, placement = 'footer' }: {
           vibrate(50); onNavigate?.();
         }}
         className={cn('flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          placement === 'footer' && 'flex-col gap-1', active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
+          placement === 'header' ? 'mobile-menu-destination' : 'flex-col gap-1', active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>
         <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
         <span>{item.shortLabel}</span>
       </Link>;

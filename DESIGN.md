@@ -453,3 +453,12 @@ Shared text stays separate from private notes. See `design/daily-public-walls-20
 - Anonymous authors stay anonymous in replies; collapsed posts fetch only counts.
 - Verified 320x568, 390x844, and 1280x900. See
   `design/prayer-wall-interactions-2026-09-11.md` for evidence and limits.
+
+## Mobile menu refinement 2026-09-28
+
+Six everyday destinations use a two-column grid, with care completing the third row.
+Keep existing routes and labels, page action portal and all permission checks.
+Settings/tools are quieter secondary links; appearance stays visible below navigation.
+Staff links have their own labelled section and logout remains a separate action.
+Use semantic colors, 44px minimum controls and the existing bounded scroll panel.
+See `design/mobile-menu-2026-09-28.md`.

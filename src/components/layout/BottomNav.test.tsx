@@ -49,12 +49,15 @@ it('dismisses on outside interaction and keeps the existing destination order', 
   expect(screen.queryByRole('navigation')).toBeNull();
 });
 
-it('puts all appearance choices first in the mobile menu without removing navigation', () => {
+it('prioritizes daily destinations while retaining all appearance choices', () => {
   render(<MemoryRouter><MobileNavigation /></MemoryRouter>);
   fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
   const menu = screen.getByRole('navigation', { name: '行動導覽選單' });
   const appearance = within(menu).getByRole('region', { name: '外觀' });
-  expect(menu.firstElementChild).toBe(appearance);
+  const daily = within(menu).getByRole('region', { name: '日常與同行' });
+  expect(daily.compareDocumentPosition(appearance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(daily).getAllByRole('link')).toHaveLength(6);
+  expect(within(daily).getByTestId('mobile-menu-care')).toHaveAttribute('href', '/care');
   expect(within(appearance).getAllByRole('radio').map(el => el.textContent)).toEqual(['明亮', '深色', '跟隨系統']);
   expect(within(menu).getAllByRole('group', { name: '顯示模式' })).toHaveLength(1);
   expect(within(menu).getAllByRole('link')).toHaveLength(8);
