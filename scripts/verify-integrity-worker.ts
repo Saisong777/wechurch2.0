@@ -166,6 +166,8 @@ try {
     const { verifySecurityBrowser } = await import('./verify-security-browser');
     await verifySecurityBrowser(pool, origin, ids[0]);
   }
+  const { verifyLeaderDashboardHttp } = await import('./verify-leader-dashboard-http');
+  await verifyLeaderDashboardHttp(pool, makeClient);
 } finally {
   if(server) await new Promise<void>(resolve=>server!.close(()=>resolve()));
   await pool.end();

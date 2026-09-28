@@ -1,3 +1,4 @@
+import { leaderDashboardRoutes } from './leaderDashboardRoutes';
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import { z } from 'zod';
 import { devotionDate } from '../shared/churchDevotion';
@@ -25,6 +26,7 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
     res.locals.actor = actor;
     next();
   });
+  router.use('/dashboard', leaderDashboardRoutes());
   router.get('/', async (_req, res) => { res.json(await groups.myGroups(res.locals.actor)); });
   router.post('/', async (req, res) => { res.status(201).json(await groups.createGroup(res.locals.actor, groupCreateInput.parse(req.body).name)); });
   router.post('/join', boundedWindowLimiter({ max: 10, windowMs: 60000, key: apiIdentity }), async (req, res) => { res.json(await groups.requestJoin(res.locals.actor, z.object({ token: invitationToken }).parse(req.body).token)); });
@@ -69,6 +71,7 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
   router.delete('/:groupId/shares/:shareId/comments/:commentId', async (req, res) => { res.json(await groups.withdrawComment(...args(res), uuid.parse(req.params.shareId), uuid.parse(req.params.commentId))); });
   router.put('/:groupId/shares/:shareId/prayed', async (req, res) => { res.json(await groups.prayForShare(...args(res), uuid.parse(req.params.shareId))); });
   router.get('/:groupId/care', async (req, res) => { res.json(await groups.listCare(...args(res), offset(req), req.query.watching === 'true')); });
+  router.get('/:groupId/care/:careId', async (req,res) => { res.json(await groups.getCare(...args(res),uuid.parse(req.params.careId))); });
   router.put('/:groupId/care/:careId', async (req, res) => { res.json(await groups.createCare(...args(res), uuid.parse(req.params.careId), careInput.parse(req.body))); });
   router.patch('/:groupId/care/:careId', async (req, res) => { res.json(await groups.editCare(...args(res), uuid.parse(req.params.careId), z.object({ version: z.number().int().positive() }).parse(req.body).version, careInput.parse(req.body))); });
   router.delete('/:groupId/care/:careId', async (req, res) => { res.json(await groups.withdrawCare(...args(res), uuid.parse(req.params.careId))); });

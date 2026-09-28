@@ -68,6 +68,7 @@
     { "idx": 15, "version": "7", "when": 1790467200001, "tag": "0015_capacity_indexes", "breakpoints": true },
     { "idx": 16, "version": "7", "when": 1790553600000, "tag": "0016_families", "breakpoints": true },
     { "idx": 17, "version": "7", "when": 1790553600001, "tag": "0017_grace_book", "breakpoints": true },
-    { "idx": 18, "version": "7", "when": 1790553600002, "tag": "0018_care_visits", "breakpoints": true }
+    { "idx": 18, "version": "7", "when": 1790553600002, "tag": "0018_care_visits", "breakpoints": true },
+    { "idx": 19, "version": "7", "when": 1790553600003, "tag": "0019_leader_dashboard", "breakpoints": true }
   ]
 }
