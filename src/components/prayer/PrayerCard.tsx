@@ -43,6 +43,10 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
   return <article aria-label={`代禱：${prayer.content.split('\n')[0]}`} className="min-w-0 bg-card">
     <div className="px-3 pt-2 md:hidden">
       <button type="button" className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={mobileExpanded} aria-controls={`${detailsId} ${actionsId}`} aria-label={`${mobileExpanded ? '收合' : '展開'}代禱：${prayer.authorName}，${summary}`} onClick={() => setMobileExpanded(value => !value)}>
+        <Avatar className="h-8 w-8 shrink-0" aria-hidden="true">
+          {!prayer.isAnonymous && prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt="" />}
+          <AvatarFallback className="bg-primary/10 text-xs text-primary">{prayer.isAnonymous ? <User className="h-4 w-4" /> : prayer.authorName.charAt(0).toUpperCase()}</AvatarFallback>
+        </Avatar>
         <span className="max-w-[28%] shrink-0 truncate text-sm font-semibold" title={prayer.authorName}>{prayer.authorName}</span>
         {isUrgentPrayer(prayer) && <AlertCircle role="img" aria-label="緊急代禱" className="h-3.5 w-3.5 shrink-0 text-red-700 dark:text-red-300" />}
         {prayer.isPinned && <Pin role="img" aria-label="置頂" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
@@ -55,7 +59,7 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
         <p className="min-w-0 self-center text-xs text-muted-foreground [overflow-wrap:anywhere] md:hidden">{prayer.authorName} · {timeAgo}</p>
         <div className="hidden min-w-0 items-center gap-2 md:flex">
           <Avatar className="h-8 w-8 shrink-0">
-            {prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt={prayer.authorName} />}
+            {!prayer.isAnonymous && prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt={prayer.authorName} />}
             <AvatarFallback className="bg-primary/10 text-xs text-primary">{prayer.isAnonymous ? <User className="h-4 w-4" /> : prayer.authorName.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="min-w-0"><p className="break-words text-sm font-semibold">{prayer.authorName}</p><p className="text-xs text-muted-foreground">{timeAgo}</p></div>

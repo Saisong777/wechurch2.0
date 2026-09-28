@@ -416,6 +416,7 @@ Shared text stays separate from private notes. See `design/daily-public-walls-20
   confirmation. Composer appears before reply history, with a full-width submit.
 - See `design/prayer-response-ux-2026-09-28.md` for the mobile response redesign.
 - Mobile prayers now default to compact author/summary rows with three reactions;
+  retain a 32px member avatar beside the name, with an anonymous icon for private identity.
   explicit expand reveals the unchanged details/actions without unmounting drafts.
   Desktop stays expanded. See `design/prayer-mobile-list-2026-09-28.md`.
 - Anonymous authors stay anonymous in replies; collapsed posts fetch only counts.

@@ -19,7 +19,7 @@ const cli = path.join(process.env.HOME, '.codex/skills/playwright/scripts/playwr
 let evidence;
 try {
   stagingSql(`BEGIN;
-    INSERT INTO users(id,email,password,display_name,church) VALUES(${sql(id)},${sql(email)},'!disabled-fixture','禱告驗收帳號','IM 行動教會');
+    INSERT INTO users(id,email,password,display_name,church,avatar_url) VALUES(${sql(id)},${sql(email)},'!disabled-fixture','禱告驗收帳號','IM 行動教會',${sql(target.origin+'/icon-512.png')});
     INSERT INTO auth_users(id,email) VALUES(${sql(authId)},${sql(email)});
     INSERT INTO user_roles(user_id,role) VALUES(${sql(id)},'member');
     INSERT INTO small_groups(id,name,church,leader_user_id) VALUES(${sql(group)},'禱告驗收小家','IM 行動教會',${sql(id)});
@@ -73,10 +73,16 @@ try {
       await dialog.waitFor({state:'hidden'});
       const extra=await page.context().request.post(origin+'/api/prayers',{headers:{Origin:origin},data:{content:shared+'，這是一段較長的禱告需求，用來確認手機摘要不會撐開版面。',category:'supplication',isAnonymous:false}});
       if(!extra.ok()) throw Error('Compact-list fixture failed');
+      const extraPrayer=await extra.json();
       await page.goto(origin+'/prayer-wall');
       await page.getByRole('searchbox',{name:'搜尋禱告牆'}).fill(shared);
       const wall=page.getByRole('article',{name:'代禱：'+title,exact:true});
       await wall.waitFor();
+      const named=page.getByRole('article',{name:'代禱：'+extraPrayer.content,exact:true});
+      const photo=named.locator('img:visible');
+      await photo.waitFor();
+      if(!await photo.evaluate(img=>img.complete&&img.naturalWidth>0)) throw Error('Member avatar did not load');
+      if(await wall.locator('img').count()) throw Error('Anonymous prayer leaked an avatar');
       if(width===390){
         if(await wall.getByRole('button',{name:/寫下鼓勵/}).isVisible()) throw Error('Mobile prayer must start collapsed');
         await wall.getByRole('button',{name:/愛心/}).click();
@@ -85,6 +91,8 @@ try {
         for(const narrow of [390,320]){
           await page.setViewportSize({width:narrow,height:844});
           if((await wall.boundingBox()).height>140) throw Error('Compact row too tall');
+          const photoBounds=await photo.boundingBox();
+          if(photoBounds.width!==32||photoBounds.height!==32) throw Error('Compact avatar must remain 32px');
           await screenshot(narrow+'-compact-list');
         }
         await page.setViewportSize({width,height:844});

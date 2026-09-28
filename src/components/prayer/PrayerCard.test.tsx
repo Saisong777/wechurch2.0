@@ -5,6 +5,11 @@ import { PrayerCard } from './PrayerCard';
 import type { Prayer } from '@/hooks/usePrayerWall';
 
 const state = vi.hoisted(() => ({ admin:false, mutate:vi.fn(), busy:false }));
+vi.mock('@/components/ui/avatar',()=>({
+  Avatar:({children,...props}:React.HTMLAttributes<HTMLSpanElement>)=><span {...props}>{children}</span>,
+  AvatarImage:(props:React.ImgHTMLAttributes<HTMLImageElement>)=><img {...props}/>,
+  AvatarFallback:({children}:React.PropsWithChildren)=><span>{children}</span>,
+}));
 vi.mock('@/hooks/useUserRole', () => ({useUserRole:()=>({isAdmin:state.admin})}));
 vi.mock('@/hooks/usePrayerWall', () => {
   const mutation = () => ({mutate:state.mutate,isPending:state.busy});
@@ -25,6 +30,16 @@ it('keeps owner management tucked away and exposes all existing actions with key
 it('does not expose owner controls to another member',()=>{
   render(<PrayerCard prayer={{...prayer,isOwner:false}}/>);
   expect(screen.queryByRole('button',{name:'管理禱告'})).toBeNull();
+});
+it('keeps the photo next to the name in the compact row',()=>{
+  render(<PrayerCard prayer={{...prayer,isAnonymous:false,authorName:'測試成員',authorAvatar:'/member-photo.png'}}/>);
+  const row=screen.getByRole('button',{name:'展開代禱：測試成員，為家人禱告'});
+  expect(row.querySelector('img')).toHaveAttribute('src','/member-photo.png');
+  expect(row.querySelector('img')?.parentElement).toHaveClass('h-8','w-8','shrink-0');
+});
+it('never renders a supplied member photo on anonymous prayers',()=>{
+  render(<PrayerCard prayer={{...prayer,authorAvatar:'/private-photo.png'}}/>);
+  expect(document.querySelector('img')).toBeNull();
 });
 it('toggles mobile details without unmounting the original actions',()=>{
   render(<PrayerCard prayer={{...prayer,content:'為家人禱告\n需要完整保留的需求',isUrgent:true}}/>);
