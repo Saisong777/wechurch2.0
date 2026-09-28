@@ -10,7 +10,7 @@ const contact = (id: string, changes: Partial<PotentialMember> = {}): PotentialM
   createdAt: '2026-09-10T12:00:00Z', updatedAt: '2026-09-10T12:00:00Z', ...changes,
 });
 const snapshot: CrmSnapshot = {
-  users: [{ id: 'u1', email: 'LEADER@example.invalid', displayName: '測試小組長', church: 'iM', createdAt: '2026-09-10T12:00:00Z' }],
+  users: [{ id: 'u1', email: 'LEADER@example.invalid', displayName: '測試小家長', church: 'iM', createdAt: '2026-09-10T12:00:00Z' }],
   roles: [{ userId: 'u1', role: 'leader' }],
   potentialMembers: [contact('linked', { userId: 'u1' }), contact('pending'), contact('declined', { status: 'declined' })],
 };
@@ -35,7 +35,7 @@ describe('CRM member snapshot', () => {
   });
   it('searches Chinese labels, trimmed words and case-insensitive email', () => {
     const members = mergeCrmMembers(snapshot);
-    expect(filterCrmMembers(members, { tab: 'all', search: '  小組長 leader@  ' }).map(m => m.id)).toEqual(['u1']);
+    expect(filterCrmMembers(members, { tab: 'all', search: '  小家長 leader@  ' }).map(m => m.id)).toEqual(['u1']);
     expect(filterCrmMembers(members, { tab: 'all', search: '待跟進' }).map(m => m.id)).toEqual(['pending']);
     expect(filterCrmMembers(members, { tab: 'all', search: '不存在' })).toEqual([]);
   });

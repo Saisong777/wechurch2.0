@@ -99,7 +99,7 @@ it.each(['/login', '/admin/crm', '/user/study/session'])('preserves dedicated na
 
 it('labels nested destinations specifically', () => {
   expect(mobilePageTitle('/learn/church-reading')).toBe('每日靈修');
-  expect(mobilePageTitle('/groups/123')).toBe('我的小組');
+  expect(mobilePageTitle('/groups/123')).toBe('我的小家');
   expect(mobilePageTitle('/unavailable')).toBe('WeChurch');
 });
 

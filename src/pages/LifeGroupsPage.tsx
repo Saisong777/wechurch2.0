@@ -14,21 +14,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { careStatuses, type GroupCare, type GroupComment, type GroupMember, type GroupShare, type GroupSummary, type CareUpdate, type ShareSource } from '@shared/lifeGroup';
 import { taipeiToday } from '@shared/churchDevotion';
 import { toast } from 'sonner';
+import { QRCodeSVG } from 'qrcode.react';
+import { FamilyJoinPanel } from '@/components/groups/FamilyJoinPanel';
+import { FamilyManagement } from '@/components/groups/FamilyManagement';
+import { familyBase as base, familyRequest as request, useFamilyQuery as useGroupQuery } from '@/lib/familyApi';
 
-const base = '/api/life-groups';
 const selectClass = 'h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm';
-async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-  const r = await fetch(base + path, { method, credentials: 'include', ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || '未完成，請重試。');
-  return data;
-}
-function useGroupQuery<T>(path: string, enabled = true) {
-  const { user } = useAuth();
-  return useQuery<T>({ queryKey: [base, user?.id, path], queryFn: () => request<T>(path), enabled: !!user && enabled, staleTime: 0, refetchInterval: 15000, retry: false });
-}
 function Notice({ error, retry }: { error?: Error | null; retry?: () => void }) {
-  return <div role="alert" className="space-y-3 py-5"><p>{error?.message || '暫時無法讀取小組資料。'}</p>{retry && <Button variant="outline" onClick={retry}><RefreshCw className="mr-2 h-4 w-4" />重新載入</Button>}</div>;
+  return <div role="alert" className="space-y-3 py-5"><p>{error?.message || '暫時無法讀取小家資料。'}</p>{retry && <Button variant="outline" onClick={retry}><RefreshCw className="mr-2 h-4 w-4" />重新載入</Button>}</div>;
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block min-w-0 space-y-1.5 text-sm"><span>{label}</span>{children}</label>;
@@ -46,7 +39,6 @@ export default function LifeGroupsPage() {
   const [search] = useSearchParams();
   const q = useGroupQuery<{ groups: GroupSummary[]; requests: Array<{ id: string; name: string; status: string }>; canCreate: boolean }>('');
   const client = useQueryClient();
-  const [name, setName] = useState('');
   const [token, setToken] = useState(pendingGroupInvitation);
   useEffect(() => {
     if (token && window.location.hash.startsWith('#invite=')) {
@@ -58,40 +50,38 @@ export default function LifeGroupsPage() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  async function submit(action: 'create' | 'join') {
+  async function submit() {
     setBusy(true); setError('');
     try {
-      if (action === 'create') { const group = await request<{ id: string }>('', 'POST', { name }); setName(''); navigate(`/groups/${group.id}`); }
-      else { const result = await request<{ status: string }>('/join', 'POST', { token }); clearGroupInvitation(); setToken(''); toast.success(result.status === 'approved' ? '你已是小組成員' : '申請已送出，等候小組長確認'); }
+      const result = await request<{ status: string }>('/join', 'POST', { token }); clearGroupInvitation(); setToken(''); toast.success(result.status === 'approved' ? '你已是小家成員' : '申請已送出，等候小家長確認');
       await client.invalidateQueries({ queryKey: [base] });
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  if (loading) return <><Header title="我的小組" backTo="/" /><p role="status" className="p-6">載入中…</p></>;
-  if (!user) return <><Header title="我的小組" backTo="/" /><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-semibold">{token ? '你收到一份小組邀請' : '我的小組'}</h1><Button asChild><Link to={`/login?${token ? 'mode=signup&' : ''}returnTo=${encodeURIComponent('/groups' + window.location.hash)}`}>{token ? '登入或建立帳號' : '登入小組'}</Link></Button></main></>;
-  return <div className="min-h-screen bg-background pb-6 [overflow-wrap:anywhere]">
-    <Header title="我的小組" backTo="/" />
+  if (loading) return <><Header title="我的小家" backTo="/" /><p role="status" className="p-6">載入中…</p></>;
+  if (!user) return <><Header title="我的小家" backTo="/" /><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-semibold">{token ? '你收到一份小家邀請' : '我的小家'}</h1><Button asChild><Link to={`/login?${token ? 'mode=signup&' : ''}returnTo=${encodeURIComponent('/groups' + window.location.hash)}`}>{token ? '登入或建立帳號' : '登入小家'}</Link></Button></main></>;
+  return <div className="bg-background pb-6 [overflow-wrap:anywhere]">
+    <Header title="我的小家" backTo="/" />
     <main className="mx-auto max-w-5xl px-4 py-5">
-      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小組" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">所有小組</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
-      {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}`} id={groupId} initialTab={search.get('view') || 'reading'} /> : q.isPending ? <p role="status">載入小組中…</p> : <>
-        <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'reading'}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小組管理' : ''}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
-        {!q.data?.groups.length && <p className="py-6 text-muted-foreground">目前尚未加入小組。</p>}
-        {q.data?.requests.map(r => <p key={r.id} className="border-b py-3 text-sm">{r.name} · {r.status === 'pending' ? '等待小組長確認' : '申請未通過，請聯絡小組長'}</p>)}
-        <div className="mt-7 grid gap-8 border-t pt-6 sm:grid-cols-2">
-          <form onSubmit={e => { e.preventDefault(); void submit('join'); }} className="space-y-3"><h2 className="text-lg font-semibold">加入小組</h2><Field label="小組邀請碼"><Input value={token} maxLength={48} required autoComplete="off" onChange={e => setToken(e.target.value.trim())} /></Field><Button disabled={busy || !token}>送出加入申請</Button></form>
-          {q.data?.canCreate && <form onSubmit={e => { e.preventDefault(); void submit('create'); }} className="space-y-3"><h2 className="text-lg font-semibold">建立小組</h2><Field label="小組名稱"><Input value={name} maxLength={160} required onChange={e => setName(e.target.value)} /></Field><Button disabled={busy || !name.trim()} variant="outline"><Plus className="mr-2 h-4 w-4" />建立</Button></form>}
-        </div>{error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">所有小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
+      {search.get('manage') === '1' ? <FamilyManagement /> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}`} id={groupId} initialTab={search.get('view') || 'all'} /> : q.isPending ? <p role="status">載入小家中…</p> : <>
+        <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'all'}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小家管理' : ''}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
+        {!q.data?.groups.length && <p className="py-6 text-muted-foreground">目前尚未加入小家。</p>}
+        {q.data?.requests.map(r => <p key={r.id} className="border-b py-3 text-sm">{r.name} · {r.status === 'pending' ? '等待小家長確認' : '申請未通過，請聯絡小家長'}</p>)}
+        <FamilyJoinPanel token={token} setToken={setToken} join={() => void submit()} joining={busy} />
+        {(q.data?.canCreate || q.data?.groups.some(g => g.manager)) && <Button asChild variant="outline" className="mt-6"><Link to="/groups?manage=1">牧養小家管理<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}
+        {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       </>}
     </main>
   </div>;
 }
 
-type Info = { id: string; name: string; manager: boolean; members: GroupMember[]; requests: Array<{ id: string; name: string }> };
+type Info = { id: string; name: string; manager: boolean; members: GroupMember[]; requests: Array<{ id: string; name: string }>; announcement?: string; meeting?: string; description?: string; status?: string };
 function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) {
   const { user } = useAuth();
   const q = useGroupQuery<Info>(`/${id}`);
-  const [tab, setTab] = useState(['reading','note','prayer','care'].includes(initialTab) ? initialTab : 'reading');
+  const [tab, setTab] = useState(['reading','note','prayer','message','all','care','info'].includes(initialTab) ? initialTab : 'all');
   const [membersOpen, setMembersOpen] = useState(false);
-  const [compose, setCompose] = useState<{ kind: 'note' | 'prayer'; reference?: string; existing?: GroupShare } | null>(null);
+  const [compose, setCompose] = useState<{ kind: GroupShare['kind']; reference?: string; existing?: GroupShare } | null>(null);
   const [careOpen, setCareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -102,18 +92,26 @@ function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) 
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   if (q.isError) return <Notice error={q.error as Error} retry={() => q.refetch()} />;
-  if (!q.data) return <p role="status">正在載入小組…</p>;
+  if (!q.data) return <p role="status">正在載入小家…</p>;
   const info = q.data;
   return <>
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold">{info.name}</h2><p className="mt-1 text-sm text-muted-foreground">僅此小組成員可見 · {info.members.length} 位成員</p></div><Button variant="outline" onClick={() => setMembersOpen(true)}><Users className="mr-2 h-4 w-4" />成員{info.requests.length > 0 && ` (${info.requests.length})`}</Button></div>
-    <div role="tablist" aria-label="小組生活" className="mb-5 grid grid-cols-4 border-b">{([['reading','一起讀經',BookOpen],['note','靈修分享',Pencil],['prayer','小組代禱',Heart],['care','共同關懷',HandHeart]] as const).map(([key,label,Icon]) => <button key={key} role="tab" aria-selected={tab === key} onClick={() => { setTab(key); setError(''); }} className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 border-b-2 px-1 text-sm sm:flex-row sm:gap-2 ${tab === key ? 'border-primary font-semibold text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}><Icon className="h-4 w-4 shrink-0" />{label}</button>)}</div>
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold">{info.name}</h2><p className="mt-1 text-sm text-muted-foreground">僅此小家成員可見 · {info.members.length} 位成員</p></div><Button variant="outline" onClick={() => setMembersOpen(true)}><Users className="mr-2 h-4 w-4" />成員{info.requests.length > 0 && ` (${info.requests.length})`}</Button></div>
+    {info.meeting && <p className="mb-4 text-sm text-muted-foreground">{info.meeting}</p>}
+    {info.announcement && <section className="mb-5 border-y py-4"><h3 className="text-sm font-semibold text-primary">小家公告</h3><p className="mt-2 whitespace-pre-wrap leading-7">{info.announcement}</p></section>}
+    {info.status === 'paused' && <p className="mb-4 text-sm text-muted-foreground">小家暫停聚會與招募，既有成員仍可彼此關心。</p>}
+    <div role="tablist" aria-label="小家生活" className="mb-5 grid grid-cols-3 border-b">{([['all','小家動態',MessageCircle],['reading','一起讀經',BookOpen],['info','小家資訊',Users]] as const).map(([key,label,Icon]) => { const selected = key === 'all' ? ['all','note','prayer','message'].includes(tab) : key === 'info' ? ['info','care'].includes(tab) : tab === key; return <button key={key} role="tab" aria-selected={selected} onClick={() => { if (compose && !window.confirm('放棄尚未送出的分享？')) return; setCompose(null); setTab(key); setError(''); }} className={`flex min-h-14 min-w-0 items-center justify-center gap-2 border-b-2 px-1 text-sm ${selected ? 'border-primary font-semibold text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}><Icon className="h-4 w-4 shrink-0" />{label}</button>; })}</div>
     {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
     <div role="tabpanel">
       {tab === 'reading' && <Reading id={id} actor={user!.id} busy={busy} act={act} onShare={reference => setCompose({ kind: 'note', reference })} />}
-      {(tab === 'note' || tab === 'prayer') && <ShareFeed key={tab} id={id} kind={tab} info={info} actor={user!.id} busy={busy} act={act} compose={existing => setCompose({ kind: tab, existing })} />}
+      {['all','note','prayer','message'].includes(tab) && <>
+        <div className="mb-4 flex flex-wrap gap-2">{([['all','全部'],['note','亮光'],['prayer','代禱'],['message','生活']] as const).map(([key,label]) => <Button key={key} size="sm" variant={tab === key ? 'secondary' : 'ghost'} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</Button>)}</div>
+        {compose && <ShareComposer key={compose.existing?.id || compose.kind} id={id} groupName={info.name} {...compose} close={() => setCompose(null)} />}
+        <ShareFeed key={tab} id={id} kind={tab as GroupShare['kind'] | 'all'} info={info} actor={user!.id} busy={busy} act={act} compose={(kind,existing) => { if (compose && !window.confirm('放棄尚未送出的分享？')) return; setCompose({ kind, existing }); }} />
+      </>}
+      {tab === 'info' && <section className="space-y-5"><p className="whitespace-pre-wrap">{info.description}</p><div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => setMembersOpen(true)}><Users className="mr-2 h-4 w-4" />成員與邀請</Button><Button variant="outline" onClick={() => setTab('care')}><HandHeart className="mr-2 h-4 w-4" />共同關懷</Button>{info.manager && <Button asChild variant="outline"><Link to="/groups?manage=1">管理小家</Link></Button>}</div></section>}
       {tab === 'care' && <CareFeed id={id} actor={user!.id} info={info} create={() => setCareOpen(true)} busy={busy} act={act} />}
     </div>
-    {compose && <ShareComposer id={id} groupName={info.name} {...compose} close={() => setCompose(null)} />}
+    {compose && tab === 'reading' && <ShareComposer id={id} groupName={info.name} {...compose} close={() => setCompose(null)} />}
     {careOpen && <CareComposer id={id} info={info} close={() => setCareOpen(false)} />}
     {membersOpen && <Members id={id} info={info} actor={user!.id} close={() => setMembersOpen(false)} />}
   </>;
@@ -144,24 +142,24 @@ function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string;
       {scripture.isFetching && !entry.scriptureText && !reading?.previewVerses.length && <p role="status" className="text-sm text-muted-foreground">正在載入經文…</p>}
       {reading && <ScriptureSection key={`${date}:${entry.reference}`} reading={reading} retry={() => scripture.refetch()} />}
       <p className="whitespace-pre-wrap leading-8">{entry.body}</p>{entry.prayer && <div className="border-l-2 border-rose-300 pl-4"><h4 className="mb-2 text-sm font-semibold">回應禱告</h4><p className="whitespace-pre-wrap leading-7">{entry.prayer}</p></div>}{entry.loveAction && <div className="border-l-2 border-emerald-300 pl-4"><h4 className="mb-2 text-sm font-semibold">愛人行動</h4><p className="whitespace-pre-wrap leading-7">{entry.loveAction}</p></div>}
-      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小組分享已讀'}</Button><Button onClick={() => onShare(entry.reference)}><Pencil className="mr-2 h-4 w-4" />分享今日領受</Button></div>
+      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小家分享已讀'}</Button><Button onClick={() => onShare(entry.reference)}><Pencil className="mr-2 h-4 w-4" />分享今日領受</Button></div>
       <p className="text-sm text-muted-foreground">{q.data!.readers.length ? `分享已讀：${q.data!.readers.map(r => r.name).join('、')}` : '還沒有人分享已讀。'}</p>
     </>}
   </section>;
 }
 
-function ShareFeed({ id, kind, info, actor, busy, act, compose }: { id: string; kind: 'note' | 'prayer'; info: Info; actor: string; busy: boolean; act: Act; compose: (existing?: GroupShare) => void }) {
+function ShareFeed({ id, kind, info, actor, busy, act, compose }: { id: string; kind: GroupShare['kind'] | 'all'; info: Info; actor: string; busy: boolean; act: Act; compose: (kind: GroupShare['kind'], existing?: GroupShare) => void }) {
   const [page, setPage] = useState(0);
   const [comments, setComments] = useState<GroupShare | null>(null);
   const q = useGroupQuery<GroupShare[]>(`/${id}/shares?kind=${kind}&offset=${page * 30}`);
-  return <section className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><Link className="py-2 text-sm text-muted-foreground underline" to={kind === 'note' ? '/learn/my-notes' : '/grace-record'}>{kind === 'note' ? '我的私人筆記' : '我的私人禱告'}</Link><Button onClick={() => compose()}><Plus className="mr-2 h-4 w-4" />{kind === 'note' ? '分享靈修筆記' : '新增小組代禱'}</Button></div>
+  return <section className="space-y-4"><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => compose('note')}><Pencil className="mr-2 h-4 w-4" />分享靈修筆記</Button><Button variant="outline" onClick={() => compose('prayer')}><Heart className="mr-2 h-4 w-4" />新增小家代禱</Button><Button variant="outline" onClick={() => compose('message')}><MessageCircle className="mr-2 h-4 w-4" />生活留言</Button></div>
     {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : q.isPending ? <p role="status">載入分享中…</p> : <>
-      {!q.data.length && <p className="py-6 text-center text-muted-foreground">{page ? '沒有更多分享。' : kind === 'note' ? '還沒有靈修分享。' : '還沒有小組代禱。'}</p>}
-      <div className="space-y-4">{q.data.map(post => <article key={post.id} className="min-w-0 rounded-lg border p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{post.authorName} · {time(post.createdAt)}{post.answered && ' · 已蒙應允'}</p><h3 className="mt-2 text-lg font-semibold">{post.title}</h3></div><div className="flex">{(post.isOwner || post.authorId === actor) && <Button size="icon" variant="ghost" title="編輯分享" aria-label={`編輯 ${post.title}`} onClick={() => compose(post)}><Pencil className="h-4 w-4" /></Button>}{((post.isOwner || post.authorId === actor) || info.manager) && <Button size="icon" variant="ghost" title="撤回分享" aria-label={`撤回 ${post.title}`} disabled={busy} onClick={() => { if (window.confirm('撤回這則分享及其回應？私人原稿不受影響。')) void act(() => request(`/${id}/shares/${post.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></div>{post.reference && <p className="mt-2 text-sm font-medium text-primary">{post.reference}</p>}<p className="mt-3 whitespace-pre-wrap text-sm leading-7">{post.body}</p><div className="mt-4 flex flex-wrap gap-3 border-t pt-3">{kind === 'prayer' && <Button size="sm" variant={post.prayed ? 'secondary' : 'outline'} disabled={busy || post.prayed} onClick={() => void act(() => request(`/${id}/shares/${post.id}/prayed`, 'PUT', {}))}><Heart className="mr-2 h-4 w-4" />{post.prayed ? '已為你禱告' : '為你禱告'} · {post.prayerCount}</Button>}<Button size="sm" variant="ghost" onClick={() => setComments(post)}><MessageCircle className="mr-2 h-4 w-4" />回應 {post.commentCount}</Button></div></article>)}</div><Pages page={page} setPage={setPage} count={q.data.length} />
+      {!q.data.length && <p className="py-6 text-center text-muted-foreground">{page ? '沒有更多分享。' : '還沒有分享，來和家人打聲招呼吧。'}</p>}
+      <div className="space-y-4">{q.data.map(post => <article key={post.id} className="min-w-0 rounded-lg border p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{post.authorName} · {time(post.createdAt)}{post.answered && ' · 已蒙應允'}</p><h3 className="mt-2 text-lg font-semibold">{post.title}</h3></div><div className="flex">{(post.isOwner || post.authorId === actor) && <Button size="icon" variant="ghost" title="編輯分享" aria-label={`編輯 ${post.title}`} onClick={() => compose(post.kind, post)}><Pencil className="h-4 w-4" /></Button>}{((post.isOwner || post.authorId === actor) || info.manager) && <Button size="icon" variant="ghost" title="撤回分享" aria-label={`撤回 ${post.title}`} disabled={busy} onClick={() => { if (window.confirm('撤回這則分享及其回應？私人原稿不受影響。')) void act(() => request(`/${id}/shares/${post.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></div>{post.reference && <p className="mt-2 text-sm font-medium text-primary">{post.reference}</p>}<p className="mt-3 whitespace-pre-wrap text-sm leading-7">{post.body}</p><div className="mt-4 flex flex-wrap gap-3 border-t pt-3">{post.kind === 'prayer' && <Button size="sm" variant={post.prayed ? 'secondary' : 'outline'} disabled={busy || post.prayed} onClick={() => void act(() => request(`/${id}/shares/${post.id}/prayed`, 'PUT', {}))}><Heart className="mr-2 h-4 w-4" />{post.prayed ? '已為你禱告' : '為你禱告'} · {post.prayerCount}</Button>}<Button size="sm" variant="ghost" onClick={() => setComments(post)}><MessageCircle className="mr-2 h-4 w-4" />回應 {post.commentCount}</Button></div></article>)}</div><Pages page={page} setPage={setPage} count={q.data.length} />
     </>}{comments && <Comments id={id} post={comments} actor={actor} manager={info.manager} close={() => setComments(null)} />}
   </section>;
 }
-function ShareComposer({ id, groupName, kind, reference = '', existing, close }: { id: string; groupName: string; kind: 'note' | 'prayer'; reference?: string; existing?: GroupShare; close: () => void }) {
+function ShareComposer({ id, groupName, kind, reference = '', existing, close }: { id: string; groupName: string; kind: GroupShare['kind']; reference?: string; existing?: GroupShare; close: () => void }) {
   const [mutationId] = useState(() => existing?.id || crypto.randomUUID());
   const [title, setTitle] = useState(existing?.title || '');
   const [body, setBody] = useState(existing?.body || '');
@@ -173,25 +171,26 @@ function ShareComposer({ id, groupName, kind, reference = '', existing, close }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const client = useQueryClient();
-  const q = useGroupQuery<ShareSource[]>(`/sources?kind=${kind}`, !existing);
+  const q = useGroupQuery<ShareSource[]>(`/sources?kind=${kind}`, !existing && kind !== 'message');
+  useEffect(() => { document.getElementById('family-composer')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); }, []);
   const dirty = title !== (existing?.title || '') || body !== (existing?.body || '') || ref !== (existing?.reference || reference) || answered !== (existing?.answered || false);
-  return <Dialog open onOpenChange={open => { if (!open && !busy && (!dirty || window.confirm('放棄尚未送出的內容？'))) close(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl [overflow-wrap:anywhere]"><DialogHeader><DialogTitle>{existing ? '編輯分享' : kind === 'note' ? '分享靈修筆記' : '新增小組代禱'}</DialogTitle><DialogDescription>分享對象：{groupName} 全體成員；私人原稿不變。</DialogDescription></DialogHeader>
-    <form onSubmit={async e => { e.preventDefault(); setBusy(true); setError(''); try { await request(`/${id}/shares/${mutationId}`, existing ? 'PATCH' : 'PUT', existing ? { title, body, reference: ref, version: existing.version, answered } : { kind, title, body, reference: ref, sourceId: sourceId || null, consent, anonymous }); await client.invalidateQueries({ queryKey: [base] }); close(); toast.success('已分享至小組'); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><fieldset disabled={busy} className="min-w-0 space-y-4">
-      {!existing && <Field label={kind === 'note' ? '選擇已儲存的私人筆記' : '選擇私人禱告'}><select className={selectClass} value={sourceId} onChange={e => { const source = q.data?.find(s => s.id === e.target.value); setSourceId(e.target.value); if (source) { setTitle(source.title.slice(0,160)); setBody(source.body); setRef(source.reference); } }}><option value="">自行填寫</option>{q.data?.map(source => <option key={source.id} value={source.id}>{source.title}</option>)}</select>{q.isError && <span role="status" className="block text-xs text-destructive">私人內容載入失敗，仍可自行填寫。</span>}</Field>}
+  return <section id="family-composer" className="mx-auto mb-6 max-w-2xl scroll-mt-28 space-y-4 border-y py-5 [overflow-wrap:anywhere]"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">{existing ? '編輯分享' : kind === 'note' ? '分享靈修筆記' : kind === 'prayer' ? '新增小家代禱' : '生活留言'}</h3><Button variant="ghost" disabled={busy} onClick={() => { if (!dirty || window.confirm('放棄尚未送出的內容？')) close(); }}>取消</Button></div><p className="text-sm text-muted-foreground">分享對象：{groupName} 成員；私人原稿不變。</p>
+    <form onSubmit={async e => { e.preventDefault(); setBusy(true); setError(''); try { await request(`/${id}/shares/${mutationId}`, existing ? 'PATCH' : 'PUT', existing ? { title, body, reference: ref, version: existing.version, answered } : { kind, title, body, reference: ref, sourceId: sourceId || null, consent, anonymous }); await client.invalidateQueries({ queryKey: [base] }); close(); toast.success('已分享至小家'); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><fieldset disabled={busy} className="min-w-0 space-y-4">
+      {!existing && kind !== 'message' && <Field label={kind === 'note' ? '選擇已儲存的私人筆記' : '選擇私人禱告'}><select className={selectClass} value={sourceId} onChange={e => { const source = q.data?.find(s => s.id === e.target.value); setSourceId(e.target.value); if (source) { setTitle(source.title.slice(0,160)); setBody(source.body); setRef(source.reference); } }}><option value="">自行填寫</option>{q.data?.map(source => <option key={source.id} value={source.id}>{source.title}</option>)}</select>{q.isError && <span role="status" className="block text-xs text-destructive">私人內容載入失敗，仍可自行填寫。</span>}</Field>}
       <Field label="分享標題"><Input required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></Field><Field label="經文出處（選填）"><Input maxLength={500} value={ref} onChange={e => setRef(e.target.value)} /></Field><Field label="分享內容"><Textarea required rows={8} maxLength={12000} value={body} onChange={e => setBody(e.target.value)} /></Field>
       {!existing && kind === 'prayer' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={anonymous} onChange={e => setAnonymous(e.target.checked)} />匿名分享</label>}
       {existing && kind === 'prayer' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={answered} onChange={e => setAnswered(e.target.checked)} />已蒙應允</label>}
       <label className="flex items-start gap-2 text-sm leading-6"><input className="mt-1.5" type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />我確認以上內容可分享給 {groupName}，不包含未經同意的他人私密資訊。</label>
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button disabled={!consent || !body.trim() || !title.trim()}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{existing ? '儲存修改' : '確認分享至小組'}</Button>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button disabled={!consent || !body.trim() || !title.trim()}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{existing ? '儲存修改' : '確認分享至小家'}</Button>
     </fieldset></form>
-  </DialogContent></Dialog>;
+  </section>;
 }
 function Comments({ id, post, actor, manager, close }: { id: string; post: GroupShare; actor: string; manager: boolean; close: () => void }) {
   const [body, setBody] = useState(''); const [mutationId, setMutationId] = useState(() => crypto.randomUUID()); const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const client = useQueryClient();
   const path = `/${id}/shares/${post.id}/comments`;
   const q = useGroupQuery<GroupComment[]>(`${path}?offset=${page * 30}`);
-  return <Dialog open onOpenChange={open => { if (!open && !busy && (!body || window.confirm('放棄尚未送出的回應？'))) close(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto [overflow-wrap:anywhere]"><DialogHeader><DialogTitle>小組回應</DialogTitle><DialogDescription>{post.title}</DialogDescription></DialogHeader>
+  return <Dialog open onOpenChange={open => { if (!open && !busy && (!body || window.confirm('放棄尚未送出的回應？'))) close(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto [overflow-wrap:anywhere]"><DialogHeader><DialogTitle>小家回應</DialogTitle><DialogDescription>{post.title}</DialogDescription></DialogHeader>
     {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : <>
       <form onSubmit={async e => { e.preventDefault(); setBusy(true); setError(''); try { await request(`${path}/${mutationId}`, 'PUT', { body }); setBody(''); setMutationId(crypto.randomUUID()); setPage(0); await client.invalidateQueries({ queryKey: [base] }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }} className="space-y-3"><Field label="寫下回應"><Textarea required maxLength={4000} value={body} onChange={e => setBody(e.target.value)} /></Field><Button disabled={busy || !body.trim()}>送出回應</Button></form>
       {q.data?.map(comment => <div key={comment.id} className="border-t pt-3"><div className="flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{comment.authorName} · {time(comment.createdAt)}</p>{(manager || comment.authorId === actor) && <Button disabled={busy} size="icon" variant="ghost" title="撤回回應" aria-label="撤回回應" onClick={async () => { if (!window.confirm('撤回這則回應？')) return; setBusy(true); try { await request(`${path}/${comment.id}`, 'DELETE'); await q.refetch(); await client.invalidateQueries({ queryKey: [base] }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><Trash2 className="h-4 w-4" /></Button>}</div><p className="mt-2 whitespace-pre-wrap text-sm leading-7">{comment.body}</p></div>)}<Pages page={page} setPage={setPage} count={q.data?.length || 0} />
@@ -205,7 +204,7 @@ function CareFeed({ id, actor, info, create, busy, act }: { id: string; actor: s
   return <section className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={watching} onChange={e => { setWatching(e.target.checked); setPage(0); }} />只看我關注的</label><Button onClick={create}><Plus className="mr-2 h-4 w-4" />新增關懷對象</Button></div>
     {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : q.isPending ? <p role="status">正在載入關懷…</p> : <>
       {!q.data.length && <p className="py-6 text-center text-muted-foreground">{watching ? '尚無關注的對象。' : '尚無共同關懷紀錄。'}</p>}
-      <div className="grid gap-4 sm:grid-cols-2">{q.data.map(care => <article key={care.id} className="min-w-0 rounded-lg border p-4"><div className="flex items-start justify-between gap-2"><div><span className={`text-xs ${care.status === 'completed' ? 'text-emerald-700' : 'text-muted-foreground'}`}>{careStatuses[care.status]}</span><h3 className="mt-1 text-lg font-semibold">{care.name}</h3></div><Button title={care.watching ? '取消關注' : '關注對象'} aria-label={`${care.watching ? '取消關注' : '關注'} ${care.name}`} aria-pressed={care.watching} variant="ghost" size="icon" disabled={busy} onClick={() => void act(() => request(`/${id}/care/${care.id}/watch`, 'PUT', { watch: !care.watching }))}><Star className={`h-5 w-5 ${care.watching ? 'fill-amber-200 text-amber-700' : ''}`} /></Button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-7">{care.need}</p><dl className="mt-4 space-y-2 border-t pt-3 text-sm"><div><dt className="text-muted-foreground">負責人</dt><dd>{info.members.find(m => m.id === care.responsibleId)?.name || (care.responsibleId ? '原負責人已離組，請重新指派' : '尚未認領')}</dd></div><div><dt className="text-muted-foreground">下一步</dt><dd>{care.nextAction || '尚未安排'}</dd></div><div><dt className="text-muted-foreground">跟進日期</dt><dd className={care.dueDate && care.dueDate < taipeiToday() && care.status !== 'completed' && care.status !== 'paused' ? 'text-amber-800' : ''}>{care.dueDate || '未設定'}</dd></div></dl><p className="mt-3 text-xs text-muted-foreground">{care.watcherCount} 人關注 · 更新 {time(care.updatedAt)}</p><div className="mt-4 flex items-center justify-between gap-2"><Button variant="outline" onClick={() => setSelected(care)}><MessageCircle className="mr-2 h-4 w-4" />進度與跟進</Button>{(care.creatorId === actor || info.manager) && <Button disabled={busy} size="icon" variant="ghost" title="撤回關懷對象" aria-label={`撤回關懷 ${care.name}`} onClick={() => { if (window.confirm('撤回此對象及跟進紀錄，讓小組不再看到？')) void act(() => request(`/${id}/care/${care.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></article>)}</div><Pages page={page} setPage={setPage} count={q.data.length} />
+      <div className="grid gap-4 sm:grid-cols-2">{q.data.map(care => <article key={care.id} className="min-w-0 rounded-lg border p-4"><div className="flex items-start justify-between gap-2"><div><span className={`text-xs ${care.status === 'completed' ? 'text-emerald-700' : 'text-muted-foreground'}`}>{careStatuses[care.status]}</span><h3 className="mt-1 text-lg font-semibold">{care.name}</h3></div><Button title={care.watching ? '取消關注' : '關注對象'} aria-label={`${care.watching ? '取消關注' : '關注'} ${care.name}`} aria-pressed={care.watching} variant="ghost" size="icon" disabled={busy} onClick={() => void act(() => request(`/${id}/care/${care.id}/watch`, 'PUT', { watch: !care.watching }))}><Star className={`h-5 w-5 ${care.watching ? 'fill-amber-200 text-amber-700' : ''}`} /></Button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-7">{care.need}</p><dl className="mt-4 space-y-2 border-t pt-3 text-sm"><div><dt className="text-muted-foreground">負責人</dt><dd>{info.members.find(m => m.id === care.responsibleId)?.name || (care.responsibleId ? '原負責人已離組，請重新指派' : '尚未認領')}</dd></div><div><dt className="text-muted-foreground">下一步</dt><dd>{care.nextAction || '尚未安排'}</dd></div><div><dt className="text-muted-foreground">跟進日期</dt><dd className={care.dueDate && care.dueDate < taipeiToday() && care.status !== 'completed' && care.status !== 'paused' ? 'text-amber-800' : ''}>{care.dueDate || '未設定'}</dd></div></dl><p className="mt-3 text-xs text-muted-foreground">{care.watcherCount} 人關注 · 更新 {time(care.updatedAt)}</p><div className="mt-4 flex items-center justify-between gap-2"><Button variant="outline" onClick={() => setSelected(care)}><MessageCircle className="mr-2 h-4 w-4" />進度與跟進</Button>{(care.creatorId === actor || info.manager) && <Button disabled={busy} size="icon" variant="ghost" title="撤回關懷對象" aria-label={`撤回關懷 ${care.name}`} onClick={() => { if (window.confirm('撤回此對象及跟進紀錄，讓小家不再看到？')) void act(() => request(`/${id}/care/${care.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></article>)}</div><Pages page={page} setPage={setPage} count={q.data.length} />
     </>}{selected && <CareProgress id={id} care={q.data?.find(c => c.id === selected.id) || selected} info={info} close={() => setSelected(null)} />}
   </section>;
 }
@@ -251,13 +250,13 @@ function CareProgress({ id, care, info, close }: { id: string; care: GroupCare; 
 }
 
 function Members({ id, info, actor, close }: { id: string; info: Info; actor: string; close: () => void }) {
-  const [invite, setInvite] = useState<{ token: string; expiresAt: string; url?: string } | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const client = useQueryClient(); const navigate = useNavigate();
+  const [invite, setInvite] = useState<{ token: string; code?: string; expiresAt: string; url?: string } | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const client = useQueryClient(); const navigate = useNavigate();
   async function act(path: string, method: string, body?: unknown) { setBusy(true); setError(''); try { await request(path, method, body); await client.invalidateQueries({ queryKey: [base] }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
   const invitationUrl = invite?.url ? new URL(invite.url, window.location.origin).href : '';
-  return <Dialog open onOpenChange={open => { if (!open && !busy) close(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto [overflow-wrap:anywhere]"><DialogHeader><DialogTitle>小組成員</DialogTitle><DialogDescription>{info.name}</DialogDescription></DialogHeader>
-    {invitationUrl && <div className="space-y-2"><Field label="邀請連結"><Input readOnly value={invitationUrl} onFocus={e => e.target.select()} /></Field><Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(invitationUrl); toast.success('邀請連結已複製'); } catch { setError('無法自動複製，請選取上方連結複製。'); } }}><Copy className="mr-2 h-4 w-4" />複製邀請連結</Button></div>}
-    {info.manager && <div className="space-y-3 border-b pb-4"><Button disabled={busy} variant="outline" onClick={async () => { if (!window.confirm('產生七天有效的新邀請碼？舊邀請碼會失效，新成員仍須審核。')) return; setBusy(true); setError(''); try { setInvite(await request(`/${id}/invite`, 'POST', {})); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>產生新邀請碼</Button>{invite && <><Field label="小組邀請碼"><Input readOnly value={invite.token} onFocus={e => e.target.select()} /></Field><p className="text-xs text-muted-foreground">有效至 {new Date(invite.expiresAt).toLocaleString('zh-TW')}</p></>}{info.requests.map(r => <div key={r.id} className="flex flex-wrap items-center gap-2 border-t pt-3"><span className="mr-auto">{r.name} · 申請加入</span><Button size="sm" disabled={busy} onClick={() => void act(`/${id}/requests/${r.id}`, 'POST', { approve: true })}>同意</Button><Button size="sm" variant="outline" disabled={busy} onClick={() => void act(`/${id}/requests/${r.id}`, 'POST', { approve: false })}>婉拒</Button></div>)}</div>}
-    {info.members.map(m => <div key={m.id} className="flex items-center justify-between gap-3 border-b py-2"><span className="text-sm">{m.name}{m.manager ? ' · 小組同工' : ''}{m.id === actor ? '（我）' : ''}</span>{!m.manager && info.manager && m.id !== actor && <Button size="icon" variant="ghost" disabled={busy} title="移出成員" aria-label={`移出 ${m.name}`} onClick={() => { if (window.confirm(`移出 ${m.name}？對方將不能再讀取小組內容。`)) void act(`/${id}/members/${m.id}`, 'DELETE'); }}><Trash2 className="h-4 w-4" /></Button>}</div>)}
-    {!info.manager && <Button variant="outline" disabled={busy} onClick={async () => { if (!window.confirm('退出小組？已分享的內容會保留在組內，請先撤回不想保留的內容。')) return; setBusy(true); try { await request(`/${id}/members/${actor}`, 'DELETE'); close(); navigate('/groups'); await client.invalidateQueries({ queryKey: [base] }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>退出小組</Button>}{error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+  return <Dialog open onOpenChange={open => { if (!open && !busy) close(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto [overflow-wrap:anywhere]"><DialogHeader><DialogTitle>小家成員</DialogTitle><DialogDescription>{info.name}</DialogDescription></DialogHeader>
+    {invitationUrl && <div className="space-y-3"><div className="mx-auto w-fit bg-white p-3"><QRCodeSVG value={invitationUrl} size={180} title="小家邀請 QR Code" /></div><Field label="邀請連結"><Input readOnly value={invitationUrl} onFocus={e => e.target.select()} /></Field><Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(invitationUrl); toast.success('邀請連結已複製'); } catch { setError('無法自動複製，請選取上方連結複製。'); } }}><Copy className="mr-2 h-4 w-4" />複製邀請連結</Button></div>}
+    {info.manager && <div className="space-y-3 border-b pb-4"><Button disabled={busy} variant="outline" onClick={async () => { if (!window.confirm('產生七天有效的新邀請碼？舊邀請碼會失效，新成員仍須審核。')) return; setBusy(true); setError(''); try { setInvite(await request(`/${id}/invite`, 'POST', {})); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>產生新邀請碼</Button>{invite && <><Field label="小家邀請碼"><Input readOnly value={invite.code || invite.token} onFocus={e => e.target.select()} /></Field><p className="text-xs text-muted-foreground">有效至 {new Date(invite.expiresAt).toLocaleString('zh-TW')}</p></>}{info.requests.map(r => <div key={r.id} className="flex flex-wrap items-center gap-2 border-t pt-3"><span className="mr-auto">{r.name} · 申請加入</span><Button size="sm" disabled={busy} onClick={() => void act(`/${id}/requests/${r.id}`, 'POST', { approve: true })}>同意</Button><Button size="sm" variant="outline" disabled={busy} onClick={() => void act(`/${id}/requests/${r.id}`, 'POST', { approve: false })}>婉拒</Button></div>)}</div>}
+    {info.members.map(m => <div key={m.id} className="flex items-center justify-between gap-3 border-b py-2"><span className="text-sm">{m.name}{m.manager ? ' · 小家同工' : ''}{m.id === actor ? '（我）' : ''}</span>{!m.manager && info.manager && m.id !== actor && <Button size="icon" variant="ghost" disabled={busy} title="移出成員" aria-label={`移出 ${m.name}`} onClick={() => { if (window.confirm(`移出 ${m.name}？對方將不能再讀取小家內容。`)) void act(`/${id}/members/${m.id}`, 'DELETE'); }}><Trash2 className="h-4 w-4" /></Button>}</div>)}
+    {!info.manager && <Button variant="outline" disabled={busy} onClick={async () => { if (!window.confirm('退出小家？已分享的內容會保留在組內，請先撤回不想保留的內容。')) return; setBusy(true); try { await request(`/${id}/members/${actor}`, 'DELETE'); close(); navigate('/groups'); await client.invalidateQueries({ queryKey: [base] }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>退出小家</Button>}{error && <p role="alert" className="text-sm text-destructive">{error}</p>}
   </DialogContent></Dialog>;
 }

@@ -47,6 +47,7 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
   const runId = randomUUID();
   const prefix = `Security browser ${runId.slice(0, 8)} `;
   const noteId = randomUUID();
+  const familyId = randomUUID(), familyPostId = randomUUID();
   const postIds = Array.from({ length: 35 }, () => randomUUID());
   const sid = `security-local-${randomUUID()}`;
   const expires = new Date(Date.now() + 30 * 60 * 1000);
@@ -102,6 +103,8 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
         'Disposable public excerpt '||ordinal,'約翰福音 3:16',$6::timestamptz,clock_timestamp()
         FROM unnest($1::uuid[]) WITH ORDINALITY AS fixture(id,ordinal)`, [postIds, noteId, userId, window.day, prefix, window.expiresAt]);
       await client.query('INSERT INTO auth_sessions(sid,sess,expire) VALUES($1,$2,$3)', [sid, JSON.stringify(session), expires]);
+      await client.query("INSERT INTO small_groups(id,name,church,leader_user_id,is_listed,meeting,announcement) VALUES($1,'同行小家','IM 行動教會',$2,true,'週五 19:30 · 桃園','這週一起分享生活中的感恩。')", [familyId,userId]);
+      await client.query("INSERT INTO life_group_shares(id,group_id,author_id,kind,title,body) VALUES($1,$2,$3,'message','本週小家聚會','週五一起吃飯、讀經，也為彼此禱告。')", [familyPostId,familyId,userId]);
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
@@ -150,6 +153,9 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
       { path: '/me/sharing', name: 'my-sharing', more: '載入更多靈修分享' },
       { path: '/me', name: 'profile' },
       { path: '/prayer-meeting', name: 'legacy-redirect', redirect:'/prayer-wall' },
+      { path: '/groups', name: 'family-entry' },
+      { path: `/groups/${familyId}`, name: 'family-feed' },
+      { path: '/groups?manage=1', name: 'family-management' },
     ];
     for (const width of [390, 1440]) {
       await cli('resize', String(width), width === 390 ? '844' : '1000');
@@ -159,6 +165,9 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
         await code(`
           await page.locator('main').first().waitFor({state:'visible',timeout:15000});
           ${route.name === 'bible' ? "await page.getByRole('heading', {name:'約翰福音 3',exact:true}).waitFor({state:'visible'});" : ''}
+          ${route.name === 'family-entry' ? "await page.getByRole('button',{name:'幫我找小家',exact:true}).waitFor();" : ''}
+          ${route.name === 'family-feed' ? "await page.getByRole('heading',{name:'本週小家聚會',exact:true}).waitFor();" : ''}
+          ${route.name === 'family-management' ? "await page.getByRole('heading',{name:'小家管理',exact:true}).waitFor();" : ''}
           ${route.more ? `await page.getByRole('button', {name:${JSON.stringify(route.more)},exact:true}).waitFor({state:'visible'});` : ''}
           return {ready:true};
         `);
@@ -182,6 +191,25 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
         assert.equal(before.overflow, false, `Horizontal overflow on ${width} ${route.path}`);
         assert.deepEqual(before.errors, [], `Browser errors on ${route.path}`);
         assert.deepEqual(before.external, [], `Unexpected external request on ${route.path}`);
+        if (route.name === 'family-feed') {
+          await code(`await page.getByRole('button',{name:'生活留言',exact:true}).click(); await page.getByRole('textbox',{name:'分享內容',exact:true}).waitFor(); return {opened:true};`);
+          await cli('snapshot');
+          const inline = await code(`
+            await page.getByRole('textbox',{name:'分享標題',exact:true}).fill('手機與桌面留言驗證');
+            await page.getByRole('textbox',{name:'分享內容',exact:true}).fill('這是可撤回的測試留言。');
+            const disabled = await page.getByRole('button',{name:'確認分享至小家',exact:true}).isDisabled();
+            await page.screenshot({path:${JSON.stringify(path.join(directory, `${width}-family-inline.png`))},fullPage:true});
+            return {disabled, dialogs:await page.getByRole('dialog').count(), overflow:await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)};
+          `);
+          assert.equal(inline.disabled,true); assert.equal(inline.dialogs,0); assert.equal(inline.overflow,false);
+          await code(`
+            await page.getByRole('checkbox').check();
+            await page.getByRole('button',{name:'確認分享至小家',exact:true}).click();
+            await page.getByRole('heading',{name:'手機與桌面留言驗證',exact:true}).first().waitFor();
+            return {posted:true};
+          `);
+          reports.push({width,scope:'family inline consent and message save',status:'passed'});
+        }
         if (route.more) {
           assert.equal(before.count, 30, `Expected the first 30 fixture shares on ${route.path}`);
           // The preceding snapshot is fresh; use the actual, source-verified role label.
@@ -253,6 +281,8 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
   finally {
     const clean = async (work: () => Promise<unknown>) => { try { await work(); } catch { failure ||= new Error('Security browser fixture cleanup failed'); } };
     if (opened) await clean(() => cli('close'));
+    await clean(() => pool.query('DELETE FROM life_group_shares WHERE group_id=$1', [familyId]));
+    await clean(() => pool.query('DELETE FROM small_groups WHERE id=$1', [familyId]));
     await clean(() => pool.query('DELETE FROM auth_sessions WHERE sid=$1', [sid]));
     await clean(() => pool.query('DELETE FROM devotion_wall_posts WHERE id=ANY($1::uuid[]) AND user_id=$2', [postIds, userId]));
     await clean(() => pool.query('DELETE FROM devotional_notes WHERE id=$1 AND user_id=$2', [noteId, userId]));

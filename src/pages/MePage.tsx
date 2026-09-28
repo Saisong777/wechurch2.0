@@ -63,7 +63,7 @@ const recordActions = [
   {
     id: 'study-notebook',
     title: '查經筆記本',
-    subtitle: '整理 SoulGym 查經、個人回答與小組成果。',
+    subtitle: '整理 SoulGym 查經、個人回答與小家成果。',
     href: '/user/notebook',
     icon: NotebookTabs,
     tone: 'border-violet-200 bg-violet-50/70',

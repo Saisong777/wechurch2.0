@@ -39,7 +39,7 @@ it('opens a successfully submitted invitation through the real route blocker',as
   let created=false;
   vi.stubGlobal('fetch',vi.fn(async(path:string,init?:RequestInit)=>{
     if(init?.method==='PUT'){created=true;return new Response(JSON.stringify({id:'contract'}));}
-    return new Response(JSON.stringify(path.endsWith('/targets')?[{groupId:'group',mentorId:'mentor',groupName:'測試小組',mentorName:'測試陪伴者'}]:path.endsWith('/contract')?{...detail(),contract:{...contract,isLearner:true,status:'pending'}}:{contracts:created?[contract]:[]}));
+    return new Response(JSON.stringify(path.endsWith('/targets')?[{groupId:'group',mentorId:'mentor',groupName:'測試小家',mentorName:'測試陪伴者'}]:path.endsWith('/contract')?{...detail(),contract:{...contract,isLearner:true,status:'pending'}}:{contracts:created?[contract]:[]}));
   }));
   const router=createMemoryRouter([{path:'/me/mentoring',element:<MentoringPanel mode="learner"/>}],{initialEntries:['/me/mentoring?journey=journey']});
   render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><RouterProvider router={router}/></QueryClientProvider>);

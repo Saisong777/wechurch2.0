@@ -440,7 +440,7 @@ export const AdminPage: React.FC = () => {
                           : role === 'minister'
                             ? '傳道人'
                             : role === 'group_leader' || role === 'leader'
-                              ? '小組長'
+                              ? '小家長'
                               : '儲備'}
                   </span>
                 )}

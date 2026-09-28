@@ -1,5 +1,16 @@
 # WeChurch Together: Current Design Recipe
 
+## Family Life Added 2026-09-28
+
+Member-facing pastoral groups are named 小家. Keep existing `/groups` links and
+identifiers. Use three onboarding choices (matching, directory, invitation) and
+three family views (feed, shared reading, information). The feed is chronological,
+with ordinary messages, prayer and Bible insights; compose inline, keep private
+sources separate, and require sharing consent. CRM owns scoped assignment,
+handover and transfer controls, not access to private journals. Keep Together's
+44px controls, 8px item corners and semantic light/dark tokens. See
+`design/families-2026-09-28.md` for authorization and migration boundaries.
+
 ## Approved 2026-09-13
 The three standing people mark is the approved identity. Runtime asset:
 `public/wechurch-together.png`, displayed through `WeChurchLogo`.

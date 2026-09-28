@@ -43,7 +43,7 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
   useEffect(()=>{setConsent(false);},[window.data?.day,window.expired]);
   const valid=title.trim() && title.length<=160 && body.trim() && body.length<=maxLength && reference.trim() && reference.length<=200 && consent && destinationReady;
   return <Dialog open onOpenChange={open=>{if(!open && !busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl [overflow-wrap:anywhere] [&>button:last-child]:right-2 [&>button:last-child]:top-2 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center">
-    <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{isWall?'全站登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小組成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
+    <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{isWall?'全站登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小家成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
     <form onSubmit={async e=>{
       e.preventDefault();if(!valid || busy)return;setBusy(true);setError('');
       try{
@@ -60,13 +60,13 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
       catch(e){setError((e as Error).message);if(isWall)void window.refetch();else void groups.refetch();}finally{setBusy(false);}
     }}><fieldset disabled={busy} className="min-w-0 space-y-4">
       {allowGroup && <fieldset className="space-y-2"><legend className="text-sm font-medium">分享對象</legend><div className="grid grid-cols-2 gap-2">
-        {([['group','所屬小組',Users],['wall','所有人・靈修牆',Globe]] as const).map(([value,label,Icon])=><label key={value} className={`flex min-h-12 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${audience===value?'border-primary bg-primary/5':'border-border'}`}><input type="radio" name="devotion-audience" value={value} checked={audience===value} onChange={()=>{setAudience(value);setConsent(false);setError('');}} /><Icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /><span>{label}</span></label>)}
+        {([['group','所屬小家',Users],['wall','所有人・靈修牆',Globe]] as const).map(([value,label,Icon])=><label key={value} className={`flex min-h-12 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${audience===value?'border-primary bg-primary/5':'border-border'}`}><input type="radio" name="devotion-audience" value={value} checked={audience===value} onChange={()=>{setAudience(value);setConsent(false);setError('');}} /><Icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /><span>{label}</span></label>)}
       </div></fieldset>}
       {!isWall && <div className="space-y-2">
-        <label className="block space-y-1 text-sm"><span>選擇所屬小組</span><select className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base" value={groupId} onChange={e=>{setGroupId(e.target.value);setConsent(false);setError('');}} disabled={groups.isPending || groups.isError || busy}><option value="">請選擇小組</option>{groups.data?.groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-        {groups.isPending && <p role="status" className="text-sm text-muted-foreground">載入小組中…</p>}
-        {groups.isError && <p role="alert" className="text-sm text-destructive">小組載入失敗。<button type="button" className="ml-2 min-h-11 underline" onClick={()=>groups.refetch()}>重新載入</button></p>}
-        {!groups.isPending && !groups.isError && !groups.data?.groups.length && <p className="text-sm text-muted-foreground">尚未加入小組。<Link to="/groups" onClick={close} className="ml-2 inline-block min-h-11 py-2 text-primary underline">前往我的小組</Link></p>}
+        <label className="block space-y-1 text-sm"><span>選擇所屬小家</span><select className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base" value={groupId} onChange={e=>{setGroupId(e.target.value);setConsent(false);setError('');}} disabled={groups.isPending || groups.isError || busy}><option value="">請選擇小家</option>{groups.data?.groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+        {groups.isPending && <p role="status" className="text-sm text-muted-foreground">載入小家中…</p>}
+        {groups.isError && <p role="alert" className="text-sm text-destructive">小家載入失敗。<button type="button" className="ml-2 min-h-11 underline" onClick={()=>groups.refetch()}>重新載入</button></p>}
+        {!groups.isPending && !groups.isError && !groups.data?.groups.length && <p className="text-sm text-muted-foreground">尚未加入小家。<Link to="/groups" onClick={close} className="ml-2 inline-block min-h-11 py-2 text-primary underline">前往我的小家</Link></p>}
       </div>}
       {isWall && <p className="text-sm font-medium">分享日期：{window.data?.day || '確認中…'}（台灣時間）</p>}
       {isWall && (window.isError || window.expired) && <p role="alert" className="text-sm text-destructive">日期已換日或無法確認。<button type="button" className="ml-2 underline" onClick={()=>window.refetch()}>重新確認日期</button></p>}
@@ -81,16 +81,16 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
           </div>
         </fieldset>
         {sections.filter(section=>selected.includes(section.key)).map(section=><label key={section.key} className="block space-y-1 text-sm"><span>{section.label}內容</span><Textarea rows={3} value={texts[section.key]} onChange={e=>{setTexts(current=>({...current,[section.key]:e.target.value}));setConsent(false);}} /></label>)}
-        <section aria-label={isWall?'公開內容預覽':'小組分享預覽'} className="space-y-2 border-y py-3"><h3 className="text-sm font-medium">{isWall?'公開內容預覽':'小組分享預覽'}</h3><div className="max-h-60 overflow-y-auto whitespace-pre-wrap text-sm leading-7">{body || '尚未選擇分享內容'}</div></section>
+        <section aria-label={isWall?'公開內容預覽':'小家分享預覽'} className="space-y-2 border-y py-3"><h3 className="text-sm font-medium">{isWall?'公開內容預覽':'小家分享預覽'}</h3><div className="max-h-60 overflow-y-auto whitespace-pre-wrap text-sm leading-7">{body || '尚未選擇分享內容'}</div></section>
       </> : <label className="block space-y-1 text-sm"><span>{isWall?'公開心得':'分享心得'}</span><Textarea required rows={6} maxLength={maxLength} value={body} onChange={e=>{setLegacyBody(e.target.value);setConsent(false);}} /></label>}
       <p className={`text-right text-xs ${body.length>maxLength?'text-destructive':'text-muted-foreground'}`}>{body.length} / {maxLength}</p>
       {body.length>maxLength && <p role="alert" className="text-sm text-destructive">內容超過字數上限，請減少段落或縮短內容。尚未送出，原始筆記不受影響。</p>}
       {isWall && <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={anonymous} onChange={e=>{setAnonymous(e.target.checked);setConsent(false);}} />匿名分享</label>}
       {isWall && anonymous && <p className="text-sm text-muted-foreground">牆上不顯示姓名；系統仍保留作者供本人管理。請移除內文中可辨識自己或他人的細節。</p>}
       {!isWall && selectedGroup && <p className="text-sm font-medium">分享對象：{selectedGroup.name} 全體成員</p>}
-      <label className="flex min-h-11 items-start gap-2 text-sm leading-6"><input type="checkbox" className="mt-1.5" checked={consent} onChange={e=>setConsent(e.target.checked)} />{isWall?'我同意公開以上內容，已移除不想公開的私人資訊。':'我同意將以上內容分享給所選小組，已移除不想分享的私人資訊。'}</label>
+      <label className="flex min-h-11 items-start gap-2 text-sm leading-6"><input type="checkbox" className="mt-1.5" checked={consent} onChange={e=>setConsent(e.target.checked)} />{isWall?'我同意公開以上內容，已移除不想公開的私人資訊。':'我同意將以上內容分享給所選小家，已移除不想分享的私人資訊。'}</label>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={close}>取消</Button><Button type="submit" disabled={!valid || busy} className="gap-2">{busy?<Loader2 className="h-4 w-4 animate-spin" />:<Share2 className="h-4 w-4" />}{isWall?'確認公開分享':'確認分享至小組'}</Button></div>
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={close}>取消</Button><Button type="submit" disabled={!valid || busy} className="gap-2">{busy?<Loader2 className="h-4 w-4 animate-spin" />:<Share2 className="h-4 w-4" />}{isWall?'確認公開分享':'確認分享至小家'}</Button></div>
     </fieldset></form>
   </DialogContent></Dialog>;
 }

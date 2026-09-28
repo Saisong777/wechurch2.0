@@ -57,9 +57,9 @@ export function PersonalPrayerShareDialog({records,close,done}:{records:Personal
       try { const result=await api<{created:number;skipped:number}>('/api/prayer-sharing','POST',{items,groupId:groupId || null,publicWall,anonymous,consent}); await refresh(); done(); toast.success(`新增 ${result.created} 份分享${result.skipped ? `，${result.skipped} 份已存在` : ''}`); }
       catch(e){setError((e as Error).message);} finally{setBusy(false);}
     }}><fieldset disabled={busy} className="min-w-0 space-y-5">
-      <label className="block space-y-2 text-sm"><span>分享至小組（選填）</span><select aria-label="分享至小組" className="h-11 w-full min-w-0 rounded-md border bg-background px-3" value={groupId} onChange={e=>{setGroupId(e.target.value);setConsent(false);}}><option value="">不分享到小組</option>{groups.data?.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
-      {groups.isError && <p role="alert" className="text-sm text-destructive">小組載入失敗。<button type="button" className="ml-2 underline" onClick={()=>groups.refetch()}>重新載入</button></p>}
-      {!groups.isPending && !groups.isError && !groups.data?.groups.length && <Link className="block text-sm text-primary underline" to="/groups">尚未加入小組</Link>}
+      <label className="block space-y-2 text-sm"><span>分享至小家（選填）</span><select aria-label="分享至小家" className="h-11 w-full min-w-0 rounded-md border bg-background px-3" value={groupId} onChange={e=>{setGroupId(e.target.value);setConsent(false);}}><option value="">不分享到小家</option>{groups.data?.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+      {groups.isError && <p role="alert" className="text-sm text-destructive">小家載入失敗。<button type="button" className="ml-2 underline" onClick={()=>groups.refetch()}>重新載入</button></p>}
+      {!groups.isPending && !groups.isError && !groups.data?.groups.length && <Link className="block text-sm text-primary underline" to="/groups">尚未加入小家</Link>}
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={publicWall} onChange={e=>{setPublicWall(e.target.checked);setConsent(false);}} />分享到公共禱告牆（全站登入成員可見）</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={anonymous} onChange={e=>{setAnonymous(e.target.checked);setConsent(false);}} />匿名分享</label>
       {anonymous && <p className="text-sm text-muted-foreground">分享中不顯示姓名、頭像或帳號識別碼；系統仍保留作者供本人管理。請移除內文中可辨認身分的細節。</p>}

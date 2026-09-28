@@ -808,7 +808,7 @@ const MyNotesPage = () => {
       <div className="min-h-screen bg-background" data-testid="my-notes-page">
         <Header variant="compact" title="我的筆記" backTo="/learn" />
         <main className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-8">
-          <Link to="/groups?view=note" className="mb-4 inline-flex min-h-11 items-center text-sm font-medium text-primary">選擇筆記分享給小組</Link>
+          <Link to="/groups?view=note" className="mb-4 inline-flex min-h-11 items-center text-sm font-medium text-primary">選擇筆記分享給小家</Link>
           <Link to="/devotion-wall" className="mb-4 ml-4 inline-flex min-h-11 items-center text-sm font-medium text-primary">今日靈修牆</Link>
           <div className="max-w-2xl md:max-w-3xl mx-auto">
             <section className="mb-5 space-y-4">

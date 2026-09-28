@@ -25,7 +25,7 @@ describe('daily homepage', () => {
     expect(screen.getAllByText(defaults.scripture.preview)).toHaveLength(1);
     expect(screen.getByRole('link', { name: '開始今日靈修' }).getAttribute('href')).toBe('/learn/church-reading');
     expect(screen.queryByText('主要入口')).toBeNull();
-    expect(screen.queryByText('小組新朋友')).toBeNull();
+    expect(screen.queryByText('小家新朋友')).toBeNull();
   });
 
   it('preserves destinations without the redundant module cards', () => {
@@ -52,7 +52,7 @@ describe('daily homepage', () => {
     expect(screen.getByText('4 筆正在等候')).toBeTruthy();
     expect(screen.getByText('僅自己可見')).toBeTruthy();
     expect(screen.getByText('測試對象')).toBeTruthy();
-    expect(screen.queryByText('分享給小組')).toBeNull();
+    expect(screen.queryByText('分享給小家')).toBeNull();
   });
 
   it('does not show an empty state during loading', () => {

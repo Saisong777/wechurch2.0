@@ -6,5 +6,5 @@ history.replaceState(null,'',location.pathname);
 const ticket=params.get('ticket')||'',group=params.get('group')||'';
 if(/^\\d{13}\\.[a-f0-9]{64}$/.test(ticket)&&Number(ticket.split('.')[0])>Date.now()&&(!group||/^[a-f0-9]{48}$/.test(group))){
 document.querySelector('[name=ticket]').value=ticket;document.querySelector('[name=group]').value=group;
-document.querySelector('button').disabled=false;document.querySelector('#status').textContent='請使用自己的帳號；小組加入仍需小組長確認。';
+document.querySelector('button').disabled=false;document.querySelector('#status').textContent='請使用自己的帳號；小家加入仍需小家長確認。';
 }else{document.querySelector('#status').textContent='邀請連結無效或已過期，請向邀請人索取新連結。';}`;

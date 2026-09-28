@@ -17,7 +17,7 @@ export interface CrmSnapshot {
 
 export const crmRoleLabels: Record<AppRole, string> = {
   admin: '系統管理員', senior_pastor: '主任牧師', pastor: '牧師',
-  minister: '傳道人', group_leader: '小組長', leader: '小組長',
+  minister: '傳道人', group_leader: '小家長', leader: '小家長',
   future_leader: '儲備領袖', member: '會友 成員',
 };
 const statusLabels = { pending: '待跟進', member: '已轉換', declined: '已婉拒' };

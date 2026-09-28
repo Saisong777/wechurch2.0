@@ -233,6 +233,12 @@ export const smallGroups = pgTable("small_groups", {
   leaderUserId: uuid("leader_user_id").references(() => users.id),
   pastorUserId: uuid("pastor_user_id").references(() => users.id),
   isActive: boolean("is_active").default(true).notNull(),
+  description: text("description").default('').notNull(),
+  meeting: text("meeting").default('').notNull(),
+  announcement: text("announcement").default('').notNull(),
+  isListed: boolean("is_listed").default(false).notNull(),
+  lifecycle: text("lifecycle").default('active').notNull(),
+  version: integer("version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -248,6 +254,7 @@ export const smallGroupMembers = pgTable("small_group_members", {
   memberEmail: text("member_email"),
   isActive: boolean("is_active").default(true).notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  historyFrom: timestamp("history_from", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   groupIdx: index("small_group_members_group_id_idx").on(table.groupId),
@@ -1374,6 +1381,7 @@ export const churchDevotionHistory = pgTable('church_devotion_history', {
 export const lifeGroupInvites = pgTable('life_group_invites', {
   groupId: uuid('group_id').primaryKey().references(() => smallGroups.id),
   tokenHash: text('token_hash').notNull().unique(),
+  shortCodeHash: text('short_code_hash').unique(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdBy: uuid('created_by').notNull().references(() => users.id),
 });
@@ -1397,7 +1405,7 @@ export const lifeGroupShares = pgTable('life_group_shares', {
   title: text('title').notNull(), body: text('body').notNull(), reference: text('reference').notNull().default(''), sourceId: uuid('source_id'),
   answered: boolean('answered').notNull().default(false), version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(), withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
-}, t => ({ feed: index('life_group_shares_feed').on(t.groupId,t.kind,t.createdAt.desc(),t.id.desc()), kind: check('life_group_shares_kind_check', sql`${t.kind} IN ('note','prayer')`) }));
+}, t => ({ feed: index('life_group_shares_feed').on(t.groupId,t.kind,t.createdAt.desc(),t.id.desc()), allFeed: index('life_group_shares_all_feed').on(t.groupId,t.createdAt.desc(),t.id.desc()).where(sql`${t.withdrawnAt} IS NULL`), kind: check('life_group_shares_kind_check', sql`${t.kind} IN ('note','prayer','message')`) }));
 export const lifeGroupComments = pgTable('life_group_comments', {
   id: uuid('id').primaryKey(), shareId: uuid('share_id').notNull().references(() => lifeGroupShares.id), authorId: uuid('author_id').notNull().references(() => users.id),
   body: text('body').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
@@ -1425,3 +1433,17 @@ export const lifeGroupCareUpdates = pgTable('life_group_care_updates', {
 export const lifeGroupCareWatches = pgTable('life_group_care_watches', {
   careId: uuid('care_id').notNull().references(() => lifeGroupCare.id), userId: uuid('user_id').notNull().references(() => users.id),
 }, t => ({ pk: primaryKey({ columns: [t.careId,t.userId] }) }));
+
+export const familyMatchingRequests = pgTable('family_matching_requests', {
+  id: uuid('id').primaryKey().defaultRandom(), userId: uuid('user_id').notNull().references(() => users.id),
+  church: text('church').notNull(), availability: text('availability').notNull(), region: text('region').notNull().default(''), contact: text('contact').notNull(),
+  status: text('status').notNull().default('pending'), ownerId: uuid('owner_id').references(() => users.id), groupId: uuid('group_id').references(() => smallGroups.id),
+  message: text('message').notNull().default(''), version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ open: uniqueIndex('family_matching_one_open').on(t.userId).where(sql`${t.status} IN ('pending','contacting')`), queue: index('family_matching_queue').on(t.church,t.status,t.createdAt), status: check('family_matching_requests_status_check', sql`${t.status} IN ('pending','contacting','matched','cancelled')`) }));
+export const familyMembershipEvents = pgTable('family_membership_events', {
+  id: uuid('id').primaryKey().defaultRandom(), groupId: uuid('group_id').notNull().references(() => smallGroups.id),
+  userId: uuid('user_id').references(() => users.id), actorId: uuid('actor_id').notNull().references(() => users.id),
+  action: text('action').notNull(), targetGroupId: uuid('target_group_id').references(() => smallGroups.id), reason: text('reason').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ group: index('family_membership_events_group').on(t.groupId,t.createdAt.desc()) }));

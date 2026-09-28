@@ -112,8 +112,8 @@ const roleLabels: Record<AppRole, string> = {
   senior_pastor: '主任牧師',
   pastor: '牧師',
   minister: '傳道人',
-  group_leader: '小組長',
-  leader: '小組長',
+  group_leader: '小家長',
+  leader: '小家長',
   future_leader: '儲備領袖',
   member: '會友',
 };
@@ -250,9 +250,9 @@ const CRMPage = () => {
     queryFn: async ({ signal }) => {
       const groupQuery = selectedChurch !== 'all' ? `?${new URLSearchParams({ church: selectedChurch }).toString()}` : '';
       const response = await fetch(`/api/crm/groups${groupQuery}`, { signal });
-      if (!response.ok) throw new Error('無法載入小組');
+      if (!response.ok) throw new Error('無法載入小家');
       const data = await response.json();
-      if (!Array.isArray(data)) throw new Error('小組資料格式異常');
+      if (!Array.isArray(data)) throw new Error('小家資料格式異常');
       return data;
     },
   });
@@ -385,7 +385,7 @@ const CRMPage = () => {
   const handleCreateGroup = async () => {
     const name = newGroupName.trim();
     if (!name || !newGroupChurch) {
-      toast.info('請輸入小組名稱並選擇教會');
+      toast.info('請輸入小家名稱並選擇教會');
       return;
     }
 
@@ -398,10 +398,10 @@ const CRMPage = () => {
       });
       if (!response.ok) throw new Error('Failed to create group');
       setNewGroupName('');
-      toast.success('小組已建立');
+      toast.success('小家已建立');
       await fetchCrmGroups();
     } catch (error) {
-      toast.error('建立小組失敗');
+      toast.error('建立小家失敗');
       console.error('Error creating group:', error);
     } finally {
       setGroupActionBusy(false);
@@ -421,7 +421,7 @@ const CRMPage = () => {
         }),
       });
       if (!response.ok) throw new Error('Failed to assign group');
-      toast.success(`已將 ${member.name} 分到小組`);
+      toast.success(`已將 ${member.name} 分到小家`);
       await fetchCrmGroups();
     } catch (error) {
       toast.error('分組失敗');
@@ -628,7 +628,7 @@ const CRMPage = () => {
                 <SelectContent>
                   <SelectItem value="members">會員</SelectItem>
                   <SelectItem value="care">關懷</SelectItem>
-                  <SelectItem value="groups">小組</SelectItem>
+                  <SelectItem value="groups">小家</SelectItem>
                   <SelectItem value="overview">總覽</SelectItem>
                   <SelectItem value="journey">個人/門訓</SelectItem>
                   <SelectItem value="prayers">代求</SelectItem>
@@ -649,7 +649,7 @@ const CRMPage = () => {
               </TabsTrigger>
               <TabsTrigger value="groups" className="gap-2">
                 <Users className="h-4 w-4" />
-                小組
+                小家
               </TabsTrigger>
               <TabsTrigger value="overview" className="gap-2">
                 <Activity className="h-4 w-4" />
@@ -685,7 +685,7 @@ const CRMPage = () => {
 
           <TabsContent value="prayers"><CrmOperationalPanel view="prayers" groups={crmGroups} loading={groupsLoading} error={groupsError} retry={() => void fetchCrmGroups()} manageMembers={() => setWorkspaceTab("members")} /></TabsContent>
 
-          <TabsContent value="groups"><CrmOperationalPanel view="groups" groups={crmGroups} loading={groupsLoading} error={groupsError} retry={() => void fetchCrmGroups()} manageMembers={() => setWorkspaceTab("members")} /></TabsContent>
+          <TabsContent value="groups"><FamilyManagement /></TabsContent>
 
           <TabsContent value="gatherings"><CrmOperationalPanel view="gatherings" groups={crmGroups} loading={groupsLoading} error={groupsError} retry={() => void fetchCrmGroups()} manageMembers={() => setWorkspaceTab("members")} /></TabsContent>
 
@@ -731,7 +731,7 @@ const CRMPage = () => {
                 </div>
               </div>
               <div className="space-y-4">
-                {groupsError && <p role="alert" className="text-sm text-destructive">無法載入小組。<Button variant="link" onClick={() => void fetchCrmGroups()}>重試小組資料</Button></p>}
+                {groupsError && <p role="alert" className="text-sm text-destructive">無法載入小家。<Button variant="link" onClick={() => void fetchCrmGroups()}>重試小家資料</Button></p>}
                 {memberTab !== 'incomplete' && (
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="relative w-full lg:max-w-md lg:flex-1">
@@ -757,7 +757,7 @@ const CRMPage = () => {
                           <SelectItem value="senior_pastor">主任牧師</SelectItem>
                           <SelectItem value="pastor">牧師</SelectItem>
                           <SelectItem value="minister">傳道人</SelectItem>
-                          <SelectItem value="group_leader">小組長</SelectItem>
+                          <SelectItem value="group_leader">小家長</SelectItem>
                           <SelectItem value="future_leader">儲備領袖</SelectItem>
                           <SelectItem value="member">成員</SelectItem>
                         </SelectContent>
@@ -784,11 +784,11 @@ const CRMPage = () => {
 
                 {isAdmin && (
                   <details className="border-y py-3">
-                    <summary className="cursor-pointer text-sm font-medium">建立小組</summary>
+                    <summary className="cursor-pointer text-sm font-medium">建立小家</summary>
                     <div className="mt-3 grid gap-3 lg:grid-cols-[200px_1fr] lg:items-center">
                     <Select value={newGroupChurch} onValueChange={setNewGroupChurch}>
-                      <SelectTrigger aria-label="小組所屬教會">
-                        <SelectValue placeholder="小組教會" />
+                      <SelectTrigger aria-label="小家所屬教會">
+                        <SelectValue placeholder="小家教會" />
                       </SelectTrigger>
                       <SelectContent>
                         {churchOptionsForActions.map((church) => (
@@ -801,9 +801,9 @@ const CRMPage = () => {
                     <div className="flex gap-2">
                       <Input
                         value={newGroupName}
-                        aria-label="新增小組名稱"
+                        aria-label="新增小家名稱"
                         onChange={(event) => setNewGroupName(event.target.value)}
-                        placeholder="新增小組名稱"
+                        placeholder="新增小家名稱"
                         className="min-w-0"
                       />
                       <Button onClick={handleCreateGroup} disabled={groupActionBusy || !newGroupName.trim()} className="shrink-0 gap-2">
@@ -905,13 +905,13 @@ const CRMPage = () => {
                                       <DropdownMenuSub>
                                         <DropdownMenuSubTrigger>
                                           <Users className="mr-2 h-4 w-4" />
-                                          分到小組
+                                          分到小家
                                         </DropdownMenuSubTrigger>
                                         <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
                                           {groupsLoading ? (
-                                            <DropdownMenuItem disabled>讀取小組中</DropdownMenuItem>
+                                            <DropdownMenuItem disabled>讀取小家中</DropdownMenuItem>
                                           ) : crmGroups.length === 0 ? (
-                                            <DropdownMenuItem disabled>尚無小組</DropdownMenuItem>
+                                            <DropdownMenuItem disabled>尚無小家</DropdownMenuItem>
                                           ) : (
                                             crmGroups.map((group) => (
                                               <DropdownMenuItem key={group.id} onClick={() => handleAssignGroup(member, group.id)}>
@@ -959,7 +959,7 @@ const CRMPage = () => {
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => handleUpdateRole(member.userId!, 'group_leader')}>
                                         <Crown className="mr-2 h-4 w-4" />
-                                        小組長
+                                        小家長
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => handleUpdateRole(member.userId!, 'future_leader')}>
                                         <Star className="mr-2 h-4 w-4" />
@@ -1076,3 +1076,4 @@ const CRMPage = () => {
 };
 
 export default CRMPage;
+import { FamilyManagement } from '@/components/groups/FamilyManagement';

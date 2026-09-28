@@ -129,7 +129,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                 className="h-12 text-base"
               />
               <p className="text-xs text-muted-foreground">
-                實名制有助於小組分組時彼此認識
+                實名制有助於小家分組時彼此認識
               </p>
             </div>
           )}

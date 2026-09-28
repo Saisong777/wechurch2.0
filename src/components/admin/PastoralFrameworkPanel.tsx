@@ -109,7 +109,7 @@ export function PastoralFrameworkPanel({ selectedChurch, currentChurchName }: Pa
           <div>
             <p className="font-semibold">愛的網際網路 / 門徒培育系統</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              這個框架把「愛的旅程 28 天」、穩定主日與小組、服事團隊、心理牧養督導、職場家庭門徒生活、Fire Cross 與非典理論放在同一條人成長路徑裡。
+              這個框架把「愛的旅程 28 天」、穩定主日與小家、服事團隊、心理牧養督導、職場家庭門徒生活、Fire Cross 與非典理論放在同一條人成長路徑裡。
             </p>
           </div>
           <div className="rounded-lg border p-3">

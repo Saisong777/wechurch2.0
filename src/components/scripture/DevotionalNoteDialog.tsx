@@ -414,7 +414,7 @@ export function DevotionalNoteDialog({
             <span>{isSaving ? '儲存中...' : '儲存'}<span className="block text-xs font-normal">自己看</span></span>
           </Button>
           <Button variant="outline" onClick={() => handleSave(true)} disabled={isSaving || isLoading} className="note-editor-action" aria-label="分享" data-testid="button-share-devotional-note">
-            <Share2 className="h-4 w-4 shrink-0" /><span>分享<span className="block text-xs font-normal text-muted-foreground">小組／靈修牆</span></span>
+            <Share2 className="h-4 w-4 shrink-0" /><span>分享<span className="block text-xs font-normal text-muted-foreground">小家／靈修牆</span></span>
           </Button>
         </footer>
     </NoteEditorSurface>

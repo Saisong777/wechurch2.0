@@ -10,7 +10,7 @@ const record:PersonalPrayer={id:'00000000-0000-4000-8000-000000000001',userId:'a
 let payload:any; let fail=false; const clients:QueryClient[]=[];
 beforeEach(()=>{fail=false;payload=undefined;vi.stubGlobal('fetch',vi.fn(async(path:string,options?:RequestInit)=>{
   if(options?.method==='POST'){payload=JSON.parse(options.body as string);return {ok:!fail,json:async()=>fail?{error:'連線失敗，尚未分享'}:{created:1,skipped:0}};}
-  return {ok:true,json:async()=>({groups:[{id:'00000000-0000-4000-8000-000000000002',name:'同行小組'}]})};
+  return {ok:true,json:async()=>({groups:[{id:'00000000-0000-4000-8000-000000000002',name:'同行小家'}]})};
 }));});
 afterEach(()=>{cleanup();clients.forEach(c=>c.clear());clients.length=0;vi.unstubAllGlobals();});
 function show(){const done=vi.fn();const client=new QueryClient({defaultOptions:{queries:{retry:false}}});clients.push(client);render(<QueryClientProvider client={client}><MemoryRouter><PersonalPrayerShareDialog records={[record]} done={done} close={vi.fn()} /></MemoryRouter></QueryClientProvider>);return done;}
@@ -25,7 +25,7 @@ it('resets consent when audience, anonymity, or preview text changes',async()=>{
   expect((screen.getByRole('button',{name:'確認分享'}) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));expect((consent() as HTMLInputElement).checked).toBe(false);
   fireEvent.click(consent());fireEvent.change(screen.getByRole('textbox',{name:'第 1 筆分享內容'}),{target:{value:'更短的分享'}});expect((consent() as HTMLInputElement).checked).toBe(false);
-  await screen.findByRole('option',{name:'同行小組'});fireEvent.click(consent());fireEvent.change(screen.getByRole('combobox',{name:'分享至小組'}),{target:{value:'00000000-0000-4000-8000-000000000002'}});expect((consent() as HTMLInputElement).checked).toBe(false);
+  await screen.findByRole('option',{name:'同行小家'});fireEvent.click(consent());fireEvent.change(screen.getByRole('combobox',{name:'分享至小家'}),{target:{value:'00000000-0000-4000-8000-000000000002'}});expect((consent() as HTMLInputElement).checked).toBe(false);
 });
 it('sends selected edited text and explicit anonymity without private fields',async()=>{
   const done=show();fireEvent.click(publicScope());fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));fireEvent.change(screen.getByRole('textbox',{name:'第 1 筆分享內容'}),{target:{value:'公開摘錄'}});fireEvent.click(consent());fireEvent.click(screen.getByRole('button',{name:'確認分享'}));

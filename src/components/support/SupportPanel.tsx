@@ -77,10 +77,10 @@ function SupportComposer({ cancel, done }: { cancel: () => void; done: (id: stri
   }
   return <form onSubmit={e => { e.preventDefault(); if(!busy)void submit(); }}><fieldset disabled={busy} className="min-w-0 space-y-4">
     <UnsavedChangesGuard dirty={dirty} /><h2 className="text-lg font-semibold">尋求陪伴</h2>
-    {targets.isError ? <Failure error={targets.error} retry={() => void targets.refetch()} /> : targets.isPending ? <p role="status">載入陪伴者中…</p> : !targets.data.length ? <p>目前沒有可選的陪伴者，請先加入小組，或聯絡教會安排。</p> : <TargetPicker targets={targets.data} value={target} change={setTarget} />}
+    {targets.isError ? <Failure error={targets.error} retry={() => void targets.refetch()} /> : targets.isPending ? <p role="status">載入陪伴者中…</p> : !targets.data.length ? <p>目前沒有可選的陪伴者，請先加入小家，或聯絡教會安排。</p> : <TargetPicker targets={targets.data} value={target} change={setTarget} />}
     <Field label="事項"><Input required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></Field>
     <Field label="希望得到的陪伴"><Textarea required maxLength={10000} rows={6} value={body} onChange={e => setBody(e.target.value)} /></Field>
-    <label className="flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0" />我同意將這項內容分享給所選陪伴者；不會公開到小組或牆上。</label>
+    <label className="flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0" />我同意將這項內容分享給所選陪伴者；不會公開到小家或牆上。</label>
     {error && <p role="alert" className="text-destructive">{error}</p>}
     <div className="flex flex-wrap gap-3"><Button type="submit" disabled={busy || !consent || !target}><Send className="mr-2 h-4 w-4" />{busy ? '送出中…' : '送出'}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { if (!dirty || window.confirm('放棄尚未送出的內容？')) cancel(); }}>取消</Button></div>
   </fieldset></form>;

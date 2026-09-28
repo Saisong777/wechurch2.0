@@ -3,14 +3,16 @@ import type { PoolClient } from 'pg';
 import type { z } from 'zod';
 import { pool } from './db';
 import { careInput, careUpdateInput, shareInput, shareEditInput } from '../shared/lifeGroup';
+import { createFamily, familyAccess } from './familyRepository';
 
-export class GroupError extends Error {
-  constructor(public status: number, message: string) { super(message); }
-}
-const missing = () => new GroupError(404, '找不到內容，或你已不在這個小組。');
+import { GroupError } from './groupError';
+export { GroupError } from './groupError';
+const missing = () => new GroupError(404, '找不到內容，或你已不在這個小家。');
 const conflict = () => new GroupError(409, '內容已更新，請重新載入後再試；你的輸入尚未送出。');
 const activeMember = `(g.leader_user_id=$2 OR g.pastor_user_id=$2 OR EXISTS (SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$2 AND m.is_active))`;
-const nameSql = (alias: string) => `COALESCE(NULLIF(${alias}.display_name,''),'小組成員')`;
+const nameSql = (alias: string) => `COALESCE(NULLIF(${alias}.display_name,''),'小家成員')`;
+const visibleContent = (alias: string, actor = '$2') => `(EXISTS(SELECT 1 FROM small_groups vg WHERE vg.id=${alias}.group_id AND (vg.leader_user_id=${actor} OR vg.pastor_user_id=${actor}))
+  OR EXISTS(SELECT 1 FROM small_group_members vm WHERE vm.group_id=${alias}.group_id AND vm.user_id=${actor} AND vm.is_active AND vm.history_from<=${alias}.created_at))`;
 
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
@@ -25,13 +27,14 @@ export async function groupAccess(c: PoolClient, groupId: string, actor: string,
   const manager = g.leader_user_id === actor || g.pastor_user_id === actor;
   const membership = await c.query('SELECT id FROM small_group_members WHERE group_id=$1 AND user_id=$2 AND is_active FOR SHARE', [groupId, actor]);
   if (!manager && (!membership.rowCount || managerOnly)) throw missing();
-  return { id: g.id, name: g.name, church: g.church, manager };
+  return { id: g.id, name: g.name, church: g.church, manager, meeting: g.meeting, announcement: g.announcement, description: g.description, status: g.lifecycle };
 }
 function withGroup<T>(groupId: string, actor: string, work: (c: PoolClient, group: Awaited<ReturnType<typeof groupAccess>>) => Promise<T>, managerOnly = false) {
   return transaction(async c => work(c, await groupAccess(c, groupId, actor, managerOnly)));
 }
 export async function canCreateGroup(actor: string) {
-  return Boolean((await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','senior_pastor','pastor','minister','group_leader','leader') LIMIT 1", [actor])).rowCount);
+  const access = await familyAccess(actor);
+  return access.canManageMembers && (access.role === 'admin' || access.churchScopes.length > 0);
 }
 export async function myGroups(actor: string) {
   const groups = (await pool.query(`SELECT g.id,g.name,g.church,(g.leader_user_id=$1 OR g.pastor_user_id=$1) IS TRUE AS manager,
@@ -41,8 +44,10 @@ export async function myGroups(actor: string) {
   return { groups, requests, canCreate: await canCreateGroup(actor) };
 }
 export async function createGroup(actor: string, name: string) {
-  if (!await canCreateGroup(actor)) throw new GroupError(403, '請由小組長或同工建立小組。');
-  return (await pool.query("INSERT INTO small_groups(name,church,leader_user_id) SELECT $2,COALESCE(NULLIF(church,''),'未分配教會'),id FROM users WHERE id=$1 RETURNING id,name", [actor, name])).rows[0];
+  if (!await canCreateGroup(actor)) throw new GroupError(403, '請由小家長或同工建立小家。');
+  const user = (await pool.query('SELECT church FROM users WHERE id=$1', [actor])).rows[0];
+  if (!user?.church) throw new GroupError(400, '請在牧養後台選擇小家所屬教會。');
+  return createFamily(actor, { name, church: user.church });
 }
 async function members(c: PoolClient, id: string) {
   return (await c.query(`SELECT u.id,${nameSql('u')} AS name,(u.id=g.leader_user_id OR u.id=g.pastor_user_id) IS TRUE AS manager
@@ -55,15 +60,17 @@ export function groupInfo(id: string, actor: string) {
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 export function rotateInvite(id: string, actor: string) {
   return withGroup(id, actor, async c => {
+    if (!(await c.query("SELECT 1 FROM small_groups WHERE id=$1 AND lifecycle='active'", [id])).rowCount) throw new GroupError(409, '暫停的小家不開放邀請。');
     const token = randomBytes(24).toString('hex');
-    const result = await c.query("INSERT INTO life_group_invites(group_id,token_hash,expires_at,created_by) VALUES($1,$2,now()+interval '7 days',$3) ON CONFLICT(group_id) DO UPDATE SET token_hash=$2,expires_at=now()+interval '7 days',created_by=$3 RETURNING expires_at AS \"expiresAt\"", [id, hashToken(token), actor]);
-    return { token, expiresAt: result.rows[0].expiresAt };
+    const code = randomBytes(6).toString('hex');
+    const result = await c.query("INSERT INTO life_group_invites(group_id,token_hash,short_code_hash,expires_at,created_by) VALUES($1,$2,$4,now()+interval '7 days',$3) ON CONFLICT(group_id) DO UPDATE SET token_hash=$2,short_code_hash=$4,expires_at=now()+interval '7 days',created_by=$3 RETURNING expires_at AS \"expiresAt\"", [id, hashToken(token), actor, hashToken(code)]);
+    return { token, code: code.toUpperCase().match(/.{4}/g)!.join('-'), expiresAt: result.rows[0].expiresAt };
   }, true);
 }
 export function requestJoin(actor: string, token: string) {
   return transaction(async c => {
-    const invitation = (await c.query('SELECT i.group_id,g.name FROM life_group_invites i JOIN small_groups g ON g.id=i.group_id WHERE i.token_hash=$1 AND i.expires_at>now() AND g.is_active FOR SHARE OF i,g', [hashToken(token)])).rows[0];
-    if (!invitation) throw new GroupError(404, '邀請碼無效或已過期，請向小組長索取。');
+    const invitation = (await c.query("SELECT i.group_id,g.name FROM life_group_invites i JOIN small_groups g ON g.id=i.group_id WHERE (i.token_hash=$1 OR i.short_code_hash=$1) AND i.expires_at>now() AND g.is_active AND g.lifecycle='active' FOR SHARE OF i,g", [hashToken(token)])).rows[0];
+    if (!invitation) throw new GroupError(404, '邀請碼無效或已過期，請向小家長索取。');
     const already = (await c.query(`SELECT 1 FROM small_groups g WHERE g.id=$1 AND ${activeMember}`, [invitation.group_id, actor])).rowCount;
     if (already) return { status: 'approved', name: invitation.name };
     await c.query("INSERT INTO life_group_requests(group_id,user_id,status) VALUES($1,$2,'pending') ON CONFLICT(group_id,user_id) DO UPDATE SET status='pending',created_at=now()", [invitation.group_id, actor]);
@@ -73,10 +80,12 @@ export function requestJoin(actor: string, token: string) {
 export function decideJoin(id: string, actor: string, userId: string, approve: boolean) {
   return transaction(async c => {
     await c.query('SELECT id FROM small_groups WHERE id=$1 FOR UPDATE', [id]);
-    await groupAccess(c, id, actor, true);
+    const group = await groupAccess(c, id, actor, true);
+    if (approve && group.status !== 'active') throw new GroupError(409, '請先恢復小家運作，再確認新成員。');
     const r = await c.query("UPDATE life_group_requests SET status=$3 WHERE group_id=$1 AND user_id=$2 AND status='pending' RETURNING user_id", [id, userId, approve ? 'approved' : 'rejected']);
     if (!r.rowCount) throw conflict();
     if (approve) await c.query('INSERT INTO small_group_members(group_id,user_id) SELECT $1,$2 WHERE NOT EXISTS(SELECT 1 FROM small_group_members WHERE group_id=$1 AND user_id=$2 AND is_active)', [id, userId]);
+    await c.query('INSERT INTO family_membership_events(group_id,user_id,actor_id,action) VALUES($1,$2,$3,$4)', [id, userId, actor, approve ? 'joined' : 'declined']);
     return { ok: true };
   });
 }
@@ -84,10 +93,12 @@ export function removeMember(id: string, actor: string, userId: string) {
   return transaction(async c => {
     const g = (await c.query('SELECT * FROM small_groups WHERE id=$1 AND is_active FOR UPDATE', [id])).rows[0];
     await groupAccess(c, id, actor, actor !== userId);
-    if (g.leader_user_id === userId || g.pastor_user_id === userId) throw new GroupError(409, '請先在後台交接小組長，再移出或退出。');
+    if (g.leader_user_id === userId || g.pastor_user_id === userId) throw new GroupError(409, '請先在後台交接小家長，再移出或退出。');
     await c.query('UPDATE small_group_members SET is_active=false,updated_at=now() WHERE group_id=$1 AND user_id=$2', [id, userId]);
     await c.query("DELETE FROM life_group_requests WHERE group_id=$1 AND user_id=$2", [id, userId]);
     await c.query('DELETE FROM life_group_care_watches WHERE user_id=$2 AND care_id IN(SELECT id FROM life_group_care WHERE group_id=$1)', [id, userId]);
+    await c.query('UPDATE life_group_care SET responsible_id=NULL,version=version+1,updated_at=now() WHERE group_id=$1 AND responsible_id=$2 AND withdrawn_at IS NULL', [id, userId]);
+    await c.query('INSERT INTO family_membership_events(group_id,user_id,actor_id,action) VALUES($1,$2,$3,$4)', [id, userId, actor, actor === userId ? 'left' : 'removed']);
     return { ok: true };
   });
 }
@@ -112,8 +123,8 @@ export async function shareSources(actor: string, kind: 'note' | 'prayer') {
     concat_ws(E'\n\n',NULLIF(notes,''),NULLIF(observation,''),NULLIF(core_insight_note,''),NULLIF(action_plan,''),NULLIF(new_understanding,'')) AS body
     FROM devotional_notes WHERE user_id=$1 AND hidden=false ORDER BY updated_at DESC LIMIT 200`, [actor])).rows;
 }
-async function share(c: PoolClient, groupId: string, shareId: string) {
-  const row = (await c.query('SELECT * FROM life_group_shares WHERE id=$1 AND group_id=$2 AND withdrawn_at IS NULL FOR UPDATE', [shareId, groupId])).rows[0];
+async function share(c: PoolClient, groupId: string, shareId: string, actor: string) {
+  const row = (await c.query(`SELECT s.* FROM life_group_shares s WHERE s.id=$1 AND s.group_id=$2 AND s.withdrawn_at IS NULL AND ${visibleContent('s', '$3')} FOR UPDATE`, [shareId, groupId, actor])).rows[0];
   if (!row) throw missing();
   return row;
 }
@@ -122,7 +133,7 @@ export function listShares(id: string, actor: string, kind: string, offset: numb
     EXISTS(SELECT 1 FROM life_group_prayed WHERE share_id=s.id AND user_id=$2) AS prayed,
     (SELECT count(*)::int FROM life_group_prayed WHERE share_id=s.id) AS "prayerCount",
     (SELECT count(*)::int FROM life_group_comments WHERE share_id=s.id AND withdrawn_at IS NULL) AS "commentCount"
-    FROM life_group_shares s JOIN users u ON u.id=s.author_id WHERE s.group_id=$1 AND s.kind=$3 AND s.withdrawn_at IS NULL ORDER BY s.created_at DESC,s.id DESC LIMIT 30 OFFSET $4`, [id, actor, kind, offset])).rows);
+    FROM life_group_shares s JOIN users u ON u.id=s.author_id WHERE s.group_id=$1 AND ($3='all' OR s.kind=$3) AND s.withdrawn_at IS NULL AND ${visibleContent('s')} ORDER BY s.created_at DESC,s.id DESC LIMIT 30 OFFSET $4`, [id, actor, kind, offset])).rows);
 }
 export function createShare(id: string, actor: string, shareId: string, input: z.infer<typeof shareInput>) {
   return withGroup(id, actor, async c => {
@@ -138,7 +149,7 @@ export function createShare(id: string, actor: string, shareId: string, input: z
 }
 export function editShare(id: string, actor: string, shareId: string, input: z.infer<typeof shareEditInput>) {
   return withGroup(id, actor, async c => {
-    const s = await share(c, id, shareId);
+    const s = await share(c, id, shareId, actor);
     if (s.author_id !== actor) throw missing();
     if (s.version !== input.version) throw conflict();
     await c.query('UPDATE life_group_shares SET title=$2,body=$3,reference=$4,answered=$5,version=version+1,updated_at=now() WHERE id=$1', [shareId, input.title, input.body, input.reference, s.kind === 'prayer' && input.answered]);
@@ -147,7 +158,7 @@ export function editShare(id: string, actor: string, shareId: string, input: z.i
 }
 export function withdrawShare(id: string, actor: string, shareId: string) {
   return withGroup(id, actor, async (c, g) => {
-    const s = await share(c, id, shareId);
+    const s = await share(c, id, shareId, actor);
     if (s.author_id !== actor && !g.manager) throw missing();
     await c.query('UPDATE life_group_shares SET withdrawn_at=now() WHERE id=$1', [shareId]);
     return { ok: true };
@@ -155,13 +166,13 @@ export function withdrawShare(id: string, actor: string, shareId: string) {
 }
 export function shareComments(id: string, actor: string, shareId: string, offset: number) {
   return withGroup(id, actor, async c => {
-    await share(c, id, shareId);
+    await share(c, id, shareId, actor);
     return (await c.query(`SELECT c.id,c.author_id AS "authorId",${nameSql('u')} AS "authorName",c.body,c.created_at AS "createdAt" FROM life_group_comments c JOIN users u ON u.id=c.author_id WHERE share_id=$1 AND withdrawn_at IS NULL ORDER BY c.created_at DESC,c.id DESC LIMIT 30 OFFSET $2`, [shareId, offset])).rows;
   });
 }
 export function addComment(id: string, actor: string, shareId: string, commentId: string, body: string) {
   return withGroup(id, actor, async c => {
-    await share(c, id, shareId);
+    await share(c, id, shareId, actor);
     const existing = (await c.query('SELECT share_id,author_id FROM life_group_comments WHERE id=$1', [commentId])).rows[0];
     if (existing && (existing.share_id !== shareId || existing.author_id !== actor)) throw conflict();
     await c.query('INSERT INTO life_group_comments(id,share_id,author_id,body) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING', [commentId, shareId, actor, body]);
@@ -170,30 +181,30 @@ export function addComment(id: string, actor: string, shareId: string, commentId
 }
 export function withdrawComment(id: string, actor: string, shareId: string, commentId: string) {
   return withGroup(id, actor, async (c, g) => {
-    await share(c, id, shareId);
+    await share(c, id, shareId, actor);
     if (!(await c.query('UPDATE life_group_comments SET withdrawn_at=now() WHERE id=$1 AND share_id=$2 AND (author_id=$3 OR $4) RETURNING id', [commentId, shareId, actor, g.manager])).rowCount) throw missing();
     return { ok: true };
   });
 }
 export function prayForShare(id: string, actor: string, shareId: string) {
   return withGroup(id, actor, async c => {
-    const s = await share(c, id, shareId);
+    const s = await share(c, id, shareId, actor);
     if (s.kind !== 'prayer') throw missing();
     await c.query('INSERT INTO life_group_prayed(share_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [shareId, actor]);
     return { ok: true };
   });
 }
 async function responsible(c: PoolClient, groupId: string, userId: string | null) {
-  if (userId && !(await members(c, groupId)).some(m => m.id === userId)) throw new GroupError(400, '負責人必須是目前的小組成員。');
+  if (userId && !(await members(c, groupId)).some(m => m.id === userId)) throw new GroupError(400, '負責人必須是目前的小家成員。');
 }
 const careColumns = `a.id,a.creator_id AS "creatorId",a.name,a.need,a.status,a.responsible_id AS "responsibleId",a.next_action AS "nextAction",a.due_date::text AS "dueDate",a.version,a.updated_at AS "updatedAt"`;
 export function listCare(id: string, actor: string, offset: number, watching: boolean) {
   return withGroup(id, actor, async c => (await c.query(`SELECT ${careColumns}, EXISTS(SELECT 1 FROM life_group_care_watches w WHERE w.care_id=a.id AND w.user_id=$2) AS watching,
-    (SELECT count(*)::int FROM life_group_care_watches WHERE care_id=a.id) AS "watcherCount" FROM life_group_care a WHERE group_id=$1 AND withdrawn_at IS NULL
+    (SELECT count(*)::int FROM life_group_care_watches WHERE care_id=a.id) AS "watcherCount" FROM life_group_care a WHERE group_id=$1 AND withdrawn_at IS NULL AND ${visibleContent('a')}
     AND (NOT $4 OR EXISTS(SELECT 1 FROM life_group_care_watches w WHERE w.care_id=a.id AND w.user_id=$2)) ORDER BY updated_at DESC,id DESC LIMIT 30 OFFSET $3`, [id, actor, offset, watching])).rows);
 }
-async function care(c: PoolClient, id: string, careId: string) {
-  const row = (await c.query('SELECT * FROM life_group_care WHERE id=$1 AND group_id=$2 AND withdrawn_at IS NULL FOR UPDATE', [careId, id])).rows[0];
+async function care(c: PoolClient, id: string, careId: string, actor: string) {
+  const row = (await c.query(`SELECT a.* FROM life_group_care a WHERE a.id=$1 AND a.group_id=$2 AND a.withdrawn_at IS NULL AND ${visibleContent('a', '$3')} FOR UPDATE`, [careId, id, actor])).rows[0];
   if (!row) throw missing();
   return row;
 }
@@ -209,13 +220,13 @@ export function createCare(id: string, actor: string, careId: string, input: z.i
 }
 export function careHistory(id: string, actor: string, careId: string, offset: number) {
   return withGroup(id, actor, async c => {
-    await care(c, id, careId);
+    await care(c, id, careId, actor);
     return (await c.query(`SELECT h.id,h.author_id AS "authorId",${nameSql('u')} AS "authorName",h.body,h.status,h.next_action AS "nextAction",h.due_date::text AS "dueDate",h.responsible_id AS "responsibleId",h.created_at AS "createdAt" FROM life_group_care_updates h JOIN users u ON u.id=h.author_id WHERE care_id=$1 ORDER BY h.created_at DESC,h.id DESC LIMIT 30 OFFSET $2`, [careId, offset])).rows;
   });
 }
 export function editCare(id: string, actor: string, careId: string, version: number, input: z.infer<typeof careInput>) {
   return withGroup(id, actor, async (c, g) => {
-    const a = await care(c, id, careId);
+    const a = await care(c, id, careId, actor);
     if (a.creator_id !== actor && !g.manager) throw missing();
     if (a.version !== version) throw conflict();
     await responsible(c, id, input.responsibleId);
@@ -226,7 +237,7 @@ export function editCare(id: string, actor: string, careId: string, version: num
 }
 export function updateCare(id: string, actor: string, careId: string, updateId: string, input: z.infer<typeof careUpdateInput>) {
   return withGroup(id, actor, async c => {
-    const a = await care(c, id, careId);
+    const a = await care(c, id, careId, actor);
     const previous = (await c.query('SELECT care_id,author_id FROM life_group_care_updates WHERE id=$1', [updateId])).rows[0];
     if (previous) { if (previous.care_id !== careId || previous.author_id !== actor) throw conflict(); return { ok: true }; }
     if (a.version !== input.version) throw conflict();
@@ -238,7 +249,7 @@ export function updateCare(id: string, actor: string, careId: string, updateId: 
 }
 export function watchCare(id: string, actor: string, careId: string, watch: boolean) {
   return withGroup(id, actor, async c => {
-    await care(c, id, careId);
+    await care(c, id, careId, actor);
     if (watch) await c.query('INSERT INTO life_group_care_watches(care_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [careId, actor]);
     else await c.query('DELETE FROM life_group_care_watches WHERE care_id=$1 AND user_id=$2', [careId, actor]);
     return { ok: true };
@@ -246,7 +257,7 @@ export function watchCare(id: string, actor: string, careId: string, watch: bool
 }
 export function withdrawCare(id: string, actor: string, careId: string) {
   return withGroup(id, actor, async (c, g) => {
-    const a = await care(c, id, careId);
+    const a = await care(c, id, careId, actor);
     if (a.creator_id !== actor && !g.manager) throw missing();
     await c.query('UPDATE life_group_care SET withdrawn_at=now() WHERE id=$1', [careId]);
     return { ok: true };

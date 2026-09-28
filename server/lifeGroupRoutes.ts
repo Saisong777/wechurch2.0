@@ -4,6 +4,9 @@ import { devotionDate } from '../shared/churchDevotion';
 import { careInput, careUpdateInput, commentInput, groupCreateInput, shareEditInput, shareInput } from '../shared/lifeGroup';
 import * as groups from './lifeGroupRepository';
 import { isTestDeployment, stagingTicket } from './deploymentSafety';
+import * as families from './familyRepository';
+import { familyCreateInput, familySettingsInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
+import { apiIdentity, boundedWindowLimiter } from './requestLimits';
 
 export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string | null>) {
   const router = Router();
@@ -24,9 +27,21 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
   });
   router.get('/', async (_req, res) => { res.json(await groups.myGroups(res.locals.actor)); });
   router.post('/', async (req, res) => { res.status(201).json(await groups.createGroup(res.locals.actor, groupCreateInput.parse(req.body).name)); });
-  router.post('/join', async (req, res) => { res.json(await groups.requestJoin(res.locals.actor, z.object({ token: z.string().trim().regex(/^[a-f0-9]{48}$/) }).parse(req.body).token)); });
+  router.post('/join', boundedWindowLimiter({ max: 10, windowMs: 60000, key: apiIdentity }), async (req, res) => { res.json(await groups.requestJoin(res.locals.actor, z.object({ token: invitationToken }).parse(req.body).token)); });
+  router.get('/directory', async (req, res) => { res.json(await families.familyDirectory(res.locals.actor, z.string().max(100).default('').parse(req.query.church), z.string().trim().max(100).default('').parse(req.query.search))); });
+  router.post('/directory/:id/join', async (req, res) => { res.json(await families.joinListedFamily(res.locals.actor, uuid.parse(req.params.id))); });
+  router.get('/matching', async (_req, res) => { res.json(await families.myMatching(res.locals.actor)); });
+  router.post('/matching', async (req, res) => { res.status(201).json(await families.requestMatching(res.locals.actor, matchingInput.parse(req.body))); });
+  router.delete('/matching/:id', async (req, res) => { res.json(await families.cancelMatching(res.locals.actor, uuid.parse(req.params.id))); });
+  router.get('/management', async (_req, res) => { res.json(await families.familyManagement(res.locals.actor)); });
+  router.post('/management', async (req, res) => { res.status(201).json(await families.createFamily(res.locals.actor, familyCreateInput.parse(req.body))); });
+  router.patch('/management/matching/:id', async (req, res) => { res.json(await families.updateMatching(res.locals.actor, uuid.parse(req.params.id), matchingUpdateInput.parse(req.body))); });
+  router.get('/management/:id', async (req, res) => { res.json(await families.managedFamilyDetail(res.locals.actor, uuid.parse(req.params.id))); });
+  router.post('/management/:id/requests/:userId', async (req, res) => { res.json(await families.decideManagedJoin(res.locals.actor, uuid.parse(req.params.id), uuid.parse(req.params.userId), z.object({ approve: z.boolean() }).parse(req.body).approve)); });
+  router.patch('/management/:id', async (req, res) => { res.json(await families.updateFamily(res.locals.actor, uuid.parse(req.params.id), familySettingsInput.parse(req.body))); });
+  router.post('/management/:id/move', async (req, res) => { res.json(await families.moveFamilyMember(res.locals.actor, uuid.parse(req.params.id), memberMoveInput.parse(req.body))); });
   router.get('/sources', async (req, res) => { res.json(await groups.shareSources(res.locals.actor, z.enum(['note', 'prayer']).parse(req.query.kind))); });
-  router.param('groupId', (req, res, next, value) => { const parsed = uuid.safeParse(value); if (!parsed.success) return void res.status(400).json({ error: '小組編號無效。' }); res.locals.groupId = parsed.data; next(); });
+  router.param('groupId', (req, res, next, value) => { const parsed = uuid.safeParse(value); if (!parsed.success) return void res.status(400).json({ error: '小家編號無效。' }); res.locals.groupId = parsed.data; next(); });
   const args = (res: { locals: Record<string, any> }): [string, string] => [res.locals.groupId, res.locals.actor];
   router.get('/:groupId', async (_req, res) => { res.json(await groups.groupInfo(...args(res))); });
   router.post('/:groupId/invite', async (_req, res) => {
@@ -45,7 +60,7 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
   router.delete('/:groupId/members/:userId', async (req, res) => { res.json(await groups.removeMember(...args(res), uuid.parse(req.params.userId))); });
   router.get('/:groupId/reading', async (req, res) => { res.json(await groups.groupReading(...args(res), devotionDate.parse(req.query.date))); });
   router.put('/:groupId/reading/:devotionId', async (req, res) => { const input = z.object({ version: z.number().int().positive(), done: z.boolean() }).parse(req.body); res.json(await groups.markReading(...args(res), uuid.parse(req.params.devotionId), input.version, input.done)); });
-  router.get('/:groupId/shares', async (req, res) => { res.json(await groups.listShares(...args(res), z.enum(['note','prayer']).parse(req.query.kind), offset(req))); });
+  router.get('/:groupId/shares', async (req, res) => { res.json(await groups.listShares(...args(res), z.enum(['note','prayer','message','all']).parse(req.query.kind), offset(req))); });
   router.put('/:groupId/shares/:shareId', async (req, res) => { res.json(await groups.createShare(...args(res), uuid.parse(req.params.shareId), shareInput.parse(req.body))); });
   router.patch('/:groupId/shares/:shareId', async (req, res) => { res.json(await groups.editShare(...args(res), uuid.parse(req.params.shareId), shareEditInput.parse(req.body))); });
   router.delete('/:groupId/shares/:shareId', async (req, res) => { res.json(await groups.withdrawShare(...args(res), uuid.parse(req.params.shareId))); });
@@ -65,7 +80,7 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
     if (error instanceof groups.GroupError) return void res.status(error.status).json({ error: error.message });
     if (error?.code === '23505') return void res.status(409).json({ error: '操作正在處理或內容已存在，請重新載入。' });
     console.error('[life-groups]', error?.code || error?.name);
-    res.status(503).json({ error: '小組服務暫時無法使用，請稍後重試。' });
+    res.status(503).json({ error: '小家服務暫時無法使用，請稍後重試。' });
   };
   router.use(errors);
   return router;

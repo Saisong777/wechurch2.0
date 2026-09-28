@@ -13,7 +13,7 @@ async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
 
 export async function listPrayerDeliveries(actor: string) {
   return (await pool.query(`SELECT s.prayer_id AS "prayerId",s.destination,s.group_id AS "groupId",s.post_id AS "postId",s.is_anonymous AS anonymous,s.created_at AS "createdAt",
-    CASE WHEN s.group_id IS NULL THEN CASE WHEN EXISTS(SELECT 1 FROM prayers p WHERE p.id=s.post_id AND (p.closed_at IS NOT NULL OR p.is_answered)) THEN '已結束的代禱（本人紀錄）' ELSE '公共禱告牆' END ELSE COALESCE(g.name,'原小組') END AS name,
+    CASE WHEN s.group_id IS NULL THEN CASE WHEN EXISTS(SELECT 1 FROM prayers p WHERE p.id=s.post_id AND (p.closed_at IS NOT NULL OR p.is_answered)) THEN '已結束的代禱（本人紀錄）' ELSE '公共禱告牆' END ELSE COALESCE(g.name,'原小家') END AS name,
     CASE WHEN s.group_id IS NULL THEN (SELECT p.content FROM prayers p WHERE p.id=s.post_id)
       ELSE (SELECT p.title || E'\\n\\n' || p.body FROM life_group_shares p WHERE p.id=s.post_id AND p.withdrawn_at IS NULL) END AS content
     FROM personal_prayer_shares s LEFT JOIN small_groups g ON g.id=s.group_id

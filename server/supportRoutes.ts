@@ -60,7 +60,7 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
   });
   router.get('/targets', async (_req, res) => {
     const actor = res.locals.actor;
-    const groups = (await pool.query(`SELECT 'group' AS kind,g.id,g.name,u.id AS "receiverId",COALESCE(u.display_name,'小組同工') AS "receiverName"
+    const groups = (await pool.query(`SELECT 'group' AS kind,g.id,g.name,u.id AS "receiverId",COALESCE(u.display_name,'小家同工') AS "receiverName"
       FROM small_groups g JOIN users u ON u.id=g.leader_user_id OR u.id=g.pastor_user_id
       WHERE g.is_active AND u.id<>$1 AND (g.leader_user_id=$1 OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active)) ORDER BY g.name,u.id`, [actor])).rows;
     const destinations = (await pool.query(`SELECT 'destination' AS kind,d.id,d.name,d.owner_id AS "receiverId",COALESCE(u.display_name,'關懷同工') AS "receiverName"

@@ -65,6 +65,7 @@
     { "idx": 12, "version": "7", "when": 1790208000000, "tag": "0012_google_account_links", "breakpoints": true },
     { "idx": 13, "version": "7", "when": 1790294400000, "tag": "0013_im_bible_import", "breakpoints": true },
     { "idx": 14, "version": "7", "when": 1790467200000, "tag": "0014_auth_session_version", "breakpoints": true },
-    { "idx": 15, "version": "7", "when": 1790467200001, "tag": "0015_capacity_indexes", "breakpoints": true }
+    { "idx": 15, "version": "7", "when": 1790467200001, "tag": "0015_capacity_indexes", "breakpoints": true },
+    { "idx": 16, "version": "7", "when": 1790553600000, "tag": "0016_families", "breakpoints": true }
   ]
 }

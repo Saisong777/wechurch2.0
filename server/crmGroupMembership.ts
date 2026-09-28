@@ -8,8 +8,8 @@ export async function assignCrmGroupMember(groupId: string, input: { userId?: st
   try {
     await c.query('BEGIN');
     await c.query("SELECT pg_advisory_xact_lock(hashtext('crm-membership:' || $1))", [groupId]);
-    const group = (await c.query('SELECT id,church FROM small_groups WHERE id=$1 AND is_active FOR SHARE', [groupId])).rows[0];
-    if (!group || (access.role !== 'admin' && !access.groupIds.includes(groupId) && !access.churchScopes.includes(normalizeChurch(group.church) || ''))) throw new GroupError(403, '小組不在管理範圍內');
+    const group = (await c.query("SELECT id,church FROM small_groups WHERE id=$1 AND is_active AND lifecycle='active' FOR UPDATE", [groupId])).rows[0];
+    if (!group || (access.role !== 'admin' && !access.groupIds.includes(groupId) && !access.churchScopes.includes(normalizeChurch(group.church) || ''))) throw new GroupError(403, '小家不在管理範圍內');
     const normalizeEmail = (value: string) => value.trim().toLowerCase();
     const emails = new Set<string>();
     if (input.userId) {
@@ -36,6 +36,7 @@ export async function assignCrmGroupMember(groupId: string, input: { userId?: st
     const result = existing || (await c.query(`INSERT INTO small_group_members(group_id,user_id,potential_member_id,member_email,joined_at,updated_at)
       VALUES($1,$2,$3,$4,now(),now()) RETURNING *`, [groupId, input.userId || null, input.potentialMemberId || null, email])).rows[0];
     // Joining another group must not silently remove a person's other memberships.
+    if (!existing) await c.query("INSERT INTO family_membership_events(group_id,user_id,actor_id,action) VALUES($1,$2,$3,'joined')", [groupId, input.userId || null, access.userId]);
     await c.query('COMMIT'); return result;
   } catch (error) { await c.query('ROLLBACK'); throw error; } finally { c.release(); }
 }

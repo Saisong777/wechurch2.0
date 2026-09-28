@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SupportPanel } from './SupportPanel';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'fixture' }, loading: false }) }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-const targets = [{ kind: 'group', id: '00000000-0000-4000-8000-000000000001', receiverId: '00000000-0000-4000-8000-000000000002', name: '測試小組', receiverName: '測試陪伴者' }];
+const targets = [{ kind: 'group', id: '00000000-0000-4000-8000-000000000001', receiverId: '00000000-0000-4000-8000-000000000002', name: '測試小家', receiverName: '測試陪伴者' }];
 function show(path='/', mode: 'personal' | 'work' = 'personal') { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><SupportPanel mode={mode} /></MemoryRouter></QueryClientProvider>); }
 it('requires recipient consent, preserves failed input, and retries the same operation', async () => {
   const writes: Array<{path: string; body: unknown}> = [];
@@ -15,7 +15,7 @@ it('requires recipient consent, preserves failed input, and retries the same ope
     return new Response(JSON.stringify(path.endsWith('/targets') ? targets : { requests: [], hasMore: false }));
   }));
   show(); fireEvent.click(await screen.findByRole('button',{name:'尋求陪伴'}));
-  await screen.findByRole('option',{name:'測試小組 · 測試陪伴者'});
+  await screen.findByRole('option',{name:'測試小家 · 測試陪伴者'});
   fireEvent.change(screen.getByLabelText('分享對象'),{ target:{ value:`group:${targets[0].id}:${targets[0].receiverId}` } });
   fireEvent.change(screen.getByLabelText('事項'),{ target:{value:'我想談談'} });
   fireEvent.change(screen.getByLabelText('希望得到的陪伴'),{ target:{value:'不公開的內容'} });
@@ -48,7 +48,7 @@ it('opens the saved request without a false unsaved-change prompt',async()=>{
   vi.stubGlobal('fetch',vi.fn(async(path:string,init?:RequestInit)=>new Response(JSON.stringify(init?.method==='PUT'?{id:'saved'}:path.endsWith('/targets')?targets:path.endsWith('/requests/saved')?{request:{id:'saved',title:'我想談談',body:'事項',status:'open',version:1,isSender:true},events:[]}:{requests:[]}))));
   const router=createMemoryRouter([{path:'/support',element:<SupportPanel mode="personal"/>}],{initialEntries:['/support']});
   render(<QueryClientProvider client={new QueryClient()}><RouterProvider router={router}/></QueryClientProvider>);
-  fireEvent.click(await screen.findByRole('button',{name:'尋求陪伴'}));await screen.findByRole('option',{name:'測試小組 · 測試陪伴者'});
+  fireEvent.click(await screen.findByRole('button',{name:'尋求陪伴'}));await screen.findByRole('option',{name:'測試小家 · 測試陪伴者'});
   fireEvent.change(screen.getByLabelText('分享對象'),{target:{value:`group:${targets[0].id}:${targets[0].receiverId}`}});
   fireEvent.change(screen.getByLabelText('事項'),{target:{value:'我想談談'}});fireEvent.change(screen.getByLabelText('希望得到的陪伴'),{target:{value:'事項'}});
   fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'送出'}));

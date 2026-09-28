@@ -43,8 +43,8 @@ export const crmRoleLabels: Record<CrmRole, string> = {
   senior_pastor: "主任牧師",
   pastor: "牧師",
   minister: "傳道人",
-  group_leader: "小組長",
-  leader: "小組長",
+  group_leader: "小家長",
+  leader: "小家長",
   future_leader: "儲備領袖",
   member: "會友",
 };

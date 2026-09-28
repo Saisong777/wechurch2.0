@@ -1073,7 +1073,7 @@ export function PastoralJourneyPanel({ selectedChurch, currentChurchName }: Past
                     <UserCheck className="mt-0.5 h-5 w-5 shrink-0" />
                     <div>
                       <p className="font-medium">有 {selectedPerson.needsFollowUpCount} 天需要跟進</p>
-                      <p className="mt-1 text-sm">可以在每日項目取消跟進，或交給小組長/陪伴者處理。</p>
+                      <p className="mt-1 text-sm">可以在每日項目取消跟進，或交給小家長/陪伴者處理。</p>
                     </div>
                   </div>
                 )}

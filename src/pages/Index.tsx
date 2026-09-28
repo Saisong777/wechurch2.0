@@ -443,7 +443,7 @@ const Index = () => {
     {
       id: 'care-module',
       title: '關懷',
-      subtitle: '個人關懷清單、小組關懷清單、具體要關心的人',
+      subtitle: '個人關懷清單、小家關懷清單、具體要關心的人',
       href: '/care',
       icon: HandHeart,
       tone: 'border-border/70 bg-card/95 hover:border-emerald-200',
