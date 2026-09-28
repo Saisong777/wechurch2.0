@@ -381,6 +381,15 @@ the default page blueprint.
 - Verified desktop 1280x900 and mobile 390x844; 320x568 prayer overflow check also
   passed. See `design/small-group-life-implementation-2026-09-11.md`.
 
+## Grace Book (2026-09-28)
+
+- Extend the approved Together recipe; private, single-column and inline editing.
+- Grace book is a filtered owner-only record collection, not an additional public wall.
+- Separate answered prayers from dated standalone stories. Ended prayers remain history.
+- Reuse semantic light/dark colors, 44px controls, restrained repeated-item cards and
+  explicit sharing preview. No new fixed navigation, nested scroll shell or AI action.
+- See `design/grace-book-2026-09-28.md` for migration, privacy and acceptance evidence.
+
 ## Personal Prayer Sharing (2026-09-11)
 
 - Private records have selection checkboxes and a sticky selection action row.

@@ -99,7 +99,8 @@ export function DailyHome({
           </Link>
         ) : <p className="mt-3 text-sm text-muted-foreground">目前沒有正在等候的禱告。</p>}
         <div className="mt-2 flex flex-wrap gap-x-5">
-          <Link to="/grace-record" className={quietLink}>禱告與恩典紀錄</Link>
+          <Link to="/grace-record" className={quietLink}>禱告清單</Link>
+          <Link to="/grace-record?view=grace" className={quietLink}>恩典記錄簿</Link>
         </div>
       </section>
 

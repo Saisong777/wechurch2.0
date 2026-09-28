@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { personalPrayerInput, personalPrayerWrite, responseStatus } from '../shared/personalPrayer';
+import { isGraceRecord, personalPrayerInput, personalPrayerWrite, responseStatus } from '../shared/personalPrayer';
 
 describe('private prayer input', () => {
+  const grace = {title:'恩典',prayer:'感謝神的帶領',recordKind:'grace',occurredOn:'2026-09-28',status:'answered',responseType:'grace'};
+  it('requires a real date, content and answered state for direct grace stories', () => {
+    expect(personalPrayerWrite.safeParse(grace).success).toBe(true);
+    for (const invalid of [{occurredOn:null},{occurredOn:'2026-02-30'},{prayer:' '},{status:'waiting'},{responseType:null},{recordKind:'public'}]) {
+      expect(personalPrayerWrite.safeParse({...grace,...invalid}).success).toBe(false);
+    }
+  });
+  it('includes answered prayers and grace stories, not generic completed prayers', () => {
+    expect(isGraceRecord(personalPrayerWrite.parse(grace))).toBe(true);
+    expect(isGraceRecord(personalPrayerInput.parse({title:'Answered',prayer:'',status:'answered'}))).toBe(true);
+    expect(isGraceRecord(personalPrayerInput.parse({title:'Legacy grace',prayer:'',status:'grace_response',responseType:'grace'}))).toBe(true);
+    for (const responseType of ['ended','blocked','other','keep_waiting']) {
+      expect(isGraceRecord(personalPrayerInput.parse({title:'History',prayer:'',status:'grace_response',responseType}))).toBe(false);
+    }
+  });
   it('defaults to waiting and strips client-supplied ownership', () => {
     const input = personalPrayerInput.parse({ title: ' Today ', prayer: '', userId: 'another-person' });
     expect(input).toEqual({ title: 'Today', prayer: '', response: '', status: 'waiting', responseType: null });

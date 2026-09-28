@@ -66,6 +66,7 @@
     { "idx": 13, "version": "7", "when": 1790294400000, "tag": "0013_im_bible_import", "breakpoints": true },
     { "idx": 14, "version": "7", "when": 1790467200000, "tag": "0014_auth_session_version", "breakpoints": true },
     { "idx": 15, "version": "7", "when": 1790467200001, "tag": "0015_capacity_indexes", "breakpoints": true },
-    { "idx": 16, "version": "7", "when": 1790553600000, "tag": "0016_families", "breakpoints": true }
+    { "idx": 16, "version": "7", "when": 1790553600000, "tag": "0016_families", "breakpoints": true },
+    { "idx": 17, "version": "7", "when": 1790553600001, "tag": "0017_grace_book", "breakpoints": true }
   ]
 }

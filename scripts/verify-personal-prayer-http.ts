@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import type { PersonalPrayer } from '../shared/personalPrayer';
 type Client = (path: string, method?: string, body?: unknown) => Promise<Response>;
 
@@ -36,5 +37,27 @@ export async function verifyPersonalPrayerHttp(other: Client, owner: Client, gue
   assert.equal((await owner(`/api/prayers/${postId}/comments`)).status,200);
   assert.equal((await owner(path,'PATCH',{...current,expectedUpdatedAt:current.updatedAt,status:'waiting'})).status,200);
   assert(!(await (await other('/api/prayers')).json()).some((p:{id:string})=>p.id===postId), 'Reopening private original must not republish');
+  const graceId = randomUUID(), gracePath = `/api/personal-prayers/${graceId}`;
+  const story = {title:'Grace fixture',prayer:'Private grace story',response:'PRIVATE REFLECTION',recordKind:'grace',occurredOn:'2026-09-20',status:'answered',responseType:'grace'};
+  assert.equal((await owner(gracePath,'PUT',{...story,occurredOn:'2026-02-30'})).status,400);
+  const created = await owner(gracePath,'PUT',story); assert.equal(created.status,200);
+  let grace = await created.json(); assert.equal(grace.occurredOn,story.occurredOn); assert.equal(grace.recordKind,'grace');
+  assert(!(await (await other('/api/personal-prayers')).json()).some((p:PersonalPrayer)=>p.id===graceId));
+  assert(!(await (await other('/api/prayers')).json()).some((p:{content:string})=>p.content.includes(story.title)));
+  assert.equal((await other(gracePath,'PATCH',{...grace,expectedUpdatedAt:grace.updatedAt})).status,404);
+  assert.equal((await owner(gracePath,'PATCH',{...grace,recordKind:'prayer',expectedUpdatedAt:grace.updatedAt})).status,400);
+  assert.equal((await owner(gracePath,'PATCH',{...grace,status:'waiting',expectedUpdatedAt:grace.updatedAt})).status,400);
+  const edited = await owner(gracePath,'PATCH',{...grace,occurredOn:'2026-09-19',expectedUpdatedAt:grace.updatedAt}); assert.equal(edited.status,200);
+  assert.equal((await owner(gracePath,'PATCH',{...grace,expectedUpdatedAt:grace.updatedAt})).status,409);
+  grace = await edited.json(); assert.equal(grace.occurredOn,'2026-09-19');
+  assert.equal((await (await owner(gracePath,'PUT',story)).json()).occurredOn,'2026-09-19');
+  const shared = await owner('/api/prayer-sharing','POST',{items:[{sourceId:graceId,title:'Public gratitude',body:'Only approved story'}],groupId:null,publicWall:true,anonymous:true,urgent:true,consent:true});
+  assert.equal(shared.status,200);
+  const gratitude = (await (await other('/api/prayers')).json()).find((p:{content:string})=>p.content==='Public gratitude\n\nOnly approved story');
+  assert(gratitude); assert.equal(gratitude.category,'thanksgiving'); assert.equal(gratitude.isUrgent,false); assert.equal(gratitude.userId,null);
+  assert(!JSON.stringify(gratitude).includes('PRIVATE REFLECTION'));
+  assert.equal((await owner(`/api/prayer-sharing/${graceId}/public`,'DELETE')).status,200);
+  assert((await (await owner('/api/personal-prayers')).json()).some((p:PersonalPrayer)=>p.id===graceId));
+  console.log('PASS grace book: dated private stories, ownership, immutable kind, conflict, idempotent retry, explicit thanksgiving share and withdrawal');
   console.log('PASS personal prayers: owner isolation, required version, conflict, safe create retry, progress, anonymous interactions, atomic close and private reopen');
 }

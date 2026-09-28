@@ -305,10 +305,14 @@ export const personalPrayers = pgTable("personal_prayers", {
   response: text("response").default("").notNull(),
   status: text("status").default("waiting").notNull(),
   responseType: text("response_type"),
+  recordKind: text("record_kind").default("prayer").notNull(),
+  occurredOn: date("occurred_on"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   userCreatedIdx: index("personal_prayers_user_created_idx").on(table.userId, table.createdAt),
+  recordKindCheck: check("personal_prayers_record_kind_check", sql`${table.recordKind} IN ('prayer', 'grace')`),
+  graceRecordCheck: check("personal_prayers_grace_record_check", sql`${table.recordKind} <> 'grace' OR (${table.occurredOn} IS NOT NULL AND ${table.status} = 'answered' AND ${table.responseType} IS NOT DISTINCT FROM 'grace' AND length(trim(${table.prayer})) > 0)`),
 }));
 
 export const prayers = pgTable("prayers", {

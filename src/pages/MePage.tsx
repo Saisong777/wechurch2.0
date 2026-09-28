@@ -72,9 +72,9 @@ const recordActions = [
   },
   {
     id: 'grace-record',
-    title: '恩典紀錄簿',
-    subtitle: '記下禱告、等待，以及神如何回應。',
-    href: '/grace-record',
+    title: '恩典記錄簿',
+    subtitle: '蒙應允的禱告與生活中的恩典。',
+    href: '/grace-record?view=grace',
     icon: BookHeart,
     tone: 'border-emerald-200 bg-emerald-50/70',
     iconTone: 'bg-emerald-500/10 text-emerald-600',
