@@ -1,5 +1,14 @@
 # WeChurch Together: Current Design Recipe
 
+## Prayer Life Updated 2026-09-28
+
+Private prayers use a compact 768px reading column, active/history filters and
+inline editors with bottom actions. Keep the dated response history expandable.
+Sharing is a deliberate preview with audience consent, never an implicit side
+effect of saving. Completion may explicitly close the public copy, never publish
+the private response. Retain separate wall navigation and semantic theme tokens.
+See `design/prayer-module-2026-09-28.md` for scope and verification boundaries.
+
 ## Family Life Added 2026-09-28
 
 Member-facing pastoral groups are named 小家. Keep existing `/groups` links and

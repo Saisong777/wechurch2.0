@@ -20,7 +20,7 @@ async function request<T>(path: string, method='GET', body?: unknown): Promise<T
 }
 export const usePrayerWall = (mine = false) => {
   const { user } = useAuth();
-  return useQuery<Prayer[]>({ queryKey:['prayer-wall',user?.id,mine?'mine':'active'], enabled:!!user, queryFn:() => request(mine?'?view=my':''), refetchInterval:15000, retry:false });
+  return useQuery<Prayer[]>({ queryKey:['prayer-wall',user?.id,mine?'mine':'active'], enabled:!!user, queryFn:() => request(mine?'?view=my':''), refetchInterval:30000, refetchIntervalInBackground:false, retry:false });
 };
 function useRefreshWall() {
   const client = useQueryClient();

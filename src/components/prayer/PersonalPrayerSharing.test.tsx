@@ -29,7 +29,15 @@ it('resets consent when audience, anonymity, or preview text changes',async()=>{
 });
 it('sends selected edited text and explicit anonymity without private fields',async()=>{
   const done=show();fireEvent.click(publicScope());fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));fireEvent.change(screen.getByRole('textbox',{name:'第 1 筆分享內容'}),{target:{value:'公開摘錄'}});fireEvent.click(consent());fireEvent.click(screen.getByRole('button',{name:'確認分享'}));
-  await waitFor(()=>expect(done).toHaveBeenCalledOnce());expect(payload).toEqual({items:[{sourceId:record.id,title:record.title,body:'公開摘錄'}],groupId:null,publicWall:true,anonymous:true,consent:true});
+  await waitFor(()=>expect(done).toHaveBeenCalledOnce());expect(payload).toEqual({items:[{sourceId:record.id,title:record.title,body:'公開摘錄'}],groupId:null,publicWall:true,anonymous:true,urgent:false,consent:true});
+});
+it('requires renewed consent when marking a public prayer urgent', async () => {
+  const done=show(); fireEvent.click(publicScope()); fireEvent.click(consent());
+  fireEvent.click(screen.getByRole('checkbox',{name:'標記為緊急代禱'}));
+  expect(consent()).not.toBeChecked(); fireEvent.click(consent());
+  fireEvent.click(screen.getByRole('button',{name:'確認分享'}));
+  await waitFor(()=>expect(done).toHaveBeenCalledOnce()); expect(payload.urgent).toBe(true);
+  expect(JSON.stringify(payload)).not.toContain(record.response);
 });
 it('keeps preview and selections on failed publication',async()=>{
   fail=true;const done=show();fireEvent.click(publicScope());fireEvent.click(consent());fireEvent.click(screen.getByRole('button',{name:'確認分享'}));

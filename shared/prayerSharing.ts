@@ -9,6 +9,7 @@ export const prayerSharingInput = z.object({
   groupId: z.string().uuid().nullable().default(null),
   publicWall: z.boolean(),
   anonymous: z.boolean(),
+  urgent: z.boolean().optional(),
   consent: z.literal(true),
 }).refine(value => value.groupId || value.publicWall, '請選擇分享對象');
 

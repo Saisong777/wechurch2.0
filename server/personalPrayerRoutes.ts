@@ -1,6 +1,7 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { personalPrayerInput } from '../shared/personalPrayer';
+import { personalPrayerWrite } from '../shared/personalPrayer';
+import { GroupError } from './lifeGroupRepository';
 import { listPersonalPrayers, savePersonalPrayer } from './personalPrayerRepository';
 
 export function personalPrayerRoutes(resolveUserId: (req: Request) => Promise<string | null>) {
@@ -21,7 +22,7 @@ export function personalPrayerRoutes(resolveUserId: (req: Request) => Promise<st
   router.put('/:id', async (req, res, next) => {
     try {
       const id = z.string().uuid().safeParse(req.params.id);
-      const input = personalPrayerInput.safeParse(req.body);
+      const input = personalPrayerWrite.safeParse(req.body);
       if (!id.success || !input.success) return void res.status(400).json({ error: 'Invalid prayer' });
       const saved = await savePersonalPrayer(res.locals.prayerOwnerId, id.data, input.data, true);
       if (!saved) return void res.status(404).json({ error: 'Prayer not found' });
@@ -31,12 +32,16 @@ export function personalPrayerRoutes(resolveUserId: (req: Request) => Promise<st
   router.patch('/:id', async (req, res, next) => {
     try {
       const id = z.string().uuid().safeParse(req.params.id);
-      const input = personalPrayerInput.safeParse(req.body);
+      const input = personalPrayerWrite.safeParse(req.body);
       if (!id.success || !input.success) return void res.status(400).json({ error: 'Invalid prayer' });
+      if (!input.data.expectedUpdatedAt) return void res.status(428).json({ error: '請重新載入禱告後再編輯。' });
       const saved = await savePersonalPrayer(res.locals.prayerOwnerId, id.data, input.data, false);
       if (!saved) return void res.status(404).json({ error: 'Prayer not found' });
       res.json(saved);
-    } catch (error) { next(error); }
+    } catch (error) {
+      if (error instanceof GroupError) return void res.status(error.status).json({ error: error.message });
+      next(error);
+    }
   });
   return router;
 }

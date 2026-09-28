@@ -9,6 +9,17 @@ export const personalPrayerInput = z.object({
 });
 
 export type PersonalPrayerInput = z.infer<typeof personalPrayerInput>;
+export const personalPrayerWrite = personalPrayerInput.extend({
+  expectedUpdatedAt: z.string().datetime().optional(),
+  closePublicShare: z.boolean().optional(),
+}).refine(input => !input.closePublicShare || input.status !== 'waiting', {
+  message: '繼續等候的禱告不能同時結束公開代禱。',
+});
+export type PersonalPrayerWrite = z.infer<typeof personalPrayerWrite>;
+
+export function responseStatus(type: PersonalPrayerInput['responseType']): PersonalPrayerInput['status'] {
+  return type === 'keep_waiting' ? 'waiting' : type === 'grace' ? 'answered' : 'grace_response';
+}
 export type PersonalPrayer = PersonalPrayerInput & {
   id: string;
   userId: string;

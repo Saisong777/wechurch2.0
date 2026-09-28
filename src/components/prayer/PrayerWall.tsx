@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, Heart, Users, User, PartyPopper } from 'lucide-react';
 import { usePrayerWall, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
@@ -37,6 +38,8 @@ export const PrayerWall: React.FC = () => {
   const queryClient = useQueryClient();
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all');
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [search, setSearch] = useState('');
+  const [limit, setLimit] = useState(20);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const view = searchParams.get('view');
     return view === 'my' || view === 'answered' ? view : 'all';
@@ -47,6 +50,8 @@ export const PrayerWall: React.FC = () => {
     setUrgentOnly(false);
     setViewMode('all');
     setFilterCategory('all');
+    setSearch('');
+    setLimit(20);
   };
 
   const handleRefresh = () => {
@@ -71,17 +76,19 @@ export const PrayerWall: React.FC = () => {
     }
     
     if (urgentOnly) filtered = filtered.filter(isUrgentPrayer);
+    const needle = search.trim().toLocaleLowerCase();
+    if (needle) filtered = filtered.filter(p => `${p.content}\n${p.scriptureReference || ''}\n${p.authorName}`.toLocaleLowerCase().includes(needle));
     return [...filtered].sort(compareWallPrayers);
-  }, [prayers, filterCategory, viewMode, urgentOnly]);
+  }, [prayers, filterCategory, viewMode, urgentOnly, search]);
 
   const waitingPrayers = useMemo(
-    () => filteredPrayers.filter((prayer) => !isClosedPrayer(prayer)),
-    [filteredPrayers]
+    () => filteredPrayers.slice(0, limit).filter((prayer) => !isClosedPrayer(prayer)),
+    [filteredPrayers, limit]
   );
 
   const answeredFilteredPrayers = useMemo(
-    () => filteredPrayers.filter(isClosedPrayer),
-    [filteredPrayers]
+    () => filteredPrayers.slice(0, limit).filter(isClosedPrayer),
+    [filteredPrayers, limit]
   );
 
   if (!user) {
@@ -184,6 +191,7 @@ export const PrayerWall: React.FC = () => {
         </div>
 
         <label className="mt-3 flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={urgentOnly} onChange={e=>{setUrgentOnly(e.target.checked);if(e.target.checked && viewMode==='answered') setViewMode('all');}} />只看緊急代禱（{prayers?.filter(isUrgentPrayer).length || 0}）</label>
+        <Input type="search" className="mt-3" aria-label="搜尋禱告牆" placeholder="搜尋代禱、經文或分享者" value={search} onChange={e => { setSearch(e.target.value); setLimit(20); }} />
         <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
           <span>{viewModeLabels[viewMode]} · {filterCategory === 'all' ? '全部分類' : CATEGORY_LABELS[filterCategory]}</span>
           <span>{filteredPrayers.length} / {totalPrayers}</span>
@@ -229,7 +237,7 @@ export const PrayerWall: React.FC = () => {
       {!isLoading && !error && filteredPrayers.length === 0 && (
         <Card className="rounded-lg border-dashed">
           <CardContent className="py-12 text-center">
-            {viewMode === 'answered' ? (
+            {search.trim() ? <h3 className="text-lg font-medium mb-2">找不到符合的代禱，試試其他關鍵字。</h3> : viewMode === 'answered' ? (
               <>
                 <PartyPopper className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">還沒有已結束的代禱</h3>
@@ -321,6 +329,7 @@ export const PrayerWall: React.FC = () => {
           )}
         </div>
       )}
+      {!error && filteredPrayers.length > limit && <Button variant="outline" className="w-full" onClick={() => setLimit(current => current + 20)}>顯示更多代禱</Button>}
     </div>
   );
 };

@@ -169,7 +169,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
             onClick={handleToggleAmen}
             disabled={toggleAmenMutation.isPending || prayer.hasAmened}
             className={cn(
-              'h-9 rounded-lg gap-1.5',
+              'h-11 rounded-lg gap-1.5',
               prayer.hasAmened && 'border-rose-500 bg-rose-500 text-white hover:bg-rose-600'
             )}
           >
@@ -189,7 +189,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-9 rounded-lg gap-1.5"
+                    className="h-11 rounded-lg gap-1.5"
                     onClick={handleMarkAnswered}
                     disabled={markAnsweredMutation.isPending}
                   >
@@ -208,7 +208,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
             <Button
               variant="ghost"
               size="sm"
-              className={cn('h-9 rounded-lg gap-1.5', prayer.isPinned ? 'text-amber-600' : 'text-muted-foreground')}
+              className={cn('h-11 rounded-lg gap-1.5', prayer.isPinned ? 'text-amber-600' : 'text-muted-foreground')}
               onClick={handleTogglePin}
               disabled={togglePinMutation.isPending}
             >
@@ -217,13 +217,13 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
             </Button>
           )}
 
-          {prayer.isOwner && !closed && <Button variant="ghost" size="sm" className="h-9 gap-1.5" aria-pressed={!!prayer.isUrgent} disabled={urgentMutation.isPending} onClick={()=>urgentMutation.mutate({prayerId:prayer.id,isUrgent:!prayer.isUrgent})}><AlertCircle className="h-4 w-4" />{prayer.isUrgent?'解除緊急':'標記緊急'}</Button>}
-          {prayer.isOwner && <Button variant="outline" size="sm" className="h-9 gap-1.5" disabled={closeMutation.isPending} onClick={()=>{if(window.confirm(closed?'重新公開此代禱與原有回應，邀請大家繼續守望？':'結束這則代禱並移出公開牆？本人仍可查看紀錄。'))closeMutation.mutate({prayerId:prayer.id,isClosed:!closed});}}><Check className="h-4 w-4" />{closed?'重新公開':'結束代禱'}</Button>}
+          {prayer.isOwner && !closed && <Button variant="ghost" size="sm" className="h-11 gap-1.5" aria-pressed={!!prayer.isUrgent} disabled={urgentMutation.isPending} onClick={()=>urgentMutation.mutate({prayerId:prayer.id,isUrgent:!prayer.isUrgent})}><AlertCircle className="h-4 w-4" />{prayer.isUrgent?'解除緊急':'標記緊急'}</Button>}
+          {prayer.isOwner && <Button variant="outline" size="sm" className="h-11 gap-1.5" disabled={closeMutation.isPending} onClick={()=>{if(window.confirm(closed?'重新公開此代禱與原有回應，邀請大家繼續守望？':'結束這則代禱並移出公開牆？本人仍可查看紀錄。'))closeMutation.mutate({prayerId:prayer.id,isClosed:!closed});}}><Check className="h-4 w-4" />{closed?'重新公開':'結束代禱'}</Button>}
 
           {canDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 rounded-lg gap-1.5 text-muted-foreground hover:text-destructive">
+                <Button variant="ghost" size="sm" className="h-11 rounded-lg gap-1.5 text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                   刪除
                 </Button>

@@ -38,7 +38,7 @@ export function sharePersonalPrayers(actor: string, input: PrayerSharingInput) {
         if (active.rowCount) { skipped++; continue; }
       }
       const postId = randomUUID();
-      if (isPublic) await c.query("INSERT INTO prayers(id,user_id,content,category,is_anonymous) VALUES($1,$2,$3,'supplication',$4)", [postId,actor,`${item.title}\n\n${item.body}`,input.anonymous]);
+      if (isPublic) await c.query("INSERT INTO prayers(id,user_id,content,category,is_anonymous,is_urgent) VALUES($1,$2,$3,'supplication',$4,$5)", [postId,actor,`${item.title}\n\n${item.body}`,input.anonymous,!!input.urgent]);
       else await c.query("INSERT INTO life_group_shares(id,group_id,author_id,kind,title,body,reference,source_id,is_anonymous) VALUES($1,$2,$3,'prayer',$4,$5,'',$6,$7)", [postId,destination,actor,item.title,item.body,item.sourceId,input.anonymous]);
       await c.query(`INSERT INTO personal_prayer_shares(prayer_id,destination,owner_id,group_id,post_id,is_anonymous) VALUES($1,$2,$3,$4,$5,$6)
         ON CONFLICT(prayer_id,destination) DO UPDATE SET post_id=$5,is_anonymous=$6,created_at=now()`, [item.sourceId,destination,actor,isPublic ? null : destination,postId,input.anonymous]);

@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import type { PersonalPrayer } from '../shared/personalPrayer';
+type Client = (path: string, method?: string, body?: unknown) => Promise<Response>;
+
+export async function verifyPersonalPrayerHttp(other: Client, owner: Client, guest: Client, initial: PersonalPrayer, postId: string) {
+  const path = `/api/personal-prayers/${initial.id}`;
+  assert.equal((await guest('/api/personal-prayers')).status,401);
+  assert(!(await (await other('/api/personal-prayers')).json()).some((p:PersonalPrayer) => p.id === initial.id));
+  const edit = {...initial,prayer:'Edited private original',expectedUpdatedAt:initial.updatedAt};
+  assert.equal((await other(path,'PATCH',edit)).status,404);
+  assert.equal((await owner(path,'PATCH',{title:'Old client',prayer:''})).status,428);
+  const saved = await owner(path,'PATCH',edit);
+  assert.equal(saved.status,200);
+  let current = await saved.json();
+  assert.equal((await owner(path,'PATCH',edit)).status,409);
+  const retried = await owner(path,'PUT',initial);
+  assert.equal((await retried.json()).prayer,'Edited private original');
+  assert.equal((await other(path,'PUT',initial)).status,404);
+  assert.equal((await owner(path,'PATCH',{...current,expectedUpdatedAt:current.updatedAt,closePublicShare:true,status:'waiting'})).status,400);
+  const progress = await owner(path,'PATCH',{...current,expectedUpdatedAt:current.updatedAt,response:'PRIVATE PROGRESS',responseType:'keep_waiting',status:'waiting'});
+  assert.equal(progress.status,200); current = await progress.json();
+  assert.equal(current.status,'waiting');
+  const active = (await (await other('/api/prayers')).json()).find((p:{id:string})=>p.id===postId);
+  assert(active); assert.equal(active.userId,null); assert.equal(active.authorName,'匿名');
+  assert(!JSON.stringify(active).includes('PRIVATE PROGRESS'));
+  assert.equal((await other(`/api/prayers/${postId}/reactions/heart`,'PUT',{selected:true})).status,200);
+  assert.equal((await other(`/api/prayers/${postId}/comments`,'POST',{kind:'prayer',content:'Praying with you'})).status,201);
+  const closed = await owner(path,'PATCH',{...current,expectedUpdatedAt:current.updatedAt,status:'answered',responseType:'grace',response:'PRIVATE PROGRESS\nPRIVATE ANSWER',closePublicShare:true});
+  assert.equal(closed.status,200); current = await closed.json();
+  assert(!(await (await other('/api/prayers')).json()).some((p:{id:string})=>p.id===postId));
+  const receipt = (await (await owner('/api/prayers?view=my')).json()).find((p:{id:string})=>p.id===postId);
+  assert(receipt.isAnswered); assert(receipt.closedAt); assert.equal(receipt.commentCount,1);
+  assert(!receipt.content.includes('PRIVATE'));
+  assert.equal((await other(`/api/prayers/${postId}/comments`)).status,404);
+  assert.equal((await other(`/api/prayers/${postId}/comments`,'POST',{kind:'prayer',content:'Too late'})).status,409);
+  assert.equal((await owner(`/api/prayers/${postId}/comments`)).status,200);
+  assert.equal((await owner(path,'PATCH',{...current,expectedUpdatedAt:current.updatedAt,status:'waiting'})).status,200);
+  assert(!(await (await other('/api/prayers')).json()).some((p:{id:string})=>p.id===postId), 'Reopening private original must not republish');
+  console.log('PASS personal prayers: owner isolation, required version, conflict, safe create retry, progress, anonymous interactions, atomic close and private reopen');
+}

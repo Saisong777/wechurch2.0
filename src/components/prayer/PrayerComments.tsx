@@ -12,7 +12,7 @@ const stickerIcons = { praying: HandHeart, together: HeartHandshake, peace: Sun 
 const stickerColors = { praying: 'text-teal-700 bg-teal-50', together: 'text-rose-700 bg-rose-50', peace: 'text-amber-800 bg-amber-50' };
 function Sticker({value}:{value:PrayerSticker}) {
   const Icon = stickerIcons[value];
-  return <span className={`inline-flex h-24 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-lg ${stickerColors[value]}`}><Icon className="h-9 w-9" strokeWidth={1.7} /><span className="text-sm font-semibold">{STICKER_LABELS[value]}</span></span>;
+  return <span className={`inline-flex h-24 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-lg ${stickerColors[value]}`}><Icon className="h-11 w-11" strokeWidth={1.7} /><span className="text-sm font-semibold">{STICKER_LABELS[value]}</span></span>;
 }
 
 export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=false}:{prayerId:string;count?:number;anonymousOwner?:boolean;readOnly?:boolean}) {
@@ -39,7 +39,7 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
     {comments.isError && <p role="alert" className="text-sm text-destructive">回應載入失敗。<button className="ml-2 underline" onClick={()=>comments.refetch()}>重新載入</button></p>}
     {!comments.isError && <div className="max-h-96 space-y-4 overflow-y-auto [overflow-wrap:anywhere]">{comments.data?.map(comment=><article key={comment.id} className="border-b pb-3 last:border-0">
       <div className="mb-2 flex items-start justify-between gap-2"><div className="min-w-0 text-xs"><span className="font-semibold">{comment.authorName}</span><span className="ml-2 text-muted-foreground">{COMMENT_LABELS[comment.kind]} · {formatDistanceToNow(new Date(comment.createdAt),{addSuffix:true,locale:zhTW})}</span></div>
-        {(comment.isOwner || isAdmin) && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" disabled={remove.isPending} title="撤回回應" aria-label="撤回回應" onClick={()=>{if(window.confirm('確定撤回這則回應？')) remove.mutate({prayerId,commentId:comment.id});}}><Trash2 className="h-4 w-4" /></Button>}
+        {(comment.isOwner || isAdmin) && <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" disabled={remove.isPending} title="撤回回應" aria-label="撤回回應" onClick={()=>{if(window.confirm('確定撤回這則回應？')) remove.mutate({prayerId,commentId:comment.id});}}><Trash2 className="h-4 w-4" /></Button>}
       </div>
       {comment.kind === 'sticker' && comment.sticker && comment.sticker in STICKER_LABELS ? <Sticker value={comment.sticker} /> : <p className="whitespace-pre-wrap text-sm leading-6">{comment.content}</p>}
     </article>)}</div>}

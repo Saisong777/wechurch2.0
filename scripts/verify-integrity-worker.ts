@@ -147,6 +147,8 @@ try {
   const deliveries=await (await b('/api/prayer-sharing')).json();
   assert.equal(deliveries.find((item:{prayerId:string})=>item.prayerId===prayer.id)?.content,'Shared title\n\nShared excerpt');
   assert(!JSON.stringify(await (await a('/api/prayer-sharing')).json()).includes(prayer.id));
+  const { verifyPersonalPrayerHttp } = await import('./verify-personal-prayer-http');
+  await verifyPersonalPrayerHttp(a,b,guest,prayer,deliveries.find((item:{prayerId:string})=>item.prayerId===prayer.id).postId);
   console.log('PASS fresh migrations, real HTTP permissions, mentoring, LINE identity, empty schedule and version restore');
   const { verifyBoundarySecurity } = await import('./verify-boundary-security');
   await verifyBoundarySecurity(pool, a, b, guest, makeClient, ids);
