@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,7 +8,8 @@ import MyNotesPage from './MyNotesPage';
 import { AdminPage } from './AdminPage';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'test-member', email: 'test@example.invalid' }, loading: false, signOut: vi.fn() }) }));
-vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => ({ role: 'admin', isAdmin: true, canCreateSession: true, loading: false }) }));
+const roleState = vi.hoisted(() => ({ isAdmin: true }));
+vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => ({ role: roleState.isAdmin ? 'admin' : 'pastor', isAdmin: roleState.isAdmin, canCreateSession: true, loading: false }) }));
 vi.mock('@/hooks/useUserProfile', () => ({ useUserProfile: () => ({ profile: null }) }));
 vi.mock('@/hooks/useFeatureToggles', () => ({ useFeatureToggles: () => ({ isFeatureEnabled: () => true, loading: false }) }));
 vi.mock('@/components/layout/Header', () => ({ Header: () => null }));
@@ -16,7 +17,7 @@ vi.mock('@/components/theme/AppearanceControl', () => ({ AppearanceControl: () =
 vi.mock('@/components/user/ProfileSettingsDialog', () => ({ ProfileSettingsDialog: () => null }));
 vi.mock('@/components/user/LineAccountLink', () => ({ LineAccountLink: () => null }));
 vi.mock('@/components/scripture/ImportedReadingHistory', () => ({ ImportedReadingHistory: () => null }));
-vi.mock('@/components/admin/PlatformMaturityPanel', () => ({ PlatformMaturityPanel: () => null }));
+vi.mock('@/components/admin/PlatformMaturityPanel', () => ({ PlatformMaturityPanel: () => <div>系統紀錄內容</div> }));
 vi.mock('@/components/auth/AuthForm', () => ({ AuthForm: () => null }));
 
 function mount(element: React.ReactNode) {
@@ -26,7 +27,7 @@ function mount(element: React.ReactNode) {
   render(<QueryClientProvider client={client}><MemoryRouter>{element}</MemoryRouter></QueryClientProvider>);
   return fetcher;
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); roleState.isAdmin = true; });
 
 it('removes deferred destinations even when every database feature toggle is enabled', () => {
   mount(<MePage />);
@@ -53,4 +54,22 @@ it('keeps active admin tools without session creation or host steps', async () =
   expect(screen.queryByTestId('button-create-session')).toBeNull();
   expect(screen.queryByTestId('button-history')).toBeNull();
   expect(screen.queryByText(/SoulGym|查經主持流程|一頁式主持台/)).toBeNull();
+});
+
+it('loads system records only when an administrator opens the disclosure', async () => {
+  mount(<AdminPage />);
+  await screen.findByText('系統紀錄');
+  expect(screen.queryByText('系統紀錄內容')).toBeNull();
+  const disclosure = screen.getByText('系統紀錄').closest('details')!;
+  disclosure.open = true; fireEvent(disclosure, new Event('toggle'));
+  expect(await screen.findByText('系統紀錄內容')).toBeVisible();
+  disclosure.open = false; fireEvent(disclosure, new Event('toggle'));
+  await waitFor(() => expect(screen.queryByText('系統紀錄內容')).toBeNull());
+});
+
+it('does not offer administrator telemetry to pastoral roles', async () => {
+  roleState.isAdmin = false;
+  mount(<AdminPage />);
+  await screen.findByTestId('button-crm');
+  expect(screen.queryByText('系統紀錄')).toBeNull();
 });

@@ -39,6 +39,7 @@ export const AdminPage: React.FC = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
   const [step, setStep] = useState<AdminStep>('auth');
+  const [recordsOpen, setRecordsOpen] = useState(false);
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/inbox/unread-count'],
@@ -136,7 +137,7 @@ export const AdminPage: React.FC = () => {
               ))}
               </div>
             </div>
-            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">系統紀錄</summary><div className="space-y-5 py-4"><PlatformMaturityPanel /></div></details>
+            {isAdmin && <details className="border-t pt-3" onToggle={event => setRecordsOpen(event.currentTarget.open)}><summary className="cursor-pointer py-3 font-medium">系統紀錄</summary>{recordsOpen && <div className="space-y-5 py-4"><PlatformMaturityPanel /></div>}</details>}
           </div>
         );
       case 'cards':
