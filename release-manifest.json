@@ -1,5 +1,5 @@
 {
-  "fingerprint": "022460c3041684c5071d053713d608dc96be83234a8274c00fb16e7855690119",
+  "fingerprint": "871f3c71905294b4dcbf8843ed580a9775712b3213b86c623bfa6359f7b73af9",
   "files": [
     {
       "file": "Dockerfile",
@@ -11,11 +11,11 @@
     },
     {
       "file": "package.json",
-      "sha256": "13454cc2655beea1a79a7eab4cad19c29e16f7c60f661883dfe1fb75597350ea"
+      "sha256": "01ebc6a19f1a5a8d2e98ebaee0b6f542897767f145b07b55f13aa81053de73ea"
     },
     {
       "file": "package-lock.json",
-      "sha256": "b063674da7bf07e9a12da896edb970327899f6fd056c04d12f3a6cf2f2ba6771"
+      "sha256": "35f191d421d7eb592d649a600991336fb301684f2697bef4608992182469ac68"
     },
     {
       "file": "index.html",
@@ -67,11 +67,7 @@
     },
     {
       "file": "src/App.tsx",
-      "sha256": "8c62485af5ed382f028d8e5e19bec52963e9857bd2f0f224e6e5ba55ffa7e492"
-    },
-    {
-      "file": "src/components/admin/AIReportViewer.tsx",
-      "sha256": "37f695cbd21962f317f594aeca3a70e421f0e69201689d81d97668d2061e8e7b"
+      "sha256": "2fd8123915012f51114b7bbcd87d415c27f0fd7e38766d645d51309512d234f6"
     },
     {
       "file": "src/components/admin/AdminInbox.tsx",
@@ -80,14 +76,6 @@
     {
       "file": "src/components/admin/AdminMailComposer.tsx",
       "sha256": "f7108b16a8e5e97131305e990656a86f678be3b21e07cb287b9853d9aa2a106d"
-    },
-    {
-      "file": "src/components/admin/AdminMonitor.tsx",
-      "sha256": "5c1202955f77cfd4da69e7931db8a66fe4d2205d8b225a34c4a7b299550dbaa6"
-    },
-    {
-      "file": "src/components/admin/AdminWaitingRoom.tsx",
-      "sha256": "30b80e3a95f1d69fb804ed37ed89635d4c610a3344a951a32c6b9cdad2a0a15e"
     },
     {
       "file": "src/components/admin/BulkImportDialog.tsx",
@@ -123,11 +111,7 @@
     },
     {
       "file": "src/components/admin/FeatureToggleManager.tsx",
-      "sha256": "e76b1b8da436ec0c8320d44096d36c21bb497294474a9dedad24fc21fdc83af4"
-    },
-    {
-      "file": "src/components/admin/HistoryBrowser.tsx",
-      "sha256": "f4a47cadbb59fa13f64b06e6d9c2176d744e25a16daec07b783279266579135a"
+      "sha256": "8cdf8c8ae70a443f9aaf064c32357a5509051db8215edf551f5c2d636b33c2b0"
     },
     {
       "file": "src/components/admin/IncompleteMembersPanel.tsx",
@@ -162,16 +146,16 @@
       "sha256": "13c9cf3ab5b2ad74fc66306abf95670723b4a93c0e023d28ee5f56c147b6ba56"
     },
     {
+      "file": "src/components/admin/PlatformMaturityPanel.test.tsx",
+      "sha256": "cde59e9b52062a27c29b71b0b9d5cf741dc985b1d6da2bbc5e3035f275cdd268"
+    },
+    {
       "file": "src/components/admin/PlatformMaturityPanel.tsx",
-      "sha256": "9bf1431176abbd25fac00b84973b54b3bd6e0551cca2c35007196a4ca327e7f3"
+      "sha256": "3370f54527e51462a35ca3bf85a01b49a1fbf818a77d318162dc4c9845d6dc39"
     },
     {
       "file": "src/components/admin/PrayerMeetingAdmin.tsx",
       "sha256": "5c53a6722cc107e5a7e91117d17b2bca0ea6a9acf7db33c363dcf880fa14e96e"
-    },
-    {
-      "file": "src/components/admin/ProductGrowthPanel.tsx",
-      "sha256": "3e87a94745f4667dd956d3c5f17d008a9dff27270bfde00510bc33f4fffb2d98"
     },
     {
       "file": "src/components/admin/RestoreParticipantAccess.tsx",
@@ -186,10 +170,6 @@
       "sha256": "ac83b951fb73184f12c9fa11aaf5cb020ccc2fd5f3e649c3d6c96af24b696ead"
     },
     {
-      "file": "src/components/admin/StressTestSimulator.tsx",
-      "sha256": "2e75c9bfd7df3c0de24535e2beaa2e1b4462ed7706767c183253e43e80e4b8db"
-    },
-    {
       "file": "src/components/admin/StudyProgressMonitor.tsx",
       "sha256": "1c101cb2693c08bab3ee17674dd08044c049ed5ea0cd9ae54d8b182e5880f42c"
     },
@@ -198,72 +178,20 @@
       "sha256": "ac2ef1b01a37fc5d378ac1bd32b9c29294d42026476eed7117db8289804afd10"
     },
     {
-      "file": "src/components/admin/report-elements/ActionItemList.tsx",
-      "sha256": "eb7fc4b673ea5de7eeaed71ff0f059b6efbc051a310f3372d60fb6dace81a611"
-    },
-    {
-      "file": "src/components/admin/report-elements/EnhancedSection.tsx",
-      "sha256": "ecde540b660b45b6ba6f979899bcdcbcf68a1c3b41fba4f6ef59c14b6ecc6878"
-    },
-    {
-      "file": "src/components/admin/report-elements/KeywordTagCloud.tsx",
-      "sha256": "7046ee65dedde9c4e1653a412944e04d71d2006845caf99a0fd3cd401e2179c4"
-    },
-    {
-      "file": "src/components/admin/report-elements/QuoteBlock.tsx",
-      "sha256": "0bf3abd034eac82da056e27c841ee1b6f5aa67c49184712c2b211b296842c027"
-    },
-    {
-      "file": "src/components/admin/report-elements/index.ts",
-      "sha256": "9d125d4de06b08061bcd54989646b87a512e9f8e255b0dfcde6362bb17a08d06"
-    },
-    {
-      "file": "src/components/admin/report-elements/utils.ts",
-      "sha256": "05a2efa4d663f38775e62ad5f4c180d5f400583ffe6a904552f28ea86f294ae3"
-    },
-    {
-      "file": "src/components/admin/report-viewer/GroupSection.tsx",
-      "sha256": "8b6ce24ea74952ce556a6242b66feb365dd70901b6a23011b7cd7a8e1076e0f9"
-    },
-    {
-      "file": "src/components/admin/report-viewer/OverallReportCharts.tsx",
-      "sha256": "e5e45c1980a6df4252d74ba189673e79bd75acfb0ec286ce31c36680c9561446"
-    },
-    {
-      "file": "src/components/admin/report-viewer/ReportComparison.tsx",
-      "sha256": "756d88c3949507becd5b343e5efe46da8cb8f44bc03fe58926933c2f00127231"
-    },
-    {
-      "file": "src/components/admin/report-viewer/ReportTakeawayPanel.tsx",
-      "sha256": "22e857c847055f7191f596283298f8448d3bc1a7b6812ddeeebd1cb403f25ec0"
-    },
-    {
-      "file": "src/components/admin/report-viewer/export.security.test.ts",
-      "sha256": "f331205227059247330574f0c65d0a7619d0ec0e22d3db1e94416a3b46d147df"
-    },
-    {
-      "file": "src/components/admin/report-viewer/export.ts",
-      "sha256": "d06e24561ba2530b022bd11bac3235d04cc9fe32bea76a2775fd3146b5fce105"
-    },
-    {
-      "file": "src/components/admin/report-viewer/index.ts",
-      "sha256": "518217d96ae1b0bf5bfa038bbfba3b6ece73ea243e62f97d640f5e6d285f8ca9"
-    },
-    {
-      "file": "src/components/admin/report-viewer/parse.test.ts",
-      "sha256": "8afb5b1b8a4f2fe9020b174205ea4473585540f82b36d4a91afba61973aa74bd"
-    },
-    {
-      "file": "src/components/admin/report-viewer/parse.ts",
-      "sha256": "e78c7fa01a4778dca840e766f8e3cb6f0038685fb987a7c118c42d4cc0d548c3"
-    },
-    {
       "file": "src/components/auth/AuthForm.tsx",
       "sha256": "c86d1d361c0becd99db5da92c7ce666df62bf93a47187492f8bf7170f432b96c"
     },
     {
       "file": "src/components/auth/LineLoginButton.tsx",
       "sha256": "d7a094ad41c5ce3a362aefa33f7188780456a6effe8fd632e367b2a80acc2cd3"
+    },
+    {
+      "file": "src/components/care/CareReminder.test.tsx",
+      "sha256": "4b7edc73f5aaf5f2c55de8b6e7823a4f508dd7655f8d70cac693840e8616231d"
+    },
+    {
+      "file": "src/components/care/CareReminder.tsx",
+      "sha256": "1fa72a24b6113da2e623140ab016ab0d229a9ecc04a0cf216633293521a6f775"
     },
     {
       "file": "src/components/care/CareVisits.test.tsx",
@@ -480,10 +408,6 @@
     {
       "file": "src/components/scripture/DevotionWallShareDialog.tsx",
       "sha256": "527b950b48e05cc4e13862870c6a2d269fc25312db7f6c1b34169536ba54f551"
-    },
-    {
-      "file": "src/components/scripture/DevotionalAnalysisBatchDialog.tsx",
-      "sha256": "8ab6fc86066f24b17cc49d6516c58282c81dcf39feebabe08d470f0dd0e31e16"
     },
     {
       "file": "src/components/scripture/DevotionalNoteDialog.test.tsx",
@@ -730,10 +654,6 @@
       "sha256": "c727e0fede944bd77ebae7869fdec32554395f48a34288399c4bf916b35ff41f"
     },
     {
-      "file": "src/components/user/GroupReportViewer.tsx",
-      "sha256": "196033756b20dd56d83dafdf2ec0245d70654af0d203aef70fb8fcd32d2c9bb2"
-    },
-    {
       "file": "src/components/user/GroupReveal.tsx",
       "sha256": "37c4b971cd55165e32a770b81a370cbc7a12f5de4a7ec6f8e346c273d69bf8bb"
     },
@@ -754,10 +674,6 @@
       "sha256": "a00cd4632efe9ce26a4afd12f870a745212a77e792f80914069f9e4c45290a9d"
     },
     {
-      "file": "src/components/user/OverallReportViewer.tsx",
-      "sha256": "fbdb14abbeddafe299af31e7424f013019a94e1a9be54d46d455b20400a9b691"
-    },
-    {
       "file": "src/components/user/ParticipantStepGuide.tsx",
       "sha256": "16e173da039487fc14b7c2eeec9c6d19d8e3e19fcc045f406d2d0e290e263e66"
     },
@@ -776,10 +692,6 @@
     {
       "file": "src/components/user/SpiritualFitnessForm.tsx",
       "sha256": "bd9e6ba676ed2646c15572a2a96a66b2934f33034a8970d7aaac1d12373e8851"
-    },
-    {
-      "file": "src/components/user/SubmissionReview.tsx",
-      "sha256": "379ed7c19d40df446d32a96142e6c9aebef8dfea1d12e5905a396ff6f17673cc"
     },
     {
       "file": "src/components/user/WaitingRoom.tsx",
@@ -870,10 +782,6 @@
       "sha256": "25280b5cbabca38dfe0be666d0e6d68e4973af80766923bc9b2c9fe5f1646a9f"
     },
     {
-      "file": "src/hooks/useSessionAnalysis.ts",
-      "sha256": "79f40526430f2316bfe5c506bc30f28c2612dd049a5d64835dc4d9b0f6936735"
-    },
-    {
       "file": "src/hooks/useSoundEffects.ts",
       "sha256": "ce12ec74ca37f24c50a457c7c76f7a3349657d327f1af8fae8492a9bbd66af98"
     },
@@ -911,7 +819,7 @@
     },
     {
       "file": "src/lib/api-helpers.ts",
-      "sha256": "576e5c91e36c527a82d15f70e4d0eaabf042c4912701ca1438754659466710c0"
+      "sha256": "d8e63b3279751b0e9ebc3406c142acab30e18d911b25e79efa070bd2d1a4efa5"
     },
     {
       "file": "src/lib/churchReading.test.ts",
@@ -1034,10 +942,6 @@
       "sha256": "22e3cf30506ff19b9273a7cc9ec16da64b7fb51b83303fb32175205566a25a2f"
     },
     {
-      "file": "src/lib/soulgym-ai-dashboard.test.ts",
-      "sha256": "6e0ca7370bf67b6767587a60cbcea37035262b91e72c017bbfcc7e951811b0c8"
-    },
-    {
       "file": "src/lib/storage-helpers.ts",
       "sha256": "dfa241ec3a427a85a2fc5112efe27e3579464ce26f5717f21ad79d8810b2c9ff"
     },
@@ -1055,7 +959,7 @@
     },
     {
       "file": "src/pages/AdminPage.tsx",
-      "sha256": "7b484eebf03ecd8c22024fdae6598e73a69e457d64a32118000d71cf82a359be"
+      "sha256": "566e8295ffc66b3cfcfa329cef8d95fe8b3322a5bc7518f2bcb234d44eef9f55"
     },
     {
       "file": "src/pages/BiblePage.test.tsx",
@@ -1075,11 +979,11 @@
     },
     {
       "file": "src/pages/CarePage.test.tsx",
-      "sha256": "42bc8e23e00c95c97523f18e95fc37f04355f8c18f4e95e3f71c53dbf2a2195b"
+      "sha256": "ca9fcf3e446644fcc8e687680870417c5fdcdb13d837cc6f352414bc06a9a0e6"
     },
     {
       "file": "src/pages/CarePage.tsx",
-      "sha256": "823f6247346d0a8b188ae66ea4bfcfc428d3bda64308e7b934d6c121463ffe26"
+      "sha256": "f344eb919cd8c221c2f6892cd2452322c8d944a7dfdd43affd2ec503be2b0b5f"
     },
     {
       "file": "src/pages/ChurchDevotionAdminPage.test.tsx",
@@ -1131,7 +1035,7 @@
     },
     {
       "file": "src/pages/Index.tsx",
-      "sha256": "86718e5c5022ec109e10f994bd1a2febc50d711510ac04f706beb0f3ef980334"
+      "sha256": "a56e788ab59f1e20dee7fd3ce016bfeac5cadfbe8b819ded92bc6a871c398ffd"
     },
     {
       "file": "src/pages/JesusTimelinePage.tsx",
@@ -1167,7 +1071,7 @@
     },
     {
       "file": "src/pages/MePage.tsx",
-      "sha256": "da4ff2c67b1198f55d0f38eb2c33a0cd62425de52e842d61261fcae0c105d1c0"
+      "sha256": "55b120b708f6640ff5baf76d3d3a0ab50d033065322ae7405750be0caa73d783"
     },
     {
       "file": "src/pages/MentoringPage.tsx",
@@ -1187,7 +1091,7 @@
     },
     {
       "file": "src/pages/MyNotesPage.tsx",
-      "sha256": "b8415a678d534d43321e049054fff34b215b50e5aef10ec441fc552543893736"
+      "sha256": "3f904089a80bee9d0e0c375653c6205e923d1be9da3f1fa75b2689428a6dde0b"
     },
     {
       "file": "src/pages/MySharingPage.tsx",
@@ -1227,7 +1131,7 @@
     },
     {
       "file": "src/pages/ReadingPlansPage.tsx",
-      "sha256": "4f1717e94d64e9f225fe35ec3cab771043ec7aff06b76195196d9df2b4ae320c"
+      "sha256": "704aee157c0f6488cb71fbfe2fa1cd0737139ffcbb72961384a2c9f49669fc1c"
     },
     {
       "file": "src/pages/ResetPasswordPage.tsx",
@@ -1238,20 +1142,12 @@
       "sha256": "08bb044265f96f5a112eea82900da58ea4fd9812ce5a70641cbd7519197c625a"
     },
     {
-      "file": "src/pages/SoulGymNotebookPage.tsx",
-      "sha256": "f758e318ae87f74db616882844bb39c1ce6ef2258dfbb71ddf5834adaed4df04"
+      "file": "src/pages/SoulGymDeferred.test.tsx",
+      "sha256": "ef0956f00e0c90b3dfae209e98f5e5299a155860c18d4b27295f886253193e2e"
     },
     {
       "file": "src/pages/SupportPage.tsx",
       "sha256": "cd2c57a59ddd7615a8aafc70e68266c7fc338dbfa1220d4ad7274a1c08e39563"
-    },
-    {
-      "file": "src/pages/UserPage.tsx",
-      "sha256": "e2789266ac91f2b1cd414b9ccdb5b74d07391ff036f35c3f154a8f9cafbfe444"
-    },
-    {
-      "file": "src/pages/WeLiveLandingPage.tsx",
-      "sha256": "5ec9df7bd4f6b430697126760fae374921814a218ccd9b7c7b3cca362d08bb46"
     },
     {
       "file": "src/pages/WePlayPage.tsx",
@@ -1391,11 +1287,11 @@
     },
     {
       "file": "server/contentSecurityPolicy.test.ts",
-      "sha256": "28f8ae9686e702458e360312541476686970903053962f7d8f75d829a25785ca"
+      "sha256": "ea278795f9f50006dbdd9096bdc202f37eb79b191fa154ffe2f9eb59b6d24a8e"
     },
     {
       "file": "server/contentSecurityPolicy.ts",
-      "sha256": "40cc0ed9f6ca6932586c8b7bee96b26531f4908e7cd5d36d393ff1eca9b09e2f"
+      "sha256": "81025562ce9cb7caf6a8706f3a115f7c44f35a7c48faaf7339e480863cc3fe95"
     },
     {
       "file": "server/crmGroupMembership.ts",
@@ -1555,11 +1451,11 @@
     },
     {
       "file": "server/observability.security.test.ts",
-      "sha256": "a6553557b2a35ec925221a5641f7343b880362185e4c00ebb62728cf14add618"
+      "sha256": "bf7a4d9a9897453a0edb21ee4b1434448b4e49136c97a5fb397270847cb56355"
     },
     {
       "file": "server/observability.ts",
-      "sha256": "ef65f6a5c541d71cfed72cb2c5ca0fd30cc84517edb6fb631659005eea3e4a0d"
+      "sha256": "975be9fc8d5369d3e45c6dfaf81fdc497da60a5aef00daeec67258f51979d4d4"
     },
     {
       "file": "server/pastoralAccess.ts",
@@ -1626,10 +1522,6 @@
       "sha256": "30689905e5f628bd0270a5358b740f0b29ec0bfec783cfa1cccf1764d25fbec4"
     },
     {
-      "file": "server/prompts/devotional-analysis.ts",
-      "sha256": "bdf31f13b2a03f2c509180caa845fff48d9dc8322ec5c219408954eea7313898"
-    },
-    {
       "file": "server/readingPlanAccess.test.ts",
       "sha256": "626f71972b19a5c2c17a11c810853623cb04123f7ee6a77b506d3495d79ffb77"
     },
@@ -1682,12 +1574,16 @@
       "sha256": "e50d93d80c3f78fc80ba4b110d1488d0655c87cb38a6dd0022f14ee6815ea408"
     },
     {
+      "file": "server/retiredAi.test.ts",
+      "sha256": "ee4fd9ccdd49e320481f158e9c9ca535060822583079ba1d98c181c948f6a021"
+    },
+    {
       "file": "server/routeRegistration.test.ts",
       "sha256": "cc389fc0f4b9e6eb915842d3a22890f609e5f2e6ba88f869bea5866a20110853"
     },
     {
       "file": "server/routes.ts",
-      "sha256": "ee2c82fbc85daa2551ef8284901673720cf44c87a000949c0249b2349180b9f1"
+      "sha256": "a41626c47c9bebe0f84a3934d6bead1b44ff95d6d4494a95be71a61b55f0cc10"
     },
     {
       "file": "server/securityPolicies.test.ts",
@@ -1723,7 +1619,7 @@
     },
     {
       "file": "server/soulGymAccess.test.ts",
-      "sha256": "927cf512345bb72b4e147cbab879666148033e452c48172b509757a08e5acc09"
+      "sha256": "f5ff897abe27d38b9a14be02887f3ffca5ca1f333826ee76f27113ae2455a957"
     },
     {
       "file": "server/soulGymAccess.ts",
@@ -1840,10 +1736,6 @@
     {
       "file": "shared/releaseFlags.ts",
       "sha256": "ceb5feb0af6f1d3ca860f489a226dafc6164ec52e34942f4e72182899b1fcad7"
-    },
-    {
-      "file": "shared/reportSlideScript.ts",
-      "sha256": "cebca1e4a028ee31f369d0e1f61b8758b8f26e13e4bd087ecad57e73371bbd03"
     },
     {
       "file": "shared/schema.ts",
@@ -2207,7 +2099,7 @@
     },
     {
       "file": "scripts/verify-integrity-worker.ts",
-      "sha256": "4cef504698c842cd86a17fdd60e1b3aed256500f4f82884cc7bb4b5fb814164c"
+      "sha256": "68b7e11d4fc1ebf3171188b378d077c425ed7dc409d331b44027df8793c7141a"
     },
     {
       "file": "scripts/verify-integrity.mjs",
@@ -2238,8 +2130,12 @@
       "sha256": "7f67f4db38b1c47fda7a71235388e04b358356cb46b9b6fc02fa131c05d44352"
     },
     {
+      "file": "scripts/verify-retired-ai-http.ts",
+      "sha256": "a2a2c634a2a3cd292985bd0970eae3420cadd8bdbcbdff5050d0a6472cff0910"
+    },
+    {
       "file": "scripts/verify-security-browser.ts",
-      "sha256": "a16e854168deff4de85bb22292f3bb7e96c44debc39a47d1822c72cf01a97621"
+      "sha256": "25e59682f8ebc6fdf79287da099c38da92e9e930f554e1b781f3dfe6b7c9b7f0"
     },
     {
       "file": "scripts/verify-single-header-browser.mjs",

@@ -2,13 +2,26 @@
 
 ## Current product scope: SoulGym deferred 2026-09-28
 
-SoulGym is reserved for a future phase. Remove its member entries, study-note
+SoulGym is reserved for a separate future project. Remove its member entries, study-note
 category, activity hosting/history and participant/host steps from the current
-app. Keep historical data and dormant source recoverable. Old participant links
+app. Keep historical data; retired source is recoverable from Git history. Old participant links
 return home; old notebooks lead to current personal notes. Keep independent Bible
 study tools, daily devotion, groups and active administration. This supersedes
 earlier sections retaining a personal SoulGym entry.
 See `design/soulgym-deferred-2026-09-28.md`.
+
+## System Records and AI Retirement 2026-09-28
+
+No AI generation, note analysis, prayer classification, model SDK or report-export
+UI is part of this release. Preserve historical database content, not active
+model integrations. See `design/ai-retirement-2026-09-28.md`.
+
+Administrator system records are collapsed by default and fetched only when
+opened. Show bounded seven-day recorded event/error totals and recent error
+locations/times, with an optional operation breakdown. Never infer platform
+health, safety, actual user counts or product maturity from these counts. Failed
+fetches must be labeled, not rendered as a healthy zero. Use unframed sections
+and compact two-column totals rather than nested score cards.
 
 ## Handshake A Approved 2026-09-28
 

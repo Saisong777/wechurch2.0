@@ -59,6 +59,11 @@ try {
       await page.getByTestId('button-view-create').waitFor();
       if(await page.getByText(/AI 整合分析|AI 品質/).count())throw Error('AI reading entry visible');
       await page.getByTestId('button-view-create').click();
+      await page.getByTestId('select-add-book-trigger').waitFor();
+      await page.getByTestId('select-add-book-trigger').click();
+      await page.getByRole('option').first().click();
+      await page.getByTestId('input-plan-name').fill('Temporary unsaved reading plan');
+      if(!(await page.getByTestId('button-create-plan').isEnabled()))throw Error('Reading plan form unavailable');
       if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Reading plan overflow');
       await page.screenshot({path:output+'/'+width+'-reading.png',fullPage:true,animations:'disabled'});
       if((await page.context().request.get(origin+'/api/admin/platform-summary')).status()!==403)throw Error('Member can read admin telemetry');
