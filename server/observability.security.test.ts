@@ -3,7 +3,7 @@ import type { Request } from 'express';
 
 const { values } = vi.hoisted(() => ({ values: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('./db', () => ({ db: { insert: vi.fn(() => ({ values })) } }));
-import { recordAppEvent, recordErrorEvent, recordAiUsage, requestContext } from './observability';
+import { recordAppEvent, recordErrorEvent, requestContext } from './observability';
 
 beforeEach(() => values.mockClear());
 
@@ -19,9 +19,8 @@ it('scrubs direct event submissions independently of the browser', async () => {
   expect(row.metadata).toEqual({ referrer: 'https://example.test', viewport: '800x600' });
 });
 
-it('scrubs error messages, stacks, filenames and AI errors before persistence', async () => {
+it('scrubs error messages, stacks and filenames before persistence', async () => {
   await recordErrorEvent({ message: 'Failed /reset?token=SECRET', stack: 'Error: token=SECRET\n at run (/app.js#SECRET)', path: '/page#SECRET', metadata: { filename: '/app.js?token=SECRET', lineno: 10 } });
-  await recordAiUsage({ provider: 'test', model: 'test', feature: 'test', status: 'error', errorMessage: 'Authorization: Bearer SECRET' });
   expect(JSON.stringify(values.mock.calls)).not.toContain('SECRET');
   expect(values.mock.calls[0][0]).toMatchObject({ path: '/page', metadata: { filename: '/app.js', lineno: 10 } });
 });

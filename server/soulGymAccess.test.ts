@@ -48,12 +48,9 @@ describe('Soul Gym trusted identity', () => {
     expect(visibleSubmissions(rows, { id: 'own', groupNumber: null })).toEqual([{ participantId: 'own', groupNumber: null }]);
     expect(visibleSubmissions(rows, undefined, true)).toEqual(rows);
   });
-  it('keeps report/hidden/group-change sibling routes on trusted ownership', () => {
+  it('keeps hidden/group-change sibling routes on trusted ownership', () => {
     const source = readFileSync(new URL('./routes.ts', import.meta.url), 'utf8');
-    const report = source.slice(source.indexOf('app.get("/api/sessions/:sessionId/reports"'), source.indexOf('app.delete("/api/reports/:id"'));
-    expect(report).toContain('res.locals.soulGymParticipant');
-    expect(report).not.toContain('req.query.email');
-    const hidden = source.slice(source.indexOf('app.patch("/api/notebook/:id/hidden"'), source.indexOf('// ============ Devotional Notes AI Analysis'));
+    const hidden = source.slice(source.indexOf('app.patch("/api/notebook/:id/hidden"'), source.indexOf('// ============ Saved Verses API Routes'));
     expect(hidden).toContain('studyAccess.owned(req, existing.sessionId, existing.userId)');
     expect(source).toContain('parsed.data.groupNumber !== existing.groupNumber');
   });

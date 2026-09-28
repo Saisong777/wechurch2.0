@@ -236,11 +236,8 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
       const violations = [];
       await probe.exposeFunction('recordCspViolation', directive => violations.push(directive));
       await probe.addInitScript(() => document.addEventListener('securitypolicyviolation', event => window.recordCspViolation(event.effectiveDirective)));
-      const response = await probe.goto(${JSON.stringify(origin + '/__test/csp-report')});
+      const response = await probe.goto(${JSON.stringify(origin + '/__test/csp-probe')});
       const policy = response.headers()['content-security-policy'];
-      await probe.locator('.slide-counter').filter({hasText:'1 /'}).waitFor();
-      await probe.keyboard.press('ArrowRight');
-      const slide = await probe.locator('.slide-counter').textContent();
       await probe.evaluate(() => {
         const script = document.createElement('script'); script.textContent = 'window.injectedScript = true'; document.body.appendChild(script);
         const button = document.createElement('button'); button.setAttribute('onclick', 'window.injectedHandler = true'); document.body.appendChild(button); button.click();
@@ -259,13 +256,13 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
       await probe.locator('#load-error-home').click();
       await probe.waitForURL(${JSON.stringify(origin + '/')});
       await probe.close();
-      return {blocked, slide, question, policy, violations};
+      return {blocked, question, policy, violations};
     `);
     assert.equal(csp.blocked, true, 'Injected inline scripts and handlers must not run');
-    assert.match(String(csp.slide), /^2 \/ /, 'Trusted offline slideshow navigation must work');
+    assert(!String(csp.policy).includes('sha256-'), 'Retired report exception must be removed');
     assert(String(csp.question).length > 3, 'External quiz script must populate a question');
     assert.deepEqual((csp.violations as string[]).sort(), ['script-src-attr', 'script-src-elem']);
-    reports.push({scope:'CSP: injected scripts blocked, slideshow/quiz/fallback functional',status:'passed'});
+    reports.push({scope:'CSP: injected scripts blocked, retired report exception removed, quiz/fallback functional',status:'passed'});
     const audit = await code('return {fontsStubbed:page.__securityAudit.fontsStubbed};');
     await writeFile(path.join(directory, 'results.json'), JSON.stringify({ reports, ...audit, limitations: ['Disposable localhost fixtures only', 'External Google Fonts replaced with empty CSS for offline acceptance', '/profile is not registered; tested /me instead'] }, null, 2));
   } catch (error) {

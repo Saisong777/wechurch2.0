@@ -1,24 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { contentSecurityPolicy, reportSlideScriptHash } from './contentSecurityPolicy';
-import { reportSlideScript } from '../shared/reportSlideScript';
+import { contentSecurityPolicy } from './contentSecurityPolicy';
 
 describe('content security policy', () => {
   it('blocks inline scripts, event handlers, plugins and injected base URLs in production', () => {
     const directives = contentSecurityPolicy().split('; ');
-    expect(directives.find(value => value.startsWith('script-src '))).toBe(`script-src 'self' 'sha256-${reportSlideScriptHash}'`);
+    expect(directives.find(value => value.startsWith('script-src '))).toBe("script-src 'self'");
     expect(directives).toContain("script-src-attr 'none'");
     expect(directives).toContain("object-src 'none'");
     expect(directives).toContain("base-uri 'none'");
     expect(directives).toContain("frame-ancestors 'none'");
     expect(contentSecurityPolicy()).not.toContain('unsafe-eval');
   });
-  it('allows only the exact static offline slideshow controller', () => {
-    expect(createHash('sha256').update(reportSlideScript).digest('base64')).toBe(reportSlideScriptHash);
-    expect(reportSlideScript).not.toContain('</script>');
-    expect(createHash('sha256').update(`${reportSlideScript};attack()`).digest('base64')).not.toBe(reportSlideScriptHash);
+  it('removes the retired report inline-script exception', () => {
+    expect(contentSecurityPolicy()).not.toContain('sha256-');
+    expect(contentSecurityPolicy().split('; ').find(value => value.startsWith('script-src '))).not.toContain('unsafe-inline');
   });
   it('keeps Vite development scripts separate from production permissions', () => {
     expect(contentSecurityPolicy(true)).toContain("script-src 'self' 'unsafe-inline'");

@@ -16,14 +16,13 @@ import {
 } from '@/components/ui/dialog';
 import {
   BookOpen, Plus, ChevronRight, Clock, Trash2, Play, Pause,
-  Calendar, AlertCircle, BookMarked, Library, X, Sparkles,
+  Calendar, AlertCircle, BookMarked, Library, X,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useReadingReminder } from '@/hooks/useReadingReminder';
-import { DevotionalAnalysisBatchDialog } from '@/components/scripture/DevotionalAnalysisBatchDialog';
 
 interface BibleBook {
   bookName: string;
@@ -79,7 +78,6 @@ const ReadingPlansPage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('my-plans');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<string | null>(null);
-  const [showBatchAnalysis, setShowBatchAnalysis] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ReadingPlanTemplate | null>(null);
 
   const [planName, setPlanName] = useState('');
@@ -330,14 +328,6 @@ const ReadingPlansPage = () => {
                 <Library className="w-4 h-4 mr-1.5" />
                 瀏覽範本
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowBatchAnalysis(true)}
-                data-testid="button-open-batch-analysis"
-              >
-                <Sparkles className="w-4 h-4 mr-1.5" />
-                AI 整合分析
-              </Button>
             </div>
 
             {viewMode === 'my-plans' && (
@@ -425,10 +415,6 @@ const ReadingPlansPage = () => {
           </DialogContent>
         </Dialog>
 
-        <DevotionalAnalysisBatchDialog
-          open={showBatchAnalysis}
-          onOpenChange={setShowBatchAnalysis}
-        />
       </div>
     </FeatureGate>
   );

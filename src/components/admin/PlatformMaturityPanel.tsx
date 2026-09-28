@@ -1,211 +1,48 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, BarChart3, Bot, CheckCircle2, Gauge, RefreshCw } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/queryClient';
 
-type PlatformEventRow = {
-  event_name: string;
-  count: number;
-};
-
-type PlatformErrorRow = {
-  source: string;
-  status_code: number;
-  count: number;
-};
-
-type AiUsageRow = {
-  feature: string;
-  model: string;
-  status: string;
-  count: number;
-  avg_quality: number;
-  cost_units: number;
-};
-
 type PlatformSummary = {
-  events: PlatformEventRow[];
-  errors: PlatformErrorRow[];
-  aiUsage: AiUsageRow[];
+  since: string;
+  until: string;
+  totalEvents: number;
+  totalErrors: number;
+  events: Array<{ event_name: string; count: number }>;
+  errors: Array<{ source: string; status_code: number; path: string | null; count: number; last_seen: string }>;
 };
-
-const formatNumber = (value: number | string | null | undefined) => Number(value || 0).toLocaleString();
+const number = (value: number) => value.toLocaleString('zh-TW');
+const time = (value: string) => new Date(value).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export const PlatformMaturityPanel = () => {
-  const { data, isLoading, isFetching, refetch } = useQuery<PlatformSummary>({
+  const { data, isPending, isError, isFetching, refetch } = useQuery<PlatformSummary>({
     queryKey: ['/api/admin/platform-summary'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/admin/platform-summary');
-      return response.json();
-    },
+    queryFn: async () => (await apiRequest('GET', '/api/admin/platform-summary')).json(),
     refetchInterval: 120000,
   });
-
-  const events = data?.events || [];
-  const errors = data?.errors || [];
-  const aiUsage = data?.aiUsage || [];
-  const totalEvents = events.reduce((sum, row) => sum + Number(row.count || 0), 0);
-  const totalErrors = errors.reduce((sum, row) => sum + Number(row.count || 0), 0);
-  const totalAiRuns = aiUsage.reduce((sum, row) => sum + Number(row.count || 0), 0);
-  const failedAiRuns = aiUsage
-    .filter((row) => row.status !== 'COMPLETED')
-    .reduce((sum, row) => sum + Number(row.count || 0), 0);
-  const aiCostUnits = aiUsage.reduce((sum, row) => sum + Number(row.cost_units || 0), 0);
-  const weightedQuality = totalAiRuns > 0
-    ? Math.round(
-      aiUsage.reduce((sum, row) => sum + Number(row.avg_quality || 0) * Number(row.count || 0), 0) / totalAiRuns
-    )
-    : 0;
-  const healthScore = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round(
-        84
-        + Math.min(totalEvents, 200) / 20
-        - Math.min(totalErrors * 8, 40)
-        - Math.min(failedAiRuns * 6, 24)
-        + (weightedQuality >= 70 ? 6 : weightedQuality >= 50 ? 2 : 0)
-      )
-    )
-  );
-
-  const statusLabel = totalErrors > 0 || failedAiRuns > 0
-    ? '需要留意'
-    : totalEvents > 0 || totalAiRuns > 0
-      ? '運作正常'
-      : '等待資料';
-  const statusTone = totalErrors > 0 || failedAiRuns > 0
-    ? 'bg-amber-100 text-amber-800 border-amber-200'
-    : 'bg-emerald-100 text-emerald-800 border-emerald-200';
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-40" />
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-4">
-          {[...Array(4)].map((_, index) => (
-            <Skeleton key={index} className="h-24 rounded-xl" />
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Gauge className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">平台成熟度</h3>
-            <Badge variant="outline" className={statusTone}>{statusLabel}</Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            最近 7 天使用與錯誤、最近 30 天 AI 生成品質與成本。
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="gap-2"
-          data-testid="button-refresh-platform-summary"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          更新
-        </Button>
+  return <section aria-label="使用與錯誤紀錄" className="min-w-0 space-y-4">
+    <div className="flex items-start justify-between gap-3">
+      <div><h3 className="text-lg font-semibold">使用與錯誤紀錄</h3><p className="text-sm text-muted-foreground">最近 7 天{data && ` · 更新於 ${time(data.until)}`}</p></div>
+      <Button variant="outline" size="icon" aria-label="更新使用與錯誤紀錄" title="更新" disabled={isFetching} onClick={() => refetch()} data-testid="button-refresh-platform-summary"><RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /></Button>
+    </div>
+    {isError && <p role="alert" className="text-sm text-destructive">無法取得最新紀錄，請重新整理。{data ? '下方仍為上次取得的資料。' : ''}</p>}
+    {isPending && <p role="status">載入紀錄中...</p>}
+    {data && <>
+      <dl className="grid grid-cols-2 gap-4 border-y py-4">
+        <div><dt className="text-sm text-muted-foreground">已記錄的操作次數</dt><dd className="mt-1 text-2xl font-semibold">{number(data.totalEvents)}</dd></div>
+        <div><dt className="text-sm text-muted-foreground">已記錄的錯誤</dt><dd className="mt-1 text-2xl font-semibold">{number(data.totalErrors)}</dd></div>
+      </dl>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="min-w-0"><h4 className="font-medium">近期錯誤</h4>
+          {!data.errors.length ? <p className="mt-3 text-sm text-muted-foreground">期間內未記錄錯誤。</p> : <ul className="mt-2 divide-y">{data.errors.map(row => <li key={`${row.source}:${row.status_code}:${row.path}`} className="space-y-1 py-3 text-sm">
+            <div className="flex justify-between gap-3"><span className="min-w-0 break-words">{row.source === 'client' ? '前端' : row.source === 'server' ? '伺服器' : row.source}{row.status_code ? ` · HTTP ${row.status_code}` : ''}</span><span className="shrink-0">{number(row.count)} 次</span></div>
+            {row.path && <p className="break-all text-muted-foreground">{row.path}</p>}<p className="text-xs text-muted-foreground">最近發生：{time(row.last_seen)}</p>
+          </li>)}</ul>}
+        </section>
+        <details className="min-w-0"><summary className="cursor-pointer font-medium">操作分佈</summary>
+          {!data.events.length ? <p className="mt-3 text-sm text-muted-foreground">期間內未記錄操作。</p> : <ul className="mt-2 divide-y">{data.events.map(row => <li key={row.event_name} className="flex justify-between gap-3 py-3 text-sm"><span className="min-w-0 break-all">{row.event_name === 'page_view' ? '頁面瀏覽' : row.event_name}</span><span className="shrink-0">{number(row.count)}</span></li>)}</ul>}
+        </details>
       </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <div className="rounded-xl border bg-background p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-muted-foreground">健康分數</p>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          </div>
-          <p className="mt-2 text-3xl font-bold">{healthScore}</p>
-          <Progress value={healthScore} className="mt-3 h-2" />
-        </div>
-        <div className="rounded-xl border bg-background p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-muted-foreground">使用事件</p>
-            <BarChart3 className="h-4 w-4 text-blue-600" />
-          </div>
-          <p className="mt-2 text-3xl font-bold">{formatNumber(totalEvents)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">前台自動紀錄頁面與重要操作</p>
-        </div>
-        <div className="rounded-xl border bg-background p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-muted-foreground">錯誤紀錄</p>
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-          </div>
-          <p className="mt-2 text-3xl font-bold">{formatNumber(totalErrors)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">含 5xx 與前端例外</p>
-        </div>
-        <div className="rounded-xl border bg-background p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-muted-foreground">AI 品質</p>
-            <Bot className="h-4 w-4 text-primary" />
-          </div>
-          <p className="mt-2 text-3xl font-bold">{weightedQuality || '-'}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {formatNumber(totalAiRuns)} 次生成，成本單位 {formatNumber(aiCostUnits)}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <div className="rounded-xl border bg-background p-4">
-          <p className="text-sm font-semibold">熱門操作</p>
-          <div className="mt-3 space-y-2">
-            {events.slice(0, 5).map((row) => (
-              <div key={row.event_name} className="flex items-center justify-between gap-3 text-sm">
-                <span className="truncate text-muted-foreground">{row.event_name}</span>
-                <span className="font-semibold">{formatNumber(row.count)}</span>
-              </div>
-            ))}
-            {events.length === 0 ? <p className="text-sm text-muted-foreground">還沒有使用事件。</p> : null}
-          </div>
-        </div>
-
-        <div className="rounded-xl border bg-background p-4">
-          <p className="text-sm font-semibold">近期錯誤</p>
-          <div className="mt-3 space-y-2">
-            {errors.slice(0, 5).map((row) => (
-              <div key={`${row.source}-${row.status_code}`} className="flex items-center justify-between gap-3 text-sm">
-                <span className="truncate text-muted-foreground">{row.source} / {row.status_code || 'client'}</span>
-                <span className="font-semibold">{formatNumber(row.count)}</span>
-              </div>
-            ))}
-            {errors.length === 0 ? <p className="text-sm text-muted-foreground">目前沒有錯誤紀錄。</p> : null}
-          </div>
-        </div>
-
-        <div className="rounded-xl border bg-background p-4">
-          <p className="text-sm font-semibold">AI 生成表現</p>
-          <div className="mt-3 space-y-2">
-            {aiUsage.slice(0, 5).map((row) => (
-              <div key={`${row.feature}-${row.model}-${row.status}`} className="rounded-lg bg-muted/50 px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate font-medium">{row.feature}</span>
-                  <Badge variant={row.status === 'COMPLETED' ? 'secondary' : 'destructive'}>{row.status}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {row.model} ・ {formatNumber(row.count)} 次 ・ 品質 {row.avg_quality || '-'} ・ 成本 {formatNumber(row.cost_units)}
-                </p>
-              </div>
-            ))}
-            {aiUsage.length === 0 ? <p className="text-sm text-muted-foreground">還沒有 AI 生成紀錄。</p> : null}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+    </>}
+  </section>;
 };

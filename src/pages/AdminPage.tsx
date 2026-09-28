@@ -136,7 +136,7 @@ export const AdminPage: React.FC = () => {
               ))}
               </div>
             </div>
-            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">平台營運與發展</summary><div className="space-y-5 py-4"><PlatformMaturityPanel /></div></details>
+            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">系統紀錄</summary><div className="space-y-5 py-4"><PlatformMaturityPanel /></div></details>
           </div>
         );
       case 'cards':

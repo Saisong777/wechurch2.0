@@ -27,11 +27,7 @@ try {
   const app = express(); app.use(express.json());
   app.use((_req, res, next) => { res.setHeader('Content-Security-Policy', contentSecurityPolicy()); next(); });
   if (process.env.RUN_SECURITY_BROWSER === '1') {
-    const { generatePPTHTML } = await import('../src/components/admin/report-viewer/export');
-    app.get('/__test/csp-report', (_req, res) => res.type('html').send(generatePPTHTML([
-      { groupNumber: 1, raw: '', observations: 'First disposable slide' },
-      { groupNumber: 2, raw: '', observations: 'Second disposable slide' },
-    ])));
+    app.get('/__test/csp-probe', (_req, res) => res.type('html').send('<main>Content security probe</main>'));
     app.get('/__test/csp-fallback', (_req, res) => res.type('html').send('<div id="root"></div><script src="/load-error.js"></script>'));
   }
   const { registerRoutes } = await import('../server/routes');
@@ -71,6 +67,8 @@ try {
   }
   const role = await pool.query("UPDATE user_roles SET role='leader' WHERE user_id=$1",[ids[0]]);
   if (!role.rowCount) await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'leader')",[ids[0]]);
+  const { verifyRetiredAiHttp } = await import('./verify-retired-ai-http');
+  await verifyRetiredAiHttp(pool, a, b, guest, ids[0]);
   const empty=await guest('/api/church-reading/today?date=2026-09-13'); assert.equal(empty.status,200);
   const brief=await empty.json();assert.equal(brief.sourceStatus,'unpublished');assert.equal(brief.scriptureReference,'');
   const { verifySupportHttp }=await import('./verify-support-http');
