@@ -40,6 +40,7 @@ export function DailyHome({
         <p className="home-tagline">愛神・愛人・門徒生活</p>
       </div>
 
+      {showAdmin && <Link to="/work" className="mb-5 flex min-h-12 items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="flex items-center gap-2"><HandHeart className="h-4 w-4 text-primary" />牧養概況</span><span className="flex items-center gap-2 text-muted-foreground">近況與待辦<ArrowRight className="h-4 w-4" /></span></Link>}
       <section aria-labelledby="daily-devotion-title" className="home-scripture">
         <h2 id="daily-devotion-title" className="flex items-center gap-2 text-xl font-semibold">
           <BookOpen aria-hidden="true" className="h-5 w-5 shrink-0 text-primary" />

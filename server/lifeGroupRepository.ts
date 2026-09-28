@@ -11,7 +11,7 @@ const missing = () => new GroupError(404, '找不到內容，或你已不在這�
 const conflict = () => new GroupError(409, '內容已更新，請重新載入後再試；你的輸入尚未送出。');
 const activeMember = `(g.leader_user_id=$2 OR g.pastor_user_id=$2 OR EXISTS (SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$2 AND m.is_active))`;
 const nameSql = (alias: string) => `COALESCE(NULLIF(${alias}.display_name,''),'小家成員')`;
-const visibleContent = (alias: string, actor = '$2') => `(EXISTS(SELECT 1 FROM small_groups vg WHERE vg.id=${alias}.group_id AND (vg.leader_user_id=${actor} OR vg.pastor_user_id=${actor}))
+export const visibleContent = (alias: string, actor = '$2') => `(EXISTS(SELECT 1 FROM small_groups vg WHERE vg.id=${alias}.group_id AND (vg.leader_user_id=${actor} OR vg.pastor_user_id=${actor}))
   OR EXISTS(SELECT 1 FROM small_group_members vm WHERE vm.group_id=${alias}.group_id AND vm.user_id=${actor} AND vm.is_active AND vm.history_from<=${alias}.created_at))`;
 
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
@@ -202,6 +202,13 @@ export function listCare(id: string, actor: string, offset: number, watching: bo
   return withGroup(id, actor, async c => (await c.query(`SELECT ${careColumns}, EXISTS(SELECT 1 FROM life_group_care_watches w WHERE w.care_id=a.id AND w.user_id=$2) AS watching,
     (SELECT count(*)::int FROM life_group_care_watches WHERE care_id=a.id) AS "watcherCount" FROM life_group_care a WHERE group_id=$1 AND withdrawn_at IS NULL AND ${visibleContent('a')}
     AND (NOT $4 OR EXISTS(SELECT 1 FROM life_group_care_watches w WHERE w.care_id=a.id AND w.user_id=$2)) ORDER BY updated_at DESC,id DESC LIMIT 30 OFFSET $3`, [id, actor, offset, watching])).rows);
+}
+export function getCare(id: string, actor: string, careId: string) {
+  return withGroup(id, actor, async c => {
+    await care(c, id, careId, actor);
+    return (await c.query(`SELECT ${careColumns}, EXISTS(SELECT 1 FROM life_group_care_watches w WHERE w.care_id=a.id AND w.user_id=$2) AS watching,
+      (SELECT count(*)::int FROM life_group_care_watches WHERE care_id=a.id) AS "watcherCount" FROM life_group_care a WHERE a.id=$3 AND a.group_id=$1`,[id,actor,careId])).rows[0];
+  });
 }
 async function care(c: PoolClient, id: string, careId: string, actor: string) {
   const row = (await c.query(`SELECT a.* FROM life_group_care a WHERE a.id=$1 AND a.group_id=$2 AND a.withdrawn_at IS NULL AND ${visibleContent('a', '$3')} FOR UPDATE`, [careId, id, actor])).rows[0];

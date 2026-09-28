@@ -493,3 +493,13 @@ written record for continuity. Keep method classification and contact background
 optional, reuse the A palette, and retain 44px targets in both themes. Existing
 reminders remain visible and are only replaced or cancelled by explicit edits.
 Historical agreements remain readable. See `design/simple-care-flow-2026-09-28.md`.
+
+## Leader Overview Added 2026-09-28
+
+`/work` opens with scoped pastoral status, with a leader shortcut on the daily
+home and the same overview in CRM. Preserve Handshake A tokens and shared mobile
+navigation. Three quiet summaries lead to concrete follow-up actions, without
+spiritual scores or decorative charts. A gathering roster uses four explicit
+states; unrecorded is never absence. Shared content retains its existing audience
+and private records stay out of leader totals. See
+`design/leader-dashboard-2026-09-28.md` for implementation boundaries.

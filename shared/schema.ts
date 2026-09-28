@@ -1468,3 +1468,21 @@ export const familyMembershipEvents = pgTable('family_membership_events', {
   action: text('action').notNull(), targetGroupId: uuid('target_group_id').references(() => smallGroups.id), reason: text('reason').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => ({ group: index('family_membership_events_group').on(t.groupId,t.createdAt.desc()) }));
+
+// Per-gathering snapshots remain attached to the group when its leader changes.
+export const groupGatherings = pgTable('group_gatherings', {
+  id: uuid('id').primaryKey(), groupId: uuid('group_id').notNull().references(() => smallGroups.id),
+  gatheringDate: date('gathering_date').notNull(), kind: text('kind').notNull(),
+  cancelled: boolean('cancelled').notNull().default(false), visitors: integer('visitors').notNull().default(0),
+  version: integer('version').notNull().default(1), createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ occurrence: uniqueIndex('group_gatherings_occurrence').on(t.groupId,t.gatheringDate,t.kind), recent: index('group_gatherings_recent').on(t.groupId,t.gatheringDate.desc()), kind: check('group_gatherings_kind_check', sql`${t.kind} IN ('group','sunday')`), visitors: check('group_gatherings_visitors_check', sql`${t.visitors} >= 0 AND ${t.visitors} <= 10000`), version: check('group_gatherings_version_check',sql`${t.version}>0`) }));
+export const groupGatheringAttendance = pgTable('group_gathering_attendance', {
+  gatheringId: uuid('gathering_id').notNull().references(() => groupGatherings.id), personKey: text('person_key').notNull(),
+  nameSnapshot: text('name_snapshot').notNull(), status: text('status').notNull().default('unrecorded'),
+  recordedBy: uuid('recorded_by').references(() => users.id), recordedAt: timestamp('recorded_at', { withTimezone: true }),
+}, t => ({ pk: primaryKey({ columns: [t.gatheringId,t.personKey] }), status: check('group_gathering_attendance_status_check',sql`${t.status} IN ('present','excused','absent','unrecorded')`) }));
+export const groupGatheringEvents = pgTable('group_gathering_events', {
+  id: uuid('id').primaryKey().defaultRandom(), gatheringId: uuid('gathering_id').notNull().references(() => groupGatherings.id), actorId: uuid('actor_id').notNull().references(() => users.id),
+  changes: jsonb('changes').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ history: index('group_gathering_events_history').on(t.gatheringId,t.createdAt) }));

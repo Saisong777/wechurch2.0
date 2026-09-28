@@ -160,7 +160,7 @@ const CRMPage = () => {
   const { role: currentRole, isLeader, isAdmin, isSystemAdmin, loading: roleLoading } = useUserRole();
   const isMobile = useIsMobile();
 
-  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('members');
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview');
   const [memberTab, setMemberTab] = useState<MemberTab>('all');
 
   const [status, setStatus] = useState<StatusFilter>('all');
