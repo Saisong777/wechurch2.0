@@ -861,38 +861,10 @@ export async function registerRoutes(app: Express) {
 
       if (role !== "admin") {
         const church = normalizeChurch(currentUser?.church);
-        return res.json(church ? [{ id: church, name: church }] : knownChurches);
+        return res.json(church ? knownChurches.filter(item => item.id === church) : knownChurches);
       }
 
-      const usersResult = await pool.query(
-        "SELECT DISTINCT church FROM users WHERE church IS NOT NULL AND trim(church) <> '' ORDER BY church"
-      );
-      const potentialResult = await pool.query(
-        "SELECT DISTINCT church FROM potential_members WHERE church IS NOT NULL AND trim(church) <> '' ORDER BY church"
-      );
-      const unassignedResult = await pool.query(`
-        SELECT
-          (SELECT COUNT(*) FROM users WHERE church IS NULL OR trim(church) = '')::int
-          +
-          (SELECT COUNT(*) FROM potential_members WHERE church IS NULL OR trim(church) = '')::int
-          AS count
-      `);
-
-      const seen = new Set<string>();
-      const churches: Array<{ id: string; name: string }> = [...knownChurches];
-      for (const church of churches) seen.add(church.id);
-      for (const row of [...usersResult.rows, ...potentialResult.rows]) {
-        const value = normalizeChurch(row.church);
-        if (value && !seen.has(value)) {
-          seen.add(value);
-          churches.push({ id: value, name: value });
-        }
-      }
-      if ((unassignedResult.rows[0]?.count || 0) > 0) {
-        churches.push({ id: UNASSIGNED_CHURCH_ID, name: "未分配教會" });
-      }
-
-      res.json(churches);
+      res.json(knownChurches);
     } catch (error) {
       console.error("Error fetching churches:", error);
       res.status(500).json({ error: "Failed to get churches" });

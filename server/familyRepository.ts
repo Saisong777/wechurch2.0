@@ -29,7 +29,8 @@ function aliases(access: CrmAccessContext) { return [...new Set(access.churchSco
 export async function familyDirectory(actor: string, church: string, search: string) {
   const own = (await pool.query('SELECT church FROM users WHERE id=$1', [actor])).rows[0];
   const churches = getKnownChurchOptions();
-  const selected = normalizeChurch(church || own?.church) || '';
+  const candidate = normalizeChurch(church || own?.church);
+  const selected = churches.some(c => c.id === candidate) ? candidate! : (!church && churches.length === 1 ? churches[0].id : '');
   const groups = selected ? (await pool.query(`SELECT id,name,church,description,meeting FROM small_groups
     WHERE is_active AND lifecycle='active' AND is_listed AND church=ANY($1::text[]) AND strpos(lower(name),lower($2))>0
     ORDER BY name,id LIMIT 100`, [getChurchAliases(selected), search])).rows : [];
@@ -89,6 +90,7 @@ export async function updateMatching(actor: string, id: string, input: z.infer<t
 }
 export async function createFamily(actor: string, input: z.infer<typeof familyCreateInput>) {
   const a = await familyAccess(actor), church = normalizeChurch(input.church)!;
+  if (!getKnownChurchOptions().some(c => c.id === church)) throw new GroupError(400, '請選擇目前開放的教會。');
   if (!churchAllowed(a, church)) throw denied();
   return transaction(async c => {
     const g = (await c.query('INSERT INTO small_groups(name,church,leader_user_id) VALUES($1,$2,$3) RETURNING id', [input.name, church, actor])).rows[0];

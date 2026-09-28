@@ -7,7 +7,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'member
 const clients: QueryClient[] = [];
 afterEach(() => { cleanup(); clients.forEach(c => c.clear()); clients.length = 0; vi.unstubAllGlobals(); });
 function show(token = '') {
-  vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ ok:true, json:async () => input.includes('/directory') ? { selectedChurch:'IM 行動教會', churches:[{id:'IM 行動教會',name:'IM 行動教會'}], groups:[{id:'family',name:'同行小家',description:'歡迎',meeting:'週五'}] } : [] })));
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ ok:true, json:async () => input.includes('/directory') ? { selectedChurch:'IM 行動教會', churches:[{id:'IM 行動教會',name:'iM行動教會'}], groups:[{id:'family',name:'同行小家',description:'歡迎',meeting:'週五'}] } : [] })));
   const client = new QueryClient({ defaultOptions:{queries:{retry:false}} }); clients.push(client);
   const join = vi.fn();
   render(<QueryClientProvider client={client}><FamilyJoinPanel token={token} setToken={() => {}} join={join} joining={false} /></QueryClientProvider>);
@@ -22,7 +22,8 @@ it('offers matching, directory and invitation without forcing membership', async
 });
 it('requires consent and contact before requesting pastoral matching', async () => {
   show();
-  await screen.findByRole('option',{name:'IM 行動教會'});
+  await screen.findByText('iM行動教會');
+  expect(screen.queryByRole('combobox', {name:'選擇教會'})).toBeNull();
   fireEvent.change(screen.getByRole('textbox',{name:'方便聚會的時間'}),{target:{value:'週五晚上'}});
   fireEvent.change(screen.getByRole('textbox',{name:'方便聯繫的方式'}),{target:{value:'fixture@example.test'}});
   expect(screen.getByRole('button',{name:'請同工協助安排'})).toBeDisabled();

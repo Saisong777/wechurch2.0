@@ -1,4 +1,5 @@
 import { CrmOperationalPanel } from '@/components/admin/CrmOperationalPanel';
+import { churchDisplayName } from '@shared/churches';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -916,7 +917,7 @@ const CRMPage = () => {
                                             crmGroups.map((group) => (
                                               <DropdownMenuItem key={group.id} onClick={() => handleAssignGroup(member, group.id)}>
                                                 {group.name}
-                                                <span className="ml-2 text-xs text-muted-foreground">{group.church}</span>
+                                                <span className="ml-2 text-xs text-muted-foreground">{churchDisplayName(group.church)}</span>
                                               </DropdownMenuItem>
                                             ))
                                           )}

@@ -1,3 +1,4 @@
+import { churchDisplayName } from '@shared/churches';
 import {
   Table,
   TableBody,
@@ -284,7 +285,7 @@ export const UnifiedMemberTable = ({
                                 groups.map((group) => (
                                   <DropdownMenuItem key={group.id} onClick={() => onAssignGroup?.(member, group.id)}>
                                     {group.name}
-                                    <span className="ml-2 text-xs text-muted-foreground">{group.church}</span>
+                                    <span className="ml-2 text-xs text-muted-foreground">{churchDisplayName(group.church)}</span>
                                   </DropdownMenuItem>
                                 ))
                               )}

@@ -26,6 +26,12 @@ export async function verifyFamilyHttp(pool: Pool, makeClient: () => Client) {
   assert.equal((await outsider.client(`${origin}/management/${first}`)).status,403);
   assert.equal((await future.client(origin+'/management','POST',{name:'越權',church:'IM 行動教會'})).status,403);
   const directory = await (await member.client(origin+'/directory?church='+encodeURIComponent('IM 行動教會'))).json();
+  assert.deepEqual(directory.churches,[{id:'IM 行動教會',name:'iM行動教會'}]);
+  assert.deepEqual(await (await leader.client('/api/churches')).json(),directory.churches);
+  assert.equal((await member.client(origin+'/matching','POST',{church:'火樂',availability:'週五',contact:'fixture@example.test',consent:true})).status,400);
+  assert.equal((await leader.client(origin+'/management','POST',{church:'火樂',name:'未開放教會'})).status,400);
+  const outsideDirectory = await (await member.client(origin+'/directory?church='+encodeURIComponent('火樂'))).json();
+  assert.deepEqual(outsideDirectory.groups,[]);
   assert(directory.groups.some((g: {id:string})=>g.id===first));
   assert(!directory.groups.some((g: {id:string})=>g.id===second));
   assert(!JSON.stringify(directory).includes('私人聚會地址'));

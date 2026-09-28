@@ -24,7 +24,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('disables church membership editing and omits it from non-admin saves', async () => {
   render(<ProfileSettingsDialog open onOpenChange={vi.fn()} />);
   const church = await screen.findByTestId('input-church');
-  await waitFor(() => expect(church).toHaveValue('IM'));
+  await waitFor(() => expect(church).toHaveValue('IM 行動教會'));
   expect(church).toBeDisabled();
   fireEvent.click(screen.getByTestId('button-save-profile'));
   await waitFor(() => expect(saved).toBeDefined());
@@ -36,9 +36,11 @@ it('allows an administrator to submit a church change', async () => {
   auth.user.role = 'admin';
   render(<ProfileSettingsDialog open onOpenChange={vi.fn()} />);
   const church = await screen.findByTestId('input-church');
-  await waitFor(() => expect(church).toHaveValue('IM'));
+  await waitFor(() => expect(church).toHaveValue('IM 行動教會'));
   expect(church).toBeEnabled();
-  fireEvent.change(church, { target: { value: 'New church' } });
+  expect(screen.getByRole('option', {name:'iM行動教會'})).toBeTruthy();
+  expect(screen.getAllByRole('option').filter(option => (option as HTMLOptionElement).value === 'New church')).toHaveLength(0);
+  fireEvent.change(church, { target: { value: 'IM 行動教會' } });
   fireEvent.click(screen.getByTestId('button-save-profile'));
-  await waitFor(() => expect(saved?.church).toBe('New church'));
+  await waitFor(() => expect(saved?.church).toBe('IM 行動教會'));
 });

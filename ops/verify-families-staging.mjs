@@ -41,6 +41,10 @@ try {
       for(const [label,route,heading] of [['entry','/groups','加入小家'],['feed','/groups/'+group,'小家操作驗收'],['management','/groups?manage=1','小家管理']]) {
         await page.goto(origin+route); await page.getByRole('heading',{name:heading,exact:true}).first().waitFor();
         await page.waitForLoadState('networkidle',{timeout:10000}).catch(()=>{});
+        if(label==='entry') {
+          await page.getByText('iM行動教會',{exact:true}).waitFor();
+          if(await page.getByRole('combobox',{name:'選擇教會'}).count()) throw Error('Single church should not require a choice');
+        }
         if(await page.getByRole('alert').count()) throw Error('Unexpected page error');
         if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)) throw Error('Horizontal overflow');
         await page.screenshot({path:${JSON.stringify(output)}+'/'+width+'-'+label+'.png',fullPage:true});
@@ -48,6 +52,8 @@ try {
       }
     }
     const api=origin+'/api/life-groups';
+    const directory=await (await page.context().request.get(api+'/directory')).json();
+    if(JSON.stringify(directory.churches)!==JSON.stringify([{id:'IM 行動教會',name:'iM行動教會'}])||directory.selectedChurch!=='IM 行動教會') throw Error('Unexpected church catalog');
     for(const route of ['/directory','/matching','/management','/management/'+group,'/'+group+'/shares?kind=all']) {
       if((await page.context().request.get(api+route)).status()!==200) throw Error('Family endpoint failed: '+route);
     }
@@ -59,7 +65,7 @@ try {
     if(matching.status()!==201) throw Error('Matching write failed');
     await page.goto(origin+'/groups/'+group);
     await page.getByText('驗收留言',{exact:true}).waitFor();
-    return {checks,fixtureSession:true,googleOAuthTested:false,apiReads:5,messageSaved:true,shortInvite:true,matchingSaved:true};
+    return {checks,fixtureSession:true,googleOAuthTested:false,singleChurch:true,apiReads:5,messageSaved:true,shortInvite:true,matchingSaved:true};
   }`;
   let raw;
   try { raw = execFileSync(cli, ['-s=families-b', 'run-code', script], { cwd: root, encoding: 'utf8', timeout: 240000, maxBuffer: 4 * 1024 * 1024 }); }

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
+import { getKnownChurchOptions, normalizeChurch } from '@shared/churches';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,11 +69,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
     queryKey: ['/api/admin/users-for-email'],
   });
 
-  const churches = useMemo(() => {
-    const set = new Set<string>();
-    allUsers.forEach(u => { if (u.church) set.add(u.church); });
-    return Array.from(set).sort();
-  }, [allUsers]);
+  const churches = getKnownChurchOptions();
 
   const roles = useMemo(() => {
     const set = new Set<string>();
@@ -87,7 +84,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
       case 'role':
         return selectedRole ? allUsers.filter(u => u.role === selectedRole) : [];
       case 'church':
-        return selectedChurch ? allUsers.filter(u => u.church === selectedChurch) : [];
+        return selectedChurch ? allUsers.filter(u => normalizeChurch(u.church) === selectedChurch) : [];
       case 'individual':
         return allUsers.filter(u => selectedUserIds.has(u.id));
       default:
@@ -315,7 +312,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
                   <SelectItem value="_none" disabled>尚無教會資料</SelectItem>
                 ) : (
                   churches.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))
                 )}
               </SelectContent>
