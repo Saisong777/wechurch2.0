@@ -63,7 +63,11 @@ export async function verifyCareHttp(pool: Pool, makeClient: () => Client) {
   assert.equal((await pastor('/api/care-visits/' + normalId, 'PATCH', { ...update, status: 'completed' })).status, 200);
   assert.equal((await (await pastor('/api/care-visits/summary')).json()).pending, 0);
   assert((await (await owner(`/api/care-visits/${id}/events`)).json()).events.length >= 3);
+  const reassigned = randomUUID();
+  assert.equal((await owner('/api/care-visits/' + reassigned, 'PUT', input)).status, 200);
+  assert.equal((await pastor('/api/care-visits/' + reassigned, 'PATCH', update)).status, 200);
   await pool.query("DELETE FROM user_roles WHERE user_id=$1 AND role='pastor'", [ids[1]]);
+  assert.equal((await owner('/api/care-visits/' + reassigned, 'PATCH', { ...update, version: 2, status: 'cancelled', note: 'Cancel after pastoral staff change' })).status, 200);
   assert.equal((await pastor(`/api/care-visits/${id}/events`)).status, 404);
   assert.equal((await (await owner('/api/care-visits/summary')).json()).available, false);
   console.log('PASS care: recurring follow-up, archive/restore, private history, consent, team church scope, urgent ordering, idempotency, concurrent assignment, cancellation and role revocation');

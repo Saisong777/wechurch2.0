@@ -112,7 +112,7 @@ export function careVisitRoutes(resolveUserId: (req: Request) => Promise<string 
       if (old.version !== input.version) throw new GroupError(409, '其他同工已更新安排。請載入最新狀態，輸入會保留。');
       if (['cancelled', 'completed'].includes(old.status)) throw new GroupError(409, '這筆申請已結束。');
       if (!manager && (input.status !== 'cancelled' || input.assigneeId !== old.assignee_id || input.dueDate !== (old.due_date ? String(old.due_date).slice(0, 10) : null))) throw new GroupError(403, '只有牧者能安排探訪。');
-      if (input.assigneeId && !(await c.query(`SELECT id FROM users u WHERE id=$1 AND church=ANY($2)
+      if (input.status !== 'cancelled' && input.assigneeId && !(await c.query(`SELECT id FROM users u WHERE id=$1 AND church=ANY($2)
         AND EXISTS(SELECT 1 FROM user_roles WHERE user_id=u.id AND role::text=ANY($3)) FOR SHARE`, [input.assigneeId, getChurchAliases(old.church), roles])).rowCount) throw new GroupError(400, '請選擇同教會的牧者或傳道人。');
       if (input.status === 'completed' && !input.assigneeId) throw new GroupError(400, '請記下負責探訪的同工。');
       await c.query(`UPDATE care_visit_requests SET status=$2,assignee_id=$3,due_date=$4,next_action=$5,version=version+1,updated_at=now() WHERE id=$1`, [id, input.status, input.assigneeId, input.dueDate, input.note]);
