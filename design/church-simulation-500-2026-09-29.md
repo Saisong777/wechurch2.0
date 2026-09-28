@@ -115,7 +115,15 @@ RSS 是同機 client＋server 程序，不得直接當作 Railway app 的記憶�
 牧師／傳道人角色原本會把限定能力的額外 CRM 授權提升成其他能力，導致未勾選個資的範圍也能看見 email。
 修正只收緊額外授權，保留本人與實際任職小家的既有權限；多份有效授權仍採合法能力聯集。
 已新增兩種角色的反向測試，並用 B 站三個臨時帳號重現修正前問題；臨時資料已清除。
-修正後 B 線上驗收待本次發布完成，不能以本機結果替代。
+修正後 B 線上驗收 `50758907-7de2-474f-8450-9a77c68a91fc` 通過：牧師、傳道人各驗證身分、限定名單、email 遮蔽、詳細頁拒絕、成員修改拒絕、明確個資授權、撤銷立即失效。三個臨時帳號及兩筆授權已刪除並讀回確認；A 不變。
+Google 登入安全 smoke 通過：B 專用 client／callback、state／PKCE、僅基本身分 scope、拒絕偽造與取消 callback、會員數不變。本輪未重新做真人 Google 同意。
+
+### B 發布
+
+- 部署：`6248f23e-bb45-4ff0-831c-71eb78cbb4a7`，Railway `SUCCESS`。
+- 精確來源：`521d05f3cc081ba1615eba852832d6764d314e71`。
+- 程式指紋：`bde60457de9c609a1ff2e1c4c9da820b5cbb35d8bd95575011fef90b04d04862`；線上逐檔來源／研經資產校驗、health 與來源 commit 對應通過。
+- [GitHub-safe 發布紀錄](releases/b-6248f23e-bb45-4ff0-831c-71eb78cbb4a7.json)。本次没有新增 migration；A 仍為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`，沒有正式站發布授權。
 
 ### 半年資料量
 
@@ -139,6 +147,7 @@ RSS 是同機 client＋server 程序，不得直接當作 Railway app 的記憶�
 - `output/church-simulation/5687a9e4-01a7-4856-a211-a78db30644f5/results.json`
 - `output/playwright/security/44066ac9-88c4-4998-a263-7321a323d717/results.json`
 - `output/church-simulation-history/715234a3-ffbc-4686-aacc-4a9d143f25f8/results.json`
+- `output/crm-capability/50758907-7de2-474f-8450-9a77c68a91fc/results.json`
 - 可重跑工具：`scripts/simulate-church.ts`、`scripts/simulate-church-history.ts`、`ops/verify-crm-capability-staging.mjs`
 
 原始本機測試輸出不進 Git；本文件只保存去識別摘要，不包含 B 會員、密碼或 session。

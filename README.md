@@ -6,6 +6,7 @@
 固定還原點請使用 Git tag 與 `design/releases/` 的 exact sourceCommit；最新線上狀態需以 B 的版本指紋回讀確認，不能把下列歷史快照當作目前部署。
 
 - [全站審查、第一批修正與後續順序](design/product-audit-2026-09-29.md)
+- [500 人／30 小家／5 管理範圍的完整情境與半年資料量驗收](design/church-simulation-500-2026-09-29.md)：`npm run test:church500`、`npm run test:church500:history`；只用一次性 localhost DB，不是 Railway 容量認證。
 - [AI 退役與系統紀錄](design/ai-retirement-2026-09-28.md)
 - [CI 改善稿](design/ci-proposal-2026-09-29.yml)已加入現役分支及 PostgreSQL 回歸，但目前 GitHub 憑證缺少 workflow scope，尚未啟用；本輪沿用 B 發布工具的完整本機檢查，不宣稱雲端 CI 通過。
 
