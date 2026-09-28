@@ -110,7 +110,7 @@ try {
       const finished=mine.find(p=>p.content.includes(title));
       if(!finished?.isAnswered||finished.commentCount!==1) throw Error('Closed record lost');
       await page.goto(origin+'/grace-record?view=grace');
-      await page.getByRole('heading',{name:'恩典記錄簿',exact:true}).waitFor();
+      await page.locator('main').getByRole('heading',{name:'恩典記錄簿',exact:true}).waitFor();
       await page.getByRole('button',{name:'記下恩典',exact:true}).click();
       const composer=page.locator('#personal-prayer-composer'), storyTitle='恩典事蹟驗收 '+width;
       await composer.getByLabel('標題',{exact:true}).fill(storyTitle);
