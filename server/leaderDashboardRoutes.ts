@@ -9,6 +9,7 @@ export function leaderDashboardRoutes() {
   const uuid = z.string().uuid();
   const scope = (req: Request) => z.union([z.literal('all'),uuid]).default('all').parse(req.query.scope);
   const offset = (req: Request) => z.coerce.number().int().min(0).max(100000).default(0).parse(req.query.offset);
+  router.get('/access', async (_req,res) => { res.json(await repo.dashboardAccess(res.locals.actor)); });
   router.get('/', async (req,res) => { res.json(await repo.dashboard(res.locals.actor, scope(req))); });
   router.get('/care', async (req,res) => { res.json(await repo.carePage(res.locals.actor,scope(req),z.enum(['active','due','unassigned']).default('active').parse(req.query.filter),offset(req))); });
   router.get('/prayers', async (req,res) => { res.json(await repo.prayerPage(res.locals.actor,scope(req),offset(req))); });

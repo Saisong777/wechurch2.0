@@ -52,3 +52,14 @@ it('does not present lack of shared permission as zero activity',async()=>{
   expect(await screen.findByText('尚無可閱讀的共同關懷範圍')).toBeTruthy();
   expect(screen.queryByText('0 件已到提醒日 · 0 件待認領')).toBeNull();
 });
+it('keeps attendance draft through a background request failure',async()=>{
+  show();fireEvent.click(await screen.findByRole('button',{name:'補記錄'}));
+  const statuses=await screen.findAllByRole('button',{name:'出席'});fireEvent.click(statuses[0]);
+  failing=true;await client.invalidateQueries({queryKey:['/api/life-groups']});
+  expect(await screen.findByRole('alert')).toHaveTextContent('無法讀取');
+  failing=false;fireEvent.click(screen.getByRole('button',{name:'重新載入'}));
+  const restored=await screen.findAllByRole('button',{name:'出席'});
+  expect(restored[0]).toHaveAttribute('aria-pressed','true');
+  fireEvent.click(screen.getByRole('button',{name:'儲存出席'}));await waitFor(()=>expect(saved).toBeDefined());
+  expect(saved?.entries).toEqual([{key:'user:one',status:'present'},{key:'user:two',status:'unrecorded'}]);
+});

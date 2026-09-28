@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock('@/hooks/usePastoralAccess', () => ({ usePastoralAccess: () => ({ data: { available: false } }) }));
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';

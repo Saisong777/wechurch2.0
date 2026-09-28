@@ -47,21 +47,23 @@ function DashboardWorkspace() {
   const [filter,setFilter] = useState('active');
   const [page,setPage] = useState(0);
   const [editor,setEditor] = useState<{ groupId: string; id?: string } | null>(null);
-  const q = useDashboard<LeaderDashboardData>(`?scope=${scope}`);
+  const [editorGroup,setEditorGroup] = useState<DashboardGroup|null>(null);
+  const q = useDashboard<LeaderDashboardData>(`?scope=${scope}`, !editor);
   const client = useQueryClient();
   async function refresh() { await client.invalidateQueries({ queryKey: [familyBase] }); }
   function openView(next: typeof view, nextFilter = 'active') { setView(next); setFilter(nextFilter); setPage(0); }
+  function edit(value: {groupId:string;id?:string}) {
+    const group = q.data?.groups.find(g=>g.id===value.groupId);
+    if (!group) return;
+    setEditorGroup(group); setEditor(value);
+  }
+  if (editor && editorGroup) return <AttendanceEditor key={`${editor.groupId}:${editor.id || 'new'}`} group={editorGroup} id={editor.id} close={() => setEditor(null)} saved={refresh} />;
   if (q.isError) return <section aria-label="牧養概況"><h2 className="mb-4 text-xl font-semibold">牧養概況</h2><Problem message={q.error.message} retry={() => { setScope('all'); void q.refetch(); }} /></section>;
   if (!q.data) return <p role="status" className="py-6">正在整理牧養概況…</p>;
   const data = q.data;
   const selected = scope === 'all' ? data.groups : data.groups.filter(g => g.id === scope);
   const readable = selected.filter(g => g.sharedReadable).length;
   if (!data.groups.length) return <section className="space-y-3 border-b pb-6"><h2 className="text-xl font-semibold">牧養概況</h2><p className="text-muted-foreground">目前沒有已指派的牧養範圍。負責的小家設定完成後，這裡會顯示近況與待辦。</p></section>;
-  if (editor) {
-    const group = data.groups.find(g => g.id === editor.groupId);
-    if (!group) return <Problem message="這個小家已不在你的負責範圍，無法繼續記錄。" retry={() => setEditor(null)} />;
-    return <AttendanceEditor key={`${editor.groupId}:${editor.id || 'new'}`} group={group} id={editor.id} close={() => setEditor(null)} saved={refresh} />;
-  }
   return <section aria-label="牧養概況" className="space-y-6 [overflow-wrap:anywhere]">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-medium text-primary">一起照顧正在同行的人</p><h2 className="mt-1 text-2xl font-semibold">牧養概況</h2></div><Button aria-label="重新整理牧養概況" variant="ghost" size="icon" onClick={() => void refresh()}><RefreshCw className={`h-4 w-4 ${q.isFetching ? 'animate-spin motion-reduce:animate-none' : ''}`} /></Button></div>
     <div className="flex flex-wrap items-center justify-between gap-3"><label className="min-w-0 flex-1 space-y-1 text-sm"><span>負責範圍</span><select aria-label="牧養範圍" className={`${familySelectClass} max-w-md`} value={scope} onChange={e => { setScope(e.target.value); setPage(0); }}><option value="all">我的全部範圍（{data.groups.length} 個小家）</option>{data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label><p className="text-xs text-muted-foreground">{new Date(data.updatedAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Taipei'})} 更新 · 台北時間</p></div>
@@ -80,10 +82,10 @@ function DashboardWorkspace() {
         </SummaryCard>
       </div>
       <section><div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3"><h3 className="text-lg font-semibold">需要我留意</h3><Button size="sm" variant="ghost" onClick={() => openView('care','due')}>查看到期關懷<ArrowRight className="ml-1 h-4 w-4" /></Button></div>
-        <ul className="divide-y">{data.care.items.map(item => <CareRow key={item.id} item={item} today={data.today} />)}{data.gatherings.filter(m => m.counts.unrecorded > 0).slice(0,3).map(m => <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><h4 className="font-medium">{m.groupName} · {m.date}</h4><p className="mt-1 text-sm text-muted-foreground">{m.counts.unrecorded} 人尚未填寫出席</p></div><Button variant="outline" onClick={() => setEditor({groupId:m.groupId,id:m.id})}>補記錄</Button></li>)}</ul>
+        <ul className="divide-y">{data.care.items.map(item => <CareRow key={item.id} item={item} today={data.today} />)}{data.gatherings.filter(m => m.counts.unrecorded > 0).slice(0,3).map(m => <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><h4 className="font-medium">{m.groupName} · {m.date}</h4><p className="mt-1 text-sm text-muted-foreground">{m.counts.unrecorded} 人尚未填寫出席</p></div><Button variant="outline" onClick={() => edit({groupId:m.groupId,id:m.id})}>補記錄</Button></li>)}</ul>
         {!data.care.items.length && !data.gatherings.some(m => m.counts.unrecorded > 0) && <p className="py-6 text-sm text-muted-foreground">目前可見記錄中沒有到期、待認領或待補填事項。</p>}
       </section>
-    </> : view === 'care' ? <CareList scope={scope} filter={filter} setFilter={v => {setFilter(v);setPage(0);}} page={page} setPage={setPage} today={data.today} /> : view === 'prayers' ? <PrayerList scope={scope} page={page} setPage={setPage} /> : <GatheringsList groups={selected} scope={scope} page={page} setPage={setPage} edit={setEditor} />}
+    </> : view === 'care' ? <CareList scope={scope} filter={filter} setFilter={v => {setFilter(v);setPage(0);}} page={page} setPage={setPage} today={data.today} /> : view === 'prayers' ? <PrayerList scope={scope} page={page} setPage={setPage} /> : <GatheringsList groups={selected} scope={scope} page={page} setPage={setPage} edit={edit} />}
   </section>;
 }
 function SummaryCard({ icon: Icon, title, caption, children, action, onClick }: { icon: typeof Heart; title: string; caption: string; children: React.ReactNode; action: string; onClick: () => void }) {
@@ -133,7 +135,7 @@ function AttendanceEditor({group,id,close,saved}:{group:DashboardGroup;id?:strin
       <Button className="w-full sm:w-auto" disabled={busy} onClick={()=>void save()}><Check className="mr-2 h-4 w-4"/>{busy?'儲存中…':'儲存出席'}</Button>
     </>:<>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2"><label className="block min-w-0 space-y-2 text-sm"><span>聚會日期</span><Input type="date" className="max-w-full" max={taipeiToday()} value={date} disabled={busy} onChange={e=>{setDate(e.target.value);setSelected([]);setDirty(true);}}/></label><label className="block min-w-0 space-y-2 text-sm"><span>聚會類型</span><select className={familySelectClass} value={kind} disabled={busy} onChange={e=>{setKind(e.target.value as typeof kind);setDirty(true);}}>{Object.entries(gatheringKinds).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></div>
-      <div><h3 className="font-semibold">確認當次應出席名單</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">名單依小家的加入與離開記錄整理，含現任領袖。請勾選當次應出席的人；補登時請再次確認。建立後每個人都先保留「未填」。</p></div>
+      <div><h3 className="font-semibold">確認當次應出席名單</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">請確認當次應出席名單。補登過去聚會時，名單可能需要核對；現任領袖也會列出。建立後每個人都先保留「未填」。</p></div>
       {!roster.data?<p role="status">載入名單中…</p>:<fieldset disabled={busy} className="divide-y border-y"><label className="flex min-h-12 items-center gap-3 py-2 font-medium"><input type="checkbox" checked={!!roster.data.length&&selected.length===roster.data.length} onChange={e=>{setSelected(e.target.checked?roster.data!.map(m=>m.key):[]);setDirty(true);}}/>選取這份名單全部成員</label>{roster.data.map(m=><label key={m.key} className="flex min-h-12 items-center gap-3 py-2"><input type="checkbox" checked={selected.includes(m.key)} onChange={e=>{setSelected(e.target.checked?[...selected,m.key]:selected.filter(k=>k!==m.key));setDirty(true);}}/>{m.name}</label>)}</fieldset>}
       <Button className="w-full sm:w-auto" disabled={busy||!selected.length||!date} onClick={()=>void create()}>{busy?'建立中…':`建立並記錄出席（${selected.length} 人）`}</Button>
     </>}{error&&<div role="alert" className="space-y-3 rounded-lg border border-destructive p-4 text-sm"><p className="text-destructive">{error}</p>{meetingId&&<Button variant="outline" disabled={busy} onClick={async()=>{if(dirty&&!window.confirm('放棄本次修改，載入最新記錄？'))return;const result=await detail.refetch();if(result.data){setDraft(result.data);setDirty(false);setError('');}}}>重新載入最新記錄</Button>}</div>}

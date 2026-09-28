@@ -18,7 +18,7 @@ async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
 // Dashboard responsibility never implies membership or visibility of old shared content.
 // Technical administrators need an explicit appointment or scoped assignment too.
 async function scopes(c: PoolClient, actor: string, scope = 'all') {
-  const user = (await c.query(`SELECT church,COALESCE((SELECT role FROM user_roles WHERE user_id=$1 LIMIT 1),'member') AS role FROM users WHERE id=$1 FOR SHARE`, [actor])).rows[0];
+  const user = (await c.query(`SELECT church,(SELECT CASE WHEN count(*)=1 THEN max(role::text) ELSE 'member' END FROM user_roles WHERE user_id=$1) AS role FROM users WHERE id=$1 FOR SHARE`, [actor])).rows[0];
   if (!user) throw denied();
   const grants = (await c.query(`SELECT scope_type,church,group_id FROM crm_scope_assignments WHERE assignee_user_id=$1 AND is_active
     AND starts_at<=now() AND (ends_at IS NULL OR ends_at>now()) AND (can_manage_care OR can_manage_members) FOR SHARE`, [actor])).rows;
@@ -50,6 +50,9 @@ const meetingFields = `m.id,m.group_id AS "groupId",g.name AS "groupName",m.gath
 const meetingCounts = `(SELECT json_build_object('present',count(*) FILTER(WHERE a.status='present'),'excused',count(*) FILTER(WHERE a.status='excused'),
   'absent',count(*) FILTER(WHERE a.status='absent'),'unrecorded',count(*) FILTER(WHERE a.status='unrecorded')) FROM group_gathering_attendance a WHERE a.gathering_id=m.id) AS counts`;
 
+export function dashboardAccess(actor: string) {
+  return transaction(async c => ({ available: (await scopes(c, actor)).groups.length > 0 }));
+}
 export function dashboard(actor: string, scope: string) {
   return transaction(async c => {
     const a = await scopes(c, actor, scope); const { today, since } = dates();
@@ -100,11 +103,17 @@ export function gatheringsPage(actor: string, scope: string, offset: number) {
   });
 }
 async function roster(c: PoolClient, groupId: string, date: string) {
+  // Legacy membership timestamps are UTC without timezone. Only actual departure
+  // events may close an interval; generic updated_at is not a departure date.
+  const eligible = `((m.joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Taipei')::date<=$2::date AND (m.is_active OR
+    (SELECT min(e.created_at AT TIME ZONE 'Asia/Taipei')::date FROM family_membership_events e
+      WHERE e.group_id=m.group_id AND e.user_id=m.user_id AND e.action IN ('left','removed','transferred_out')
+      AND e.created_at >= (m.joined_at AT TIME ZONE 'UTC')) >= $2::date)`;
   return (await c.query(`SELECT 'user:'||u.id AS key,COALESCE(NULLIF(u.display_name,''),'小家成員') AS name
     FROM users u CROSS JOIN small_groups g WHERE g.id=$1 AND (g.leader_user_id=u.id OR g.pastor_user_id=u.id OR EXISTS(
-      SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=u.id AND m.joined_at::date<=$2::date AND (m.is_active OR m.updated_at::date>=$2::date)))
+      SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=u.id AND ${eligible}))
     UNION ALL SELECT 'membership:'||m.id,COALESCE(NULLIF(p.name,''),'未連結帳號的成員')
-    FROM small_group_members m LEFT JOIN potential_members p ON p.id=m.potential_member_id WHERE m.group_id=$1 AND m.joined_at::date<=$2::date AND (m.is_active OR m.updated_at::date>=$2::date) AND m.user_id IS NULL
+    FROM small_group_members m LEFT JOIN potential_members p ON p.id=m.potential_member_id WHERE m.group_id=$1 AND ${eligible} AND m.user_id IS NULL
     ORDER BY name,key`, [groupId,date])).rows as { key: string; name: string }[];
 }
 export function gatheringRoster(actor: string, groupId: string, date: string) {

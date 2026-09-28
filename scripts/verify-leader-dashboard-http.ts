@@ -36,6 +36,9 @@ export async function verifyLeaderDashboardHttp(pool:Pool,makeClient:()=>Client)
   assert.equal((await(await admin(base)).json()).groups.length,0);
   assert.equal((await(await b(base)).json()).groups.length,0);
   const seniorData=await(await senior(`${base}?scope=${g}`)).json();assert.equal(seniorData.groups.some((x:{id:string})=>x.id===g),true);assert.equal(seniorData.care.active,0);assert.equal(seniorData.prayers.recent,0);assert.equal(seniorData.groups.find((x:{id:string})=>x.id===g).sharedReadable,false);
+  await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'member')",[ids[2]]);
+  assert.equal((await senior(`${base}?scope=${g}`)).status,404,'ambiguous role rows must not grant church-wide access');
+  await pool.query("DELETE FROM user_roles WHERE user_id=$1 AND role='member'",[ids[2]]);
   const assignment=randomUUID();
   await pool.query("INSERT INTO crm_scope_assignments(id,assignee_user_id,scope_type,group_id,can_manage_care,assigned_by_user_id) VALUES($1,$2,'group',$3,true,$4)",[assignment,ids[3],g,ids[2]]);
   // Current membership is not a grant to see pre-join shared content.
@@ -43,12 +46,20 @@ export async function verifyLeaderDashboardHttp(pool:Pool,makeClient:()=>Client)
   await pool.query("INSERT INTO crm_scope_assignments(assignee_user_id,scope_type,member_user_id,can_manage_care,assigned_by_user_id) VALUES($1,'member',$2,true,$3)",[ids[4],ids[1],ids[2]]);
   assert.equal((await(await minister(base)).json()).groups.length,0);
   await pool.query("UPDATE crm_scope_assignments SET ends_at=now()-interval '1 second' WHERE id=$1",[assignment]);assert.equal((await pastor(`${base}?scope=${g}`)).status,404);
+  const departed=randomUUID();
+  await pool.query("INSERT INTO small_group_members(id,group_id,user_id,is_active,joined_at,updated_at) VALUES($1,$2,$3,false,'2026-09-01 00:00:00',now())",[departed,g,ids[4]]);
+  await pool.query("INSERT INTO family_membership_events(group_id,user_id,actor_id,action,created_at) VALUES($1,$2,$3,'left','2026-09-10T17:00:00Z')",[g,ids[4],ids[0]]);
+  const pastRoster=await(await a(`${base}/${g}/roster?date=2026-09-11`)).json();
+  assert(pastRoster.some((m:{key:string})=>m.key===`user:${ids[4]}`),'Taipei departure day is Sep 11');
+  const afterDeparture=await(await a(`${base}/${g}/roster?date=2026-09-12`)).json();
+  assert(!afterDeparture.some((m:{key:string})=>m.key===`user:${ids[4]}`),'later updated_at must not reopen past membership');
   const roster=await(await a(`${base}/${g}/roster`)).json();assert.equal(roster.length,3);
   const meeting=randomUUID();const create={date:taipeiToday(),kind:'group',roster:roster.map((m:{key:string})=>m.key)};
   assert.equal((await foreign(`${base}/${g}/gatherings/${meeting}`,'PUT',create)).status,404);
   assert.equal((await a(`${base}/${g}/gatherings/${meeting}`,'PUT',{...create,roster:[...create.roster,`user:${ids[6]}`]})).status,409);
   assert.equal((await a(`${base}/${g}/gatherings/${meeting}`,'PUT',create)).status,200);
   assert.equal((await a(`${base}/${g}/gatherings/${meeting}`,'PUT',create)).status,200);
+  assert.equal((await a(`${base}/${g}/gatherings/${meeting}`,'PUT',{...create,kind:'sunday'})).status,409,'same id cannot silently accept different input');
   let detail=await(await a(`${base}/${g}/gatherings/${meeting}`)).json();assert.equal(detail.counts.unrecorded,3);assert.equal(detail.counts.absent,0);
   const entries=detail.entries.map((e:{key:string},i:number)=>({key:e.key,status:['present','excused','unrecorded'][i]}));
   const save={version:detail.version,entries,visitors:2,cancelled:false};
@@ -60,7 +71,9 @@ export async function verifyLeaderDashboardHttp(pool:Pool,makeClient:()=>Client)
   assert.equal((await(await a(`${base}?scope=${g}`)).json()).gatherings.length,0);
   assert.equal((await(await a(`${base}/gatherings?scope=${g}`)).json()).total,1);
   // Role handoff: preserve organizational history and authors, revoke prior appointment views.
+  await pool.query("UPDATE user_roles SET role='member' WHERE user_id=$1",[ids[1]]);
   await pool.query('UPDATE small_groups SET leader_user_id=$2 WHERE id=$1',[g,ids[1]]);
+  assert.equal((await (await b(base+'/access')).json()).available,true);
   await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2)',[g,ids[0]]);
   assert.equal((await a(`${base}?scope=${g}`)).status,404);
   assert.equal((await a(`${base}/${g}/gatherings/${meeting}`,'PATCH',{...save,version:3})).status,404);
