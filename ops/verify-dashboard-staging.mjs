@@ -35,7 +35,7 @@ try{
     const origin=${JSON.stringify(target.origin)},output=${JSON.stringify(output)},group=${JSON.stringify(group)},people=${JSON.stringify(people.map(p=>({id:p.id,cookie:p.cookie})))};
     const gate=await page.context().request.post(origin+'/__staging/access',{headers:{Origin:origin},data:{code:${JSON.stringify(app.STAGING_ACCESS_CODE)}},maxRedirects:0});
     if(gate.status()!==303)throw Error('B gate failed');
-    async function login(index){await page.context().addCookies([{name:'connect.sid',value:people[index].cookie,url:origin,httpOnly:true,secure:true,sameSite:'Lax'}]);await page.goto(origin+'/work');const r=await page.context().request.get(origin+'/api/auth/user');if(r.status()!==200||(await r.json()).legacyUserId!==people[index].id)throw Error('Fixture identity mismatch');}
+    async function login(index){await page.context().addCookies([{name:'connect.sid',value:people[index].cookie,url:origin,httpOnly:true,secure:true,sameSite:'Lax'}]);await page.goto(origin+(index===2?'/me':'/work'));const r=await page.context().request.get(origin+'/api/auth/user');if(r.status()!==200||(await r.json()).legacyUserId!==people[index].id)throw Error('Fixture identity mismatch');}
     await login(0);
     await page.setViewportSize({width:390,height:844});
     await page.getByRole('heading',{name:'牧養概況',exact:true}).waitFor();
