@@ -1,5 +1,15 @@
 # WeChurch Handshake: Current Design Recipe
 
+## Current product scope: SoulGym deferred 2026-09-28
+
+SoulGym is reserved for a future phase. Remove its member entries, study-note
+category, activity hosting/history and participant/host steps from the current
+app. Keep historical data and dormant source recoverable. Old participant links
+return home; old notebooks lead to current personal notes. Keep independent Bible
+study tools, daily devotion, groups and active administration. This supersedes
+earlier sections retaining a personal SoulGym entry.
+See `design/soulgym-deferred-2026-09-28.md`.
+
 ## Handshake A Approved 2026-09-28
 
 Sai selected the upright handclasp forming the center of a W, with no cross or

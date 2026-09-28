@@ -7,7 +7,6 @@ import {
   Clock,
   HeartHandshake,
   MailCheck,
-  NotebookTabs,
   Send,
   Settings,
   Sparkles,
@@ -47,10 +46,6 @@ const recordActions = [
   { id:'sharing',title:'我的分享',subtitle:'',href:'/me/sharing',icon:Send,tone:'border-border bg-card',iconTone:'bg-primary/10 text-primary',featureKeys:[] },
   { id: 'support', title: '尋求陪伴', subtitle: '', href: '/support', icon: HeartHandshake, tone: 'border-border bg-card', iconTone: 'bg-primary/10 text-primary', featureKeys: [] },
   {
-    id: 'soulgym', title: 'SoulGym 查經', subtitle: '', href: '/user',
-    icon: NotebookTabs, tone: 'border-border bg-card', iconTone: 'bg-primary/10 text-primary', featureKeys: ['we_live'],
-  },
-  {
     id: 'devotional-notes',
     title: '讀經與靈修筆記',
     subtitle: '回看經文亮光、每日靈修與個人默想。',
@@ -59,16 +54,6 @@ const recordActions = [
     tone: 'border-sky-200 bg-sky-50/70',
     iconTone: 'bg-sky-500/10 text-sky-600',
     featureKeys: ['we_learn'],
-  },
-  {
-    id: 'study-notebook',
-    title: '查經筆記本',
-    subtitle: '整理 SoulGym 查經、個人回答與小家成果。',
-    href: '/user/notebook',
-    icon: NotebookTabs,
-    tone: 'border-violet-200 bg-violet-50/70',
-    iconTone: 'bg-violet-500/10 text-violet-600',
-    featureKeys: ['we_live'],
   },
   {
     id: 'grace-record',

@@ -27,7 +27,6 @@ interface FeatureToggleManagerProps {
 }
 
 const FEATURE_HIERARCHY: Record<string, string[]> = {
-  we_live: ['bible_study', 'notebook'],
   we_learn: ['bible_reading', 'jesus_timeline', 'reading_plans'],
   we_play: ['icebreaker_game', 'random_grouper'],
   we_share: ['prayer_wall', 'prayer_meeting', 'message_cards'],

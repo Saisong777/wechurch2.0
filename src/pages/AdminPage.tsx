@@ -3,57 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSession } from '@/contexts/SessionContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
-import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, History, Sparkles, Image, ToggleLeft, Crown, Mail, Inbox, Plus, BookOpen, QrCode, Gauge } from 'lucide-react';
+import { Settings, LogOut, ChevronLeft, Loader2, Home, Users, Sparkles, Image, ToggleLeft, Crown, Mail, Inbox, BookOpen } from 'lucide-react';
 import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest } from '@/lib/queryClient';
 
-type AdminStep = 'auth' | 'dashboard' | 'history' | 'cards' | 'message-cards' | 'feature-toggles' | 'mail' | 'inbox' | 'create' | 'waiting' | 'monitor';
-
-const hostFlowSteps: Array<{ step: AdminStep; label: string; hint: string }> = [
-  { step: 'create', label: '建立聚會', hint: '設定經文' },
-  { step: 'waiting', label: '邀請與分組', hint: 'QR、成員、分組' },
-  { step: 'monitor', label: '主持查經', hint: '進度、AI、結束' },
-];
-
-const dashboardHostCards: Array<{
-  step: AdminStep;
-  title: string;
-  description: string;
-  icon: typeof Plus;
-  tone: string;
-  iconTone: string;
-}> = [
-  {
-    step: 'create',
-    title: '開一場查經',
-    description: '設定經文、主題與查經流程',
-    icon: Plus,
-    tone: 'bg-primary/10 border-primary/20',
-    iconTone: 'text-primary',
-  },
-  {
-    step: 'waiting',
-    title: '帶大家進場',
-    description: 'QR Code、報名、分組與確認',
-    icon: QrCode,
-    tone: 'bg-secondary/10 border-secondary/20',
-    iconTone: 'text-secondary',
-  },
-  {
-    step: 'monitor',
-    title: '看進度與 AI',
-    description: '查經進度、資料品質、成果整理',
-    icon: Gauge,
-    tone: 'bg-emerald-500/10 border-emerald-500/20',
-    iconTone: 'text-emerald-600',
-  },
-];
+type AdminStep = 'auth' | 'dashboard' | 'cards' | 'message-cards' | 'feature-toggles' | 'mail' | 'inbox';
 
 function lazyAdminComponent<T extends Record<string, unknown>>(
   factory: () => Promise<T>,
@@ -62,18 +21,12 @@ function lazyAdminComponent<T extends Record<string, unknown>>(
   return lazy(() => factory().then((module) => ({ default: module[name] as ComponentType<any> })));
 }
 
-const SessionHistory = lazyAdminComponent(() => import('@/components/admin/SessionHistory'), 'SessionHistory');
-const CreateSession = lazyAdminComponent(() => import('@/components/admin/CreateSession'), 'CreateSession');
-const AdminWaitingRoom = lazyAdminComponent(() => import('@/components/admin/AdminWaitingRoom'), 'AdminWaitingRoom');
-const AdminMonitor = lazyAdminComponent(() => import('@/components/admin/AdminMonitor'), 'AdminMonitor');
-const HistoryBrowser = lazyAdminComponent(() => import('@/components/admin/HistoryBrowser'), 'HistoryBrowser');
 const CardQuestionManager = lazyAdminComponent(() => import('@/components/admin/CardQuestionManager'), 'CardQuestionManager');
 const MessageCardManager = lazyAdminComponent(() => import('@/components/admin/MessageCardManager'), 'MessageCardManager');
 const FeatureToggleManager = lazyAdminComponent(() => import('@/components/admin/FeatureToggleManager'), 'FeatureToggleManager');
 const AdminMailComposer = lazyAdminComponent(() => import('@/components/admin/AdminMailComposer'), 'AdminMailComposer');
 const AdminInbox = lazyAdminComponent(() => import('@/components/admin/AdminInbox'), 'AdminInbox');
 const PlatformMaturityPanel = lazyAdminComponent(() => import('@/components/admin/PlatformMaturityPanel'), 'PlatformMaturityPanel');
-const ProductGrowthPanel = lazyAdminComponent(() => import('@/components/admin/ProductGrowthPanel'), 'ProductGrowthPanel');
 
 const AdminSectionLoader = () => (
   <div className="flex min-h-[280px] items-center justify-center">
@@ -85,7 +38,6 @@ export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
-  const { currentSession, setCurrentSession, setUsers, setSubmissions, setIsAdmin } = useSession();
   const [step, setStep] = useState<AdminStep>('auth');
 
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -117,77 +69,12 @@ export const AdminPage: React.FC = () => {
     }
   }, [user, loading, canCreateSession, navigate]);
 
-  const handleSelectSession = async (sessionId: string) => {
-    try {
-      // Load session data
-      const sessionResponse = await fetch(`/api/sessions/${sessionId}`);
-      if (!sessionResponse.ok) throw new Error('Failed to fetch session');
-      const sessionData = await sessionResponse.json();
-
-      // Load participants
-      const participantsResponse = await fetch(`/api/admin/sessions/${sessionId}/participants`);
-      const participants = participantsResponse.ok ? await participantsResponse.json() : [];
-
-      // Load submissions
-      const submissionsResponse = await fetch(`/api/sessions/${sessionId}/submissions`);
-      const submissions = submissionsResponse.ok ? await submissionsResponse.json() : [];
-
-      setCurrentSession({
-        id: sessionData.id,
-        shortCode: sessionData.shortCode,
-        bibleVerse: '',
-        verseReference: sessionData.verseReference,
-        status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-        createdAt: new Date(sessionData.createdAt),
-        groups: [],
-        allowLatecomers: sessionData.allowLatecomers,
-        icebreakerEnabled: sessionData.icebreakerEnabled,
-      });
-      setIsAdmin(true);
-      setUsers(participants);
-      setSubmissions(submissions);
-
-      // Determine which step to show based on session status
-      if (sessionData.status === 'waiting') {
-        setStep('waiting');
-      } else {
-        // Rebuild groups from participants
-        const groupNumbers = [...new Set(participants.filter((p: any) => p.groupNumber).map((p: any) => p.groupNumber))];
-        const groups = groupNumbers.map((num: number) => ({
-          id: `group-${num}`,
-          number: num,
-          members: participants.filter((p: any) => p.groupNumber === num),
-        }));
-        
-        const updatedSession = {
-          id: sessionData.id,
-          shortCode: sessionData.shortCode,
-          bibleVerse: '',
-          verseReference: sessionData.verseReference,
-          status: sessionData.status as 'waiting' | 'grouping' | 'studying' | 'completed',
-          createdAt: new Date(sessionData.createdAt),
-          groups,
-          allowLatecomers: sessionData.allowLatecomers,
-          icebreakerEnabled: sessionData.icebreakerEnabled,
-        };
-        setCurrentSession(updatedSession);
-        setStep('monitor');
-      }
-    } catch (error) {
-      console.error('Error loading session:', error);
-      toast.error('無法載入課程資料');
-    }
-  };
-
   const handleSignOut = async () => {
     await signOut();
     setStep('auth');
   };
 
   const handleBackToDashboard = () => {
-    setCurrentSession(null);
-    setUsers([]);
-    setSubmissions([]);
     setStep('dashboard');
   };
 
@@ -207,15 +94,7 @@ export const AdminPage: React.FC = () => {
                 <WeChurchIcon size={28} className="text-primary" />
                 <h2 className="text-xl sm:text-2xl font-semibold font-display">管理後台</h2>
               </div>
-              <Button 
-                size="default"
-                onClick={() => setStep('create')}
-                className="gap-2 h-11 sm:h-10 text-base sm:text-sm gradient-coral text-white shadow-md hover:shadow-lg transition-shadow"
-                data-testid="button-create-session"
-              >
-                <Plus className="w-5 h-5 sm:w-4 sm:h-4" />
-                建立查經活動
-              </Button>
+
             </div>
 
 
@@ -227,7 +106,6 @@ export const AdminPage: React.FC = () => {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {([
                 ...(isAdmin ? [{ icon: BookOpen, label: '每日靈修課表', desc: '課表、短文與發佈', action: () => navigate('/admin/church-devotions'), testId: 'button-church-devotions' }] : []),
-                { icon: History, label: '歷史資料', desc: '查看過往活動', action: () => setStep('history'), testId: 'button-history' },
                 { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
                 { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
                 { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
@@ -258,78 +136,7 @@ export const AdminPage: React.FC = () => {
               ))}
               </div>
             </div>
-            <div>
-              <h3 className="text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                <BookOpen className="w-4 h-4" />
-                今日 SoulGym
-              </h3>
-              <SessionHistory
-                onCreateNew={() => setStep('create')}
-                onSelectSession={handleSelectSession}
-              />
-            </div>
-            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">查經主持流程</summary>            <section className="space-y-4 py-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-primary">今晚主持台</p>
-                  <h3 className="mt-1 text-xl font-bold text-foreground">從開場到 AI 成果，一頁往前走</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    先建立查經，接著邀請與分組，最後在主持台看進度與整理成果。
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setStep('create')}
-                  className="h-11 gap-2 self-stretch sm:self-auto"
-                  data-testid="button-dashboard-primary-create"
-                >
-                  <Plus className="h-4 w-4" />
-                  立即開場
-                </Button>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {dashboardHostCards.map((card, index) => {
-                  const Icon = card.icon;
-                  return (
-                    <button
-                      key={card.step}
-                      type="button"
-                      onClick={() => {
-                        if (card.step === 'create' || currentSession) {
-                          setStep(card.step);
-                          return;
-                        }
-                        toast.info('先選擇今日 SoulGym', {
-                          description: '下方選擇一場活動後，就能進入等候室或主持台。',
-                        });
-                      }}
-                      className={`rounded-lg border p-4 text-left transition-colors hover:bg-muted ${card.tone}`}
-                      data-testid={`button-host-card-${card.step}`}
-                    >
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-background/80">
-                          <Icon className={`h-5 w-5 ${card.iconTone}`} />
-                        </div>
-                        <span className="rounded-full bg-background/80 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                          {index + 1}
-                        </span>
-                      </div>
-                      <h4 className="text-sm font-semibold text-foreground">{card.title}</h4>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-</details>
-            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">平台營運與發展</summary><div className="space-y-5 py-4"><ProductGrowthPanel /><PlatformMaturityPanel /></div></details>
-          </div>
-        );
-      case 'history':
-        return (
-          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            <HistoryBrowser />
+            <details className="border-t pt-3"><summary className="cursor-pointer py-3 font-medium">平台營運與發展</summary><div className="space-y-5 py-4"><PlatformMaturityPanel /></div></details>
           </div>
         );
       case 'cards':
@@ -360,24 +167,6 @@ export const AdminPage: React.FC = () => {
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
             <AdminInbox onBack={handleBackToDashboard} />
-          </div>
-        );
-      case 'create':
-        return (
-          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            <CreateSession onCreated={() => setStep('waiting')} />
-          </div>
-        );
-      case 'waiting':
-        return (
-          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            <AdminWaitingRoom onGroupingComplete={() => setStep('monitor')} />
-          </div>
-        );
-      case 'monitor':
-        return (
-          <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            <AdminMonitor />
           </div>
         );
       default:
@@ -464,38 +253,6 @@ export const AdminPage: React.FC = () => {
 
 
       <main className="container mx-auto max-w-7xl">
-        {/* Progress indicator - only show during session flow */}
-        {(step === 'create' || step === 'waiting' || step === 'monitor') && (
-          <div className="px-3 sm:px-4 py-4 sm:py-6">
-            <div className="mx-auto max-w-3xl rounded-2xl border bg-card/80 p-3 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-primary">一頁式主持台</p>
-                  <p className="text-xs text-muted-foreground">照著目前階段操作即可</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-            {hostFlowSteps.map(({ step: s, label, hint }, index) => (
-              <React.Fragment key={s}>
-                <div
-                  className={`rounded-xl px-2 py-2 text-center transition-all ${
-                    step === s
-                      ? 'gradient-coral text-white shadow-lg'
-                      : hostFlowSteps.findIndex(item => item.step === step) > index
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground'
-                  }`}
-                >
-                  <p className="text-xs font-bold sm:text-sm">{index + 1}. {label}</p>
-                  <p className="mt-0.5 hidden text-[11px] opacity-80 sm:block">{hint}</p>
-                </div>
-              </React.Fragment>
-            ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         <Suspense fallback={<AdminSectionLoader />}>
           {renderStep()}
         </Suspense>

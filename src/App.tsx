@@ -4,8 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { createBrowserRouter, RouterProvider, Routes, Route } from "react-router-dom";
-import { SessionProvider } from "@/contexts/SessionContext";
+import { createBrowserRouter, RouterProvider, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -42,15 +41,11 @@ function lazyNamed<T extends Record<string, ComponentType<any>>>(
 const Index = lazyPage(() => import("./pages/Index"));
 const BibleQuizPage = lazyNamed(() => import("./pages/BibleQuizPage"), "BibleQuizPage");
 const DiscipleQuizPage = lazyNamed(() => import("./pages/DiscipleQuizPage"), "DiscipleQuizPage");
-const WeLiveLandingPage = lazyNamed(() => import("./pages/WeLiveLandingPage"), "WeLiveLandingPage");
-const UserPage = lazyNamed(() => import("./pages/UserPage"), "UserPage");
-const SoulGymNotebookPage = lazyNamed(() => import("./pages/SoulGymNotebookPage"), "SoulGymNotebookPage");
 const AdminPage = lazyNamed(() => import("./pages/AdminPage"), "AdminPage");
 const CRMPage = lazyPage(() => import("./pages/CRMPage"));
 const ChurchDevotionAdminPage = lazyPage(() => import('./pages/ChurchDevotionAdminPage'));
 const LifeGroupsPage = lazyPage(() => import('./pages/LifeGroupsPage'));
 const PastoralPersonPage = lazyPage(() => import("./pages/PastoralPersonPage"));
-const NotebookPage = lazyPage(() => import("./pages/NotebookPage"));
 const MePage = lazyPage(() => import("./pages/MePage"));
 const MyActivityPage = lazyPage(() => import('./pages/MyActivityPage'));
 const MySharingPage = lazyPage(() => import('./pages/MySharingPage'));
@@ -100,16 +95,16 @@ const router = createBrowserRouter([{ path: '*', element: (
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<Index />} />
-                    <Route path="/user" element={<WeLiveLandingPage />} />
-                    <Route path="/user/study" element={<UserPage />} />
-                    <Route path="/user/notebook" element={<SoulGymNotebookPage />} />
+                    <Route path="/user" element={<Navigate to="/" replace />} />
+                    <Route path="/user/study" element={<Navigate to="/" replace />} />
+                    <Route path="/user/notebook" element={<Navigate to="/learn/my-notes" replace />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/admin/crm" element={<CRMPage />} />
                     <Route path="/admin/church-devotions" element={<ChurchDevotionAdminPage />} />
                     <Route path="/groups" element={<LifeGroupsPage />} />
                     <Route path="/groups/:groupId" element={<LifeGroupsPage />} />
                     <Route path="/admin/crm/person/:personId" element={<PastoralPersonPage />} />
-                    <Route path="/notebook" element={<NotebookPage />} />
+                    <Route path="/notebook" element={<Navigate to="/learn/my-notes" replace />} />
                     <Route path="/me" element={<MePage />} />
                     <Route path="/me/activity" element={<MyActivityPage />} />
                     <Route path="/me/sharing" element={<MySharingPage />} />
@@ -155,13 +150,11 @@ const router = createBrowserRouter([{ path: '*', element: (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <SessionProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <RouterProvider router={router} />
-        </TooltipProvider>
-      </SessionProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <RouterProvider router={router} />
+      </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

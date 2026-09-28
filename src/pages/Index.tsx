@@ -254,13 +254,6 @@ const Index = () => {
   });
 
   useEffect(() => {
-    const sessionId = searchParams.get('session');
-    if (sessionId) {
-      navigate(`/user/study?session=${sessionId}`);
-    }
-  }, [searchParams, navigate]);
-
-  useEffect(() => {
     localStorage.setItem(HOME_SECTION_STATE_KEY, JSON.stringify(openSections));
   }, [openSections]);
 
@@ -465,12 +458,12 @@ const Index = () => {
     ...(canCreateSession ? [{
       id: 'host-module',
       title: '主持與管理',
-      subtitle: '主持 SoulGym、管理禱告會、查看歷史資料與成員',
+      subtitle: '管理靈修課表、會員與教會工具',
       href: '/admin',
       icon: Settings,
       tone: 'border-border/70 bg-card/95 hover:border-slate-300',
       iconTone: 'bg-slate-500/10 text-slate-700',
-      featureKeys: ['we_live'],
+      featureKeys: [],
     }] : []),
   ];
   const todayLabel = new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', weekday: 'short' });
@@ -662,7 +655,7 @@ const Index = () => {
             careUnavailable={!!user && careError}
             care={featuredCareContact}
             showTools={!featuresLoading && isFeatureEnabled('we_play')}
-            showAdmin={!featuresLoading && canCreateSession && isFeatureEnabled('we_live')}
+            showAdmin={!featuresLoading && canCreateSession}
           />
         ) : (
         <div className="mx-auto max-w-6xl space-y-5">
