@@ -1,4 +1,26 @@
-# WeChurch Together: Current Design Recipe
+# WeChurch Handshake: Current Design Recipe
+
+## Handshake A Approved 2026-09-28
+
+Sai selected the upright handclasp forming the center of a W, with no cross or
+religious totem. Approved light palette: indigo `#293C65`, canvas `#F7F8FC`,
+Scripture ivory `#FFF9EF`, ink `#202B40`, ochre `#93631F`. Dark mode adapts the
+same semantic roles for readable contrast. This section supersedes historical
+Together logo and evergreen/coral color descriptions below.
+
+Assets: `public/wechurch-handshake.png` (transparent raster mark) and
+`public/wechurch-handshake-app.png` (square app icon). Old assets remain for
+rollback. Shared header, favicon, Apple touch icon, web manifest and reading
+notification all use the new identity. The raster mark is not claimed to be an
+SVG master. Dark headers display a white mark.
+
+Homepage scope is layout-safe: compact date/title, one ivory Scripture surface,
+a full-width primary reading action, separate note actions, open personal prayer
+and care sections, then the existing community links. Do not replace real data
+with mockup text, remove drafts/statuses or change requests, routing or privacy.
+Keep the single sticky top navigation and all existing entry points.
+See `design/handshake-a-home-2026-09-28.md` for acceptance and release evidence.
+
 
 ## Prayer Life Updated 2026-09-28
 
@@ -20,8 +42,8 @@ handover and transfer controls, not access to private journals. Keep Together's
 44px controls, 8px item corners and semantic light/dark tokens. See
 `design/families-2026-09-28.md` for authorization and migration boundaries.
 
-## Approved 2026-09-13
-The three standing people mark is the approved identity. Runtime asset:
+## Historical identity approved 2026-09-13 (superseded by Handshake A)
+The three standing people mark was the previous identity. Historical asset:
 `public/wechurch-together.png`, displayed through `WeChurchLogo`.
 Primary navigation: Today, Bible, Prayer, Sharing Walls, Groups.
 Keep one sticky mobile header, Back / Home / Menu; no bottom navigation.

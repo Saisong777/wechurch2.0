@@ -10,7 +10,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   localStorage.clear();
   document.documentElement.className = '';
-  document.head.innerHTML = '<meta name="theme-color" content="#F8FAF9" />';
+  document.head.innerHTML = '<meta name="theme-color" content="#F7F8FC" />';
   systemDark = false;
   listeners.clear();
   vi.stubGlobal('matchMedia', () => ({
@@ -36,7 +36,7 @@ it('defaults to light and remembers an explicit dark choice across remounts', ()
   expect(document.documentElement).toHaveClass('dark');
   select('明亮');
   expect(document.documentElement).toHaveClass('light');
-  expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute('content', '#F8FAF9');
+  expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute('content', '#F7F8FC');
 });
 
 it('only follows device changes when system is selected', () => {

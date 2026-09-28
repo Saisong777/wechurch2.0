@@ -9,5 +9,5 @@
   var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.add(dark ? 'dark' : 'light');
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#151819' : '#F8FAF9');
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#151819' : '#F7F8FC');
 })();

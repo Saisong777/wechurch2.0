@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Gamepad2, HandHeart, Heart, LockKeyhole, PenLine, Plus, Settings, Users } from 'lucide-react';
+import { ArrowRight, BookOpen, Gamepad2, HandHeart, Heart, LockKeyhole, PenLine, Plus, Settings, Users, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -23,7 +23,7 @@ export interface DailyHomeProps {
   showAdmin: boolean;
 }
 
-const quietLink = 'inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const quietLink = 'home-link inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 export function DailyHome({
   date, scripture, readingState = 'ready', note, notesLoading, onOpenNote, signedIn,
@@ -33,30 +33,32 @@ export function DailyHome({
   const hasDraft = note?.syncStatus === 'pending' || note?.syncStatus === 'blocked';
 
   return (
-    <div className="mx-auto max-w-3xl pb-6 [overflow-wrap:anywhere]" data-testid="daily-home">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-5 text-sm text-muted-foreground">
-        <p>愛神・愛人・門徒生活</p>
-        <p>{date}</p>
+    <div className="daily-home mx-auto max-w-3xl pb-6 [overflow-wrap:anywhere]" data-testid="daily-home">
+      <div className="home-intro">
+        <p className="home-date">{date}</p>
+        <h1>今天，一起與主同行</h1>
+        <p className="home-tagline">愛神・愛人・門徒生活</p>
       </div>
-      <div className="mb-4 flex flex-wrap gap-x-6"><Link to="/groups" className={quietLink}><Users className="h-4 w-4" />我的小家<ArrowRight className="h-4 w-4" /></Link><Link to="/walls" className={quietLink}>分享牆<ArrowRight className="h-4 w-4" /></Link>{signedIn && <Link to="/me/activity" className={quietLink}>待回應<ArrowRight className="h-4 w-4" /></Link>}</div>
 
-      <section aria-labelledby="daily-devotion-title" className="border-b border-border pb-6">
+      <section aria-labelledby="daily-devotion-title" className="home-scripture">
         <h2 id="daily-devotion-title" className="flex items-center gap-2 text-xl font-semibold">
           <BookOpen aria-hidden="true" className="h-5 w-5 shrink-0 text-primary" />
           今日靈修
         </h2>
         {readingState !== 'ready' ? <div className="mt-3 space-y-2"><p role="status" className="text-sm text-muted-foreground">{readingState === 'loading' ? '正在載入教會課表…' : readingState === 'error' ? '暫時無法載入教會課表' : '今天的靈修尚未發佈'}</p><Link to={scripture.href} className={quietLink}>查看每日靈修<ArrowRight className="h-4 w-4" /></Link></div> : <>
-        <p className="mt-3 text-sm font-medium text-primary">{scripture.reference}</p>
-        <p className="mt-2 max-w-2xl whitespace-pre-line text-base leading-7 text-foreground" data-testid="daily-scripture-preview">
+        <p className="home-scripture-reference">{scripture.reference}</p>
+        <p className="home-scripture-caption">經文節錄</p>
+        <p className="home-scripture-preview mt-2 max-w-2xl whitespace-pre-line text-base leading-7 text-foreground" data-testid="daily-scripture-preview">
           {scripture.preview}
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-          <Button asChild className="min-h-11 gap-2 rounded-md" data-testid="start-daily-devotion">
+        <div className="home-reading-actions">
+          <Button asChild className="home-start gap-2 rounded-lg" data-testid="start-daily-devotion">
             <Link to={scripture.href}>
               {note ? '繼續今日靈修' : '開始今日靈修'}
               <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
             </Link>
           </Button>
+          <div className="home-note-actions">
           {notesLoading ? <Skeleton className="h-5 w-24" aria-label="載入筆記狀態" /> : (
             <button type="button" onClick={onOpenNote} className={quietLink}>
               <PenLine aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -64,12 +66,13 @@ export function DailyHome({
             </button>
           )}
           <Link to="/learn/my-notes" className={quietLink}>回看筆記</Link>
+          </div>
         </div>
-        {hasDraft && <p role="status" className="mt-2 text-sm text-amber-800">此裝置草稿，尚未同步</p>}
+        {hasDraft && <p role="status" className="mt-2 text-sm text-secondary">此裝置草稿，尚未同步</p>}
         </>}
       </section>
 
-      <section aria-labelledby="daily-prayer-title" className="border-b border-border py-6">
+      <section aria-labelledby="daily-prayer-title" className="home-personal-section border-b border-border py-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h2 id="daily-prayer-title" className="flex items-center gap-2 text-xl font-semibold">
             <Heart aria-hidden="true" className="h-5 w-5 shrink-0 text-secondary" />
@@ -83,7 +86,10 @@ export function DailyHome({
           <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />僅自己可見
         </p>
         {!signedIn ? (
-          <Link to="/login" className={`${quietLink} mt-2`}>登入查看我的禱告<ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+          <div className="mt-3">
+            <p className="text-sm text-muted-foreground">登入，接續你的禱告與恩典記錄。</p>
+            <Link to="/login" className={`${quietLink} mt-1`}>登入查看我的禱告<ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+          </div>
         ) : prayersError ? (
           <div role="alert" className="mt-3 flex flex-wrap items-center gap-x-4">
             <p className="text-sm text-muted-foreground">暫時無法載入禱告</p>
@@ -104,7 +110,7 @@ export function DailyHome({
         </div>
       </section>
 
-      <section aria-labelledby="daily-care-title" className="border-b border-border py-6">
+      <section aria-labelledby="daily-care-title" className="home-personal-section border-b border-border py-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h2 id="daily-care-title" className="flex items-center gap-2 text-xl font-semibold">
             <HandHeart aria-hidden="true" className="h-5 w-5 shrink-0 text-primary" />
@@ -124,6 +130,15 @@ export function DailyHome({
           </div>
         ) : <p className="mt-2 text-sm text-muted-foreground">{signedIn ? '還沒有待關心的對象。' : '登入查看你的關懷清單。'}</p>}
       </section>
+
+      <nav className="home-community" aria-label="與大家同行">
+        <h2 className="flex items-center gap-2 text-xl font-semibold"><Users aria-hidden="true" className="h-5 w-5 text-primary" />與大家同行</h2>
+        <div className="home-community-links">
+          <Link to="/groups"><Users aria-hidden="true" /><span>我的小家</span><ArrowRight aria-hidden="true" /></Link>
+          <Link to="/walls"><MessageCircle aria-hidden="true" /><span>分享牆</span><ArrowRight aria-hidden="true" /></Link>
+        </div>
+        {signedIn && <Link to="/me/activity" className={quietLink}>待回應<ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>}
+      </nav>
 
       {(showTools || showAdmin) && (
         <nav aria-label="其他入口" className="flex flex-wrap items-center gap-x-6 pt-3">

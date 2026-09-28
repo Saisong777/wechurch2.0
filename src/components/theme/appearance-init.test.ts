@@ -23,7 +23,7 @@ it.each([
   const result = run(saved as string | null, dark as boolean);
   expect(result.classes).toEqual([expected]);
   expect(result.style.colorScheme).toBe(expected);
-  expect(result.color).toBe(expected === 'dark' ? '#151819' : '#F8FAF9');
+  expect(result.color).toBe(expected === 'dark' ? '#151819' : '#F7F8FC');
   if (saved === 'invalid') expect(result.cleared).toBe(true);
 });
 it('does not block initial rendering when local storage throws', () => {

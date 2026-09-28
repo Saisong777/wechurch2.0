@@ -16,45 +16,45 @@
 
   :root {
     /* WeChurch - calm, durable product palette */
-    --background: 150 24% 98%;
-    --foreground: 170 8% 16%;
-    --brand-indigo: 213 52% 25%;
-    --brand-sky: 211 65% 45%;
-    --scripture-surface: 41 56% 96%;
-    --scripture-border: 38 36% 85%;
+    --background: 228.00 45.45% 97.84%;
+    --foreground: 219.38 33.33% 18.82%;
+    --brand-indigo: 221.00 42.25% 27.84%;
+    --brand-sky: 216.15 39.80% 38.43%;
+    --scripture-surface: 37.50 100.00% 96.86%;
+    --scripture-border: 37.71 44.30% 84.51%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 170 8% 16%;
+    --card: 0.00 0.00% 100.00%;
+    --card-foreground: 219.38 33.33% 18.82%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 170 8% 16%;
+    --popover: 0.00 0.00% 100.00%;
+    --popover-foreground: 219.38 33.33% 18.82%;
 
-    /* Together: evergreen actions, coral accents, neutral reading surfaces. */
-    --primary: 171 68% 24%;
+    /* Handshake A: indigo actions, restrained ochre accents, warm Scripture. */
+    --primary: 221.00 42.25% 27.84%;
     --primary-foreground: 0 0% 100%;
 
-    /* Clay - prayer and present action */
-    --secondary: 11 57% 40%;
+    /* Accessible ochre - prayer and supporting actions */
+    --secondary: 35.17 65.17% 34.90%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 155 18% 93%;
-    --muted-foreground: 170 6% 39%;
+    --muted: 216.00 35.71% 94.51%;
+    --muted-foreground: 217.71 16.59% 41.37%;
 
-    --accent: 171 48% 29%;
+    --accent: 218.82 39.08% 34.12%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 65% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 160 14% 86%;
-    --input: 160 14% 86%;
-    --ring: 171 68% 24%;
+    --border: 218.18 20.75% 89.61%;
+    --input: 217.89 21.35% 82.55%;
+    --ring: 221.00 42.25% 27.84%;
 
     --radius: 0.5rem;
 
     /* Custom tokens - WeChurch style */
-    --sky-gradient: linear-gradient(135deg, hsl(171, 58%, 28%) 0%, hsl(171, 68%, 20%) 100%);
-    --coral-gradient: linear-gradient(135deg, hsl(11, 57%, 42%) 0%, hsl(11, 57%, 35%) 100%);
+    --sky-gradient: linear-gradient(#293C65, #293C65);
+    --coral-gradient: linear-gradient(#93631F, #93631F);
     --warm-gradient: linear-gradient(135deg, hsl(39, 80%, 57%) 0%, hsl(18, 82%, 54%) 100%);
     --sunset-gradient: linear-gradient(135deg, hsl(204, 72%, 42%) 0%, hsl(18, 82%, 54%) 100%);
     --card-shadow: 0 14px 40px -28px hsla(214, 36%, 24%, 0.28);
@@ -62,48 +62,48 @@
     --glow-sky: 0 0 0 4px hsla(204, 72%, 38%, 0.1);
     --glow-coral: 0 0 0 4px hsla(18, 82%, 54%, 0.1);
 
-    --sidebar-background: 170 12% 16%;
+    --sidebar-background: 219.38 33.33% 18.82%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 171 68% 24%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 170 12% 25%;
+    --sidebar-primary: 220.68 58.42% 80.20%;
+    --sidebar-primary-foreground: 219 33% 19%;
+    --sidebar-accent: 218.57 32.31% 25.49%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 215 20% 28%;
     --sidebar-ring: 205 85% 50%;
   }
 
   .dark {
-    --background: 195 9% 9%;
-    --foreground: 160 10% 95%;
-    --brand-indigo: 204 58% 76%;
-    --brand-sky: 204 70% 74%;
-    --scripture-surface: 170 8% 13%;
-    --scripture-border: 170 8% 29%;
+    --background: 195.00 8.70% 9.02%;
+    --foreground: 222.00 41.67% 95.29%;
+    --brand-indigo: 220.75 67.09% 84.51%;
+    --brand-sky: 216.19 64.95% 80.98%;
+    --scripture-surface: 221.54 16.88% 15.10%;
+    --scripture-border: 225.88 10.97% 30.39%;
 
-    --card: 180 6% 13%;
-    --card-foreground: 160 10% 95%;
+    --card: 218.82 21.52% 15.49%;
+    --card-foreground: 222.00 41.67% 95.29%;
 
-    --popover: 180 6% 16%;
-    --popover-foreground: 160 10% 95%;
+    --popover: 217.14 22.58% 18.24%;
+    --popover-foreground: 222.00 41.67% 95.29%;
 
-    --primary: 165 45% 68%;
-    --primary-foreground: 170 18% 12%;
+    --primary: 220.75 67.09% 84.51%;
+    --primary-foreground: 219.38 33.33% 18.82%;
 
-    --secondary: 14 66% 70%;
-    --secondary-foreground: 170 18% 12%;
+    --secondary: 37.98 69.43% 69.22%;
+    --secondary-foreground: 219.38 33.33% 18.82%;
 
-    --muted: 180 5% 20%;
-    --muted-foreground: 165 7% 72%;
+    --muted: 218.18 20.75% 20.78%;
+    --muted-foreground: 217.24 24.79% 77.06%;
 
-    --accent: 171 48% 29%;
+    --accent: 218.82 39.08% 34.12%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 78% 73%;
     --destructive-foreground: 0 0% 9%;
 
-    --border: 175 7% 29%;
-    --input: 175 7% 34%;
-    --ring: 165 45% 68%;
+    --border: 218.00 17.44% 33.73%;
+    --input: 217.71 16.59% 41.37%;
+    --ring: 220.75 67.09% 84.51%;
   }
 }
 
@@ -1253,4 +1253,39 @@
   .dark :where(.bg-gray-100, .bg-gray-50) { @apply bg-gray-400/10; }
   .dark :where(.text-gray-500, .text-gray-600, .text-gray-700, .text-gray-900) { @apply text-gray-300; }
   .dark :where(.border-gray-200) { @apply border-gray-400/30; }
+}
+
+/* Approved 2026-09-28: Handshake A homepage. Scoped structure, shared semantic colors. */
+@layer components {
+  .wechurch-handshake-logo { object-fit: contain; }
+  .dark .wechurch-handshake-logo { filter: brightness(0) invert(1); }
+  .daily-home .home-intro { padding: 4px 0 24px; }
+  .daily-home .home-date { color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1.5; }
+  .daily-home .home-intro h1 { margin: 10px 0 8px; color: hsl(var(--primary)); font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: clamp(1.625rem, 5.8vw, 2.125rem); line-height: 1.4; letter-spacing: 0; }
+  .daily-home .home-tagline { color: hsl(var(--muted-foreground)); font-size: 15px; line-height: 1.6; }
+  .daily-home .home-scripture { padding: 20px; border: 1px solid hsl(var(--scripture-border)); border-radius: 8px; background: hsl(var(--scripture-surface)); }
+  .daily-home .home-scripture h2 { color: hsl(var(--primary)); font-size: 18px; }
+  .daily-home .home-scripture-reference { margin-top: 12px; font-family: 'Noto Serif TC', 'Songti TC', serif; font-weight: 700; font-size: clamp(1.375rem, 5.4vw, 1.75rem); line-height: 1.4; }
+  .daily-home .home-scripture-caption { margin-top: 8px; color: hsl(var(--muted-foreground)); font-size: 13px; }
+  .daily-home .home-scripture-preview { font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: 18px; line-height: 1.8; }
+  .daily-home .home-reading-actions { display: grid; gap: 12px; margin-top: 20px; }
+  .daily-home .home-start { position: relative; display: flex; min-height: 48px; width: 100%; font-size: 16px; padding: 12px 40px; justify-content: center; }
+  .daily-home .home-start svg { position: absolute; right: 16px; }
+  .daily-home .home-note-actions { display: flex; flex-wrap: wrap; column-gap: 28px; justify-content: center; border-top: 1px solid hsl(var(--scripture-border)); padding-top: 8px; }
+  .daily-home .home-link { color: hsl(var(--primary)); font-size: 15px; line-height: 1.5; }
+  .daily-home .home-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .daily-home .home-link:active, .daily-home .home-community-links a:active { background: hsl(var(--muted)); }
+  .daily-home .home-personal-section { padding: 28px 0; }
+  .daily-home .home-community { padding: 24px 0 16px; }
+  .daily-home .home-community-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .daily-home .home-community-links a { display: flex; min-height: 60px; align-items: center; gap: 8px; padding: 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); color: hsl(var(--primary)); font-weight: 600; font-size: 16px; }
+  .daily-home .home-community-links a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+  .daily-home .home-community-links svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .daily-home .home-community-links svg:last-child { width: 16px; margin-left: auto; }
+  @media (max-width: 359px) {
+    .daily-home .home-scripture { padding: 16px; }
+    .daily-home .home-community-links { gap: 8px; }
+    .daily-home .home-community-links a { gap: 6px; padding: 10px 8px; font-size: 15px; }
+    .daily-home .home-community-links svg:first-child { width: 18px; }
+  }
 }

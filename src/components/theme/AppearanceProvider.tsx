@@ -5,7 +5,7 @@ function BrowserThemeColor() {
   const { resolvedTheme } = useTheme();
   useEffect(() => {
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
-      'content', resolvedTheme === 'dark' ? '#151819' : '#F8FAF9',
+      'content', resolvedTheme === 'dark' ? '#151819' : '#F7F8FC',
     );
   }, [resolvedTheme]);
   return null;
