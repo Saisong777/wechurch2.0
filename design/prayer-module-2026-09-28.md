@@ -49,4 +49,20 @@ anonymous interactions, closing and private reopening. B browser acceptance uses
 only a synthetic test identity and removes its fixtures afterwards. Desktop and
 mobile viewport tests do not replace physical iPhone acceptance.
 
-Release identifiers and actual results are recorded after B verification.
+## B Release Evidence
+
+- Source: `95914b1e8e1bd3801a687fce2737cf29d0fdcedd`.
+- Railway B: `4113ec50-033f-4022-92e0-929733509a52`, SUCCESS.
+- Runtime fingerprint: `82f0bdbb3a32ab6f2b3429e91cf0b72b6f83ae6245bb55db7a295a988f002c8d`, 556 files.
+- 108 test files / 623 tests, 33 deployment/recovery tests, typecheck, build and
+  disposable database HTTP checks passed. Lint: zero errors, 359 warnings across
+  the repository; this release does not claim to resolve all lint warnings.
+- B live OAuth boundary checks passed (not a fresh real-user Google consent).
+- B 390px and 1440px: inline edit, progress save, anonymous family/public sharing,
+  urgent mark, comment, public closure, preserved history, dark appearance and
+  horizontal overflow checks passed. Ten screenshots were captured with a
+  disposable member identity; the fixture and all its prayer copies were removed.
+- A remains `a8a4db29-527f-4cc3-8d17-caed230f69cb`. No schema change or member-data
+  rewrite. Physical iPhone acceptance is still pending for this prayer update.
+- GitHub-safe restore tag: `b-2026-09-28-4113ec50`; encrypted data backups remain
+  separate and are not included in the source manifest.

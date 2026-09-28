@@ -35,8 +35,10 @@ try {
     if(me.status()!==200||(await me.json()).legacyUserId!==${JSON.stringify(id)}) throw Error('Fixture identity mismatch');
     const checks=[];
     async function screenshot(name) {
+      await page.locator('[data-sonner-toast]').last().waitFor({state:'hidden',timeout:10000});
+      await page.evaluate(()=>window.scrollTo(0,0));
       if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)) throw Error('Horizontal overflow: '+name);
-      await page.screenshot({path:output+'/'+name+'.png',fullPage:true});
+      await page.screenshot({path:output+'/'+name+'.png',fullPage:true,animations:'disabled'});
     }
     for(const width of [390,1440]) {
       await page.setViewportSize({width,height:844});
@@ -78,7 +80,7 @@ try {
       await wall.getByRole('button',{name:/鼓勵與禱告/}).click();
       await wall.getByRole('textbox',{name:'回應內容'}).fill('一起守望');
       await wall.getByRole('button',{name:'送出回應'}).click();
-      await wall.getByText('一起守望',{exact:true}).waitFor();
+      await wall.locator('article').getByText('一起守望',{exact:true}).waitFor();
       await screenshot(width+'-wall');
       const copies=await (await page.context().request.get(origin+'/api/life-groups/'+group+'/shares?kind=prayer')).json();
       if(!copies.some(copy=>copy.body===shared&&copy.anonymous)) throw Error('Family prayer share missing');

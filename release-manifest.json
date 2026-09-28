@@ -1,5 +1,5 @@
 {
-  "fingerprint": "c5930de303ea489f5816fe74c992992607ef00b1298de3452bb2faaceeb6ced7",
+  "fingerprint": "82f0bdbb3a32ab6f2b3429e91cf0b72b6f83ae6245bb55db7a295a988f002c8d",
   "files": [
     {
       "file": "Dockerfile",
@@ -402,16 +402,20 @@
       "sha256": "1636f419cec7e11cf05ac2690eed28bcd4d6b286c78dd064b4f0f608b7bd72db"
     },
     {
+      "file": "src/components/prayer/PersonalPrayerEntry.tsx",
+      "sha256": "e340804424a676f22e69896e0e22cf54d81bc22816baff3982e1e7a2fe670062"
+    },
+    {
       "file": "src/components/prayer/PersonalPrayerSharing.test.tsx",
-      "sha256": "45c0602875643ae07be38299086421a00d9dadc768e29c7131c4c63c4ce3b647"
+      "sha256": "d17c537dc59c7716d8f27eadeaaec2cf88bb83662976e3eb86fabbca60a7e1ca"
     },
     {
       "file": "src/components/prayer/PersonalPrayerSharing.tsx",
-      "sha256": "4835ac09d90be61a69301254643582ad520e439d122e20e1480eb45584cd506d"
+      "sha256": "fd6ca3f33cee7fbde3d190ff77053772f389b15cee8506eb76ae4cd2380990c8"
     },
     {
       "file": "src/components/prayer/PrayerCard.tsx",
-      "sha256": "57d6e7f6140f916c6816f3771b0774bc3f7e35ee315e3ab1a636abb1471b8f8c"
+      "sha256": "3a248fb9f8c06ad91db090ed24a06913e54d659ed9333f05d7acaf653db13c32"
     },
     {
       "file": "src/components/prayer/PrayerComments.test.tsx",
@@ -419,11 +423,11 @@
     },
     {
       "file": "src/components/prayer/PrayerComments.tsx",
-      "sha256": "ac5c6d81db7c89ee0a4bbdf2fb9b9734c00c37caac17c492e5bf262f0ddaaab3"
+      "sha256": "7e899def25990de3240e9c7207a557aaf5f5e5d393e0a50d49d6431fb85282a6"
     },
     {
       "file": "src/components/prayer/PrayerWall.tsx",
-      "sha256": "5a61d120cc2a4ea0189fd67047c4e2431e511e9564e7b9dc811cd580a5893462"
+      "sha256": "d42c7e9586d267b7a0970d09a4e7923c28f2a29c89a579520a4c444da48f5d96"
     },
     {
       "file": "src/components/prayer/PublicWallTabs.tsx",
@@ -827,7 +831,7 @@
     },
     {
       "file": "src/hooks/usePersonalPrayers.ts",
-      "sha256": "5e9124bf2ec675fedbbf19ca79538e734f48dee07457afdcd734fb2d94a642d2"
+      "sha256": "b78c08ff285d87a9ed486b4beeaba340f3f56e5e4ab31bab0e6ef0a3192288e4"
     },
     {
       "file": "src/hooks/usePrayerComments.ts",
@@ -835,7 +839,7 @@
     },
     {
       "file": "src/hooks/usePrayerWall.ts",
-      "sha256": "ca7cafc7bb5e98eedd619623d317ae468285a8bee4226e05e4ff56ea042fc04f"
+      "sha256": "94efb06e7a79b1ccdb8a2b3b223355d2f9b5ec866ffb9a593f72ec39c21a0789"
     },
     {
       "file": "src/hooks/useReadingReminder.ts",
@@ -1095,11 +1099,11 @@
     },
     {
       "file": "src/pages/GraceRecordPage.test.tsx",
-      "sha256": "0b29488299ac8eb74f7312e54c2944b6989106a8d390875156d64d77985fccb0"
+      "sha256": "5732cb1dc169bed6a5f00a5ff3086cd075fd30261f999f53929b68702ad7b4c4"
     },
     {
       "file": "src/pages/GraceRecordPage.tsx",
-      "sha256": "e18c718bbd7af9fcc3705dbcc91cdf3ed0e93cf580745a1b6d41c43c4b6a80ae"
+      "sha256": "fc855fbb300740f1f97fed91ba0ac9c73f5480c531accf1441ae1d30b5f84a45"
     },
     {
       "file": "src/pages/GrouperPage.tsx",
@@ -1571,15 +1575,15 @@
     },
     {
       "file": "server/personalPrayer.test.ts",
-      "sha256": "3ea5b89324ed10cc15fb9b491ddf9f6822ee3af725ff1fea65e4a2a79654ddb5"
+      "sha256": "eba197e9ceb1655c1d597fc10ebc5a36d05991d6b016bacd0d73860257717e14"
     },
     {
       "file": "server/personalPrayerRepository.ts",
-      "sha256": "332284c2f44030031b32aeab91fa0f1ae03e56ef952f884ab0df4e980d63dfb3"
+      "sha256": "f7c75c9ffd461cedf158cbbb42191066ba13039916798649992bc3e534847747"
     },
     {
       "file": "server/personalPrayerRoutes.ts",
-      "sha256": "42735c1755a03b8cf33c76c6e1a6c5658615db99f8337d39e0faf1ed8cb8861d"
+      "sha256": "685e967c30da1f904abbbb1c86b956d8006cdc05430774b6b599401793092ff9"
     },
     {
       "file": "server/prayerInteraction.test.ts",
@@ -1595,7 +1599,7 @@
     },
     {
       "file": "server/prayerSharingRepository.ts",
-      "sha256": "2e91ede29ff7abf1bb97cc1e512e567aa56fea52b1b338bc91fb7a95cb6ab50c"
+      "sha256": "e17e2018ef18b9631390f1a7e483026a7e98d342ab8b31e9b9a793c8cf0cf318"
     },
     {
       "file": "server/prayerSharingRoutes.ts",
@@ -1795,7 +1799,7 @@
     },
     {
       "file": "shared/personalPrayer.ts",
-      "sha256": "2e8c23a38e95273c94c16c58e3c4c4f5c3a4e2042146a64aff1ede96ab5529f2"
+      "sha256": "324cba1ce594c8627411e1ff49850a6ede5281030bc277d9ae5232c847fe4d91"
     },
     {
       "file": "shared/prayerInteraction.ts",
@@ -1803,7 +1807,7 @@
     },
     {
       "file": "shared/prayerSharing.ts",
-      "sha256": "2cbb485ffd7df0bfaaa37659e51df46384b544c65d544fd9acbb2bdf5efc4b59"
+      "sha256": "039d2b0e6bbe34bb726b8878105ffe998ea669c776f6d1b2b33def22645626e6"
     },
     {
       "file": "shared/releaseFlags.ts",
@@ -2155,7 +2159,7 @@
     },
     {
       "file": "scripts/verify-integrity-worker.ts",
-      "sha256": "3cfe31c98da070355c941eb8e6997935929e1e174960e0dfa6581993bf9eab4c"
+      "sha256": "f59c8aed99005b459a6d2dbf065100e25921c6b2c4f397fd885f6162c7a6dcc6"
     },
     {
       "file": "scripts/verify-integrity.mjs",
@@ -2180,6 +2184,10 @@
     {
       "file": "scripts/verify-navigation-flows.mjs",
       "sha256": "cf423b3fafda140c61878d545e022f316418a7556fdfaac4e7727395741a6858"
+    },
+    {
+      "file": "scripts/verify-personal-prayer-http.ts",
+      "sha256": "84c6d9f837a3dbd6b1e78d2aaaacc332f9e53b2252c2383abfd3a5f930b8483a"
     },
     {
       "file": "scripts/verify-security-browser.ts",
