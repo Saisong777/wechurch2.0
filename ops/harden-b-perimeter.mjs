@@ -43,7 +43,7 @@ export function assertRecovery(directory, now = Date.now()) {
 }
 
 export async function main(command = 'inspect', directory) {
-  assert(['inspect', 'close-database', 'apply-edge-rules'].includes(command), 'Only explicit B perimeter operations are supported');
+  assert(['inspect', 'close-database', 'apply-edge-rules', 'close-retired-domain'].includes(command), 'Only explicit B perimeter operations are supported');
   const before = inspectStaging();
   const ids = { e: target.environment, db: target.database, app: target.app };
   const state = await query(`query($e:String!,$db:String!,$app:String!){
@@ -58,6 +58,20 @@ export async function main(command = 'inspect', directory) {
     if (vars.DATABASE_URL) assert(new URL(vars.DATABASE_URL).hostname.endsWith('.railway.internal'), 'A B service still depends on public database access');
   }
   assert.equal(stagingSql('SELECT 1'), '1', 'Encrypted maintenance must work before removing the public proxy');
+  if (command === 'close-retired-domain') {
+    const retired = 'cf36df49-a0f4-4224-80f2-4d0e4d1c1194';
+    const domainQuery = 'query($e:String!,$s:String!){serviceInstance(environmentId:$e,serviceId:$s){domains{serviceDomains{id domain} customDomains{id domain}}}}';
+    const result = await query(domainQuery, { e: target.environment, s: retired });
+    assert.equal(result.serviceInstance.domains.customDomains.length, 0);
+    for (const domain of result.serviceInstance.domains.serviceDomains) {
+      assert.equal(domain.domain, 'wechurch-staging-retired-20260926.up.railway.app', 'Do not remove an unexpected domain');
+      assert.equal((await query('mutation($id:String!){serviceDomainDelete(id:$id)}', { id: domain.id })).serviceDomainDelete, true);
+    }
+    const after = await query(domainQuery, { e: target.environment, s: retired });
+    assert.equal(after.serviceInstance.domains.serviceDomains.length, 0);
+    const current = await query(domainQuery, { e: target.environment, s: target.app });
+    assert(current.serviceInstance.domains.serviceDomains.some(domain => `https://${domain.domain}` === target.origin));
+  }
   if (command === 'close-database') {
     assertRecovery(directory);
     for (const proxy of state.tcpProxies) {
