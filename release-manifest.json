@@ -1,5 +1,5 @@
 {
-  "fingerprint": "f3eee279e07d8b7ad679610ba3de82e4f69842ccfd7634916a020930069598b9",
+  "fingerprint": "c5930de303ea489f5816fe74c992992607ef00b1298de3452bb2faaceeb6ced7",
   "files": [
     {
       "file": "Dockerfile",
@@ -79,7 +79,7 @@
     },
     {
       "file": "src/components/admin/AdminMailComposer.tsx",
-      "sha256": "18a8494ff6577f747350fb97e77b9cd2b716113c21ae12f398c21f8f813a5196"
+      "sha256": "f7108b16a8e5e97131305e990656a86f678be3b21e07cb287b9853d9aa2a106d"
     },
     {
       "file": "src/components/admin/AdminMonitor.tsx",
@@ -195,7 +195,7 @@
     },
     {
       "file": "src/components/admin/UnifiedMemberTable.tsx",
-      "sha256": "449c1e749f125d569808928635111b1ad6f5cef26ae2b1f6d74b8fa336fcab85"
+      "sha256": "ac2ef1b01a37fc5d378ac1bd32b9c29294d42026476eed7117db8289804afd10"
     },
     {
       "file": "src/components/admin/report-elements/ActionItemList.tsx",
@@ -267,15 +267,15 @@
     },
     {
       "file": "src/components/groups/FamilyJoinPanel.test.tsx",
-      "sha256": "ba90470945d431dc3f94a29630c5cea66dc1294845b8e6481af64ae2369ef51b"
+      "sha256": "487ee0eba96554983536ef486837b8a41871dbab7d4982ce0a09e65b53082b72"
     },
     {
       "file": "src/components/groups/FamilyJoinPanel.tsx",
-      "sha256": "c5e297ebaa1f818b6df57fe5e243ecb6695673ba752af891b7c530c8a1107c3b"
+      "sha256": "a54a557294e304ce6ce26ffc18a249d674b2057db86a523a664c750369245473"
     },
     {
       "file": "src/components/groups/FamilyManagement.tsx",
-      "sha256": "459a0836d92af269be21bb349d393841d285f2d41ac663f63f952bb35a0f888f"
+      "sha256": "2aefa89bc4b632512f39ea1b966264fff9dd27aab68700bb285d269ddb9b26e0"
     },
     {
       "file": "src/components/home/DailyHome.test.tsx",
@@ -743,11 +743,11 @@
     },
     {
       "file": "src/components/user/ProfileSettingsDialog.test.tsx",
-      "sha256": "de83e419edb8e6f362bbf90e7d4f1319646cb5ec35ca76e79241d4c5c31a7a45"
+      "sha256": "63a614766566bc218ac27f16cca7202acad5c9435580bd3aef214071f1ff9215"
     },
     {
       "file": "src/components/user/ProfileSettingsDialog.tsx",
-      "sha256": "abf64082b80a434522b64990027d00539140aa9694a7b4df628653ffff81c69c"
+      "sha256": "2c06b7a5ce80e19cfa7477bb6debe7d2997f994d23e081f728a8e117e5b566d9"
     },
     {
       "file": "src/components/user/QRCodeScanner.tsx",
@@ -1051,7 +1051,7 @@
     },
     {
       "file": "src/pages/CRMPage.tsx",
-      "sha256": "2d95ae9edb7f82f6e95375268f431d9bba1aefecd578d892f589f9dfdf3af5e6"
+      "sha256": "bbb1842a50ac6b9df22a0b0d9615c99dd8ac4d40a6a00419e8d45db0bcfe464b"
     },
     {
       "file": "src/pages/CarePage.test.tsx",
@@ -1363,7 +1363,7 @@
     },
     {
       "file": "server/churches.ts",
-      "sha256": "bbe5ac2d5af6e48fdd387a168be53fbfeb50ff56ce90a9a65bc11e03f58d920c"
+      "sha256": "f7c9e38aae9091a941c6781a5b30b94dc051aae9e845acc0ac31682fbfd6eb26"
     },
     {
       "file": "server/contentSecurityPolicy.test.ts",
@@ -1451,7 +1451,7 @@
     },
     {
       "file": "server/familyRepository.ts",
-      "sha256": "2ed3a0b3b2f6c22d2b3e90141805c0ee7e62d5c0527cabdaccc8a5d3ec90662f"
+      "sha256": "2ff1e909ecd13f1e30ddbf632844561727c760c3b2210a8774f90f987dd1fd09"
     },
     {
       "file": "server/generated/loveJourneyTemplate.generated.ts",
@@ -1663,7 +1663,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "6dbfde8b673e104362cb0594219edd767c1c83844c0a233fe9ce110f1947bef1"
+      "sha256": "df6ae989dc4d404d2b2f0e5552f5154461ebb4c1419d9494a4fc945a3ac065be"
     },
     {
       "file": "server/securityPolicies.test.ts",
@@ -1756,6 +1756,14 @@
     {
       "file": "shared/churchDevotion.ts",
       "sha256": "5111ac73724c5222949a0e1683f0726cc1b31f12b75723c5d3c32cef4a146787"
+    },
+    {
+      "file": "shared/churches.test.ts",
+      "sha256": "5b61e69eb4c36e90011f1239288eca726e1b7059aa4bf31142cabd63709cc729"
+    },
+    {
+      "file": "shared/churches.ts",
+      "sha256": "8011a7491e2c86d99387738bbfef65e94e22032d77c9f5f61401f64a72ac1470"
     },
     {
       "file": "shared/devotionGovernance.test.ts",
@@ -2131,7 +2139,7 @@
     },
     {
       "file": "scripts/verify-family-http.ts",
-      "sha256": "899c85bfdb4d936d31bd5f3bd918c132f97d3a7fa53ea7330a1528227325cd6a"
+      "sha256": "81a8d7f33003f786867b8eb51c8761a1220f4e71e0253c7908cdda9d0f518852"
     },
     {
       "file": "scripts/verify-google-identity.ts",

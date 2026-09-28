@@ -23,3 +23,14 @@ records or private content are deleted, and no bulk membership assignment occurs
 Verification includes catalog/alias and profile UI tests, real HTTP directory and
 management-option checks, existing cross-church authorization tests, and B browser
 readback. A is not authorized for this release.
+
+## Acceptance
+
+- 108 test files / 617 tests; 33 deployment/backup tests; typecheck, isolated
+  PostgreSQL HTTP checks and production build passed.
+- B deployment b9638923-cfda-49f9-82c8-a3637e520503 succeeded, source c6b9a26,
+  554-file fingerprint c5930de303ea489f5816fe74c992992607ef00b1298de3452bb2faaceeb6ced7.
+- Live B acceptance at 390px and 1440px: entry/feed/management, sole church label
+  and automatic selection, five authenticated API reads, message/invite/matching
+  persistence passed; disposable fixture removed. Physical-phone testing is not
+  claimed. Production A remained unchanged.
