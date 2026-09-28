@@ -16,10 +16,10 @@ beforeEach(()=>{fail=false;posts=[];rows=[];localStorage.clear();vi.stubGlobal('
   return {ok:true,json:async()=>rows};
 }));});
 afterEach(()=>{cleanup();clients.forEach(c=>c.clear());clients.length=0;vi.unstubAllGlobals();});
-function show(){const client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});clients.push(client);render(<QueryClientProvider client={client}><PrayerComments prayerId="prayer" anonymousOwner count={2} /></QueryClientProvider>);}
-async function expand(){fireEvent.click(screen.getByRole('button',{name:'鼓勵與禱告 · 2'}));await screen.findByRole('textbox',{name:'回應內容'});}
+function show(readOnly=false){const client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});clients.push(client);render(<QueryClientProvider client={client}><PrayerComments prayerId="prayer" anonymousOwner count={2} readOnly={readOnly} /></QueryClientProvider>);}
+async function expand(){fireEvent.click(screen.getByRole('button',{name:'寫下鼓勵 · 2'}));await screen.findByRole('textbox',{name:'回應內容'});}
 it('does not fetch every collapsed conversation',()=>{
-  show();expect(fetch).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'鼓勵與禱告 · 2'})).toBeTruthy();
+  show();expect(fetch).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'寫下鼓勵 · 2'})).toBeTruthy();
 });
 it('keeps failed text without local success and reuses the receipt key when retrying',async()=>{
   show();await expand();fail=true;
@@ -33,12 +33,37 @@ it('keeps failed text without local success and reuses the receipt key when retr
 });
 it('sends the chosen sticker as structured content and preserves anonymous author display',async()=>{
   show();await expand();expect(screen.getByText('以匿名發文者回應')).toBeTruthy();
-  fireEvent.change(screen.getByRole('combobox',{name:'回應類型'}),{target:{value:'sticker'}});
+  fireEvent.change(screen.getByRole('textbox',{name:'回應內容'}),{target:{value:'送貼圖後仍保留的文字'}});
+  fireEvent.click(screen.getByRole('radio',{name:'貼圖'}));
   fireEvent.click(screen.getByRole('radio',{name:'願你平安'}));fireEvent.click(screen.getByRole('button',{name:'送出回應'}));
   await screen.findByText('匿名發文者');expect(posts[0]).toMatchObject({kind:'sticker',sticker:'peace',content:''});expect(posts[0].userId).toBeUndefined();
+  await waitFor(()=>expect(screen.getByRole('radio',{name:'鼓勵'})).not.toBeDisabled());
+  fireEvent.click(screen.getByRole('radio',{name:'鼓勵'}));
+  expect(screen.getByRole('textbox',{name:'回應內容'})).toHaveValue('送貼圖後仍保留的文字');
 });
 it('supports longer prayer words and keeps text rendering literal',async()=>{
-  show();await expand();fireEvent.change(screen.getByRole('combobox',{name:'回應類型'}),{target:{value:'scripture'}});
+  show();await expand();fireEvent.click(screen.getByRole('radio',{name:'經文'}));
   fireEvent.change(screen.getByRole('textbox',{name:'回應內容'}),{target:{value:'<script>literal words</script>'}});fireEvent.click(screen.getByRole('button',{name:'送出回應'}));
   await screen.findByText('<script>literal words</script>');expect(document.querySelector('script')).toBeNull();expect(posts[0].kind).toBe('scripture');
+});
+it('preserves a draft when switching response kinds or collapsing and does not send on selection',async()=>{
+  show();await expand();
+  fireEvent.change(screen.getByRole('textbox',{name:'回應內容'}),{target:{value:'尚未送出的鼓勵'}});
+  fireEvent.click(screen.getByRole('radio',{name:'貼圖'}));
+  fireEvent.click(screen.getByRole('radio',{name:'與你同行'}));
+  expect(posts).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button',{name:'收起回應 · 2'}));
+  fireEvent.click(screen.getByRole('button',{name:'寫下鼓勵 · 2'}));
+  expect(screen.getByRole('radio',{name:'與你同行'})).toBeChecked();
+  fireEvent.click(screen.getByRole('radio',{name:'禱告'}));
+  expect(screen.getByRole('textbox',{name:'回應內容'})).toHaveValue('尚未送出的鼓勵');
+  fireEvent.click(screen.getByRole('button',{name:'送出回應'}));
+  await waitFor(()=>expect(posts).toHaveLength(1));
+  expect(posts[0]).toMatchObject({kind:'prayer',content:'尚未送出的鼓勵'});
+});
+it('retains read-only history without a composer on completed prayers',async()=>{
+  show(true);fireEvent.click(screen.getByRole('button',{name:'查看回應 · 2'}));
+  await screen.findByText('還沒有回應');
+  expect(screen.queryByRole('textbox')).toBeNull();
+  expect(screen.queryByRole('button',{name:'送出回應'})).toBeNull();
 });

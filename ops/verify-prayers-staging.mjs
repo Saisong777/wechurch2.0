@@ -77,11 +77,46 @@ try {
       await wall.getByText('緊急代禱',{exact:true}).waitFor();
       await wall.getByText('匿名',{exact:true}).waitFor();
       if((await wall.innerText()).includes('私人')) throw Error('Private text leaked');
-      await wall.getByRole('button',{name:/鼓勵與禱告/}).click();
+      if(await page.getByRole('menuitem').count()) throw Error('Management should be collapsed');
+      await wall.getByRole('button',{name:'管理禱告'}).click();
+      await page.getByRole('menuitem',{name:'刪除',exact:true}).click();
+      await page.getByRole('alertdialog').getByRole('button',{name:'取消'}).click();
+      await page.getByRole('alertdialog').waitFor({state:'hidden'});
+      if(!await wall.getByRole('button',{name:'管理禱告'}).evaluate(el=>el===document.activeElement)) throw Error('Delete cancel lost keyboard focus');
+      await wall.getByRole('button',{name:/^為你禱告/}).click();
+      await wall.getByRole('button',{name:/已為你禱告/}).waitFor();
+      await wall.getByRole('button',{name:/寫下鼓勵/}).click();
       await wall.getByRole('textbox',{name:'回應內容'}).fill('一起守望');
+      await wall.getByRole('radio',{name:'貼圖',exact:true}).check();
+      await wall.getByRole('radio',{name:'願你平安',exact:true}).check();
+      if(await wall.locator('article').count()) throw Error('Sticker selection posted without submit');
+      const stickerRows=await wall.getByRole('radiogroup',{name:'禱告貼圖'}).locator('label').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().top));
+      if(Math.max(...stickerRows)-Math.min(...stickerRows)>1) throw Error('Stickers must fit on one row');
+      await screenshot(width+'-sticker-composer');
+      if(width===390){
+        await page.setViewportSize({width:320,height:844});
+        await screenshot('320-sticker-composer');
+        await page.setViewportSize({width,height:844});
+      }
+      await wall.getByRole('button',{name:/收起回應/}).click();
+      await wall.getByRole('button',{name:/寫下鼓勵/}).click();
+      await wall.getByRole('radio',{name:'禱告',exact:true}).check();
+      await wall.getByRole('radio',{name:'經文',exact:true}).check();
+      await wall.getByRole('radio',{name:'鼓勵',exact:true}).check();
+      if(await wall.getByRole('textbox',{name:'回應內容'}).inputValue()!=='一起守望') throw Error('Switching mode lost draft');
       await wall.getByRole('button',{name:'送出回應'}).click();
       await wall.locator('article').getByText('一起守望',{exact:true}).waitFor();
+      await wall.getByRole('radio',{name:'貼圖',exact:true}).check();
+      await wall.getByRole('button',{name:'送出回應'}).click();
+      await wall.locator('article').getByText('願你平安',{exact:true}).waitFor();
       await screenshot(width+'-wall');
+      await page.evaluate(()=>localStorage.setItem('wechurch-theme','dark'));
+      await page.reload();
+      await page.getByRole('searchbox',{name:'搜尋禱告牆'}).fill(shared);
+      await wall.getByRole('button',{name:/寫下鼓勵/}).click();
+      await wall.getByRole('radio',{name:'貼圖',exact:true}).check();
+      await screenshot(width+'-dark-sticker-composer');
+      await page.evaluate(()=>localStorage.setItem('wechurch-theme','light'));
       const copies=await (await page.context().request.get(origin+'/api/life-groups/'+group+'/shares?kind=prayer')).json();
       if(!copies.some(copy=>copy.body===shared&&copy.anonymous)) throw Error('Family prayer share missing');
       await page.goto(origin+'/grace-record');
@@ -108,7 +143,7 @@ try {
       if(feed.some(p=>p.content.includes(title))) throw Error('Completed prayer still public');
       const mine=await (await page.context().request.get(origin+'/api/prayers?view=my')).json();
       const finished=mine.find(p=>p.content.includes(title));
-      if(!finished?.isAnswered||finished.commentCount!==1) throw Error('Closed record lost');
+      if(!finished?.isAnswered||finished.commentCount!==2) throw Error('Closed record lost');
       await page.goto(origin+'/grace-record?view=grace');
       await page.locator('main').getByRole('heading',{name:'恩典記錄簿',exact:true}).waitFor();
       await page.getByRole('button',{name:'記下恩典',exact:true}).click();
@@ -144,12 +179,12 @@ try {
       await page.goto(origin+'/');
       await page.locator('main').getByRole('link',{name:'恩典記錄簿',exact:true}).click();
       await page.locator('main').getByRole('heading',{name:'恩典記錄簿',exact:true}).waitFor();
-      checks.push({width,inline:true,progress:true,anonymousFamily:true,urgentPublic:true,comment:true,close:true,history:true,dark:true,graceBook:true,privateDatedStory:true,graceEditPersisted:true,graceFilters:true,homeEntry:true});
+      checks.push({width,inline:true,progress:true,anonymousFamily:true,urgentPublic:true,comment:true,close:true,history:true,dark:true,graceBook:true,privateDatedStory:true,graceEditPersisted:true,graceFilters:true,homeEntry:true,managementCollapsed:true,deleteCancelFocus:true,prayed:true,stickerSingleRow:true,explicitSubmit:true,draftPreserved:true,responseModes:true,darkComposer:true});
     }
     return {checks,fixtureSession:true,googleOAuthTested:false,physicalPhoneTested:false};
   }`;
   let raw;
-  try { raw = execFileSync(cli, ['-s=prayers-b', 'run-code', script], { cwd: root, encoding: 'utf8', timeout: 240000, maxBuffer: 4 * 1024 * 1024 }); }
+  try { raw = execFileSync(cli, ['-s=prayers-b', 'run-code', script], { cwd: root, encoding: 'utf8', timeout: 360000, maxBuffer: 4 * 1024 * 1024 }); }
   catch (error) {
     const text = String(error.stdout || '') + String(error.stderr || '');
     const diagnostic = text.split('### Error\n')[1]?.split('\n###')[0]?.slice(0, 1000);

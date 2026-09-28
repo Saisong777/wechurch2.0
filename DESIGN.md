@@ -410,8 +410,11 @@ Shared text stays separate from private notes. See `design/daily-public-walls-20
 
 - Urgency is a checkbox and badge, with active urgent prayers sorted first.
 - Reactions use Lucide icons, accessible pressed state, counts, and undo.
-- Expanded conversations are unframed, with a compact response-type menu,
-  multiline input, and three fixed-size icon stickers. Preserve failed drafts.
+- Expanded conversations are unframed, with visible response-mode segments,
+  multiline input, and three compact stickers on one row. Preserve failed drafts.
+- Owner management stays in the card's overflow menu; destructive actions require
+  confirmation. Composer appears before reply history, with a full-width submit.
+- See `design/prayer-response-ux-2026-09-28.md` for the mobile response redesign.
 - Anonymous authors stay anonymous in replies; collapsed posts fetch only counts.
 - Verified 320x568, 390x844, and 1280x900. See
   `design/prayer-wall-interactions-2026-09-11.md` for evidence and limits.
