@@ -10,7 +10,19 @@ vi.mock('@/components/layout/Header', () => ({ Header: () => null }));
 vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/components/scripture/DevotionalNoteDialog', () => ({ DevotionalNoteDialog: () => null }));
 vi.mock('@/components/scripture/DevotionWallShareDialog', () => ({ DevotionWallShareDialog: () => null }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+it('shows a recoverable error rather than claiming the reader has no notes', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 503 })));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(['/api/im-reading-history', 'reader'], []);
+  render(<QueryClientProvider client={client}><MemoryRouter><MyNotesPage /></MemoryRouter></QueryClientProvider>);
+  expect(await screen.findByRole('alert', { name: '筆記載入狀態' })).toHaveTextContent('暫時無法取得最新筆記');
+  expect(screen.queryByText('尚無經文感動')).toBeNull();
+  expect(screen.getByRole('button', { name: '重新載入筆記' })).toBeEnabled();
+  expect(screen.getByTestId('button-export-notes')).toHaveTextContent('匯出目前可用筆記');
+  client.clear();
+});
 
 it('starts with daily notes and filters display without losing the source notes', () => {
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });

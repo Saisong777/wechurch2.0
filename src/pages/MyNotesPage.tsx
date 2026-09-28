@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,9 @@ import { DevotionWallShareDialog } from '@/components/scripture/DevotionWallShar
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { mergeLocalDevotionalNotes, removeLocalDevotionalNote } from '@/lib/localDevotionalNotes';
+import { removeLocalDevotionalNote } from '@/lib/localDevotionalNotes';
+import { useDevotionalNotes } from '@/hooks/useDevotionalNotes';
+import { NotesLoadNotice } from '@/components/scripture/NotesLoadNotice';
 import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Target, MessageCircle, BookOpen, EyeOff, Download } from 'lucide-react';
 import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { createDevotionShareDraft } from '@/lib/devotionShareDraft';
@@ -350,19 +352,7 @@ const MyNotesPage = () => {
     }
   }, [user, loading, navigate]);
 
-  const { data: devotionalNotes, isLoading: notesLoading } = useQuery<DevotionalNote[]>({
-    queryKey: ['/api/devotional-notes', user?.id],
-    queryFn: async () => {
-      try {
-        const res = await fetch('/api/devotional-notes', { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch devotional notes');
-        return mergeLocalDevotionalNotes((await res.json()) as DevotionalNote[], user?.id || '');
-      } catch {
-        return mergeLocalDevotionalNotes<DevotionalNote>([], user?.id || '', true);
-      }
-    },
-    enabled: !!user,
-  });
+  const { data: devotionalNotes, isLoading: notesLoading, isError: notesError, isFetching: notesFetching, refetch: retryNotes } = useDevotionalNotes<DevotionalNote>(user?.id);
 
   const [search, setSearch] = useState('');
   const matchesSearch = (content: string) => content.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
@@ -427,6 +417,7 @@ const MyNotesPage = () => {
       filename = `經文感動_${today}.md`;
     }
 
+    if (notesError) content = '> 此次僅匯出目前可用的筆記，尚未取得完整的最新資料。\n\n' + content;
     downloadMarkdown(content, filename);
     toast({ title: '筆記已匯出' });
   };
@@ -458,9 +449,10 @@ const MyNotesPage = () => {
           <div className="max-w-2xl md:max-w-3xl mx-auto">
             <section className="mb-5 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div><h1 className="text-2xl font-semibold">我的筆記</h1><p className="mt-1 text-sm text-muted-foreground">私人筆記 · {totalNotes} 則紀錄</p></div>
+                <div><h1 className="text-2xl font-semibold">我的筆記</h1><p className="mt-1 text-sm text-muted-foreground">私人筆記 · {notesLoading ? '載入中' : notesError ? `目前可用 ${totalNotes} 則` : `${totalNotes} 則紀錄`}</p></div>
                 <Button asChild><Link to="/learn/church-reading"><BookOpen className="h-4 w-4" />今日靈修</Link></Button>
               </div>
+              {notesError && <NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} />}
               <Input aria-label="搜尋筆記" type="search" placeholder="搜尋經文、心得或行動" value={search} onChange={e => setSearch(e.target.value)} />
               <details className="border-b pb-3">
                 <summary className="cursor-pointer py-2 text-sm text-muted-foreground">筆記回顧與下一步</summary>
@@ -491,7 +483,7 @@ const MyNotesPage = () => {
                   data-testid="button-export-notes"
                 >
                   <Download className="w-4 h-4 mr-1" />
-                  匯出
+                  {notesError ? '匯出目前可用筆記' : '匯出'}
                 </Button>
               </div>
 
@@ -503,7 +495,7 @@ const MyNotesPage = () => {
                       <div key={i} className="h-24 w-full rounded-md bg-muted animate-pulse" />
                     ))}
                   </div>
-                ) : readingPlanNotes.length === 0 ? (
+                ) : notesError && readingPlanNotes.length === 0 ? null : readingPlanNotes.length === 0 ? (
                   <Card className="text-center py-12">
                     <CardContent>
                       <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -534,7 +526,7 @@ const MyNotesPage = () => {
                       <div key={i} className="h-24 w-full rounded-md bg-muted animate-pulse" />
                     ))}
                   </div>
-                ) : devotionalOnlyNotes.length === 0 ? (
+                ) : notesError && devotionalOnlyNotes.length === 0 ? null : devotionalOnlyNotes.length === 0 ? (
                   <Card className="text-center py-12">
                     <CardContent>
                       <BookMarked className="w-12 h-12 mx-auto text-muted-foreground mb-4" />

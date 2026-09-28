@@ -38,6 +38,7 @@ export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
+  const isSystemAdmin = role === 'admin';
   const [step, setStep] = useState<AdminStep>('auth');
   const [recordsOpen, setRecordsOpen] = useState(false);
 
@@ -47,7 +48,7 @@ export const AdminPage: React.FC = () => {
       const res = await apiRequest('GET', '/api/admin/inbox/unread-count');
       return res.json();
     },
-    enabled: step === 'dashboard' && !!user,
+    enabled: step === 'dashboard' && !!user && isSystemAdmin,
     refetchInterval: 60000,
   });
 
@@ -108,12 +109,16 @@ export const AdminPage: React.FC = () => {
               {([
                 ...(isAdmin ? [{ icon: BookOpen, label: '每日靈修課表', desc: '課表、短文與發佈', action: () => navigate('/admin/church-devotions'), testId: 'button-church-devotions' }] : []),
                 { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
-                { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
-                { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
+                ...(isSystemAdmin ? [
+                  { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
+                  { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
+                ] : []),
                 { icon: Crown, label: '公共禱告牆', desc: '查看與分享代禱', action: () => navigate('/prayer-wall'), testId: 'button-prayer-meeting-admin' },
                 { icon: Sparkles, label: '真心話題庫', desc: '管理破冰遊戲題目', action: () => setStep('cards'), testId: 'button-cards' },
-                { icon: Image, label: '信息卡片', desc: '上傳管理信息卡片', action: () => setStep('message-cards'), testId: 'button-message-cards' },
-                { icon: ToggleLeft, label: '功能開關', desc: '啟用或停用系統功能', action: () => setStep('feature-toggles'), testId: 'button-feature-toggles' },
+                ...(isSystemAdmin ? [
+                  { icon: Image, label: '信息卡片', desc: '上傳管理信息卡片', action: () => setStep('message-cards'), testId: 'button-message-cards' },
+                  { icon: ToggleLeft, label: '功能開關', desc: '啟用或停用系統功能', action: () => setStep('feature-toggles'), testId: 'button-feature-toggles' },
+                ] : []),
               ] as Array<{ icon: any; label: string; desc: string; action: () => void; testId: string; badge?: number }>).map(({ icon: Icon, label, desc, action, testId, badge }) => (
                 <button
                   key={testId}
@@ -137,7 +142,7 @@ export const AdminPage: React.FC = () => {
               ))}
               </div>
             </div>
-            {isAdmin && <details className="border-t pt-3" onToggle={event => setRecordsOpen(event.currentTarget.open)}><summary className="cursor-pointer py-3 font-medium">系統紀錄</summary>{recordsOpen && <div className="space-y-5 py-4"><PlatformMaturityPanel /></div>}</details>}
+            {isSystemAdmin && <details className="border-t pt-3" onToggle={event => setRecordsOpen(event.currentTarget.open)}><summary className="cursor-pointer py-3 font-medium">系統紀錄</summary>{recordsOpen && <div className="space-y-5 py-4"><PlatformMaturityPanel /></div>}</details>}
           </div>
         );
       case 'cards':

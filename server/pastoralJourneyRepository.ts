@@ -646,12 +646,16 @@ export async function getPastoralPersons(
   const conditions: string[] = ['p.merged_into_person_id IS NULL'];
   appendChurchCondition(conditions, params, "p.church", churchScope);
   appendPastoralAccessCondition(conditions, params, "p", options.access);
+  // Project and search email through the same per-person personal-data scope.
+  const personalConditions: string[] = [];
+  appendPastoralAccessCondition(personalConditions, params, "p", options.access?.personalAccess || { accessLevel: 'none' });
+  const visibleEmail = `CASE WHEN ${personalConditions.join(' AND ') || 'true'} THEN p.primary_email ELSE NULL END`;
   const search = options.search?.trim();
   if (search) {
     params.push(`%${search}%`);
     conditions.push(`(
       p.display_name ILIKE $${params.length}
-      OR p.primary_email ILIKE $${params.length}
+      OR (${visibleEmail}) ILIKE $${params.length}
       OR p.church ILIKE $${params.length}
       OR p.pastoral_stage ILIKE $${params.length}
     )`);
@@ -721,7 +725,7 @@ export async function getPastoralPersons(
       SELECT
         p.id,
         p.display_name AS "displayName",
-        p.primary_email AS "primaryEmail",
+        ${visibleEmail} AS "primaryEmail",
         p.church,
         p.pastoral_stage AS "pastoralStage",
         p.pastoral_status AS "pastoralStatus",
@@ -1291,7 +1295,7 @@ export async function getPastoralPersonDetail(
   const tasks = options.self ? [] : await listPastoralTasks(personId, churchScope, options.access);
 
   return {
-    person: { ...person, notes: canViewPersonal && !options.self ? person.notes : null },
+    person: { ...person, primaryEmail: canViewPersonal || options.self ? person.primaryEmail : null, notes: canViewPersonal && !options.self ? person.notes : null },
     links:options.self?links.filter(link=>link.userId===options.access?.userId):links,
     loveJourney: journey ? {
       ...journey,

@@ -23,7 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { LineAccountLink } from '@/components/user/LineAccountLink';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { mergeLocalDevotionalNotes, type LocalDevotionalNote } from '@/lib/localDevotionalNotes';
+import { useDevotionalNotes } from '@/hooks/useDevotionalNotes';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from 'sonner';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
@@ -94,19 +94,7 @@ const MePage = () => {
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [emailPreview, setEmailPreview] = useState<{ subject: string; text: string } | null>(null);
   const queryClient = useQueryClient();
-  const { data: devotionalNotes = [] } = useQuery<LocalDevotionalNote[]>({
-    queryKey: ['/api/devotional-notes', user?.id],
-    queryFn: async () => {
-      try {
-        const res = await fetch('/api/devotional-notes', { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch devotional notes');
-        return mergeLocalDevotionalNotes((await res.json()) as LocalDevotionalNote[], user?.id || '');
-      } catch {
-        return mergeLocalDevotionalNotes<LocalDevotionalNote>([], user?.id || '', true);
-      }
-    },
-    enabled: !!user,
-  });
+  const { data: devotionalNotes, isError: notesError } = useDevotionalNotes(user?.id);
   const { data: emailPreferences, isLoading: emailPreferencesLoading } = useQuery<EmailPreferences>({
     queryKey: ['/api/email-preferences'],
     queryFn: async () => {
@@ -217,7 +205,7 @@ const MePage = () => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="text-base font-bold text-foreground">{action.title}</h3>
-                        {action.id === 'devotional-notes' && devotionalNotes.length > 0 && <p className="mt-1 text-sm text-muted-foreground">{devotionalNotes.length} 則筆記</p>}
+                        {action.id === 'devotional-notes' && (notesError ? <p className="mt-1 text-sm text-muted-foreground">筆記尚未更新，點此重新載入</p> : devotionalNotes.length > 0 && <p className="mt-1 text-sm text-muted-foreground">{devotionalNotes.length} 則筆記</p>)}
                       </div>
                       <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-primary" />
                     </Link>

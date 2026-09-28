@@ -51,11 +51,12 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { churchScripturePreview, fetchChurchReadingForToday, getChurchReadingForToday } from '@/lib/churchReading';
 import {
   createLocalDevotionalNoteId,
-  mergeLocalDevotionalNotes,
 } from '@/lib/localDevotionalNotes';
 import { saveDevotionalNote, noteSaveMessage } from '@/lib/saveDevotionalNote';
 import { toast } from 'sonner';
 import { DailyHome } from '@/components/home/DailyHome';
+import { useDevotionalNotes } from '@/hooks/useDevotionalNotes';
+import { NotesLoadNotice } from '@/components/scripture/NotesLoadNotice';
 
 interface DevotionalNoteSummary {
   syncStatus?: 'pending' | 'blocked' | 'synced';
@@ -226,22 +227,7 @@ const Index = () => {
 
   const { data: homePrayers = [] } = usePrayerWall();
 
-  const { data: devotionalNotes = [], isLoading: devotionalNotesLoading } = useQuery<DevotionalNoteSummary[]>({
-    queryKey: ['/api/devotional-notes', user?.id],
-    queryFn: async () => {
-      try {
-        const res = await fetch('/api/devotional-notes', { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch devotional notes');
-        return mergeLocalDevotionalNotes((await res.json()) as DevotionalNoteSummary[], user?.id || '');
-      } catch {
-        return mergeLocalDevotionalNotes<DevotionalNoteSummary>([], user?.id || '', true);
-      }
-    },
-    enabled: !!user,
-    refetchOnWindowFocus: false,
-    retry: false,
-    staleTime: 60000,
-  });
+  const { data: devotionalNotes, isLoading: devotionalNotesLoading, isError: notesError, isFetching: notesFetching, refetch: retryNotes } = useDevotionalNotes<DevotionalNoteSummary>(user?.id);
 
   const fallbackChurchReading = useMemo(() => getChurchReadingForToday(), []);
   const { data: syncedChurchReading, isLoading: churchReadingLoading, isError: churchReadingError } = useQuery({
@@ -637,6 +623,7 @@ const Index = () => {
 
       <main className="dashboard-main mobile-readable container mx-auto px-4 py-4 sm:px-6 md:py-8">
         <VisitReminder />
+        {notesError && <div className="mx-auto max-w-3xl"><NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} /></div>}
         {!styleLabMode ? (
           <DailyHome
             date={todayLabel}

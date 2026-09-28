@@ -3499,7 +3499,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/message-card-downloads", requireLeader, async (req, res) => {
+  app.get("/api/message-card-downloads", requireAdmin, async (req, res) => {
     try {
       const downloads = await storage.getMessageCardDownloads();
       res.json(downloads);
@@ -3611,7 +3611,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/message-card-downloads/by-card/:cardId", requireLeader, async (req, res) => {
+  app.get("/api/message-card-downloads/by-card/:cardId", requireAdmin, async (req, res) => {
     try {
       const downloads = await storage.getMessageCardDownloadsByCardId(req.params.cardId);
       res.json(downloads);
@@ -3837,7 +3837,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Profile notification endpoint using Resend integration
-  app.post("/api/send-profile-notification", requireLeader, async (req, res) => {
+  app.post("/api/send-profile-notification", requireAdmin, async (req, res) => {
     try {
       const { email, name, type, redirectUrl } = req.body;
 
@@ -3886,7 +3886,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/admin/users-for-email", async (req, res) => {
+  app.get("/api/admin/users-for-email", requireAdmin, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -4090,7 +4090,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/admin/daily-follow-email/send", async (req, res) => {
+  app.post("/api/admin/daily-follow-email/send", requireAdmin, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -4119,8 +4119,8 @@ export async function registerRoutes(app: Express) {
         .where(eq(userEmailPreferences.dailyFollowEnabled, true));
       const enabledUserIds = new Set(enabledPreferences.map((preference) => preference.userId));
       const selectedUsers = allUsers
-        .filter((user) => user.email && (!userIds ? enabledUserIds.has(user.id) : userIds.includes(user.id)))
-        .slice(0, limit ?? allUsers.length);
+        .filter((user) => user.email && enabledUserIds.has(user.id) && (!userIds || userIds.includes(user.id)))
+        .slice(0, limit ?? 500);
 
       const { buildDailyFollowEmail, sendDailyFollowEmail } = await import("./dailyFollowEmail");
       const results = {
@@ -4128,7 +4128,7 @@ export async function registerRoutes(app: Express) {
         total: selectedUsers.length,
         sent: 0,
         failed: 0,
-        previews: [] as Array<{ userId: string; email: string; subject: string; context: any }>,
+        previews: [] as Array<{ userId: string; email: string; subject: string }>,
         errors: [] as string[],
       };
 
@@ -4136,11 +4136,11 @@ export async function registerRoutes(app: Express) {
         try {
           if (dryRun) {
             const email = await buildDailyFollowEmail(user);
-            results.previews.push({ userId: user.id, email: user.email, subject: email.subject, context: email.context });
+            results.previews.push({ userId: user.id, email: user.email, subject: email.subject });
           } else {
-            const context = await sendDailyFollowEmail(user);
+            await sendDailyFollowEmail(user);
             results.sent++;
-            results.previews.push({ userId: user.id, email: user.email, subject: "", context });
+            results.previews.push({ userId: user.id, email: user.email, subject: "" });
           }
         } catch (error: any) {
           results.failed++;
@@ -4204,7 +4204,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/send-bulk-email", async (req, res) => {
+  app.post("/api/send-bulk-email", requireAdmin, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -4308,7 +4308,8 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/admin/inbox", async (req, res) => {
+  // The shared mailbox has no per-recipient assignments; family roles cannot access it.
+  app.get("/api/admin/inbox", requireAdmin, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -4318,8 +4319,8 @@ export async function registerRoutes(app: Express) {
       }
 
       const archived = req.query.archived === 'true';
-      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
-      const offset = parseInt(req.query.offset as string) || 0;
+      const limit = Math.max(1, Math.min(parseInt(req.query.limit as string) || 50, 100));
+      const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
       const emails = await storage.getInboxEmails({ archived, limit, offset });
       res.json(emails);
@@ -4329,7 +4330,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/admin/inbox/unread-count", async (req, res) => {
+  app.get("/api/admin/inbox/unread-count", requireAdmin, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -4346,7 +4347,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/admin/inbox/:id/read", async (req, res) => {
+  app.patch("/api/admin/inbox/:id/read", requireAdmin, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -4368,7 +4369,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/admin/inbox/:id/archive", async (req, res) => {
+  app.patch("/api/admin/inbox/:id/archive", requireAdmin, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });

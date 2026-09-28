@@ -69,6 +69,8 @@ try {
   if (!role.rowCount) await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'leader')",[ids[0]]);
   const { verifyRetiredAiHttp } = await import('./verify-retired-ai-http');
   await verifyRetiredAiHttp(pool, a, b, guest, ids[0]);
+  const { verifyAuditBoundaries } = await import('./verify-audit-boundaries');
+  await verifyAuditBoundaries(pool, a, guest, ids[0], ids[1]);
   const empty=await guest('/api/church-reading/today?date=2026-09-13'); assert.equal(empty.status,200);
   const brief=await empty.json();assert.equal(brief.sourceStatus,'unpublished');assert.equal(brief.scriptureReference,'');
   const { verifySupportHttp }=await import('./verify-support-http');

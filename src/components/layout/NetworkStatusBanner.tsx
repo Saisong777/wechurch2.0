@@ -13,6 +13,7 @@ export const NetworkStatusBanner = () => {
     const handleOnline = () => {
       setIsOnline(true);
       setShowRestored(true);
+      if (restoreTimer) window.clearTimeout(restoreTimer);
       restoreTimer = window.setTimeout(() => setShowRestored(false), 3000);
     };
 
@@ -45,7 +46,7 @@ export const NetworkStatusBanner = () => {
       <div className="flex items-center justify-center gap-2">
         <Icon className={isOnline ? 'h-4 w-4 text-emerald-600' : 'h-4 w-4 text-destructive'} />
         <span>
-          {isOnline ? '網路已恢復，可以繼續使用' : '目前網路不穩，已暫停新的操作'}
+          {isOnline ? '網路已恢復，可以繼續使用' : '目前離線，部分功能暫時無法使用；請保留尚未送出的內容'}
         </span>
       </div>
     </div>

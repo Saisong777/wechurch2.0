@@ -1,6 +1,15 @@
 # WeChurch B 站可重建版本
 
-## 目前分支狀態：B 新譯本及異地還原已驗收
+## 現役工作與驗收
+
+現役 B 功能分支為 `codex/bible-study-integration`，不是固定不再變動的救援分支。
+固定還原點請使用 Git tag 與 `design/releases/` 的 exact sourceCommit；最新線上狀態需以 B 的版本指紋回讀確認，不能把下列歷史快照當作目前部署。
+
+- [全站審查、第一批修正與後續順序](design/product-audit-2026-09-29.md)
+- [AI 退役與系統紀錄](design/ai-retirement-2026-09-28.md)
+- [CI 改善稿](design/ci-proposal-2026-09-29.yml)已加入現役分支及 PostgreSQL 回歸，但目前 GitHub 憑證缺少 workflow scope，尚未啟用；本輪沿用 B 發布工具的完整本機檢查，不宣稱雲端 CI 通過。
+
+## 2026-09-26 歷史驗收：新譯本及異地還原
 
 2026-09-26 已將原 B 網址切至替代執行服務，保留原資料庫、檔案 volume、
 登入設定與會員內容。正常發布流程亦已驗證成功，A 未發布。
@@ -43,7 +52,7 @@ A 發布仍須另行授權。舊服務的底層異常未由 Railway 證實；
 ## A / B 工作規則
 
 1. `main` 只用於 A 正式站；`integration` 是 B 的整合分支；功能修改使用獨立分支。目前 B 仍採人工部署，尚未接上 GitHub 自動部署。
-2. 本分支是固定的救援基準，不是自動升級 A 的入口。不得直接合併 main。
+2. 本分支是現役 B 功能分支；固定救援基準使用已驗收標籤。不是自動升級 A 的入口，不得直接合併 main。
 3. 開始修改前已有 GitHub 基準；修改過程小步提交到功能分支，不能等 B 全部測完才保存。
 4. CI 通過後才部署 B。每次 B 發布記錄 commit、migration、部署 ID 與實際版本指紋。
 5. B 驗收與 Sai 明確確認後，才準備 A 發布。只發布程式與相容的 migration，絕不把 B DB 覆蓋 A。
@@ -51,7 +60,7 @@ A 發布仍須另行授權。舊服務的底層異常未由 Railway 證實；
 ## 從 GitHub 重建
 
 1. 取回本分支或固定 B 標籤，在新的目錄核對 `release-manifest.json`。
-2. 使用 Node 22、`npm ci`，執行 `npm run typecheck`、`npm test`、`npm run test:deployment`、`npm run build`。完整驗收另以一次性 PostgreSQL 17 跑 `npm run test:integrity`；目前 GitHub 沿用既有 CI，尚未加入這個資料庫測試。
+2. 使用 Node 22、`npm ci`，執行 `npm run typecheck`、`npm test`、`npm run test:deployment`、`npm run build`。完整驗收另以一次性 PostgreSQL 17 跑 `npm run test:integrity`；CI 擴充稿仍待 GitHub workflow 授權後啟用。
 3. 建立或選定 Railway 的 B 專用環境、B 資料庫及 B 上傳 volume；不可選 A。實際密碼從另行保管的位置取回，`.env.example` 只列範本。
 4. B 的環境需設定獨立 `SESSION_SECRET`、`DATABASE_URL`、`STAGING_ACCESS_CODE`、`APP_ENV=staging`、正確 B environment/database identity、`PUBLIC_BASE_URL`、`UPLOAD_ROOT=/data`，並禁止外部發送。
 5. 資料庫與上傳檔先在隔離位置還原、核對版本及引用，再切換 B。程式回退不會自動回復資料，不能直接把舊備份覆蓋正在新增的資料。

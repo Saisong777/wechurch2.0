@@ -8,8 +8,8 @@ import MyNotesPage from './MyNotesPage';
 import { AdminPage } from './AdminPage';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'test-member', email: 'test@example.invalid' }, loading: false, signOut: vi.fn() }) }));
-const roleState = vi.hoisted(() => ({ isAdmin: true }));
-vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => ({ role: roleState.isAdmin ? 'admin' : 'pastor', isAdmin: roleState.isAdmin, canCreateSession: true, loading: false }) }));
+const roleState = vi.hoisted(() => ({ role: 'admin' }));
+vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => ({ role: roleState.role, isAdmin: ['admin', 'senior_pastor'].includes(roleState.role), canCreateSession: true, loading: false }) }));
 vi.mock('@/hooks/useUserProfile', () => ({ useUserProfile: () => ({ profile: null }) }));
 vi.mock('@/hooks/useFeatureToggles', () => ({ useFeatureToggles: () => ({ isFeatureEnabled: () => true, loading: false }) }));
 vi.mock('@/components/layout/Header', () => ({ Header: () => null }));
@@ -27,7 +27,7 @@ function mount(element: React.ReactNode) {
   render(<QueryClientProvider client={client}><MemoryRouter>{element}</MemoryRouter></QueryClientProvider>);
   return fetcher;
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); roleState.isAdmin = true; });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); roleState.role = 'admin'; });
 
 it('removes deferred destinations even when every database feature toggle is enabled', () => {
   mount(<MePage />);
@@ -67,9 +67,12 @@ it('loads system records only when an administrator opens the disclosure', async
   await waitFor(() => expect(screen.queryByText('系統紀錄內容')).toBeNull());
 });
 
-it('does not offer administrator telemetry to pastoral roles', async () => {
-  roleState.isAdmin = false;
-  mount(<AdminPage />);
+it.each(['senior_pastor', 'pastor', 'minister', 'leader', 'group_leader', 'future_leader'])('does not offer global administration or fetch its inbox for %s', async role => {
+  roleState.role = role;
+  const fetcher = mount(<AdminPage />);
   await screen.findByTestId('button-crm');
   expect(screen.queryByText('系統紀錄')).toBeNull();
+  for (const id of ['button-inbox', 'button-mail-system', 'button-feature-toggles', 'button-message-cards']) expect(screen.queryByTestId(id)).toBeNull();
+  expect(fetcher.mock.calls.some(([url]) => String(url).includes('/api/admin/inbox'))).toBe(false);
+  if (role === 'senior_pastor') expect(screen.getByTestId('button-church-devotions')).toBeVisible();
 });
