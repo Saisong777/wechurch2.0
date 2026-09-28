@@ -141,7 +141,10 @@ try {
       await story.waitFor();
       await screenshot(width+'-grace-dark');
       await page.evaluate(()=>localStorage.setItem('wechurch-theme','light'));
-      checks.push({width,inline:true,progress:true,anonymousFamily:true,urgentPublic:true,comment:true,close:true,history:true,dark:true,graceBook:true,privateDatedStory:true,graceEditPersisted:true,graceFilters:true});
+      await page.goto(origin+'/');
+      await page.locator('main').getByRole('link',{name:'恩典記錄簿',exact:true}).click();
+      await page.locator('main').getByRole('heading',{name:'恩典記錄簿',exact:true}).waitFor();
+      checks.push({width,inline:true,progress:true,anonymousFamily:true,urgentPublic:true,comment:true,close:true,history:true,dark:true,graceBook:true,privateDatedStory:true,graceEditPersisted:true,graceFilters:true,homeEntry:true});
     }
     return {checks,fixtureSession:true,googleOAuthTested:false,physicalPhoneTested:false};
   }`;

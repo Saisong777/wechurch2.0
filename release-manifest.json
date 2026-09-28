@@ -1,5 +1,5 @@
 {
-  "fingerprint": "82f0bdbb3a32ab6f2b3429e91cf0b72b6f83ae6245bb55db7a295a988f002c8d",
+  "fingerprint": "2f1a34e49e5c7e8ddee19dcbcec4e5e590d0042e77468590b5c5d3e12028aad3",
   "files": [
     {
       "file": "Dockerfile",
@@ -283,7 +283,7 @@
     },
     {
       "file": "src/components/home/DailyHome.tsx",
-      "sha256": "4ab3cc75c21b747feae0e7db98c0c756a2fbe24390d0df48aaab0d0bdf406465"
+      "sha256": "f292dd5b329a556f4b84a6f2589b3d170195d99b92b66ad10ab772b1beedc48f"
     },
     {
       "file": "src/components/icebreaker/GameLobby.tsx",
@@ -403,7 +403,7 @@
     },
     {
       "file": "src/components/prayer/PersonalPrayerEntry.tsx",
-      "sha256": "e340804424a676f22e69896e0e22cf54d81bc22816baff3982e1e7a2fe670062"
+      "sha256": "58735c9f0961a4ff831bb9226011f24c94fc615c3b92c7b0b30bb47122d61d79"
     },
     {
       "file": "src/components/prayer/PersonalPrayerSharing.test.tsx",
@@ -411,7 +411,7 @@
     },
     {
       "file": "src/components/prayer/PersonalPrayerSharing.tsx",
-      "sha256": "fd6ca3f33cee7fbde3d190ff77053772f389b15cee8506eb76ae4cd2380990c8"
+      "sha256": "7f5114e7519d4090652c4818a7d072916f97a055bf322661088866c97fde0966"
     },
     {
       "file": "src/components/prayer/PrayerCard.tsx",
@@ -1099,11 +1099,11 @@
     },
     {
       "file": "src/pages/GraceRecordPage.test.tsx",
-      "sha256": "5732cb1dc169bed6a5f00a5ff3086cd075fd30261f999f53929b68702ad7b4c4"
+      "sha256": "d317b70be932869a5d0f30b3f311b0aad3f5204699cd4c1b09a7e76b4f3e9fda"
     },
     {
       "file": "src/pages/GraceRecordPage.tsx",
-      "sha256": "fc855fbb300740f1f97fed91ba0ac9c73f5480c531accf1441ae1d30b5f84a45"
+      "sha256": "f9b29b007c26e3a4a55361124020b40f37c800e649ea1791ca4be6232d9c66f4"
     },
     {
       "file": "src/pages/GrouperPage.tsx",
@@ -1151,7 +1151,7 @@
     },
     {
       "file": "src/pages/MePage.tsx",
-      "sha256": "aabe58b8dcf5459e712044e10eb506a4feb0ab49d74c65f80e3c2c6f653ec765"
+      "sha256": "da4ff2c67b1198f55d0f38eb2c33a0cd62425de52e842d61261fcae0c105d1c0"
     },
     {
       "file": "src/pages/MentoringPage.tsx",
@@ -1575,11 +1575,11 @@
     },
     {
       "file": "server/personalPrayer.test.ts",
-      "sha256": "eba197e9ceb1655c1d597fc10ebc5a36d05991d6b016bacd0d73860257717e14"
+      "sha256": "ebfb4873fcc1e7c5cbf61a7d381a3e2455a3fa6a59630a0155184f87a4e6e508"
     },
     {
       "file": "server/personalPrayerRepository.ts",
-      "sha256": "f7c75c9ffd461cedf158cbbb42191066ba13039916798649992bc3e534847747"
+      "sha256": "d402ca0111ffae36c7a314d9398d6630b98d0adad30d73b4b24b1a495702c59c"
     },
     {
       "file": "server/personalPrayerRoutes.ts",
@@ -1599,7 +1599,7 @@
     },
     {
       "file": "server/prayerSharingRepository.ts",
-      "sha256": "e17e2018ef18b9631390f1a7e483026a7e98d342ab8b31e9b9a793c8cf0cf318"
+      "sha256": "71d5ba6bef4381c00d3f9c8514a2bd81b6a6fe07fd640da0523857adf45c7dcd"
     },
     {
       "file": "server/prayerSharingRoutes.ts",
@@ -1799,7 +1799,7 @@
     },
     {
       "file": "shared/personalPrayer.ts",
-      "sha256": "324cba1ce594c8627411e1ff49850a6ede5281030bc277d9ae5232c847fe4d91"
+      "sha256": "810c3fc6a4273e8404117afa65e2a99205ef7a25dd851ffc03eb3b7e22143016"
     },
     {
       "file": "shared/prayerInteraction.ts",
@@ -1819,7 +1819,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "5c3991f51117ffded643d902f8b57c50569d94ed81cbb3039a8144866a065761"
+      "sha256": "e5f81ac78ac78af74304e5d3dec005b0ac4c584b8fa50798709e2606f6a01b9c"
     },
     {
       "file": "shared/support.ts",
@@ -1946,6 +1946,10 @@
       "sha256": "35dac1c32f6bf88ea0b49480817fa119af0401b137fca02cf60c16b71e4c4de0"
     },
     {
+      "file": "migrations/0017_grace_book.sql",
+      "sha256": "48ba4ea6d41648e1404d976753074dba25135cf3d84d6e4aaee74629f722da5b"
+    },
+    {
       "file": "migrations/meta/0000_snapshot.json",
       "sha256": "1976122184ff987e42ad9ff2c4569c3d3dc8a8c81a2be264f8968d41372eda93"
     },
@@ -1955,7 +1959,7 @@
     },
     {
       "file": "migrations/meta/_journal.json",
-      "sha256": "ca22ab2ef323d9bd0f2754ea781d63f2c422d8474f74ad615a7625360fcad342"
+      "sha256": "20988838997c25ee286c6e7af4af4a2afd94f125b915dff2ccee244c29c7f783"
     },
     {
       "file": "scripts/backup-envelope.mjs",
@@ -2187,7 +2191,7 @@
     },
     {
       "file": "scripts/verify-personal-prayer-http.ts",
-      "sha256": "84c6d9f837a3dbd6b1e78d2aaaacc332f9e53b2252c2383abfd3a5f930b8483a"
+      "sha256": "7f67f4db38b1c47fda7a71235388e04b358356cb46b9b6fc02fa131c05d44352"
     },
     {
       "file": "scripts/verify-security-browser.ts",
