@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-vi.mock('@/hooks/usePastoralAccess', () => ({ usePastoralAccess: () => ({ data: { available: false } }) }));
+const pastoral = vi.hoisted(() => ({ data: { available: false } }));
+vi.mock('@/hooks/usePastoralAccess', () => ({ usePastoralAccess: () => pastoral }));
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -9,7 +10,7 @@ const auth = vi.hoisted(() => ({ user: null as null | { id: string }, loading: f
 const roles = vi.hoisted(() => ({ isAdmin: false, isLeader: false }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => roles }));
-afterEach(() => { cleanup(); auth.user = null; roles.isAdmin = false; roles.isLeader = false; vi.restoreAllMocks(); auth.signOut.mockClear(); });
+afterEach(() => { cleanup(); pastoral.data.available = false; auth.user = null; roles.isAdmin = false; roles.isLeader = false; vi.restoreAllMocks(); auth.signOut.mockClear(); });
 const renderActions = () => render(<MemoryRouter><MobileAccountActions close={vi.fn()} /></MemoryRouter>);
 
 it('keeps staff destinations hidden from guests and ordinary members', () => {
@@ -31,4 +32,11 @@ it('does not sign out when the unsaved-content confirmation is cancelled', () =>
   auth.user = { id: 'member' }; vi.spyOn(window, 'confirm').mockReturnValue(false); renderActions();
   fireEvent.click(screen.getByRole('button', { name: '登出' }));
   expect(auth.signOut).not.toHaveBeenCalled();
+});
+
+it('shows the work entry for an appointed leader without granting the admin entry', () => {
+  auth.user = { id: 'appointed-member' }; pastoral.data.available = true;
+  renderActions();
+  expect(screen.getByRole('link', { name: '同工工作區' })).toHaveAttribute('href', '/work');
+  expect(screen.queryByRole('link', { name: '管理後台' })).toBeNull();
 });

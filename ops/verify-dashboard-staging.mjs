@@ -59,9 +59,9 @@ try{
       await page.screenshot({path:output+'/'+width+'-overview.png',fullPage:true});checks.push({width,overflow:false});
     }
     await page.setViewportSize({width:390,height:844});
-    await page.evaluate(()=>localStorage.setItem('wechurch-appearance','dark'));
+    await page.evaluate(()=>localStorage.setItem('wechurch-theme','dark'));
     await page.emulateMedia({colorScheme:'dark'});
-    await page.evaluate(()=>document.documentElement.classList.add('dark'));
+    await page.reload();await page.getByRole('button',{name:'補記錄',exact:true}).waitFor();
     await page.screenshot({path:output+'/390-overview-dark.png',fullPage:true});
     await page.getByRole('link',{name:'記錄關心',exact:true}).click();
     await page.getByRole('heading',{name:'小明（示範） · 關懷進度',exact:true}).waitFor();
@@ -72,7 +72,14 @@ try{
     await page.getByRole('link',{name:'前往代禱',exact:true}).click();await page.getByText('求有平安與智慧，適應新的工作環境。',{exact:true}).waitFor();
     await login(2);const admin=await(await page.context().request.get(origin+'/api/life-groups/dashboard')).json();if(admin.groups.length)throw Error('System admin inherited pastoral scope');
     await login(1);const denied=await page.context().request.get(origin+'/api/life-groups/dashboard?scope='+group);if(denied.status()!==404)throw Error('Ordinary member inherited dashboard scope');
-    return {checks,attendanceSaved:true,unknownPreserved:true,careDeepLinkAndWrite:true,sharedPrayerNavigation:true,anonymousProtected:true,adminScopeDenied:true,ordinaryMemberScopeDenied:true,fixtureSession:true,physicalIPhoneTested:false,googleOAuthTested:false};
+    await login(2);
+    const changed=await page.context().request.patch(origin+'/api/life-groups/management/'+group,{headers:{Origin:origin},data:{version:1,name:'恩典小家（示範）',description:'',meeting:'',announcement:'',listed:false,status:'active',leaderId:people[1].id}});
+    if(changed.status()!==200)throw Error('Fixture handoff failed');
+    await login(1);const inherited=await(await page.context().request.get(origin+'/api/life-groups/dashboard?scope='+group)).json();
+    if(inherited.gatherings[0]?.counts.present!==1||inherited.care.active!==1)throw Error('New appointment did not inherit group history');
+    await page.goto(origin+'/');await page.getByRole('link',{name:/牧養概況/}).waitFor();
+    await login(0);if((await page.context().request.get(origin+'/api/life-groups/dashboard?scope='+group)).status()!==404)throw Error('Former appointment retained dashboard permission');
+    return {checks,attendanceSaved:true,unknownPreserved:true,careDeepLinkAndWrite:true,sharedPrayerNavigation:true,anonymousProtected:true,adminScopeDenied:true,ordinaryMemberScopeDenied:true,fixtureSession:true,handoffHistoryPreserved:true,memberRoleLeaderEntry:true,formerLeaderRevoked:true,physicalIPhoneTested:false,googleOAuthTested:false};
   }`;
   let raw;
   try{raw=execFileSync(cli,['-s=leader-dashboard-b','run-code',script],{cwd:root,encoding:'utf8',timeout:240000,maxBuffer:4*1024*1024});}
@@ -91,7 +98,8 @@ try{
     DELETE FROM life_group_comments WHERE share_id=${sql(prayer)};
     DELETE FROM life_group_shares WHERE id=${sql(prayer)} AND group_id=${sql(group)};
     DELETE FROM small_group_members WHERE group_id=${sql(group)};
-    DELETE FROM small_groups WHERE id=${sql(group)} AND leader_user_id=${sql(people[0].id)};
+    DELETE FROM family_membership_events WHERE group_id=${sql(group)};
+    DELETE FROM small_groups WHERE id=${sql(group)} AND leader_user_id IN(${sql(people[0].id)},${sql(people[1].id)});
     ${people.map(p=>`DELETE FROM auth_sessions WHERE sid=${sql(p.sid)};DELETE FROM user_roles WHERE user_id=${sql(p.id)};DELETE FROM users WHERE id=${sql(p.id)} AND email=${sql(p.email)};DELETE FROM auth_users WHERE id=${sql(p.authId)} AND email=${sql(p.email)};`).join('\n')}
     COMMIT;`);
   assert.equal(stagingSql(`SELECT count(*) FROM users WHERE id IN(${people.map(p=>sql(p.id)).join(',')})`),'0');
