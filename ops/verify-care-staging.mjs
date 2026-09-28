@@ -68,7 +68,7 @@ try {
       await row.getByRole('button',{name:'儲存紀錄'}).click();
       await row.waitFor({state:'hidden'});
       await page.getByRole('button',{name:/^全部 /}).click();
-      await row.getByRole('button',{name:new RegExp(name)}).click();
+      await row.locator('button[aria-expanded]').click();
       await row.getByText('PRIVATE_HISTORY_'+width,{exact:true}).waitFor();
       await row.getByRole('button',{name:'編輯'+name,exact:true}).click();
       await page.getByLabel('下次關心日期',{exact:true}).fill('2000-01-01');
@@ -77,19 +77,19 @@ try {
       await row.waitFor();
       await row.getByRole('button',{name:'代禱',exact:true}).click();
       await row.getByRole('button',{name:'代禱 1',exact:true}).waitFor();
-      if(await row.getByRole('button',{name:new RegExp(name)}).getAttribute('aria-expanded')==='false') await row.getByRole('button',{name:new RegExp(name)}).click();
+      if(await row.locator('button[aria-expanded]').getAttribute('aria-expanded')==='false') await row.locator('button[aria-expanded]').click();
       await row.getByRole('button',{name:'封存'+name,exact:true}).click();
       await page.getByRole('dialog').getByRole('button',{name:'確認封存'}).click();
       await row.waitFor({state:'hidden'});
       await page.getByRole('button',{name:/^已封存 /}).click();
-      await row.getByRole('button',{name:new RegExp(name)}).click();
+      await row.locator('button[aria-expanded]').click();
       await row.getByText('PRIVATE_HISTORY_'+width,{exact:true}).waitFor();
       await row.getByRole('button',{name:'恢復關懷'}).click();
       await row.waitFor({state:'hidden'});
       await page.getByRole('button',{name:/^待關心 /}).click();
       if(width===390) { await page.setViewportSize({width:320,height:844}); await screenshot('320-list'); await page.setViewportSize({width,height:844}); }
       await screenshot(width+'-list');
-      await row.getByRole('button',{name:new RegExp(name)}).click();
+      await row.locator('button[aria-expanded]').click();
       await row.getByRole('button',{name:'請牧者協助探訪'}).click();
       const form=page.getByRole('region',{name:'請牧者協助探訪',exact:true});
       if(await form.getByLabel('希望牧者知道的狀況').inputValue()!=='') throw Error('Private notes copied into request');
