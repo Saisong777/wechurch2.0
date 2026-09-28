@@ -122,8 +122,8 @@ Google 登入安全 smoke 通過：B 專用 client／callback、state／PKCE、�
 
 - 部署：`6248f23e-bb45-4ff0-831c-71eb78cbb4a7`，Railway `SUCCESS`。
 - 精確來源：`521d05f3cc081ba1615eba852832d6764d314e71`。
-- 程式指紋：`bde60457de9c609a1ff2e1c4c9da820b5cbb35d8bd95575011fef90b04d04862`；線上逐檔來源／研經資產校驗、health 與來源 commit 對應通過。
-- [GitHub-safe 發布紀錄](releases/b-6248f23e-bb45-4ff0-831c-71eb78cbb4a7.json)。本次没有新增 migration；A 仍為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`，沒有正式站發布授權。
+- 程式指紋：`bde60457de9c609a1ff2e1c4c9da820b5cbb35d8bd95575011fef90b04d04862`；線上版本清單指紋、研經資產校驗、health 與本機快照逐檔來源 commit 對應通過。
+- [GitHub-safe 發布紀錄](releases/b-6248f23e-bb45-4ff0-831c-71eb78cbb4a7.json)。本次沒有新增 migration；A 仍為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`，沒有正式站發布授權。
 
 ### 半年資料量
 
