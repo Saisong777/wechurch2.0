@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readBackupKey, unseal } from './backup-envelope.mjs';
 import { verifyAssets, releaseId as bibleReleaseId } from './bible-study-assets.mjs';
+import { assertReleaseBaseline, assertKnownMigrations } from './staging-release-baseline.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'fef7af7c-e3c3-4977-8294-c3a123a4242e', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
@@ -35,6 +36,19 @@ export function verifyRemoteBibleAssets(directory) {
 function save(name, value) {
   fs.mkdirSync(evidence, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(evidence, name), typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
+}
+
+export function verifyStagingReleaseBase(expected) {
+  const deployments = json(['deployment', 'list', '-s', target.app, '-e', target.environment, '--json']);
+  if (!['SUCCESS', 'FAILED', 'CRASHED', 'REMOVED', 'SKIPPED'].includes(deployments[0]?.status)) {
+    throw new Error('Another B deployment is pending; wait for it before validating a new release');
+  }
+  const live = JSON.parse(railway(['ssh', '-p', target.project, '-e', target.environment, '-s', target.app, '--', 'cat', '/app/release-manifest.json']));
+  if (!Array.isArray(live.files) || live.fingerprint !== sha(JSON.stringify(live.files))) throw new Error('Invalid B release manifest');
+  const directory = path.join(root, 'design/releases');
+  const records = fs.readdirSync(directory).filter(name => /^b-.*\.json$/.test(name)).map(name => JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8')));
+  return assertReleaseBaseline({ fingerprint: live.fingerprint, expected, records, origin: target.origin,
+    isAncestor: commit => spawnSync('git', ['merge-base', '--is-ancestor', commit, 'HEAD'], { cwd: root }).status === 0 });
 }
 
 export function inspectStaging() {
@@ -137,7 +151,7 @@ async function migrate(database) {
     console.log({ stagingMigrationsApplied: changed });
 }
 
-function snapshot(referenceAssets) {
+function snapshot(referenceAssets, baseFingerprint) {
   const release = path.join(evidence, `release-${Date.now()}`);
   fs.mkdirSync(release, { recursive: true, mode: 0o700 });
   const entries = ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json', 'index.html', 'components.json', 'vite.config.ts', 'vitest.config.ts', 'tailwind.config.ts', 'postcss.config.js', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'drizzle.config.ts', 'eslint.config.js', 'nixpacks.toml', 'src', 'server', 'shared', 'public', 'migrations', 'scripts'];
@@ -162,7 +176,7 @@ function snapshot(referenceAssets) {
   if (referenceAssets) fs.writeFileSync(path.join(release, 'bible-study-asset-manifest.json'), JSON.stringify(referenceAssets, null, 2));
   const fingerprint = sha(JSON.stringify(manifest));
   fs.writeFileSync(path.join(release, 'release-manifest.json'), JSON.stringify({ fingerprint, files: manifest }, null, 2));
-  save('release.json', { directory: release, fingerprint, createdAt: new Date().toISOString(), target, files: manifest.length });
+  save('release.json', { directory: release, fingerprint, baseFingerprint, createdAt: new Date().toISOString(), target, files: manifest.length });
   return { release, fingerprint };
 }
 
@@ -180,8 +194,10 @@ async function main() {
     const config = json(['environment', 'config', '-e', target.environment, '--json']);
     const source = config.services[target.app]?.source;
     if (source?.branch && source.branch !== 'integration') throw new Error('B must not auto-deploy from the production branch.');
+    const baseFingerprint = verifyStagingReleaseBase();
       const applied = JSON.parse(stagingSql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT hash,created_at FROM drizzle.__drizzle_migrations) t"));
       const journal = JSON.parse(fs.readFileSync(path.join(root, 'migrations/meta/_journal.json'), 'utf8')).entries;
+      assertKnownMigrations(applied, journal.map(entry => ({ when: entry.when, hash: sha(fs.readFileSync(path.join(root, 'migrations', `${entry.tag}.sql`))) })));
       for (const entry of journal) if (!applied.some(row => Number(row.created_at) === entry.when && row.hash === sha(fs.readFileSync(path.join(root, 'migrations', `${entry.tag}.sql`))))) throw new Error(`Run staging:backup and staging:migrate first: ${entry.tag}`);
     for (const step of ['typecheck', 'test', 'test:deployment', 'test:integrity', 'build']) {
       const result = spawnSync('npm', ['run', step], { cwd: root, stdio: 'inherit' });
@@ -192,7 +208,7 @@ async function main() {
       referenceAssets = verifyAssets(path.join(root, 'bible-study-data'));
       if (JSON.stringify(verifyRemoteBibleAssets(app.BIBLE_STUDY_DIR)) !== JSON.stringify(referenceAssets)) throw new Error('B volume does not contain the verified reference assets');
     } else if (app.BIBLE_STUDY_DIR) throw new Error('Local reference assets required to verify this release');
-    const { fingerprint } = snapshot(referenceAssets);
+    const { fingerprint } = snapshot(referenceAssets, baseFingerprint);
     save('production-before.json', { deployment: productionDeployment });
     // The CLI's 30-second upload deadline is too short for this verified snapshot.
     const upload = spawnSync(process.execPath, [path.join(root, 'ops/upload-verified-b-snapshot.mjs')], { cwd: root, stdio: 'inherit' });

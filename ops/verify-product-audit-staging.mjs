@@ -38,7 +38,7 @@ try {
     }
     const checks=[], errors=[];
     page.on('pageerror',e=>errors.push(e.message.slice(0,200)));
-    const memberRoutes=['/','/learn','/learn/church-reading','/learn/bible','/learn/my-notes','/learn/reading-plans','/grace-record','/share','/walls','/prayer-wall','/devotion-wall','/groups','/care','/me','/me/activity','/me/sharing','/me/love-journey','/me/mentoring','/support','/play','/icebreaker','/grouper','/play/bible-quiz','/play/disciple-quiz','/card','/user','/user/notebook','/notebook','/learn/jesus-timeline','/prayer-meeting'];
+    const memberRoutes=['/','/learn','/learn/church-reading','/learn/bible','/learn/my-notes','/learn/reading-plans','/grace-record','/share','/walls','/prayer-wall','/devotion-wall','/groups','/care','/me','/me/activity','/me/sharing','/me/love-journey','/me/mentoring','/support','/work','/play','/icebreaker','/grouper','/play/bible-quiz','/play/disciple-quiz','/card','/user','/user/notebook','/notebook','/learn/jesus-timeline','/prayer-meeting'];
     for(const width of [390,1440]) {
       await page.setViewportSize({width,height:844});
       for(const [index,routes] of [[0,memberRoutes],[2,['/admin','/admin/crm','/admin/church-devotions','/work/settings']]]) {

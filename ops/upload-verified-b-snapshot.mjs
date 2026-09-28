@@ -5,7 +5,7 @@ import path from 'node:path';
 import https from 'node:https';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { inspectStaging, root, target, verifyRemoteBibleAssets } from '../scripts/railway-staging.mjs';
+import { inspectStaging, root, target, verifyRemoteBibleAssets, verifyStagingReleaseBase } from '../scripts/railway-staging.mjs';
 
 const { app } = inspectStaging();
 const release = JSON.parse(fs.readFileSync(path.join(root, 'artifacts/railway-staging/release.json'), 'utf8'));
@@ -22,6 +22,8 @@ for (const entry of manifest.files) {
 }
 const assets = JSON.parse(fs.readFileSync(path.join(directory, 'bible-study-asset-manifest.json'), 'utf8'));
 if (JSON.stringify(verifyRemoteBibleAssets(app.BIBLE_STUDY_DIR)) !== JSON.stringify(assets)) throw new Error('Reference assets differ');
+if (!/^[a-f0-9]{64}$/.test(release.baseFingerprint || '')) throw new Error('Release baseline required; run staging:deploy again');
+verifyStagingReleaseBase(release.baseFingerprint);
 const bytes = execFileSync('tar', ['-czf', '-', '-C', directory, 'release-manifest.json', 'bible-study-asset-manifest.json', ...manifest.files.map(f => f.file)], { maxBuffer: 32 * 1024 * 1024, env: { ...process.env, COPYFILE_DISABLE: '1' } });
 const token = process.env.RAILWAY_TOKEN || process.env.RAILWAY_API_TOKEN || JSON.parse(fs.readFileSync(path.join(os.homedir(), '.railway/config.json'), 'utf8')).user?.token;
 if (!token) throw new Error('Railway login required');

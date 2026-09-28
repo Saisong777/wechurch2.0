@@ -1,6 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tables, selectSql, actionFor, validateBible } from './railway-staging-content.mjs';
+import { assertReleaseBaseline, assertKnownMigrations } from './staging-release-baseline.mjs';
+
+const baseline = { fingerprint: 'a'.repeat(64), origin: 'https://staging.example.test', records: [{
+  environment: 'staging', origin: 'https://staging.example.test', fingerprint: 'a'.repeat(64), sourceMatchesCommit: true, sourceCommit: 'b'.repeat(40),
+}], isAncestor: () => true };
+test('release requires a recorded B source already merged into the current branch', () => {
+  assert.equal(assertReleaseBaseline(baseline), baseline.fingerprint);
+  assert.throws(() => assertReleaseBaseline({ ...baseline, records: [] }), /source record/);
+  assert.throws(() => assertReleaseBaseline({ ...baseline, isAncestor: () => false }), /unmerged work/);
+});
+test('release refuses changed, malformed, or wrong-environment baselines', () => {
+  assert.throws(() => assertReleaseBaseline({ ...baseline, expected: 'c'.repeat(64) }), /changed during/);
+  assert.throws(() => assertReleaseBaseline({ ...baseline, fingerprint: 'invalid' }), /Invalid/);
+  assert.throws(() => assertReleaseBaseline({ ...baseline, origin: 'https://production.example.test' }), /source record/);
+  assert.throws(() => assertReleaseBaseline({ ...baseline, records: [{ ...baseline.records[0], sourceMatchesCommit: false }] }), /source record/);
+});
+test('release refuses migrations present in B but missing or changed in local source', () => {
+  const applied = [{ created_at: '123', hash: 'same' }];
+  assert.doesNotThrow(() => assertKnownMigrations(applied, [{ when: 123, hash: 'same' }]));
+  assert.throws(() => assertKnownMigrations(applied, []), /migration missing/);
+  assert.throws(() => assertKnownMigrations(applied, [{ when: 123, hash: 'different' }]), /migration missing/);
+});
 
 test('only five public reference tables are eligible', () => {
   assert.equal(tables.length, 5);
