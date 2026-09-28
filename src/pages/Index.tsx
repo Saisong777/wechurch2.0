@@ -43,6 +43,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCareContacts } from '@/hooks/useCareContacts';
+import { needsCare } from '@shared/care';
+import { VisitReminder } from '@/components/care/CareVisits';
 import { usePrayerWall } from '@/hooks/usePrayerWall';
 import { usePersonalPrayers } from '@/hooks/usePersonalPrayers';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -201,7 +203,7 @@ const Index = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { profile } = useUserProfile();
   const { canCreateSession } = useUserRole();
-  const { contacts: allCareContacts, isLoading: careLoading, isError: careError } = useCareContacts();
+  const { contacts: allCareContacts, isLoading: careLoading, isError: careError, today: careDay } = useCareContacts();
   const careContacts = useMemo(() => allCareContacts.filter(contact => !!user && contact.userId === user.id), [allCareContacts, user]);
   const { isFeatureEnabled, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
@@ -302,8 +304,8 @@ const Index = () => {
     };
   }, [homePrayers, user]);
   const activeCareContacts = useMemo(() => {
-    return careContacts.filter((contact) => !contact.lastCaredAt).slice(0, 3);
-  }, [careContacts]);
+    return careContacts.filter(contact => needsCare(contact, careDay)).sort((a, b) => (a.nextCareDate || '9999').localeCompare(b.nextCareDate || '9999')).slice(0, 3);
+  }, [careContacts, careDay]);
   const activePrivatePrayerRecords = useMemo(() => {
     return [...personalPrayerRecords]
       .filter((record) => {
@@ -641,6 +643,7 @@ const Index = () => {
       </header>
 
       <main className="dashboard-main mobile-readable container mx-auto px-4 py-4 sm:px-6 md:py-8">
+        <VisitReminder />
         {!styleLabMode ? (
           <DailyHome
             date={todayLabel}

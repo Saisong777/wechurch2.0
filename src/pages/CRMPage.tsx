@@ -1,4 +1,5 @@
 import { CrmOperationalPanel } from '@/components/admin/CrmOperationalPanel';
+import { VisitReminder } from '@/components/care/CareVisits';
 import { churchDisplayName } from '@shared/churches';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
 import { useQuery } from '@tanstack/react-query';
@@ -702,7 +703,7 @@ const CRMPage = () => {
             </FeatureGate>
           </TabsContent>
 
-          <TabsContent value="care"><CrmOperationalPanel view="care" groups={crmGroups} loading={groupsLoading} error={groupsError} retry={() => void fetchCrmGroups()} manageMembers={() => setWorkspaceTab("members")} /></TabsContent>
+          <TabsContent value="care"><VisitReminder always /><CrmOperationalPanel view="care" groups={crmGroups} loading={groupsLoading} error={groupsError} retry={() => void fetchCrmGroups()} manageMembers={() => setWorkspaceTab("members")} /></TabsContent>
 
           <TabsContent value="members" className="space-y-5">
             <fieldset disabled={writesPending} className="min-w-0 space-y-4 disabled:opacity-70" aria-busy={writesPending}>

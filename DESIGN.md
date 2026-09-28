@@ -381,6 +381,15 @@ the default page blueprint.
 - Verified desktop 1280x900 and mobile 390x844; 320x568 prayer overflow check also
   passed. See `design/small-group-life-implementation-2026-09-11.md`.
 
+## Care And Pastoral Visits (2026-09-28)
+
+- Extend Together with compact owner-only people rows and inline editors, not drawers.
+- Keep next-care dates, chronological notes, archive/restore and small-family care distinct.
+- Visits require an explicit share preview. Never copy personal care notes into pastoral requests.
+- Same-church pastoral inbox sorts urgent requests first, supports assigned dates and visible progress.
+- Homepage and CRM care show a polling reminder; this is not external push or emergency dispatch.
+- See `design/care-workflow-2026-09-28.md` for privacy boundaries and verification.
+
 ## Grace Book (2026-09-28)
 
 - Extend the approved Together recipe; private, single-column and inline editing.

@@ -56,6 +56,8 @@ try {
     };
   };
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
+  const { verifyCareHttp } = await import('./verify-care-http');
+  await verifyCareHttp(pool, makeClient);
   const { verifyFamilyHttp } = await import('./verify-family-http');
   await verifyFamilyHttp(pool, makeClient);
   for (const hidden of ['/uploads/.bible-study/public-20260925-v1/data/core.sqlite', '/uploads/%2ebible-study/public-20260925-v1/NOTICE.md', '/uploads/%2Ebible-study/public-20260925-v1/data/core.sqlite', '/uploads/%252ebible-study/public-20260925-v1/NOTICE.md', '/uploads/missing-file.png']) {

@@ -10,7 +10,7 @@ import { rasterExtension, rasterOnly, setMediaHeaders } from './uploadSafety';
 import { apiIdentity, boundedWindowLimiter, clientAddress } from './requestLimits';
 import { randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { db } from "./db";
 import { careActions, careContacts, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants, userEmailPreferences } from "@shared/schema";
@@ -119,6 +119,8 @@ import { devotionWallRoutes } from './devotionWallRoutes';
 import { publicPrayerFeed, publicPrayerReceipt } from './prayerSharingRepository';
 import { lifeGroupRoutes } from './lifeGroupRoutes';
 import { supportRoutes } from './supportRoutes';
+import { careVisitRoutes } from './careVisitRoutes';
+import { careActionInput } from '../shared/care';
 import { mentoringRoutes } from './mentoringRoutes';
 import { assignCrmGroupMember } from './crmGroupMembership';
 import { churchDevotionRoutes } from './churchDevotionRoutes';
@@ -158,16 +160,14 @@ const careContactBodySchema = z.object({
   need: z.string().trim().max(500).optional(),
   nextAction: z.string().trim().max(300).optional(),
   prayer: z.string().trim().max(500).optional(),
+  nextCareDate: devotionDate.nullable().optional(),
   source: z.string().trim().max(60).optional(),
   visibility: z.enum(["private", "pastoral", "team"]).optional(),
 });
 const careContactPatchSchema = careContactBodySchema.partial().extend({
   isArchived: z.boolean().optional(),
 });
-const careActionBodySchema = z.object({
-  actionType: z.string().trim().min(1).max(40).default("note"),
-  note: z.string().trim().max(500).optional(),
-});
+const careActionBodySchema = careActionInput;
 const careActionTypesThatUpdateLastCared = new Set(["care", "message", "visit", "call", "invite"]);
 const crmScopeAssignmentBodySchema = z.object({
   assigneeUserId: z.string().uuid(),
@@ -793,6 +793,7 @@ export async function registerRoutes(app: Express) {
   app.use('/open', bibleStudyCreditsRoutes());
   app.use(['/library', '/data/core.sqlite', '/bible-study-data', '/api/info', '/api/reference', '/COBSGreek.ttf', '/cobsh.ttf'], (_req, res) => res.sendStatus(404));
   app.use('/api/support', supportRoutes(resolveUserId));
+  app.use('/api/care-visits', careVisitRoutes(resolveUserId));
   app.use('/api/mentoring', mentoringRoutes(resolveUserId));
 
   app.get("/api/health/detailed", requireAdmin, async (req, res) => {
@@ -2581,7 +2582,7 @@ export async function registerRoutes(app: Express) {
       const contacts = await db
         .select()
         .from(careContacts)
-        .where(and(eq(careContacts.userId, userId), eq(careContacts.isArchived, false)))
+        .where(and(eq(careContacts.userId, userId), req.query.includeArchived === '1' ? undefined : eq(careContacts.isArchived, false)))
         .orderBy(desc(careContacts.createdAt));
 
       if (contacts.length === 0) {
@@ -2589,29 +2590,22 @@ export async function registerRoutes(app: Express) {
       }
 
       const actions = await db
-        .select()
+        .select({ contactId: careActions.contactId,
+          prayerCount: sql<number>`count(*) filter (where ${careActions.actionType} = 'prayer')::int`,
+          lastActionAt: sql<string>`max(${careActions.createdAt})`,
+        })
         .from(careActions)
         .where(eq(careActions.userId, userId))
-        .orderBy(desc(careActions.createdAt));
-
-      const prayerCounts = new Map<string, number>();
-      const lastActionAt = new Map<string, Date>();
-      for (const action of actions) {
-        if (action.actionType === "prayer") {
-          prayerCounts.set(action.contactId, (prayerCounts.get(action.contactId) || 0) + 1);
-        }
-        if (!lastActionAt.has(action.contactId)) {
-          lastActionAt.set(action.contactId, action.createdAt);
-        }
-      }
+        .groupBy(careActions.contactId);
+      const counts = new Map(actions.map(action => [action.contactId, action]));
 
       res.json(contacts.map((contact) => ({
         ...contact,
-        prayerCount: prayerCounts.get(contact.id) || 0,
-        lastActionAt: lastActionAt.get(contact.id) || null,
+        prayerCount: counts.get(contact.id)?.prayerCount || 0,
+        lastActionAt: counts.get(contact.id)?.lastActionAt || null,
       })));
     } catch (error) {
-      console.error("[care-contacts] Error:", error);
+      console.error("[care-contacts] Request failed");
       res.status(500).json({ error: "Failed to get care contacts" });
     }
   });
@@ -2631,6 +2625,7 @@ export async function registerRoutes(app: Express) {
         need: input.need || "",
         nextAction: input.nextAction || "",
         prayer: input.prayer || "",
+        nextCareDate: input.nextCareDate || null,
         source: input.source || "personal",
         visibility: input.visibility || "private",
         isArchived: false,
@@ -2640,7 +2635,7 @@ export async function registerRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid care contact", details: error.flatten() });
       }
-      console.error("[create-care-contact] Error:", error);
+      console.error("[create-care-contact] Request failed");
       res.status(500).json({ error: "Failed to create care contact" });
     }
   });
@@ -2659,6 +2654,7 @@ export async function registerRoutes(app: Express) {
       if (input.need !== undefined) updateData.need = input.need || "";
       if (input.nextAction !== undefined) updateData.nextAction = input.nextAction || "";
       if (input.prayer !== undefined) updateData.prayer = input.prayer || "";
+      if (input.nextCareDate !== undefined) updateData.nextCareDate = input.nextCareDate;
       if (input.source !== undefined) updateData.source = input.source || "personal";
       if (input.visibility !== undefined) updateData.visibility = input.visibility || "private";
       if (input.isArchived !== undefined) updateData.isArchived = input.isArchived;
@@ -2678,7 +2674,7 @@ export async function registerRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid care contact", details: error.flatten() });
       }
-      console.error("[update-care-contact] Error:", error);
+      console.error("[update-care-contact] Request failed");
       res.status(500).json({ error: "Failed to update care contact" });
     }
   });
@@ -2702,8 +2698,27 @@ export async function registerRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error) {
-      console.error("[archive-care-contact] Error:", error);
+      console.error("[archive-care-contact] Request failed");
       res.status(500).json({ error: "Failed to archive care contact" });
+    }
+  });
+
+  app.get("/api/care/contacts/:id/actions", async (req, res) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const id = z.string().uuid().parse(req.params.id);
+      const offset = z.coerce.number().int().min(0).max(100000).default(0).parse(req.query.offset);
+      const [contact] = await db.select({ id: careContacts.id }).from(careContacts)
+        .where(and(eq(careContacts.id, id), eq(careContacts.userId, userId))).limit(1);
+      if (!contact) return res.status(404).json({ error: 'Care contact not found' });
+      const actions = await db.select().from(careActions)
+        .where(and(eq(careActions.contactId, id), eq(careActions.userId, userId)))
+        .orderBy(desc(careActions.createdAt), desc(careActions.id)).limit(31).offset(offset);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({ actions: actions.slice(0, 30), hasMore: actions.length > 30 });
+    } catch (error) {
+      res.status(error instanceof z.ZodError ? 400 : 500).json({ error: 'Unable to load care history' });
     }
   });
 
@@ -2727,12 +2742,26 @@ export async function registerRoutes(app: Express) {
       const input = careActionBodySchema.parse(req.body);
       const action = await db.transaction(async (tx) => {
         const createdAt = new Date();
+        // Lock the owner row so retries cannot create duplicate actions or reschedule twice.
+        const [current] = await tx.select().from(careContacts).where(and(eq(careContacts.id, contact.id), eq(careContacts.isArchived, false))).for('update');
+        if (!current) throw new Error('Care action conflict');
+        if (input.id) {
+          const [existing] = await tx.select().from(careActions).where(eq(careActions.id, input.id));
+          if (existing) {
+            if (existing.userId !== userId || existing.contactId !== contact.id || existing.actionType !== input.actionType || (existing.note || '') !== (input.note || '')) throw new Error('Care action conflict');
+            return existing;
+          }
+        }
         const [saved] = await tx.insert(careActions).values({
-          contactId: contact.id, userId, actionType: input.actionType, note: input.note || null, createdAt,
+          ...(input.id ? { id: input.id } : {}), contactId: contact.id, userId, actionType: input.actionType, note: input.note || null, createdAt,
         }).returning();
-        if (careActionTypesThatUpdateLastCared.has(input.actionType)) {
+        if (careActionTypesThatUpdateLastCared.has(input.actionType) || input.nextCareDate !== undefined || input.nextAction !== undefined) {
           await tx.update(careContacts)
-            .set({ lastCaredAt: createdAt, updatedAt: createdAt })
+            .set({ updatedAt: createdAt,
+              ...(careActionTypesThatUpdateLastCared.has(input.actionType) ? { lastCaredAt: createdAt } : {}),
+              ...(input.nextCareDate !== undefined ? { nextCareDate: input.nextCareDate } : {}),
+              ...(input.nextAction !== undefined ? { nextAction: input.nextAction } : {}),
+            })
             .where(and(eq(careContacts.id, contact.id), eq(careContacts.userId, userId)));
         }
         return saved;
@@ -2743,7 +2772,8 @@ export async function registerRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid care action", details: error.flatten() });
       }
-      console.error("[create-care-action] Error:", error);
+      if (error instanceof Error && error.message === 'Care action conflict') return res.status(409).json({ error: '紀錄已送出，請重新載入。' });
+      console.error("[create-care-action] Request failed");
       res.status(500).json({ error: "Failed to create care action" });
     }
   });

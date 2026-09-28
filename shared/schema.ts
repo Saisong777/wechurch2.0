@@ -379,6 +379,7 @@ export const careContacts = pgTable("care_contacts", {
   visibility: text("visibility").default("private").notNull(),
   isArchived: boolean("is_archived").default(false).notNull(),
   lastCaredAt: timestamp("last_cared_at"),
+  nextCareDate: date("next_care_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -396,7 +397,23 @@ export const careActions = pgTable("care_actions", {
 }, (table) => ({
   contactIdx: index("care_actions_contact_id_idx").on(table.contactId),
   userIdx: index("care_actions_user_id_idx").on(table.userId),
+  historyIdx: index('care_actions_history_idx').on(table.contactId, table.createdAt.desc(), table.id.desc()),
 }));
+
+export const careVisitRequests = pgTable('care_visit_requests', {
+  id: uuid('id').primaryKey(), senderId: uuid('sender_id').notNull().references(() => users.id),
+  contactId: uuid('contact_id').references(() => careContacts.id), church: text('church').notNull(),
+  name: text('name').notNull(), reason: text('reason').notNull(), contactMethod: text('contact_method').notNull(),
+  urgency: text('urgency').notNull(), status: text('status').notNull().default('open'),
+  assigneeId: uuid('assignee_id').references(() => users.id), dueDate: date('due_date'), nextAction: text('next_action').notNull().default(''),
+  version: integer('version').notNull().default(1), consentAt: timestamp('consent_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('care_visit_sender_idx').on(t.senderId, t.createdAt.desc()), index('care_visit_inbox_idx').on(t.church, t.status, t.urgency, t.createdAt),
+  check('care_visit_requests_urgency_check', sql`${t.urgency} IN ('normal','urgent')`), check('care_visit_requests_status_check', sql`${t.status} IN ('open','assigned','completed','cancelled')`), check('care_visit_requests_version_check', sql`${t.version}>0`)]);
+export const careVisitEvents = pgTable('care_visit_events', {
+  id: uuid('id').primaryKey().defaultRandom(), requestId: uuid('request_id').notNull().references(() => careVisitRequests.id),
+  actorId: uuid('actor_id').notNull().references(() => users.id), body: text('body').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('care_visit_events_request_idx').on(t.requestId, t.createdAt.desc())]);
 
 export const cardQuestions = pgTable("card_questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
