@@ -9,18 +9,21 @@ const { app, productionDeployment } = inspectStaging();
 const output = path.join(root, 'output/playwright/product-audit', randomUUID());
 fs.mkdirSync(output, { recursive: true, mode: 0o700 });
 const people = ['member', 'senior_pastor', 'admin'].map(role => {
-  const id = randomUUID(), authId = randomUUID(), sid = 'product-audit-' + randomUUID(), email = `product-audit-${id}@example.test`;
+  const id = randomUUID(), personId = randomUUID(), authId = randomUUID(), sid = 'product-audit-' + randomUUID(), email = `product-audit-${id}@example.test`;
   const expires = new Date(Date.now() + 1800000);
   const session = { cookie: { originalMaxAge: 1800000, expires: expires.toISOString(), secure: true, httpOnly: true, path: '/', sameSite: 'lax' }, passport: { user: { claims: { sub: authId, email }, sessionUserId: id, sessionVersion: 0, expires_at: Math.floor(expires.getTime() / 1000) } } };
   const signature = createHmac('sha256', app.SESSION_SECRET).update(sid).digest('base64').replace(/=+$/, '');
-  return { id, authId, sid, email, role, session, expires, cookie: encodeURIComponent(`s:${sid}.${signature}`) };
+  return { id, personId, authId, sid, email, role, session, expires, cookie: encodeURIComponent(`s:${sid}.${signature}`) };
 });
 const sql = value => `'${String(value).replaceAll("'", "''")}'`;
 const ids = people.map(p => sql(p.id)).join(',');
+const personIds = people.map(p => sql(p.personId)).join(',');
 const cli = path.join(process.env.HOME, '.codex/skills/playwright/scripts/playwright_cli.sh');
 let evidence;
 try {
   stagingSql('BEGIN;\n' + people.map(p => `INSERT INTO users(id,email,password,display_name,church) VALUES(${sql(p.id)},${sql(p.email)},'!disabled-fixture','網站驗收','IM 行動教會');
+    INSERT INTO persons(id,display_name,primary_email,church) VALUES(${sql(p.personId)},'網站驗收',${sql(p.email)},'IM 行動教會');
+    INSERT INTO person_identity_links(person_id,user_id,source_type) VALUES(${sql(p.personId)},${sql(p.id)},'user');
     INSERT INTO auth_users(id,email) VALUES(${sql(p.authId)},${sql(p.email)});
     INSERT INTO user_roles(user_id,role) VALUES(${sql(p.id)},${sql(p.role)});
     INSERT INTO auth_sessions(sid,sess,expire) VALUES(${sql(p.sid)},${sql(JSON.stringify(p.session))},${sql(p.expires.toISOString())});`).join('\n') + '\nCOMMIT;');
@@ -91,8 +94,9 @@ try {
   evidence=JSON.parse(result);
 } finally {
   try {execFileSync(cli,['-s=product-audit','close'],{cwd:root,stdio:'pipe',timeout:30000});}catch{ /* Cleanup still required. */ }
-  stagingSql(`BEGIN; DELETE FROM auth_sessions WHERE sid IN (${people.map(p=>sql(p.sid)).join(',')}); DELETE FROM user_roles WHERE user_id IN (${ids}); DELETE FROM users WHERE id IN (${ids}); DELETE FROM auth_users WHERE id IN (${people.map(p=>sql(p.authId)).join(',')}); COMMIT;`);
+  stagingSql(`BEGIN; DELETE FROM auth_sessions WHERE sid IN (${people.map(p=>sql(p.sid)).join(',')}); DELETE FROM user_roles WHERE user_id IN (${ids}); DELETE FROM person_identity_links WHERE person_id IN (${personIds}) AND user_id IN (${ids}); DELETE FROM persons WHERE id IN (${personIds}) AND primary_email IN (${people.map(p=>sql(p.email)).join(',')}); DELETE FROM users WHERE id IN (${ids}); DELETE FROM auth_users WHERE id IN (${people.map(p=>sql(p.authId)).join(',')}); COMMIT;`);
   assert.equal(stagingSql(`SELECT count(*) FROM users WHERE id IN (${ids})`),'0');
+  assert.equal(stagingSql(`SELECT count(*) FROM persons WHERE id IN (${personIds})`),'0');
 }
 assert.equal(inspectStaging().productionDeployment,productionDeployment);
 evidence={...evidence,fixtureRemoved:true,productionUnchanged:true,at:new Date().toISOString()};

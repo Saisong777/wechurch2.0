@@ -31,6 +31,7 @@ WeChurch 已經具備「個人靈修與禱告 → 主動分享 → 小家同行 
 若要委派教會行政寄信，應新增有範圍的郵件權限，不能再把「小家長」等同「全站郵件管理員」。
 
 來源：`server/routes.ts`、`server/storage.ts`、`server/crmPermissions.ts`、`server/pastoralJourneyRepository.ts`、`src/pages/AdminPage.tsx`、`src/hooks/useDevotionalNotes.ts`、`.github/workflows/ci.yml`；待啟用稿為 `design/ci-proposal-2026-09-29.yml`。
+修正定位：收件匣 `server/routes.ts:4312`、摘要 `server/routes.ts:4093`、寄信名單 `server/routes.ts:3889`、下載歷史 `server/routes.ts:3502`、email 投影 `server/pastoralJourneyRepository.ts:652`、發布基準 `scripts/railway-staging.mjs:41`。
 
 ## 1. 牧養教會
 
@@ -44,6 +45,7 @@ WeChurch 已經具備「個人靈修與禱告 → 主動分享 → 小家同行 
 
 ### 優先補齊
 
+**門訓開放流程尚未完成。** B 線上一般會員造訪 `/me/love-journey` 仍是 beta 限制頁，`/me/mentoring` 顯示尚未開放。有資料模型與領袖工具不等於會友已能使用；需要確認課程、陪伴者資格、同意與指派流程並驗收後開放，本輪未直接改功能旗標。
 1. **交接與逾期閉環。** 每件探訪／加入小家／求助有主要負責人、代理人、接受時間、下一步、到期日、結案原因；離職或轉任不得留下無人接手的案件。現有提醒主要在站內，不等於 LINE 或手機推播已送達。
 2. **可靠通知。** 先做資料庫 outbox、去重鍵、重試、失敗佇列、送達紀錄與收件偏好，再接外部通知。推播只顯示「有一則待處理關懷」，不要放疾病、家庭衝突或禱告正文。B 保持禁止對外發送。
 3. **保護與申訴。** 未成年人、家庭暴力、性騷擾與利益衝突需要不經原小家長的安全通道、最小可見範圍與真人值班規則。緊急事項不可承諾 App 會即時處理。需由教會確認負責人及政策，不能由程式自行決定。
@@ -91,6 +93,7 @@ WeChurch 已經具備「個人靈修與禱告 → 主動分享 → 小家同行 
 | P1 | 定期加密備份與金鑰復原 | 不只單次快照；連續執行證據、失敗通知、隔離還原演練與保管者可取得獨立金鑰 |
 | P1 | 牧養接手／逾期提醒 | 接受、轉交、逾期、代理與結案均有可追蹤結果；沒有默默消失的請求 |
 | P1 | 權限與個資治理 | 定期角色複核、同工離任撤權、保存期限、本人匯出／刪除、保護與申訴負責人 |
+| P1 | 集中發布與 CI | 授權啟用現役分支 CI，單一發布工作佇列；不得繞過版本／migration 基準檢查 |
 | P2 | 可觀測性與容量 | 分辨真錯誤、預期拒絕與健康檢查；有 p95／錯誤率／pool 等候／queue 深度與告警，不用任意健康分數 |
 | P2 | 接近正式配置的負載驗收 | 分別測讀經、私人筆記、分享牆與小家混合負載；1000 人在線不等於 1000 個並行 DB 查詢。未跑此測試不得保證承載人數 |
 | P2 | 模組化舊路由 | 約數千行 `server/routes.ts` 逐步按 auth／personal／community／pastoral／operations 拆分，先有契約測試；不要一次重寫 |
@@ -101,14 +104,21 @@ WeChurch 已經具備「個人靈修與禱告 → 主動分享 → 小家同行 
 
 ### 本輪發現的平行發布問題
 
-本次安全基準是 f87acbb，但另一分支在審查期間已發布領袖概況 84bdd83d，原发布工具只檢查本機 migration 已套用，未拒絕線上額外 migration 或尚未合併的版本。
+本次安全基準是 f87acbb，但另一分支在審查期間已發布領袖概況 84bdd83d，原發布工具只檢查本機 migration 已套用，未拒絕線上額外 migration 或尚未合併的版本。
 首次候選 d7951ac9 已取消；切換時舊服務已被停止，因此以原已驗收映像恢復為 0a2fd387，確認 SUCCESS 與 health 200。資料庫沒有回退或刪除。
 隨後合併 codex/leader-dashboard 的 82e838f，並增加發布基準與 migration 雙向檢查；合併後重新測試再發布，不以第一次候選當成果。此防護縮小競態窗口，但不是跨所有工具的全域部署鎖，後續仍應集中發布入口。
 
 ## 驗收紀錄
 
+- 合併領袖概況後：116 個測試檔、634 項功能測試、36 項部署與備份測試、型別與 production build 通過；包含新增發布防回退規則。
+- npm audit（包含與不包含開發套件）皆回報 0 已知漏洞；不等於應用程式安全認證。lint 為 0 errors、288 warnings，保留既有型別／hook 等技術債，未進行無關的大規模重寫。
 - 已通過隔離 PostgreSQL：7 角色 × 10 受限操作、guest 拒絕、admin 正向讀寫、退訂不寄送、email 顯示／搜尋遮蔽、逐人授權與撤權。
 - 筆記單元測試包括初始失敗、重新整理失敗保留快取、手動重試、裝置草稿、帳號隔離與格式錯誤。
-- 手機／桌面自動化腳本：`ops/verify-product-audit-staging.mjs`。部署與畫面驗收結果在執行後補記，不預先標完成。
+- B 部署 `19e0247e-072e-4e45-8f7b-717bcb6fc5e7` SUCCESS；來源 `3c0b1de`、556 檔指紋 `d7eca88fd15d7f7083a5dd75ff7bda6fc2a0ac23837960b772bb241453c5ee1e`，線上指紋／Git 來源與 health 200 已核對；A 仍為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`。
+- 手機／桌面自動化 `ops/verify-product-audit-staging.mjs`：35 個入口 × 390／1440 = 70 個初始頁面狀態，另有筆記錯誤／深色截圖。0 pageerror、0 橫向溢出、0 破圖；角色入口、503 不冒充空資料與重試恢復通過。合成會員、登入 session 與牧養身分已清除，保留必要系統操作紀錄。
+- 已目視首頁、每日靈修、小家新加入、筆記空白／失敗／深色、管理後台等代表截圖；沒有宣稱逐一操作所有頁面的每個按鈕。證據：`output/playwright/product-audit/e058c084-2f70-48fd-b98d-252db9f76ae6/results.json`，截圖留在本機、不提交會員資料到 GitHub。
+- Google 安全 smoke 通過：B 獨立 client、精確 callback、state／PKCE、假造／取消 callback 不建立登入；未重新真人授權。
+- 合併後的領袖概況另以合成小家在 B 驗證 320／390／1440、明暗外觀、實際出席儲存、未填區分、原案關懷更新、匿名代禱跳轉、管理員不自動取得牧養範圍、換領袖後歷史保留與前任撤權；測試帳號與合成小家資料已清除。證據：`output/playwright/leader-dashboard/15e811b4-19fd-4c9e-956b-05e616bc436a/results.json`。
+- 可及性後續：兩個功能限制頁缺主要內容 landmark；部分頁面缺內容層 heading，桌面返回鍵與授權連結、checkbox 等被尺寸探測標記。需結合可點 label、間距例外、鍵盤及螢幕閱讀器檢查；本輪不宣稱 WCAG 全面通過。
 - 真實 iPhone、本輪完整 Google OAuth、螢幕閱讀器、真實同工交接、全部動態詳情頁及所有角色組合未列為已驗收。
 - 安全工具回報相關 5 個 threads 的合計 token 為 23,434,985，其中 cached input 為 22,394,240；屬工具聚合量，不能當成本次新增 token 或費用。安全覆蓋狀態明確為 partial。
