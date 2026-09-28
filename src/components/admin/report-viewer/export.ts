@@ -1,3 +1,4 @@
+import { reportSlideScript } from "../../../../shared/reportSlideScript";
 // Export utilities for AI report viewer (Markdown & PDF/Print/PPTX)
 
 import { GroupReport } from './parse';
@@ -765,35 +766,7 @@ export function generatePPTHTML(sections: GroupReport[], verseReference?: string
         ${slides.join('\n')}
         <div class="nav-hint">← → 或點擊切換頁面</div>
         <div class="slide-counter"></div>
-        <script>
-          let currentSlide = 0;
-          const slides = document.querySelectorAll('.slide');
-          const counter = document.querySelector('.slide-counter');
-          
-          function showSlide(n) {
-            slides.forEach((s, i) => {
-              s.style.display = i === n ? 'flex' : 'none';
-            });
-            counter.textContent = (n + 1) + ' / ' + slides.length;
-          }
-          
-          document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight' || e.key === ' ') {
-              currentSlide = Math.min(currentSlide + 1, slides.length - 1);
-              showSlide(currentSlide);
-            } else if (e.key === 'ArrowLeft') {
-              currentSlide = Math.max(currentSlide - 1, 0);
-              showSlide(currentSlide);
-            }
-          });
-          
-          document.body.addEventListener('click', () => {
-            currentSlide = Math.min(currentSlide + 1, slides.length - 1);
-            showSlide(currentSlide);
-          });
-          
-          showSlide(0);
-        </script>
+        <script>${reportSlideScript}</script>
       </body>
     </html>
   `;

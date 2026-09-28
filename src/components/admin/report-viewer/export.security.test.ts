@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { generatePrintHTML, generatePPTHTML } from './export';
 import type { GroupReport } from './parse';
+import { reportSlideScript } from '../../../../shared/reportSlideScript';
 
 vi.mock('pptxgenjs', () => ({ default: class {} }));
 const payload = '</title><img src=x onerror="attack()"><script>attack()</script>&\'"';
@@ -26,6 +27,7 @@ describe('report HTML output encoding', () => {
     const doc = documentFor(generatePPTHTML([report({ [field]: payload })], payload));
     expect(doc.querySelector('img, [onerror]')).toBeNull();
     expect(doc.querySelectorAll('script')).toHaveLength(1);
+    expect(doc.querySelector('script')?.textContent).toBe(reportSlideScript);
     expect(doc.querySelector('script')?.textContent).not.toContain('attack');
     expect(doc.title).toContain(payload);
   });

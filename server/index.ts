@@ -6,6 +6,8 @@ import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
 import { drainServer } from './shutdown';
 import { permissionsPolicy, publicError } from './httpSafety';
+import { contentSecurityPolicy } from './contentSecurityPolicy';
+import { createSecuritySignals, securitySummaryMessage } from './securitySignals';
 import { recordErrorEvent, requestContext } from "./observability";
 import { assertDeploymentSafety, isTestDeployment, stagingAccessGate } from './deploymentSafety';
 
@@ -23,6 +25,12 @@ process.on("unhandledRejection", (reason) => {
 
 const app = express();
 app.disable("x-powered-by");
+const securitySignals = createSecuritySignals(summary => {
+  console.warn(JSON.stringify({ event: 'security.request-burst', ...summary }));
+  void recordErrorEvent({ source: 'security', level: 'warning', message: securitySummaryMessage(summary) });
+});
+setInterval(() => securitySignals.flush(), 60000).unref();
+app.use(securitySignals.middleware);
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -30,17 +38,7 @@ app.use((_req, res, next) => {
   res.setHeader("Permissions-Policy", permissionsPolicy);
   res.setHeader(
     "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://www.wechurch.online",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
+    contentSecurityPolicy(process.env.NODE_ENV === 'development'),
   );
   if (process.env.NODE_ENV === "production") {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");

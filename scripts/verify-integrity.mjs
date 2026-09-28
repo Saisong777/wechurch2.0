@@ -23,6 +23,7 @@ try {
       SESSION_SECRET: randomUUID()+randomUUID(), DISABLE_OUTBOUND_EMAIL: '1', DISABLE_MORNING_BRIEF: '1',
       UPLOAD_ROOT: uploadRoot, RUN_CAPACITY_BENCHMARK: process.env.RUN_CAPACITY_BENCHMARK === '1' ? '1' : '0',
       RUN_SECURITY_BROWSER: process.env.RUN_SECURITY_BROWSER === '1' ? '1' : '0',
+      SECURITY_BROWSER_OUTPUT_ROOT: process.env.SECURITY_BROWSER_OUTPUT_ROOT || '',
       API_RATE_LIMIT_MAX:'10000', API_WRITE_RATE_LIMIT_MAX:'10000' },
     stdio: 'inherit', timeout: 600000,
   });

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import express from 'express';
+import { contentSecurityPolicy } from '../server/contentSecurityPolicy';
 
 const url = new URL(process.env.DATABASE_URL!);
 assert(['127.0.0.1','localhost','[::1]'].includes(url.hostname));
@@ -24,6 +25,15 @@ try {
     finally { migrationClient.release(); }
   }
   const app = express(); app.use(express.json());
+  app.use((_req, res, next) => { res.setHeader('Content-Security-Policy', contentSecurityPolicy()); next(); });
+  if (process.env.RUN_SECURITY_BROWSER === '1') {
+    const { generatePPTHTML } = await import('../src/components/admin/report-viewer/export');
+    app.get('/__test/csp-report', (_req, res) => res.type('html').send(generatePPTHTML([
+      { groupNumber: 1, raw: '', observations: 'First disposable slide' },
+      { groupNumber: 2, raw: '', observations: 'Second disposable slide' },
+    ])));
+    app.get('/__test/csp-fallback', (_req, res) => res.type('html').send('<div id="root"></div><script src="/load-error.js"></script>'));
+  }
   const { registerRoutes } = await import('../server/routes');
   await registerRoutes(app);
   // Production serves the SPA for unmatched paths; uploads must not fall through.

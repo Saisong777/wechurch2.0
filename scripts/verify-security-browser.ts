@@ -56,7 +56,7 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
     cookie: { originalMaxAge: 1800000, expires: expires.toISOString(), secure: false, httpOnly: true, path: '/', sameSite: 'lax' },
     passport: { user: { claims: { sub: member.auth_id, email: member.email }, sessionUserId: userId, sessionVersion: member.session_version, expires_at: Math.floor(expires.getTime() / 1000) } },
   };
-  const directory = path.resolve('output/playwright/security', runId);
+  const directory = path.resolve(process.env.SECURITY_BROWSER_OUTPUT_ROOT || 'output/playwright/security', runId);
   await mkdir(directory, { recursive: true });
   const config = path.join(directory, 'cli.config.json');
   await writeFile(config, JSON.stringify({ browser: { browserName: 'chromium', isolated: true,
@@ -203,6 +203,41 @@ export async function verifySecurityBrowser(pool: Pool, origin: string, userId: 
         reports.push({ width, route: route.path, loadMore: Boolean(route.more), status: 'passed' });
       }
     }
+    const csp = await code(`
+      const probe = await page.context().newPage();
+      const violations = [];
+      await probe.exposeFunction('recordCspViolation', directive => violations.push(directive));
+      await probe.addInitScript(() => document.addEventListener('securitypolicyviolation', event => window.recordCspViolation(event.effectiveDirective)));
+      const response = await probe.goto(${JSON.stringify(origin + '/__test/csp-report')});
+      const policy = response.headers()['content-security-policy'];
+      await probe.locator('.slide-counter').filter({hasText:'1 /'}).waitFor();
+      await probe.keyboard.press('ArrowRight');
+      const slide = await probe.locator('.slide-counter').textContent();
+      await probe.evaluate(() => {
+        const script = document.createElement('script'); script.textContent = 'window.injectedScript = true'; document.body.appendChild(script);
+        const button = document.createElement('button'); button.setAttribute('onclick', 'window.injectedHandler = true'); document.body.appendChild(button); button.click();
+      });
+      await probe.waitForFunction(() => document.querySelector('button'));
+      const blocked = await probe.evaluate(() => !window.injectedScript && !window.injectedHandler);
+      await probe.goto(${JSON.stringify(origin + '/bible-quiz.html')});
+      await probe.locator('#btn-start').click();
+      await probe.locator('#d-opts button').first().waitFor({state:'visible'});
+      const question = await probe.locator('#d-q').textContent();
+      await probe.locator('#d-opts button').first().click();
+      await probe.locator('#d-fb').waitFor({state:'visible'});
+      await probe.goto(${JSON.stringify(origin + '/__test/csp-fallback')});
+      await probe.evaluate(() => window.dispatchEvent(new ErrorEvent('error',{message:'Loading chunk failed'})));
+      await probe.locator('#load-error-home').waitFor({state:'visible'});
+      await probe.locator('#load-error-home').click();
+      await probe.waitForURL(${JSON.stringify(origin + '/')});
+      await probe.close();
+      return {blocked, slide, question, policy, violations};
+    `);
+    assert.equal(csp.blocked, true, 'Injected inline scripts and handlers must not run');
+    assert.match(String(csp.slide), /^2 \/ /, 'Trusted offline slideshow navigation must work');
+    assert(String(csp.question).length > 3, 'External quiz script must populate a question');
+    assert.deepEqual((csp.violations as string[]).sort(), ['script-src-attr', 'script-src-elem']);
+    reports.push({scope:'CSP: injected scripts blocked, slideshow/quiz/fallback functional',status:'passed'});
     const audit = await code('return {fontsStubbed:page.__securityAudit.fontsStubbed};');
     await writeFile(path.join(directory, 'results.json'), JSON.stringify({ reports, ...audit, limitations: ['Disposable localhost fixtures only', 'External Google Fonts replaced with empty CSS for offline acceptance', '/profile is not registered; tested /me instead'] }, null, 2));
   } catch (error) {

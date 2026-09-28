@@ -21,7 +21,7 @@
     "db:migrate:local": "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/wechurch_dev npm run db:migrate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
-    "test:deployment": "node --test scripts/railway-staging-content.test.mjs scripts/backup-envelope.test.mjs scripts/content-tables.test.cjs scripts/member-data-hygiene.test.cjs ops/b-database-snapshot.test.mjs ops/verify-b-recovery-cleanup.test.mjs",
+    "test:deployment": "node --test scripts/railway-staging-content.test.mjs scripts/backup-envelope.test.mjs scripts/content-tables.test.cjs scripts/member-data-hygiene.test.cjs ops/b-database-snapshot.test.mjs ops/verify-b-recovery-cleanup.test.mjs ops/harden-b-perimeter.test.mjs",
     "test:integrity": "node scripts/verify-integrity.mjs",
     "check": "npm run typecheck && npm test && npm run test:deployment && npm run lint && npm run build",
     "lint:strict": "eslint . --max-warnings=0",
