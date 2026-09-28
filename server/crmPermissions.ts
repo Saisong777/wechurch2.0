@@ -144,7 +144,9 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   let canManageMembers = role === "pastor";
 
   for (const assignment of assignmentsResult.rows) {
-    const granted = !capability || roleGrant || (capability === 'careOrMembers' ? assignment.can_manage_care || assignment.can_manage_members : assignment[capability === 'personal' ? 'can_view_personal' : capability === 'care' ? 'can_manage_care' : 'can_manage_members']);
+    // A role's intrinsic appointment capabilities must not widen a separately
+    // delegated scope. Each explicit assignment grants only its selected abilities.
+    const granted = !capability || (capability === 'careOrMembers' ? assignment.can_manage_care || assignment.can_manage_members : assignment[capability === 'personal' ? 'can_view_personal' : capability === 'care' ? 'can_manage_care' : 'can_manage_members']);
     if (!granted) continue;
     if (assignment.scope_type === "church") addNormalized(churchScopes, assignment.church);
     if (assignment.scope_type === "group" && assignment.group_id) groupIds.add(assignment.group_id);

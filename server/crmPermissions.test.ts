@@ -40,6 +40,17 @@ describe('CRM grants keep their own scope', () => {
     expect(conditions.join(' ')).toContain('p.church = ANY');
     expect(params).toContainEqual(['Other']);
   });
+  it.each(['pastor', 'minister'])('%s does not upgrade a care-only assignment into personal or membership access', async role => {
+    assignments = [{ scope_type: 'member', member_user_id: 'b', can_view_personal: false, can_manage_care: true, can_manage_members: false }];
+    const people = [{ id: 'a' }, { id: 'b' }];
+    expect(filterUsersForCrmAccess(people, await getCrmAccessContext('leader', role, 'personal')).map(u => u.id)).toEqual(['a']);
+    expect(filterUsersForCrmAccess(people, await getCrmAccessContext('leader', role, 'members')).map(u => u.id)).not.toContain('b');
+    expect(filterUsersForCrmAccess(people, await getCrmAccessContext('leader', role, 'care')).map(u => u.id)).toEqual(['a', 'b']);
+    assignments[0].can_view_personal = true;
+    expect(filterUsersForCrmAccess(people, await getCrmAccessContext('leader', role, 'personal')).map(u => u.id)).toEqual(['a', 'b']);
+    assignments = [];
+    expect(filterUsersForCrmAccess(people, await getCrmAccessContext('leader', role, 'personal')).map(u => u.id)).toEqual(['a']);
+  });
   it('an unassigned senior pastor fails closed', async () => {
     query.mockResolvedValueOnce({ rows: [{ id: 'leader', church: null }] });
     const access = await getCrmAccessContext('leader', 'senior_pastor');

@@ -51,6 +51,10 @@ try {
       return response;
     };
   };
+  if (process.env.RUN_CHURCH_SIMULATION === '1') {
+    const { simulateChurch } = await import('./simulate-church');
+    await simulateChurch(pool, origin);
+  } else {
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
   const { verifyCareHttp } = await import('./verify-care-http');
   await verifyCareHttp(pool, makeClient);
@@ -168,6 +172,7 @@ try {
   }
   const { verifyLeaderDashboardHttp } = await import('./verify-leader-dashboard-http');
   await verifyLeaderDashboardHttp(pool, makeClient);
+  }
 } finally {
   if(server) await new Promise<void>(resolve=>server!.close(()=>resolve()));
   await pool.end();

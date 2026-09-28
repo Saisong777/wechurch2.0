@@ -22,5 +22,5 @@
       "@shared/*": ["./shared/*"]
     }
   },
-  "include": ["vite.config.ts", "drizzle.config.ts", "server"]
+  "include": ["vite.config.ts", "drizzle.config.ts", "server", "scripts/simulate-church.ts"]
 }
