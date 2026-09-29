@@ -1,5 +1,9 @@
 # Single active church
 
+Update 2026-09-29: Sai subsequently authorized assigning all current B members.
+All 68 accounts are now assigned to iM; see [assignment evidence](member-church-assignment-2026-09-29.md).
+The original catalog-only change described below did not itself assign membership.
+
 Sai requested that all church choices be removed except iM行動教會. The active
 catalog is now defined in shared/churches.ts and reused by the server and UI.
 Its existing persisted ID remains IM 行動教會 to avoid rewriting membership,
