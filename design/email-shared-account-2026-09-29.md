@@ -16,6 +16,7 @@
 - 每日信尊重訂閱、偏好時間／時區及同一天寄送紀錄；手動測試不占用排程寄送紀錄。
 - 信中連結留在所屬站台，模板跳轉只允許同來源；新增登入後管理訂閱／停止接收入口。
 - 「服務已接受」與實際送達明確區分。
+- 補齊下載紀錄及會員資料提醒的舊入口：相容通知類型、收件人確認／上限、附件上限、B狀態、部分失敗顯示及同請求重試識別。小螢幕姓名／地址上下排列。
 
 ## 帳號接手步驟（尚待完成）
 
@@ -39,7 +40,14 @@
 
 - [Resend 冪等鍵](https://resend.com/docs/dashboard/emails/idempotency-keys)：有效期24小時；不同內容重用相同鍵會衝突。這不是永久 exactly-once 保證。
 - [Resend 網域 Claim](https://resend.com/changelog/domain-claim)：轉移可能將網域自原團隊釋出，因此不可直接用新帳號搶移。
+- [Resend Send Email API](https://resend.com/docs/api-reference/emails/send-email)：HTTP寄送格式、附件及冪等鍵。
 
 ## 驗收
 
-工程測試與 B 發布結果在本輪完成後補記。公用帳號、DNS、真實外寄、實體手機與 A 切換均須獨立驗收。
+- 來源 `7a2f4d3`；B `746de00e-9916-467b-b2b6-e1b71d169a53` SUCCESS，指紋 `d41872bd927b13ef263d21aa4b01b1d57087a42ce4e75391689778d1d9aa71b3`。
+- 型別檢查、666功能測試、36部署保護測試、隔離PostgreSQL整合及正式打包通過；變更檔lint零錯誤，既有警告未全面清理。
+- B實際API：預覽202且success=false／previewOnly=true，連結B同來源，群發503；沒有真實外寄。
+- 320／390／1440px瀏覽器：本人預覽、預設0收件人、選擇後仍禁止B寄送、無橫向溢出、零頁面異常；另檢視深色畫面。
+- 證據：`output/playwright/email/ea5dcea9-6ec7-4257-a233-488776396683/results.json` 與截圖；臨時測試會員／登入session清除，缺席回讀通過。
+- A仍為 `a8a4db29-527f-4cc3-8d17-caed230f69cb`，沒有改變部署或憑證。GitHub-safe版本紀錄見 `design/releases/b-746de00e-9916-467b-b2b6-e1b71d169a53.json`。
+- 公用帳號登入、DNS、真實外寄、實體手機與 A 切換均未完成，不包含在以上通過範圍。
