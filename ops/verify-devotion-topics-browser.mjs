@@ -71,6 +71,8 @@ async function journey(page, config) {
     await page.getByRole('button', { name: '編輯 2026-09-01', exact: true }).click();
     await page.getByRole('dialog').waitFor();
     if (await page.getByLabel('課表名稱', { exact: true }).inputValue() !== fixture[0].planName) throw Error('Wrong editor target');
+    // Escape from the text field, not the auto-focused native date control.
+    await page.getByLabel('課表名稱', { exact: true }).click();
     await page.keyboard.press('Escape');
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
     await page.getByLabel('搜尋', { exact: true }).fill('今日焦點');

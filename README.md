@@ -6,6 +6,7 @@
 固定還原點請使用 Git tag 與 `design/releases/` 的 exact sourceCommit；最新線上狀態需以 B 的版本指紋回讀確認，不能把下列歷史快照當作目前部署。
 
 - [全站審查、第一批修正與後續順序](design/product-audit-2026-09-29.md)
+- [每日靈修後台主題分組與收合驗收](design/devotion-topic-admin-2026-09-29.md)：依課表名稱分組，保留匯入、編輯與批次操作；B 已驗收，未更動課程內容。
 - [500 人／30 小家／5 管理範圍的完整情境與半年資料量驗收](design/church-simulation-500-2026-09-29.md)：`npm run test:church500`、`npm run test:church500:history`；只用一次性 localhost DB，不是 Railway 容量認證。
 - [AI 退役與系統紀錄](design/ai-retirement-2026-09-28.md)
 - [CI 改善稿](design/ci-proposal-2026-09-29.yml)已加入現役分支及 PostgreSQL 回歸，但目前 GitHub 憑證缺少 workflow scope，尚未啟用；本輪沿用 B 發布工具的完整本機檢查，不宣稱雲端 CI 通過。
@@ -47,7 +48,7 @@ A 發布仍須另行授權。舊服務的底層異常未由 Railway 證實；
 - 2026-09-25 每日靈修改為經文／靈修／禱告分頁、可調字級及分段原文；見 [閱讀頁驗收](reader-audit-2026-09-25.md)。
 - 2026-09-25 已將 9/24 快照的 62 位舊會員、105 篇筆記與 1,114 筆打卡匯入 B；見 [匯入與剩餘門檻](im-bible-b-import-2026-09-25.md)。A 尚未切換。
 - 2026-09-25 新增明亮／暗色／跟隨裝置，見 [外觀驗收](appearance-2026-09-25.md)。
-- `node ops/verify-b-checkpoint.mjs` 可以逐檔核對版本；不需要資料庫或密碼。
+- `node ops/verify-b-checkpoint.mjs` 僅核對根目錄歷史 `release-manifest.json` 對應的 checkpoint；現役分支已變更時不適用。新版部署用 `staging:release:record` 核對發布快照與線上指紋，紀錄在 `design/releases/`。
 - `design/releases/` 保存發布紀錄時，`sourceCommit` 指向確切來源提交，不以日期或分支名稱代替。
 
 ## A / B 工作規則
