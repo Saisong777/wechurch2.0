@@ -28,10 +28,14 @@ export async function verifyAuditBoundaries(pool: Pool, actor: Client, guest: Cl
     await pool.query("UPDATE user_roles SET role='admin' WHERE user_id=$1", [actorId]);
     for (const [path, method, body] of routes.slice(0, 7)) assert.equal((await actor(path, method, body)).status, 200, path);
     await pool.query('INSERT INTO user_email_preferences(user_id,daily_follow_enabled) VALUES($1,false) ON CONFLICT(user_id) DO UPDATE SET daily_follow_enabled=false', [targetId]);
-    const skipped = await actor('/api/admin/daily-follow-email/send', 'POST', { userIds: [targetId], dryRun: false });
+    const skipped = await actor('/api/admin/daily-follow-email/send', 'POST', { userIds: [targetId], dryRun: true });
     assert.equal(skipped.status, 200);
     assert.equal((await skipped.json()).total, 0, 'Explicit selection cannot override opt-out');
-    await pool.query('UPDATE user_email_preferences SET daily_follow_enabled=true WHERE user_id=$1', [targetId]);
+    const blockedSend = await actor('/api/admin/daily-follow-email/send', 'POST', { userIds: [targetId], dryRun: false });
+    assert.equal(blockedSend.status, 503, 'Disabled mail must not report a successful send');
+    assert.equal((await guest('/api/email-provider-status')).status, 401);
+    assert.equal((await actor('/api/email-preferences', 'PATCH', { dailyFollowTime: '25:99' })).status, 400);
+    await pool.query("UPDATE user_email_preferences SET daily_follow_enabled=true,daily_follow_time='00:00',timezone='UTC',last_daily_follow_sent_at=null WHERE user_id=$1", [targetId]);
     const preview = await actor('/api/admin/daily-follow-email/send', 'POST', { userIds: [targetId], dryRun: true });
     assert.equal(preview.status, 200);
     const data = await preview.json(); assert.equal(data.total, 1); assert.equal(data.failed, 0);

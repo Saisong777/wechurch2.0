@@ -8,6 +8,8 @@ import fs from "fs";
 import { uploadRoot, messageCardRoot } from './uploadPaths';
 import { rasterExtension, rasterOnly, setMediaHeaders } from './uploadSafety';
 import { apiIdentity, boundedWindowLimiter, clientAddress } from './requestLimits';
+import { bulkEmailInput, emailPreferencesInput, mailbox } from '@shared/email';
+import { dailyEmailDue, emailAppUrl, emailProviderStatus, escapeEmailHtml } from './emailPolicy';
 import { randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -3837,9 +3839,18 @@ export async function registerRoutes(app: Express) {
   });
 
   // Profile notification endpoint using Resend integration
-  app.post("/api/send-profile-notification", requireAdmin, async (req, res) => {
+  const mailLimit = boundedWindowLimiter({ max: 5, windowMs: 15 * 60_000, key: apiIdentity });
+  app.post("/api/send-profile-notification", requireAdmin, mailLimit, async (req, res) => {
     try {
-      const { email, name, type, redirectUrl } = req.body;
+      const parsed = z.object({ email: mailbox, name: z.string().trim().max(200), type: z.enum(['welcome', 'session_invite', 'notification']), redirectUrl: z.string().max(2000).default('/') }).safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: '通知內容格式不正確' });
+      let redirectUrl: string;
+      try { redirectUrl = escapeEmailHtml(emailAppUrl(parsed.data.redirectUrl)); }
+      catch { return res.status(400).json({ error: '通知連結必須指向本站' }); }
+      const { email, type } = parsed.data;
+      const name = escapeEmailHtml(parsed.data.name);
+      const status = emailProviderStatus();
+      if (!status.canSend) return res.status(503).json({ error: status.message });
 
       const { sendEmail } = await import('./resend');
 
@@ -3987,17 +3998,9 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/email-provider-status", async (_req, res) => {
-    const hasResendKey = Boolean(process.env.RESEND_API_KEY);
-    const hasReplitConnector = Boolean(
-      process.env.REPLIT_CONNECTORS_HOSTNAME &&
-      (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL)
-    );
-
-    res.json({
-      configured: hasResendKey || hasReplitConnector,
-      mode: hasResendKey ? "resend_api_key" : hasReplitConnector ? "replit_connector" : "preview_only",
-    });
+  app.get("/api/email-provider-status", async (req, res) => {
+    if (!await resolveUserId(req)) return res.status(401).json({ error: 'Unauthorized' });
+    res.json(emailProviderStatus());
   });
 
   app.patch("/api/email-preferences", async (req, res) => {
@@ -4007,12 +4010,7 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const preferenceSchema = z.object({
-        dailyFollowEnabled: z.boolean().optional(),
-        dailyFollowTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-        timezone: z.string().trim().min(1).max(80).optional(),
-      });
-      const parsed = preferenceSchema.safeParse(req.body || {});
+      const parsed = emailPreferencesInput.safeParse(req.body || {});
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid email preferences", details: parsed.error.flatten() });
       }
@@ -4043,7 +4041,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/daily-follow-email/send-test", async (req, res) => {
+  app.post("/api/daily-follow-email/send-test", mailLimit, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -4055,42 +4053,22 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "User email not found" });
       }
 
+      const status = emailProviderStatus();
+      if (!status.canSend) {
+        const { buildDailyFollowEmail } = await import('./dailyFollowEmail');
+        const preview = await buildDailyFollowEmail(user);
+        return res.status(202).json({ success: false, previewOnly: true, message: status.message, ...preview });
+      }
       const { sendDailyFollowEmail } = await import("./dailyFollowEmail");
       const context = await sendDailyFollowEmail(user);
       res.json({ success: true, sent: 1, context });
     } catch (error: any) {
-      if (error?.message === "EMAIL_PROVIDER_NOT_CONFIGURED" || error?.message?.includes("X_REPLIT_TOKEN")) {
-        try {
-          const userId = await resolveUserId(req);
-          const user = userId ? await storage.getUser(userId) : null;
-          if (!user?.email) {
-            return res.status(503).json({
-              error: "Email provider not configured",
-              message: "本機尚未連接寄信服務，也找不到使用者 email。",
-            });
-          }
-
-          const { buildDailyFollowEmail } = await import("./dailyFollowEmail");
-          const preview = await buildDailyFollowEmail(user);
-          return res.status(202).json({
-            success: false,
-            previewOnly: true,
-            message: "本機尚未連接 Resend 寄信服務，已改為產生測試信預覽。正式部署設定 Resend 後會真的寄出。",
-            subject: preview.subject,
-            html: preview.html,
-            text: preview.text,
-            context: preview.context,
-          });
-        } catch (previewError: any) {
-          console.error("Error building daily follow test email preview:", previewError);
-        }
-      }
-      console.error("Error sending daily follow test email:", error);
-      res.status(500).json({ error: "Failed to send daily follow test email", message: error.message });
+      console.error("Daily follow test failed");
+      res.status(500).json({ error: "EMAIL_TEST_FAILED", message: "無法確認測試信結果，請先檢查收件匣，稍後再試。" });
     }
   });
 
-  app.post("/api/admin/daily-follow-email/send", requireAdmin, async (req, res) => {
+  app.post("/api/admin/daily-follow-email/send", requireAdmin, mailLimit, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -4112,12 +4090,13 @@ export async function registerRoutes(app: Express) {
       }
 
       const { userIds, dryRun, limit } = parsed.data;
+      if (!dryRun && !emailProviderStatus().canSend) return res.status(503).json({ error: emailProviderStatus().message });
       const allUsers = await storage.getUsers();
       const enabledPreferences = await db
         .select()
         .from(userEmailPreferences)
         .where(eq(userEmailPreferences.dailyFollowEnabled, true));
-      const enabledUserIds = new Set(enabledPreferences.map((preference) => preference.userId));
+      const enabledUserIds = new Set(enabledPreferences.filter(preference => dailyEmailDue(preference)).map(preference => preference.userId));
       const selectedUsers = allUsers
         .filter((user) => user.email && enabledUserIds.has(user.id) && (!userIds || userIds.includes(user.id)))
         .slice(0, limit ?? 500);
@@ -4138,7 +4117,7 @@ export async function registerRoutes(app: Express) {
             const email = await buildDailyFollowEmail(user);
             results.previews.push({ userId: user.id, email: user.email, subject: email.subject });
           } else {
-            await sendDailyFollowEmail(user);
+            await sendDailyFollowEmail(user, new Date(), enabledPreferences.find(p => p.userId === user.id)!.timezone);
             results.sent++;
             results.previews.push({ userId: user.id, email: user.email, subject: "" });
           }
@@ -4171,12 +4150,13 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
       }
 
+      if (!parsed.data.dryRun && !emailProviderStatus().canSend) return res.status(503).json({ error: emailProviderStatus().message });
       const allUsers = await storage.getUsers();
       const enabledPreferences = await db
         .select()
         .from(userEmailPreferences)
         .where(eq(userEmailPreferences.dailyFollowEnabled, true));
-      const enabledUserIds = new Set(enabledPreferences.map((preference) => preference.userId));
+      const enabledUserIds = new Set(enabledPreferences.filter(preference => dailyEmailDue(preference)).map(preference => preference.userId));
       const selectedUsers = allUsers
         .filter((user) => user.email && enabledUserIds.has(user.id))
         .slice(0, parsed.data.limit ?? allUsers.length);
@@ -4188,7 +4168,7 @@ export async function registerRoutes(app: Express) {
           if (parsed.data.dryRun) {
             await buildDailyFollowEmail(user);
           } else {
-            await sendDailyFollowEmail(user);
+            await sendDailyFollowEmail(user, new Date(), enabledPreferences.find(p => p.userId === user.id)!.timezone);
             results.sent++;
           }
         } catch (error: any) {
@@ -4204,7 +4184,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/send-bulk-email", requireAdmin, async (req, res) => {
+  app.post("/api/send-bulk-email", requireAdmin, mailLimit, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
@@ -4215,31 +4195,17 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const { recipients, subject, body, isHtml, attachments } = req.body;
-
-      if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-        return res.status(400).json({ error: "Recipients required" });
-      }
-      if (!subject || typeof subject !== 'string') {
-        return res.status(400).json({ error: "Subject required" });
-      }
-      if (!body || typeof body !== 'string') {
-        return res.status(400).json({ error: "Body required" });
-      }
-      if (attachments && Array.isArray(attachments)) {
-        if (attachments.length > 5) {
-          return res.status(400).json({ error: "Maximum 5 attachments allowed" });
-        }
-        for (const att of attachments) {
-          if (!att.filename || !att.content) {
-            return res.status(400).json({ error: "Invalid attachment format" });
-          }
-        }
-      }
+      const parsed = bulkEmailInput.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: '郵件格式不正確：每次最多 100 人，附件合計 2MB。' });
+      const { recipients, subject, body, isHtml, attachments, requestId } = parsed.data;
+      const allowedEmails = new Set((await storage.getUsers()).map(user => user.email.toLowerCase()));
+      if (recipients.some(r => !allowedEmails.has(r.email.toLowerCase()))) return res.status(403).json({ error: '只能寄給本站會員' });
+      const status = emailProviderStatus();
+      if (!status.canSend) return res.status(503).json({ error: status.message });
 
       const { sendBulkEmail } = await import('./resend');
 
-      const result = await sendBulkEmail(recipients, subject, body, isHtml !== false, attachments);
+      const result = await sendBulkEmail(recipients, subject, body, isHtml, attachments, requestId);
 
       res.json(result);
     } catch (error: any) {

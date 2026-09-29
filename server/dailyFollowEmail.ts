@@ -7,14 +7,7 @@ import { withDevotionScripture } from './devotionScripture';
 import { db } from "./db";
 import { sendEmail } from "./resend";
 import { storage } from "./storage";
-
-const DEFAULT_APP_URL = "https://www.wechurch.online";
-
-function appUrl(path = "/") {
-  const base = (process.env.PUBLIC_APP_URL || process.env.APP_URL || DEFAULT_APP_URL).replace(/\/+$/, "");
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
-}
+import { emailAppUrl as appUrl } from './emailPolicy';
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -254,6 +247,7 @@ export async function buildDailyFollowEmail(user: User, date = new Date()): Prom
                 <p style="margin:10px 0 0;color:#66758c;font-size:13px;">
                   <a href="${appUrl("/grace-record")}" style="color:#3182ce;text-decoration:none;">打開個人禱告與恩典紀錄簿</a>
                 </p>
+                <p style="margin:10px 0 0;font-size:13px;"><a href="${appUrl("/me")}" style="color:#66758c;">管理每日信訂閱或停止接收</a></p>
               </td>
             </tr>
           </table>
@@ -290,6 +284,7 @@ export async function buildDailyFollowEmail(user: User, date = new Date()): Prom
     `禱告牆：${appUrl("/prayer-wall")}`,
     `關懷：${appUrl("/care")}`,
     `個人禱告與恩典紀錄簿：${appUrl("/grace-record")}`,
+    `管理每日信訂閱或停止接收：${appUrl("/me")}`,
   ].join("\n");
 
   return {
@@ -306,15 +301,18 @@ export async function buildDailyFollowEmail(user: User, date = new Date()): Prom
   };
 }
 
-export async function sendDailyFollowEmail(user: User, date = new Date()) {
+export async function sendDailyFollowEmail(user: User, date = new Date(), scheduledTimezone?: string) {
   const email = await buildDailyFollowEmail(user, date);
   await sendEmail({
     to: user.email,
     subject: email.subject,
     html: email.html,
     text: email.text,
+    ...(scheduledTimezone ? { idempotencyKey: `daily/${user.id}/${new Intl.DateTimeFormat('en-CA', { timeZone: scheduledTimezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)}` } : {}),
   });
 
+  // A manual test email must not consume today's scheduled delivery.
+  if (!scheduledTimezone) return email.context;
   await db
     .insert(userEmailPreferences)
     .values({

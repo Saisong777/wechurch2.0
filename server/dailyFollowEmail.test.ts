@@ -1,18 +1,59 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { careContacts, prayers, type User } from '@shared/schema';
 
-const mocks = vi.hoisted(() => ({ select: vi.fn(), sendEmail: vi.fn(), getPrayers: vi.fn() }));
-vi.mock('./db', () => ({ db: { select: mocks.select } }));
+const mocks = vi.hoisted(() => ({ select: vi.fn(), insert: vi.fn(), sendEmail: vi.fn(), getPrayers: vi.fn() }));
+vi.mock('./db', () => ({ db: { select: mocks.select, insert: mocks.insert } }));
 vi.mock('./resend', () => ({ sendEmail: mocks.sendEmail }));
 vi.mock('./storage', () => ({ storage: { getPrayers: mocks.getPrayers, getBibleVerses: vi.fn(), getDevotionalNoteByVerseReference: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock('./churchDevotionRepository', () => ({ getManagedChurchDevotion: vi.fn().mockResolvedValue({ entry: null }) }));
 vi.mock('./churchDevotionPublic', () => ({ managedDevotionBrief: vi.fn(() => ({})) }));
 vi.mock('./devotionScripture', () => ({ withDevotionScripture: vi.fn().mockResolvedValue({ scriptureReference: 'John 1:1', dayNumber: 1, previewVerses: [], devotionalTitle: 'Reading', devotionalText: 'Text' }) }));
-import { buildDailyFollowEmail } from './dailyFollowEmail';
+import { buildDailyFollowEmail, sendDailyFollowEmail } from './dailyFollowEmail';
 
 const dialect = new PgDialect();
 beforeEach(() => vi.clearAllMocks());
+afterEach(() => vi.unstubAllEnvs());
+
+function emptyReading() {
+  mocks.select.mockImplementation(() => ({ from: () => ({ where: () => ({ orderBy: () => ({ limit: async () => [] }) }) }) }));
+}
+const reader = { id: 'test-user', displayName: '<Reader>', email: 'reader@example.test' } as User;
+
+it('keeps all preview links on B including subscription management', async () => {
+  emptyReading();
+  vi.stubEnv('APP_ENV', 'staging');
+  vi.stubEnv('PUBLIC_BASE_URL', 'https://b.example.test');
+  const email = await buildDailyFollowEmail(reader);
+  expect(email.html).toContain('https://b.example.test/me');
+  expect(email.text).toContain('https://b.example.test/me');
+  expect(email.html).not.toContain('https://wechurch.online');
+  expect(email.html).not.toContain('<Reader>');
+});
+
+it('manual test does not consume a scheduled daily email or create an opt-in', async () => {
+  emptyReading();
+  mocks.sendEmail.mockResolvedValue({ data: { id: 'accepted' } });
+  await sendDailyFollowEmail(reader);
+  expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
+  expect(mocks.sendEmail.mock.calls[0][0].idempotencyKey).toBeUndefined();
+  expect(mocks.insert).not.toHaveBeenCalled();
+});
+
+it('updates scheduled date only after provider acceptance, without changing opt-in', async () => {
+  emptyReading();
+  const update = vi.fn().mockResolvedValue(undefined);
+  mocks.insert.mockReturnValue({ values: () => ({ onConflictDoUpdate: update }) });
+  mocks.sendEmail.mockResolvedValue({ data: { id: 'accepted' } });
+  const date = new Date('2026-09-28T23:00:00Z');
+  await sendDailyFollowEmail(reader, date, 'Asia/Taipei');
+  expect(mocks.sendEmail.mock.calls[0][0].idempotencyKey).toBe('daily/test-user/2026-09-29');
+  expect(update.mock.calls[0][0].set).toEqual({ lastDailyFollowSentAt: date, updatedAt: date });
+  mocks.insert.mockClear();
+  mocks.sendEmail.mockRejectedValueOnce(new Error('EMAIL_SEND_UNCONFIRMED'));
+  await expect(sendDailyFollowEmail(reader, date, 'Asia/Taipei')).rejects.toThrow('EMAIL_SEND_UNCONFIRMED');
+  expect(mocks.insert).not.toHaveBeenCalled();
+});
 
 it('selects only open unanswered prayers, pinned first and newest first, with a database limit of three', async () => {
   const rows = [

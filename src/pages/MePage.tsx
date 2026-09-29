@@ -27,6 +27,7 @@ import { useDevotionalNotes } from '@/hooks/useDevotionalNotes';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from 'sonner';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
+import type { EmailProviderStatus } from '@shared/email';
 
 interface EmailPreferences {
   userId: string;
@@ -34,11 +35,6 @@ interface EmailPreferences {
   dailyFollowTime: string;
   timezone: string;
   lastDailyFollowSentAt: string | null;
-}
-
-interface EmailProviderStatus {
-  configured: boolean;
-  mode: 'resend_api_key' | 'replit_connector' | 'preview_only';
 }
 
 const recordActions = [
@@ -124,7 +120,7 @@ const MePage = () => {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['/api/email-preferences'], data);
-      toast.success(data.dailyFollowEnabled ? '每日同行信已開啟' : '每日同行信已關閉');
+      toast.success(data.dailyFollowEnabled ? (emailProviderStatus?.canSend ? '每日同行信偏好已開啟' : '訂閱偏好已儲存，目前不會寄信') : '每日同行信已關閉');
     },
     onError: () => {
       toast.error('設定沒有成功更新，請再試一次');
@@ -138,11 +134,11 @@ const MePage = () => {
     onSuccess: (data) => {
       if (data?.previewOnly) {
         setEmailPreview({ subject: data.subject, text: data.text });
-        toast.info('本機尚未連接寄信服務，已產生測試信預覽；正式部署後會真的寄出。');
+        toast.info(data.message || '已產生預覽，沒有寄出郵件。');
         return;
       }
       setEmailPreview(null);
-      toast.success('測試信已寄出');
+      toast.success('測試信已交付寄信服務，請檢查收件匣');
     },
     onError: () => {
       toast.error('測試信寄送失敗，請確認帳號 email 與寄信設定');
@@ -231,11 +227,11 @@ const MePage = () => {
                       <div className="min-w-0">
                         <h3 className="text-base font-bold text-foreground">每日同行信</h3>
                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          每天早上把今日靈修、禱告牆代求與關懷提醒整理成一封信。
+                          今日靈修、禱告牆代求與關懷提醒。
                         </p>
-                        {emailProviderStatus && !emailProviderStatus.configured && (
-                          <p className="mt-2 text-sm leading-6 text-amber-700">
-                            本機尚未連接寄信服務，目前只能預覽測試信。
+                        {emailProviderStatus && !emailProviderStatus.canSend && (
+                          <p role="status" className="mt-2 text-sm leading-6 text-muted-foreground">
+                            {emailProviderStatus.message}
                           </p>
                         )}
                       </div>
@@ -251,7 +247,7 @@ const MePage = () => {
                   <div className="mt-4 flex flex-col gap-3 rounded-lg border border-sky-100 bg-card/80 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-sky-600" />
-                      <span>每天 {emailPreferences?.dailyFollowTime || '07:00'}（台灣時間）寄出</span>
+                      <span>偏好時間：{emailPreferences?.dailyFollowTime || '07:00'}（{emailPreferences?.timezone || 'Asia/Taipei'}）</span>
                     </div>
                     <Button
                       variant="outline"
@@ -261,7 +257,7 @@ const MePage = () => {
                       disabled={sendTestEmail.isPending}
                     >
                       <Send className="h-4 w-4" />
-                      {emailProviderStatus?.configured ? '寄測試信' : '預覽測試信'}
+                      {emailProviderStatus?.canSend ? '寄測試信' : '預覽測試信'}
                     </Button>
                   </div>
 
