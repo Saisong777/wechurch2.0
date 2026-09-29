@@ -74,7 +74,7 @@ export async function changeAccountRole(actor: string, targetId: string, role: s
     await c.query("SELECT pg_advisory_xact_lock(hashtext('access-account-roles'))");
     const target=await accessActor(targetId,c), a=await director(actor,target.church || '',c);
     if(a.role!=='admin' && ([role,target.role].some(r=>['admin','senior_pastor'].includes(r))))throw new GroupError(403,'管理者職分限系統管理員調整。');
-    if(target.role==='admin' && role!=='admin' && Number((await c.query("SELECT count(*) FROM user_roles WHERE role='admin'")).rows[0].count)<=1)throw new GroupError(409,'不可移除最後一位系統管理員。');
+    if(target.role==='admin' && role!=='admin' && Number((await c.query("SELECT count(DISTINCT user_id) FROM user_roles WHERE role='admin'")).rows[0].count)<=1)throw new GroupError(409,'不可移除最後一位系統管理員。');
     const updated=await c.query('UPDATE user_roles SET role=$2,updated_at=now() WHERE user_id=$1',[targetId,role]);
     if(!updated.rowCount)await c.query('INSERT INTO user_roles(user_id,role) VALUES($1,$2)',[targetId,role]);
     await audit(c,actor,target.church || '',targetId,'變更既有帳號角色',{role:target.role},{role});

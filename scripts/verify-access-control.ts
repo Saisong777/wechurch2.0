@@ -118,6 +118,9 @@ export async function verifyAccessControl(pool:Pool,makeClient:()=>Client){
   await pool.query("UPDATE user_roles SET role='member' WHERE role='admin' AND user_id<>$1",[admin.id]);
   assert.equal((await admin.client('/api/access-control/account-role/'+admin.id,'PUT',{role:'member'})).status,409);
   assert.equal((await admin.client('/api/user-roles/'+admin.id,'PUT',{role:'member'})).status,409);
+  const duplicate=(await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'admin') RETURNING id",[admin.id])).rows[0].id;
+  try{assert.equal((await admin.client('/api/access-control/account-role/'+admin.id,'PUT',{role:'member'})).status,409,'duplicate legacy rows do not represent another administrator');}
+  finally{await pool.query('DELETE FROM user_roles WHERE id=$1',[duplicate]);}
  }finally{await pool.query("UPDATE user_roles SET role='admin' WHERE user_id=ANY($1::uuid[])",[beforeAdmins]);}
  assert((await pool.query("SELECT count(*)::int AS n FROM access_audit WHERE actor_id=$1",[admin.id])).rows[0].n>=8);
  console.log('PASS access controls: multi-role, strict scopes, no self-escalation/private data, explicit preset application, stale writes, expiry, church transfer, revocation, audit and last-admin protection');
