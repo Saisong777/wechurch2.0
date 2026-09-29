@@ -15,7 +15,11 @@ const session = { cookie: { originalMaxAge: 1800000, expires: expires.toISOStrin
 const cookie = encodeURIComponent(`s:${sid}.${createHmac('sha256', state.app.SESSION_SECRET).update(sid).digest('base64').replace(/=+$/, '')}`);
 const sql = value => `'${String(value).replaceAll("'", "''")}'`;
 const wrapper = path.join(process.env.HOME, '.codex/skills/playwright/scripts/playwright_cli.sh');
-const cli = (...args) => execFileSync(wrapper, ['-s=email-acceptance', ...args], { cwd: root, encoding: 'utf8', timeout: 240000, maxBuffer: 4 * 1024 * 1024 });
+let browserOperation = '';
+const cli = (...args) => {
+  browserOperation = args[0];
+  return execFileSync(wrapper, ['-s=email-acceptance', ...args], { cwd: root, encoding: 'utf8', timeout: 240000, maxBuffer: 4 * 1024 * 1024 });
+};
 let result;
 async function journey(page, { origin, code, cookie, id, email, output, controlled }) {
   const errors = [], checks = [];
@@ -28,6 +32,10 @@ async function journey(page, { origin, code, cookie, id, email, output, controll
   const status = await (await page.context().request.get(origin + '/api/email-provider-status')).json();
   if (status.canSend !== controlled) throw Error('B email policy mismatch');
   if (controlled && !status.remindersEnabled) throw Error('B reminder scheduler not enabled');
+  const directory = await page.context().request.get(origin + '/api/admin/users-for-email');
+  if (directory.status() !== 200) throw Error('Pastor email directory denied');
+  const visible = await directory.json();
+  if (visible.length !== 1 || visible[0].id !== id) throw Error('Pastor directory escaped fixture scope');
   // Live acceptance must never deliver to real users or to the synthetic fixture.
   const preview = await page.context().request.get(origin + '/api/daily-follow-email/preview');
   const data = await preview.json();
@@ -44,6 +52,13 @@ async function journey(page, { origin, code, cookie, id, email, output, controll
     const reminder = page.getByRole('switch', { name: '每日 Email 提醒', exact: true });
     if (await reminder.isChecked()) throw Error('Reminder enabled without consent');
     await page.getByLabel('寄送時間', { exact: true }).waitFor();
+    if (width === 390) {
+      await page.getByLabel('寄送時間', { exact: true }).fill('08:15');
+      await page.getByRole('button', { name: '儲存時間', exact: true }).click();
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent === '儲存時間' && button.disabled));
+      const preferences = await (await page.context().request.get(origin + '/api/email-preferences')).json();
+      if (preferences.dailyFollowTime !== '08:15' || preferences.dailyFollowEnabled || preferences.dailyFollowConsentAt) throw Error('Time save changed reminder consent');
+    }
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Personal mail horizontal overflow ' + width);
     await page.screenshot({ path: output + '/personal-' + width + '.png', fullPage: true });
     await page.goto(origin + '/admin');
@@ -54,7 +69,8 @@ async function journey(page, { origin, code, cookie, id, email, output, controll
     await page.getByTestId('user-row-' + id).waitFor();
     await page.getByTestId('button-select-all').click();
     if (!(await page.getByTestId('text-recipient-count').innerText()).includes('1')) throw Error('Fixture recipient not selected');
-    if ((await page.getByTestId('button-send-email').isDisabled()) === controlled) throw Error('Composer availability mismatch');
+    if (controlled) await page.waitForFunction(() => !document.querySelector('[data-testid="button-send-email"]')?.disabled);
+    else if (!await page.getByTestId('button-send-email').isDisabled()) throw Error('Preview-only composer enabled');
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Composer horizontal overflow ' + width);
     await page.screenshot({ path: output + '/composer-' + width + '.png', fullPage: true });
     checks.push({ width, personalPreview: true, safeComposer: true, horizontalOverflow: false });
@@ -66,6 +82,8 @@ async function journey(page, { origin, code, cookie, id, email, output, controll
   await page.goto(origin + '/admin');
   await page.getByTestId('button-mail-system').click();
   await page.getByTestId('user-row-' + id).waitFor();
+  await page.getByTestId('button-select-all').click();
+  if (controlled) await page.waitForFunction(() => !document.querySelector('[data-testid="button-send-email"]')?.disabled);
   await page.screenshot({ path: output + '/composer-dark.png', fullPage: true });
   if (errors.length) throw Error('Browser errors encountered');
   return { checks, errors, actualEmailsSent: 0, physicalPhoneTested: false };
@@ -87,7 +105,15 @@ try {
   }
   result = JSON.parse(serialized);
 } catch (error) {
-  if (error instanceof Error && 'stdout' in error) throw Error('Browser command failed; credential-bearing output withheld');
+  if (error instanceof Error && 'stdout' in error) {
+    const stdout = String(error.stdout || '');
+    let diagnostic = String(error.stderr || '') + (stdout.split('### Error\n')[1]?.split('\n###')[0] || stdout);
+    for (const secret of [cookie, decodeURIComponent(cookie), state.app.STAGING_ACCESS_CODE, state.app.SESSION_SECRET]) {
+      if (secret) diagnostic = diagnostic.replaceAll(secret, '[redacted]');
+    }
+    console.error(JSON.stringify({ operation: browserOperation, status: error.status, code: error.code, signal: error.signal, diagnostic: diagnostic.slice(0, 1800) }));
+    throw Error('Browser command failed; credential-bearing output withheld');
+  }
   throw error;
 } finally {
   try { cli('close'); } catch { /* Remove the isolated fixture even if browser cleanup fails. */ }
