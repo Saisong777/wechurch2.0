@@ -6,6 +6,7 @@ import { emailProviderStatus, senderAddress } from './emailPolicy';
 export interface EmailAttachment { filename: string; content: string }
 export interface BulkEmailRecipient { email: string; name?: string }
 export interface SendEmailOptions {
+  purpose?: 'staff' | 'self';
   to: string | string[];
   subject: string;
   html?: string;
@@ -16,8 +17,8 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail(options: SendEmailOptions) {
-  // B cannot send even if credentials are accidentally present.
-  assertOutboundEmailAllowed();
+  // B requires both an explicit deployment opt-in and a trusted caller purpose.
+  assertOutboundEmailAllowed(options.purpose);
   if (!emailProviderStatus().configured) throw new Error('EMAIL_PROVIDER_NOT_CONFIGURED');
   const to = (Array.isArray(options.to) ? options.to : [options.to]).map(value => mailbox.parse(value));
   if (to.length !== 1) throw new Error('EMAIL_ONE_RECIPIENT_REQUIRED');
@@ -46,7 +47,7 @@ export async function sendEmail(options: SendEmailOptions) {
 
 export async function sendBulkEmail(recipients: BulkEmailRecipient[], subject: string, body: string, isHtml = true, attachments?: EmailAttachment[], requestId: string = randomUUID()) {
   const input = bulkEmailInput.parse({ recipients, subject, body, isHtml, attachments, requestId });
-  assertOutboundEmailAllowed();
+  assertOutboundEmailAllowed('staff');
   if (!emailProviderStatus().configured) throw new Error('EMAIL_PROVIDER_NOT_CONFIGURED');
   const unique = [...new Map(input.recipients.map(r => [r.email.toLowerCase(), r])).values()];
   const results = { sent: 0, failed: 0, errors: [] as string[], acceptedOnly: true };
@@ -54,7 +55,7 @@ export async function sendBulkEmail(recipients: BulkEmailRecipient[], subject: s
     if (index) await new Promise(resolve => setTimeout(resolve, 600));
     try {
       const id = createHash('sha256').update(recipient.email.toLowerCase()).digest('hex');
-      await sendEmail({ to: recipient.email, subject: input.subject, ...(input.isHtml ? { html: input.body } : { text: input.body }),
+      await sendEmail({ purpose: 'staff', to: recipient.email, subject: input.subject, ...(input.isHtml ? { html: input.body } : { text: input.body }),
         attachments: input.attachments, idempotencyKey: `bulk/${requestId}/${id}` });
       results.sent++;
     } catch (error) {

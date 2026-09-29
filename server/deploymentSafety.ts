@@ -26,8 +26,11 @@ export function assertDeploymentSafety(env: Env = process.env) {
   if (env.RAILWAY_ENVIRONMENT_ID && (!env.UPLOAD_ROOT || env.UPLOAD_ROOT !== env.RAILWAY_VOLUME_MOUNT_PATH)) throw new Error('Staging uploads require a dedicated mounted volume.');
 }
 
-export function assertOutboundEmailAllowed() {
-  if (isTestDeployment() || process.env.DISABLE_OUTBOUND_EMAIL === '1') throw new Error('EMAIL_DISABLED_IN_TEST_ENVIRONMENT');
+export function assertOutboundEmailAllowed(purpose?: 'staff' | 'self') {
+  if (process.env.DISABLE_OUTBOUND_EMAIL === '1' || (isTestDeployment() &&
+    (process.env.STAGING_CONTROLLED_EMAIL_ENABLED !== '1' || (purpose !== 'staff' && purpose !== 'self')))) {
+    throw new Error('EMAIL_DISABLED_IN_TEST_ENVIRONMENT');
+  }
 }
 
 const digest = (value: string) => createHash('sha256').update(value).digest();

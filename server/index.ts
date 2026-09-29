@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
+import { startEmailReminderScheduler } from './emailReminders';
 import { drainServer } from './shutdown';
 import { permissionsPolicy, publicError } from './httpSafety';
 import { contentSecurityPolicy } from './contentSecurityPolicy';
@@ -142,6 +143,7 @@ app.use((req, res, next) => {
   server.listen(port, "::", () => {
     log(`serving on port ${port}`);
   });
+  const stopEmailReminders = startEmailReminderScheduler();
 
   // Graceful shutdown — close connections cleanly during Railway deploys
   let isShuttingDown = false;
@@ -152,6 +154,7 @@ app.use((req, res, next) => {
     const deadline = setTimeout(() => process.exit(1), 10000);
     deadline.unref();
     try {
+      await stopEmailReminders();
       await drainServer(server, pool);
       clearTimeout(deadline);
       log('HTTP server and DB pool closed');

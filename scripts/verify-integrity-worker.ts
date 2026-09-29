@@ -176,6 +176,8 @@ try {
   }
   const { verifyLeaderDashboardHttp } = await import('./verify-leader-dashboard-http');
   await verifyLeaderDashboardHttp(pool, makeClient);
+  const { verifyEmailPermissions } = await import('./verify-email-permissions');
+  await verifyEmailPermissions(pool, makeClient);
   }
 } finally {
   if(server) await new Promise<void>(resolve=>server!.close(()=>resolve()));

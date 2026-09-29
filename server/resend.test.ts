@@ -37,6 +37,16 @@ describe('Resend delivery boundary', () => {
     await expect(sendEmail({ ...message, subject: 'Hello\r\nBcc: x' })).rejects.toThrow('EMAIL_SUBJECT_INVALID');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it('opens only explicitly authorized B purposes and preserves the kill switch', async () => {
+    vi.stubEnv('APP_ENV', 'staging');
+    vi.stubEnv('STAGING_CONTROLLED_EMAIL_ENABLED', '1');
+    await expect(sendEmail(message)).rejects.toThrow('EMAIL_DISABLED_IN_TEST_ENVIRONMENT');
+    await sendEmail({ ...message, purpose: 'staff' });
+    await sendEmail({ ...message, purpose: 'self' });
+    vi.stubEnv('DISABLE_OUTBOUND_EMAIL', '1');
+    await expect(sendEmail({ ...message, purpose: 'self' })).rejects.toThrow('EMAIL_DISABLED_IN_TEST_ENVIRONMENT');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
   it.each([[429, 'EMAIL_RATE_LIMITED'], [409, 'EMAIL_REQUEST_CONFLICT'], [403, 'EMAIL_PROVIDER_REJECTED']])('redacts provider response for status %s', async (status, error) => {
     fetchMock.mockResolvedValue(new Response('private account details', { status }));
     await expect(sendEmail(message)).rejects.toThrow(error);

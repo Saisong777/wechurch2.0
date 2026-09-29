@@ -11,14 +11,14 @@ export function senderAddress(value: string | undefined) {
 export function emailProviderStatus(env: NodeJS.ProcessEnv = process.env): EmailProviderStatus {
   const configured = !!env.RESEND_API_KEY?.trim() && !!senderAddress(env.RESEND_FROM_EMAIL)
     && mailbox.safeParse(env.RESEND_REPLY_TO?.trim()).success;
-  const reason = isTestDeployment(env) ? 'staging' : env.DISABLE_OUTBOUND_EMAIL === '1' ? 'disabled' : configured ? 'ready' : 'not_configured';
+  const reason = isTestDeployment(env) && env.STAGING_CONTROLLED_EMAIL_ENABLED !== '1' ? 'staging' : env.DISABLE_OUTBOUND_EMAIL === '1' ? 'disabled' : configured ? 'ready' : 'not_configured';
   const messages = {
     ready: '寄信服務已設定，送達結果仍以收件匣為準。',
     staging: 'B 測試站只提供預覽，不會寄出郵件。',
     disabled: '目前暫停寄送郵件，可預覽內容。',
     not_configured: '寄信服務尚未完成設定，目前僅提供預覽。',
   };
-  return { configured, canSend: reason === 'ready', mode: configured ? 'resend_api_key' : 'preview_only', reason, message: messages[reason] };
+  return { configured, canSend: reason === 'ready', remindersEnabled: reason === 'ready' && env.DAILY_EMAIL_SCHEDULER_ENABLED === '1', mode: configured ? 'resend_api_key' : 'preview_only', reason, message: messages[reason] };
 }
 
 export function emailAppUrl(route = '/', env: NodeJS.ProcessEnv = process.env) {

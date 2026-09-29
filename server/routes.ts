@@ -8,8 +8,8 @@ import fs from "fs";
 import { uploadRoot, messageCardRoot } from './uploadPaths';
 import { rasterExtension, rasterOnly, setMediaHeaders } from './uploadSafety';
 import { apiIdentity, boundedWindowLimiter, clientAddress } from './requestLimits';
-import { bulkEmailInput, emailPreferencesInput, profileNotificationInput } from '@shared/email';
-import { dailyEmailDue, emailAppUrl, emailProviderStatus, escapeEmailHtml } from './emailPolicy';
+import { bulkEmailInput, emailPreferencesInput, emailStaffRoles, profileNotificationInput } from '@shared/email';
+import { emailAppUrl, emailProviderStatus, escapeEmailHtml } from './emailPolicy';
 import { randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -3840,7 +3840,13 @@ export async function registerRoutes(app: Express) {
 
   // Profile notification endpoint using Resend integration
   const mailLimit = boundedWindowLimiter({ max: 5, windowMs: 15 * 60_000, key: apiIdentity });
-  app.post("/api/send-profile-notification", requireAdmin, mailLimit, async (req, res) => {
+  const requireEmailStaff = requireRole(...emailStaffRoles);
+  const emailRecipientsFor = async (req: Parameters<RequestHandler>[0]) => {
+    const access = await getCrmAccessForRequest(req, 'members');
+    if (!access?.canEnterCrm || !access.canManageMembers) return [];
+    return filterUsersForCrmAccess(await storage.getUsers(await getChurchScope(req)), access);
+  };
+  app.post("/api/send-profile-notification", requireEmailStaff, mailLimit, async (req, res) => {
     try {
       const parsed = profileNotificationInput.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: '通知內容格式不正確' });
@@ -3848,6 +3854,9 @@ export async function registerRoutes(app: Express) {
       try { redirectUrl = escapeEmailHtml(emailAppUrl(parsed.data.redirectUrl)); }
       catch { return res.status(400).json({ error: '通知連結必須指向本站' }); }
       const { email, type } = parsed.data;
+      if (!(await emailRecipientsFor(req)).some(user => user.email.toLowerCase() === email.toLowerCase())) {
+        return res.status(403).json({ error: '只能寄給你管理範圍內的會員' });
+      }
       const name = escapeEmailHtml(parsed.data.name);
       const status = emailProviderStatus();
       if (!status.canSend) return res.status(503).json({ error: status.message });
@@ -3891,6 +3900,7 @@ export async function registerRoutes(app: Express) {
       }
 
       await sendEmail({
+        purpose: 'staff',
         to: email,
         subject,
         html,
@@ -3904,14 +3914,14 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/admin/users-for-email", requireAdmin, async (req, res) => {
+  app.get("/api/admin/users-for-email", requireEmailStaff, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const userRole = await storage.getUserRole(userId);
-      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+      if (!userRole || !['admin', 'senior_pastor', 'pastor'].includes(userRole)) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -3921,7 +3931,7 @@ export async function registerRoutes(app: Express) {
       if (!access || !access.canEnterCrm) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const allUsers = filterUsersForCrmAccess(await storage.getUsers(churchScope), access);
+      const allUsers = await emailRecipientsFor(req);
       const visibleUserIds = new Set(allUsers.map((user) => user.id));
       const allRoles = (await storage.getUserRoles(churchScope)).filter((role) => visibleUserIds.has(role.userId));
 
@@ -3966,8 +3976,8 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "User email not found" });
       }
 
-      const { buildDailyFollowEmail } = await import("./dailyFollowEmail");
-      const email = await buildDailyFollowEmail(user);
+      const { buildSelfReminder } = await import("./emailReminders");
+      const email = buildSelfReminder();
       res.json(email);
     } catch (error: any) {
       console.error("Error building daily follow email preview:", error);
@@ -3981,6 +3991,7 @@ export async function registerRoutes(app: Express) {
     dailyFollowTime: "07:00",
     timezone: "Asia/Taipei",
     lastDailyFollowSentAt: null,
+    dailyFollowConsentAt: null,
     createdAt: null,
     updatedAt: null,
   });
@@ -3998,7 +4009,8 @@ export async function registerRoutes(app: Express) {
         .where(eq(userEmailPreferences.userId, userId))
         .limit(1);
 
-      res.json(preferences || defaultEmailPreferences(userId));
+      const lastDelivery = await pool.query('SELECT status,local_day::text AS day FROM email_reminder_deliveries WHERE user_id=$1 ORDER BY local_day DESC LIMIT 1', [userId]);
+      res.json({ ...(preferences || defaultEmailPreferences(userId)), lastReminderDelivery: lastDelivery.rows[0] ?? null });
     } catch (error: any) {
       console.error("Error fetching email preferences:", error);
       res.status(500).json({ error: "Failed to fetch email preferences", message: error.message });
@@ -4021,13 +4033,18 @@ export async function registerRoutes(app: Express) {
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid email preferences", details: parsed.error.flatten() });
       }
+      if (parsed.data.dailyFollowEnabled === true && !emailProviderStatus().remindersEnabled) {
+        return res.status(409).json({ error: '提醒寄送尚未啟用，啟用後請再開啟訂閱。' });
+      }
 
       const now = new Date();
+      const consent = parsed.data.dailyFollowEnabled === true ? now : parsed.data.dailyFollowEnabled === false ? null : undefined;
       const [preferences] = await db
         .insert(userEmailPreferences)
         .values({
           userId,
           dailyFollowEnabled: parsed.data.dailyFollowEnabled ?? false,
+          dailyFollowConsentAt: consent ?? null,
           dailyFollowTime: parsed.data.dailyFollowTime || "07:00",
           timezone: parsed.data.timezone || "Asia/Taipei",
           updatedAt: now,
@@ -4036,6 +4053,7 @@ export async function registerRoutes(app: Express) {
           target: userEmailPreferences.userId,
           set: {
             ...parsed.data,
+            ...(consent !== undefined ? { dailyFollowConsentAt: consent } : {}),
             updatedAt: now,
           },
         })
@@ -4062,27 +4080,28 @@ export async function registerRoutes(app: Express) {
 
       const status = emailProviderStatus();
       if (!status.canSend) {
-        const { buildDailyFollowEmail } = await import('./dailyFollowEmail');
-        const preview = await buildDailyFollowEmail(user);
+        const { buildSelfReminder } = await import('./emailReminders');
+        const preview = buildSelfReminder();
         return res.status(202).json({ success: false, previewOnly: true, message: status.message, ...preview });
       }
-      const { sendDailyFollowEmail } = await import("./dailyFollowEmail");
-      const context = await sendDailyFollowEmail(user);
-      res.json({ success: true, sent: 1, context });
+      const { buildSelfReminder } = await import('./emailReminders');
+      const { sendEmail } = await import('./resend');
+      await sendEmail({ purpose: 'self', to: user.email, ...buildSelfReminder() });
+      res.json({ success: true, sent: 1, acceptedOnly: true });
     } catch (error: any) {
       console.error("Daily follow test failed");
       res.status(500).json({ error: "EMAIL_TEST_FAILED", message: "無法確認測試信結果，請先檢查收件匣，稍後再試。" });
     }
   });
 
-  app.post("/api/admin/daily-follow-email/send", requireAdmin, mailLimit, async (req, res) => {
+  app.post("/api/admin/daily-follow-email/send", requireEmailStaff, mailLimit, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const userRole = await storage.getUserRole(userId);
-      if (!userRole || !["admin", "leader"].includes(userRole)) {
+      if (!userRole || !["admin", "senior_pastor", "pastor"].includes(userRole)) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -4097,44 +4116,11 @@ export async function registerRoutes(app: Express) {
       }
 
       const { userIds, dryRun, limit } = parsed.data;
-      if (!dryRun && !emailProviderStatus().canSend) return res.status(503).json({ error: emailProviderStatus().message });
-      const allUsers = await storage.getUsers();
-      const enabledPreferences = await db
-        .select()
-        .from(userEmailPreferences)
-        .where(eq(userEmailPreferences.dailyFollowEnabled, true));
-      const enabledUserIds = new Set(enabledPreferences.filter(preference => dailyEmailDue(preference)).map(preference => preference.userId));
-      const selectedUsers = allUsers
-        .filter((user) => user.email && enabledUserIds.has(user.id) && (!userIds || userIds.includes(user.id)))
-        .slice(0, limit ?? 500);
-
-      const { buildDailyFollowEmail, sendDailyFollowEmail } = await import("./dailyFollowEmail");
-      const results = {
-        dryRun,
-        total: selectedUsers.length,
-        sent: 0,
-        failed: 0,
-        previews: [] as Array<{ userId: string; email: string; subject: string }>,
-        errors: [] as string[],
-      };
-
-      for (const user of selectedUsers) {
-        try {
-          if (dryRun) {
-            const email = await buildDailyFollowEmail(user);
-            results.previews.push({ userId: user.id, email: user.email, subject: email.subject });
-          } else {
-            await sendDailyFollowEmail(user, new Date(), enabledPreferences.find(p => p.userId === user.id)!.timezone);
-            results.sent++;
-            results.previews.push({ userId: user.id, email: user.email, subject: "" });
-          }
-        } catch (error: any) {
-          results.failed++;
-          results.errors.push(`${user.email}: ${error.message}`);
-        }
-      }
-
-      res.json(results);
+      if (!dryRun && !emailProviderStatus().remindersEnabled) return res.status(503).json({ error: '自動提醒尚未啟用' });
+      const visibleIds = (await emailRecipientsFor(req)).map(user => user.id);
+      if (userIds?.some(id => !visibleIds.includes(id))) return res.status(403).json({ error: '收件人不在你的管理範圍內' });
+      const { runDailyReminders } = await import('./emailReminders');
+      res.json(await runDailyReminders({ userIds: userIds ?? visibleIds, dryRun, limit }));
     } catch (error: any) {
       console.error("Error sending admin daily follow emails:", error);
       res.status(500).json({ error: "Failed to send daily follow emails", message: error.message });
@@ -4157,56 +4143,31 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
       }
 
-      if (!parsed.data.dryRun && !emailProviderStatus().canSend) return res.status(503).json({ error: emailProviderStatus().message });
-      const allUsers = await storage.getUsers();
-      const enabledPreferences = await db
-        .select()
-        .from(userEmailPreferences)
-        .where(eq(userEmailPreferences.dailyFollowEnabled, true));
-      const enabledUserIds = new Set(enabledPreferences.filter(preference => dailyEmailDue(preference)).map(preference => preference.userId));
-      const selectedUsers = allUsers
-        .filter((user) => user.email && enabledUserIds.has(user.id))
-        .slice(0, parsed.data.limit ?? allUsers.length);
-      const { buildDailyFollowEmail, sendDailyFollowEmail } = await import("./dailyFollowEmail");
-      const results = { dryRun: parsed.data.dryRun, total: selectedUsers.length, sent: 0, failed: 0, errors: [] as string[] };
-
-      for (const user of selectedUsers) {
-        try {
-          if (parsed.data.dryRun) {
-            await buildDailyFollowEmail(user);
-          } else {
-            await sendDailyFollowEmail(user, new Date(), enabledPreferences.find(p => p.userId === user.id)!.timezone);
-            results.sent++;
-          }
-        } catch (error: any) {
-          results.failed++;
-          results.errors.push(`${user.email}: ${error.message}`);
-        }
-      }
-
-      res.json(results);
+      if (!parsed.data.dryRun && !emailProviderStatus().remindersEnabled) return res.status(503).json({ error: '自動提醒尚未啟用' });
+      const { runDailyReminders } = await import('./emailReminders');
+      res.json(await runDailyReminders(parsed.data));
     } catch (error: any) {
       console.error("Error running daily follow email cron:", error);
       res.status(500).json({ error: "Failed to run daily follow email cron", message: error.message });
     }
   });
 
-  app.post("/api/send-bulk-email", requireAdmin, mailLimit, async (req, res) => {
+  app.post("/api/send-bulk-email", requireEmailStaff, mailLimit, async (req, res) => {
     try {
       const userId = await resolveUserId(req);
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const userRole = await storage.getUserRole(userId);
-      if (!userRole || !['admin', 'leader'].includes(userRole)) {
+      if (!userRole || !['admin', 'senior_pastor', 'pastor'].includes(userRole)) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
       const parsed = bulkEmailInput.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: '郵件格式不正確：每次最多 100 人，附件合計 2MB。' });
       const { recipients, subject, body, isHtml, attachments, requestId } = parsed.data;
-      const allowedEmails = new Set((await storage.getUsers()).map(user => user.email.toLowerCase()));
-      if (recipients.some(r => !allowedEmails.has(r.email.toLowerCase()))) return res.status(403).json({ error: '只能寄給本站會員' });
+      const allowedEmails = new Set((await emailRecipientsFor(req)).map(user => user.email.toLowerCase()));
+      if (recipients.some(r => !allowedEmails.has(r.email.toLowerCase()))) return res.status(403).json({ error: '只能寄給你管理範圍內的會員' });
       const status = emailProviderStatus();
       if (!status.canSend) return res.status(503).json({ error: status.message });
 

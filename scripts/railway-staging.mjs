@@ -88,7 +88,8 @@ function configure(app) {
     APP_ENV: 'staging', NODE_ENV: 'production', LOCAL_INSECURE_COOKIES: '0',
     STAGING_ACCESS_CODE: code, STAGING_EXPECTED_ENVIRONMENT_ID: target.environment,
     STAGING_EXPECTED_DB_HOST: new URL(app.DATABASE_URL).hostname,
-    DISABLE_OUTBOUND_EMAIL: '1', DISABLE_MORNING_BRIEF: '1', UPLOAD_ROOT: '/data',
+    DISABLE_OUTBOUND_EMAIL: app.STAGING_CONTROLLED_EMAIL_ENABLED === '1' && app.DISABLE_OUTBOUND_EMAIL === '0' ? '0' : '1',
+    DISABLE_MORNING_BRIEF: '1', UPLOAD_ROOT: '/data',
   };
   for (const [key, value] of Object.entries(settings)) railway(['variable', 'set', '-e', target.environment, '-s', target.app, '--skip-deploys', '--stdin', key], { input: value });
   save('access.txt', `B 測試站：${target.origin}\n測試邀請碼：${code}\n僅分享給受邀測試同工，請勿提交此檔。\n`);

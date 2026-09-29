@@ -1,11 +1,15 @@
 import { z } from 'zod';
 
+export const emailStaffRoles = ['admin', 'senior_pastor', 'pastor'] as const;
+export const canComposeEmail = (role?: string | null) => emailStaffRoles.some(value => value === role);
+
 export type EmailProviderStatus = {
   configured: boolean;
   canSend: boolean;
   mode: 'resend_api_key' | 'preview_only';
   reason: 'ready' | 'staging' | 'disabled' | 'not_configured';
   message: string;
+  remindersEnabled?: boolean;
 };
 
 export const mailbox = z.string().trim().email().max(254);

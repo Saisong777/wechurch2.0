@@ -22,7 +22,10 @@ export async function verifyAuditBoundaries(pool: Pool, actor: Client, guest: Cl
     for (const [path, method, body] of routes) assert.equal((await guest(path, method, body)).status, 401, path);
     for (const role of ['member', 'leader', 'group_leader', 'future_leader', 'minister', 'pastor', 'senior_pastor']) {
       await pool.query('UPDATE user_roles SET role=$2 WHERE user_id=$1', [actorId, role]);
-      for (const [path, method, body] of routes) assert.equal((await actor(path, method, body)).status, 403, `${role}: ${path}`);
+      for (const [path, method, body] of routes) {
+        if (['pastor', 'senior_pastor'].includes(role) && ['/api/admin/users-for-email', '/api/admin/daily-follow-email/send', '/api/send-bulk-email', '/api/send-profile-notification'].includes(path)) continue;
+        assert.equal((await actor(path, method, body)).status, 403, `${role}: ${path}`);
+      }
     }
     assert.deepEqual((await pool.query('SELECT is_read,is_archived FROM inbox_emails WHERE id=$1', [inboxId])).rows[0], { is_read: false, is_archived: false });
     await pool.query("UPDATE user_roles SET role='admin' WHERE user_id=$1", [actorId]);
@@ -35,7 +38,7 @@ export async function verifyAuditBoundaries(pool: Pool, actor: Client, guest: Cl
     assert.equal(blockedSend.status, 503, 'Disabled mail must not report a successful send');
     assert.equal((await guest('/api/email-provider-status')).status, 401);
     assert.equal((await actor('/api/email-preferences', 'PATCH', { dailyFollowTime: '25:99' })).status, 400);
-    await pool.query("UPDATE user_email_preferences SET daily_follow_enabled=true,daily_follow_time='00:00',timezone='UTC',last_daily_follow_sent_at=null WHERE user_id=$1", [targetId]);
+    await pool.query("UPDATE user_email_preferences SET daily_follow_enabled=true,daily_follow_consent_at=now(),daily_follow_time='00:00',timezone='UTC',last_daily_follow_sent_at=null WHERE user_id=$1", [targetId]);
     const preview = await actor('/api/admin/daily-follow-email/send', 'POST', { userIds: [targetId], dryRun: true });
     assert.equal(preview.status, 200);
     const data = await preview.json(); assert.equal(data.total, 1); assert.equal(data.failed, 0);
@@ -71,5 +74,5 @@ export async function verifyAuditBoundaries(pool: Pool, actor: Client, guest: Cl
     await pool.query('DELETE FROM user_email_preferences WHERE user_id=$1', [targetId]);
     await pool.query('UPDATE user_roles SET role=$2 WHERE user_id=$1', [actorId, originalRole]);
   }
-  console.log('PASS audit boundaries: 7 roles x 10 restricted operations, guest denial, admin access, opt-out, private-email projection/search and revocation');
+  console.log('PASS role-sensitive audit boundaries, guest denial, admin access, opt-out, private-email projection/search and revocation');
 }

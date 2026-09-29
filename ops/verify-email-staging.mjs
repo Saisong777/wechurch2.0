@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { inspectStaging, stagingSql, target, root } from '../scripts/railway-staging.mjs';
 
 const state = inspectStaging();
-assert.equal(state.app.DISABLE_OUTBOUND_EMAIL, '1');
+const controlled = state.app.STAGING_CONTROLLED_EMAIL_ENABLED === '1' && state.app.DISABLE_OUTBOUND_EMAIL === '0';
 const id = randomUUID(), authId = randomUUID(), sid = `email-ui-${randomUUID()}`, email = `email-ui-${id}@example.test`;
 const output = path.join(root, 'output/playwright/email', randomUUID());
 fs.mkdirSync(output, { recursive: true, mode: 0o700 });
@@ -17,7 +17,7 @@ const sql = value => `'${String(value).replaceAll("'", "''")}'`;
 const wrapper = path.join(process.env.HOME, '.codex/skills/playwright/scripts/playwright_cli.sh');
 const cli = (...args) => execFileSync(wrapper, ['-s=email-acceptance', ...args], { cwd: root, encoding: 'utf8', timeout: 240000, maxBuffer: 4 * 1024 * 1024 });
 let result;
-async function journey(page, { origin, code, cookie, id, email, output }) {
+async function journey(page, { origin, code, cookie, id, email, output, controlled }) {
   const errors = [], checks = [];
   page.on('pageerror', error => errors.push(error.message));
   const gate = await page.context().request.post(origin + '/__staging/access', { headers: { Origin: origin }, data: { code }, maxRedirects: 0 });
@@ -26,43 +26,42 @@ async function journey(page, { origin, code, cookie, id, email, output }) {
   const me = await page.context().request.get(origin + '/api/auth/user');
   if (me.status() !== 200 || (await me.json()).legacyUserId !== id) throw Error('Fixture identity mismatch');
   const status = await (await page.context().request.get(origin + '/api/email-provider-status')).json();
-  if (status.canSend !== false || status.reason !== 'staging') throw Error('B email guard missing');
-  const preview = await page.context().request.post(origin + '/api/daily-follow-email/send-test', { headers: { Origin: origin }, data: {} });
+  if (status.canSend !== controlled) throw Error('B email policy mismatch');
+  if (controlled && !status.remindersEnabled) throw Error('B reminder scheduler not enabled');
+  // Live acceptance must never deliver to real users or to the synthetic fixture.
+  const preview = await page.context().request.get(origin + '/api/daily-follow-email/preview');
   const data = await preview.json();
-  if (preview.status() !== 202 || data.previewOnly !== true || data.success !== false || !data.text.includes(origin + '/me') || data.html.includes('https://wechurch.online')) throw Error('Preview or B origin incorrect');
-  const blocked = await page.context().request.post(origin + '/api/send-bulk-email', { headers: { Origin: origin }, data: { requestId: 'b14c3cd4-2e44-4a59-bc48-13b467683890', recipients: [{ email }], subject: 'Acceptance only', body: 'Never send' } });
-  if (blocked.status() !== 503) throw Error('B bulk email not blocked');
-  checks.push({ livePreview: true, outboundBlocked: true, correctOrigin: true });
+  if (preview.status() !== 200 || !data.text.includes(origin + '/me') || data.html.includes('https://wechurch.online')) throw Error('Preview or B origin incorrect');
+  const blocked = await page.context().request.post(origin + '/api/send-bulk-email', { headers: { Origin: origin }, data: { requestId: 'b14c3cd4-2e44-4a59-bc48-13b467683890', recipients: [{ email: 'not-a-wechurch-member@example.test' }], subject: 'Acceptance only', body: 'Never send' } });
+  if (blocked.status() !== 403) throw Error('Unscoped recipient was not blocked');
+  checks.push({ livePreview: true, controlledMail: controlled, unscopedRecipientBlocked: true, correctOrigin: true });
   // Screenshots use only fixture recipient data, not the real member directory.
   await page.route('**/api/admin/users-for-email', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id, email: 'fixture@example.test', displayName: '郵件驗收', role: 'admin', church: 'IM 行動教會' }]) }));
   for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(origin + '/me');
-    await page.getByRole('button', { name: '預覽測試信', exact: true }).waitFor();
-    await page.getByText('B 測試站只提供預覽，不會寄出郵件。', { exact: true }).waitFor();
-    if (width === 390) {
-      await page.getByRole('button', { name: '預覽測試信', exact: true }).click();
-      await page.getByText('測試信預覽', { exact: true }).waitFor();
-    }
+    await page.getByRole('button', { name: controlled ? '寄一封給自己' : '預覽提醒信', exact: true }).waitFor();
+    const reminder = page.getByRole('switch', { name: '每日 Email 提醒', exact: true });
+    if (await reminder.isChecked()) throw Error('Reminder enabled without consent');
+    await page.getByLabel('寄送時間', { exact: true }).waitFor();
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Personal mail horizontal overflow ' + width);
     await page.screenshot({ path: output + '/personal-' + width + '.png', fullPage: true });
     await page.goto(origin + '/admin');
     await page.getByTestId('button-mail-system').click();
-    await page.getByText('B 測試站只提供預覽，不會寄出郵件。', { exact: true }).waitFor();
     await page.getByTestId('text-recipient-count').waitFor();
     if (!(await page.getByTestId('text-recipient-count').innerText()).includes('0')) throw Error('Recipients preselected');
-    if (!await page.getByTestId('button-send-email').isDisabled()) throw Error('B send button enabled');
+    if (!await page.getByTestId('button-send-email').isDisabled()) throw Error('Send enabled without recipients');
     await page.getByTestId('user-row-' + id).waitFor();
     await page.getByTestId('button-select-all').click();
     if (!(await page.getByTestId('text-recipient-count').innerText()).includes('1')) throw Error('Fixture recipient not selected');
-    if (!await page.getByTestId('button-send-email').isDisabled()) throw Error('Selection bypassed B protection');
+    if ((await page.getByTestId('button-send-email').isDisabled()) === controlled) throw Error('Composer availability mismatch');
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Composer horizontal overflow ' + width);
     await page.screenshot({ path: output + '/composer-' + width + '.png', fullPage: true });
     checks.push({ width, personalPreview: true, safeComposer: true, horizontalOverflow: false });
   }
   await page.evaluate(() => localStorage.setItem('wechurch-theme', 'dark'));
   await page.goto(origin + '/me');
-  await page.getByRole('button', { name: '預覽測試信', exact: true }).waitFor();
+  await page.getByRole('button', { name: controlled ? '寄一封給自己' : '預覽提醒信', exact: true }).waitFor();
   await page.screenshot({ path: output + '/personal-dark.png', fullPage: true });
   await page.goto(origin + '/admin');
   await page.getByTestId('button-mail-system').click();
@@ -75,10 +74,10 @@ try {
   stagingSql(`BEGIN;
     INSERT INTO users(id,email,password,display_name,church) VALUES(${sql(id)},${sql(email)},'!disabled-fixture','郵件驗收','IM 行動教會');
     INSERT INTO auth_users(id,email) VALUES(${sql(authId)},${sql(email)});
-    INSERT INTO user_roles(user_id,role) VALUES(${sql(id)},'admin');
+    INSERT INTO user_roles(user_id,role) VALUES(${sql(id)},'pastor');
     INSERT INTO auth_sessions(sid,sess,expire) VALUES(${sql(sid)},${sql(JSON.stringify(session))},${sql(expires.toISOString())}); COMMIT;`);
   cli('open', 'about:blank'); cli('snapshot');
-  const config = { origin: target.origin, code: state.app.STAGING_ACCESS_CODE, cookie, id, email, output };
+  const config = { origin: target.origin, code: state.app.STAGING_ACCESS_CODE, cookie, id, email, output, controlled };
   const raw = cli('run-code', `async page => (${journey.toString()})(page,${JSON.stringify(config)})`);
   const serialized = raw.split('### Result\n')[1]?.split('\n###')[0];
   if (!serialized) {

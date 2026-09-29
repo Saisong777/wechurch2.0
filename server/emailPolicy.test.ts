@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { bulkEmailInput, emailPreferencesInput, profileNotificationInput } from '@shared/email';
+import { bulkEmailInput, canComposeEmail, emailPreferencesInput, profileNotificationInput } from '@shared/email';
 import { dailyEmailDue, emailAppUrl, emailProviderStatus, escapeEmailHtml, senderAddress } from './emailPolicy';
 
 const configured = { RESEND_API_KEY: 'test-key', RESEND_FROM_EMAIL: 'WeChurch <mail@example.test>', RESEND_REPLY_TO: 'reply@example.test' };
 const preference = { dailyFollowEnabled: true, dailyFollowTime: '07:00', timezone: 'Asia/Taipei', lastDailyFollowSentAt: null };
 
 describe('email policy', () => {
+  it('allows only admins and pastors to compose mail', () => {
+    for (const role of ['admin', 'senior_pastor', 'pastor']) expect(canComposeEmail(role)).toBe(true);
+    for (const role of ['minister', 'leader', 'member', 'future_leader', null]) expect(canComposeEmail(role)).toBe(false);
+  });
+  it('requires explicit staging and scheduler opt-ins independently', () => {
+    const env = { ...configured, APP_ENV: 'staging', STAGING_CONTROLLED_EMAIL_ENABLED: '1' };
+    expect(emailProviderStatus(env)).toMatchObject({ canSend: true, remindersEnabled: false });
+    expect(emailProviderStatus({ ...env, DAILY_EMAIL_SCHEDULER_ENABLED: '1' }).remindersEnabled).toBe(true);
+    expect(emailProviderStatus({ ...env, DAILY_EMAIL_SCHEDULER_ENABLED: '1', DISABLE_OUTBOUND_EMAIL: '1' })).toMatchObject({ canSend: false, remindersEnabled: false });
+  });
   it('retains the existing incomplete-member notification types', () => {
     for (const type of ['unverified_email', 'incomplete_profile', 'potential_member']) {
       expect(profileNotificationInput.safeParse({ email: 'member@example.test', name: 'Member', type, redirectUrl: '/login' }).success).toBe(true);

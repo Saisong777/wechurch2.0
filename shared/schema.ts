@@ -72,9 +72,23 @@ export const userEmailPreferences = pgTable("user_email_preferences", {
   dailyFollowTime: text("daily_follow_time").default("07:00").notNull(),
   timezone: text("timezone").default("Asia/Taipei").notNull(),
   lastDailyFollowSentAt: timestamp("last_daily_follow_sent_at"),
+  dailyFollowConsentAt: timestamp("daily_follow_consent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const emailReminderDeliveries = pgTable('email_reminder_deliveries', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  localDay: date('local_day').notNull(),
+  status: text('status').notNull(),
+  providerId: text('provider_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, table => ({
+  pk: primaryKey({ columns: [table.userId, table.localDay] }),
+  statusCheck: check('email_reminder_deliveries_status_check', sql`${table.status} IN ('claimed', 'accepted', 'unconfirmed')`),
+  statusIdx: index('email_reminder_deliveries_status_idx').on(table.status, table.createdAt),
+}));
 
 export const persons = pgTable("persons", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),

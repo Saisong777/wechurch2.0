@@ -35,6 +35,8 @@ interface EmailPreferences {
   dailyFollowTime: string;
   timezone: string;
   lastDailyFollowSentAt: string | null;
+  dailyFollowConsentAt: string | null;
+  lastReminderDelivery?: { status: 'claimed' | 'accepted' | 'unconfirmed'; day: string } | null;
 }
 
 const recordActions = [
@@ -89,6 +91,8 @@ const MePage = () => {
   const { isFeatureEnabled, loading: featuresLoading } = useFeatureToggles();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [emailPreview, setEmailPreview] = useState<{ subject: string; text: string } | null>(null);
+  const [reminderTime, setReminderTime] = useState<string | null>(null);
+  const [reminderTimezone, setReminderTimezone] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { data: devotionalNotes, isError: notesError } = useDevotionalNotes(user?.id);
   const { data: emailPreferences, isLoading: emailPreferencesLoading } = useQuery<EmailPreferences>({
@@ -110,17 +114,15 @@ const MePage = () => {
     enabled: !!user,
   });
   const updateEmailPreferences = useMutation({
-    mutationFn: async (dailyFollowEnabled: boolean) => {
-      const res = await apiRequest('PATCH', '/api/email-preferences', {
-        dailyFollowEnabled,
-        dailyFollowTime: emailPreferences?.dailyFollowTime || '07:00',
-        timezone: emailPreferences?.timezone || 'Asia/Taipei',
-      });
+    mutationFn: async (preferences: Partial<Pick<EmailPreferences, 'dailyFollowEnabled' | 'dailyFollowTime' | 'timezone'>>) => {
+      const res = await apiRequest('PATCH', '/api/email-preferences', preferences);
       return res.json() as Promise<EmailPreferences>;
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(['/api/email-preferences'], data);
-      toast.success(data.dailyFollowEnabled ? (emailProviderStatus?.canSend ? '每日同行信偏好已開啟' : '訂閱偏好已儲存，目前不會寄信') : '每日同行信已關閉');
+      queryClient.setQueryData(['/api/email-preferences'], { ...data, lastReminderDelivery: emailPreferences?.lastReminderDelivery });
+      setReminderTime(null);
+      setReminderTimezone(null);
+      toast.success(data.dailyFollowEnabled && data.dailyFollowConsentAt ? '每日提醒設定已儲存' : '每日提醒已關閉');
     },
     onError: () => {
       toast.error('設定沒有成功更新，請再試一次');
@@ -225,10 +227,12 @@ const MePage = () => {
                         <MailCheck className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-base font-bold text-foreground">每日同行信</h3>
+                        <h3 className="text-base font-bold text-foreground">每日 Email 提醒</h3>
                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          今日靈修、禱告牆代求與關懷提醒。
+                          只寄給自己，不包含私人筆記或代禱內容。
                         </p>
+                        <p className="mt-1 break-all text-sm text-muted-foreground">{user?.email}</p>
+                        {emailPreferences?.dailyFollowEnabled && !emailPreferences.dailyFollowConsentAt && <p className="mt-2 text-sm text-muted-foreground">先前只儲存測試偏好，請重新開啟以確認收信。</p>}
                         {emailProviderStatus && !emailProviderStatus.canSend && (
                           <p role="status" className="mt-2 text-sm leading-6 text-muted-foreground">
                             {emailProviderStatus.message}
@@ -237,18 +241,23 @@ const MePage = () => {
                       </div>
                     </div>
                     <Switch
-                      checked={Boolean(emailPreferences?.dailyFollowEnabled)}
-                      disabled={emailPreferencesLoading || updateEmailPreferences.isPending}
-                      onCheckedChange={(checked) => updateEmailPreferences.mutate(checked)}
-                      aria-label="每日同行信"
+                      checked={Boolean(emailPreferences?.dailyFollowEnabled && emailPreferences.dailyFollowConsentAt)}
+                      disabled={emailPreferencesLoading || updateEmailPreferences.isPending || (!emailProviderStatus?.remindersEnabled && !emailPreferences?.dailyFollowEnabled)}
+                      onCheckedChange={(checked) => updateEmailPreferences.mutate({ dailyFollowEnabled: checked })}
+                      aria-label="每日 Email 提醒"
                     />
                   </div>
 
-                  <div className="mt-4 flex flex-col gap-3 rounded-lg border border-sky-100 bg-card/80 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-sky-600" />
-                      <span>偏好時間：{emailPreferences?.dailyFollowTime || '07:00'}（{emailPreferences?.timezone || 'Asia/Taipei'}）</span>
-                    </div>
+                  <div className="mt-4 grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
+                    <label className="space-y-1"><span className="flex items-center gap-2"><Clock className="h-4 w-4" />寄送時間</span>
+                      <input className="h-11 w-full min-w-0 rounded-md border bg-background px-3" type="time" value={reminderTime ?? emailPreferences?.dailyFollowTime ?? '07:00'} onChange={event => setReminderTime(event.target.value)} />
+                    </label>
+                    <label className="space-y-1"><span>時區</span>
+                      <select className="h-11 w-full min-w-0 rounded-md border bg-background px-3" value={reminderTimezone ?? emailPreferences?.timezone ?? 'Asia/Taipei'} onChange={event => setReminderTimezone(event.target.value)}>
+                        {[...new Set(['Asia/Taipei', 'Asia/Hong_Kong', 'Asia/Tokyo', 'Australia/Sydney', 'America/Los_Angeles', 'America/New_York', 'Europe/London', 'UTC', emailPreferences?.timezone || 'Asia/Taipei'])].map(zone => <option key={zone} value={zone}>{zone}</option>)}
+                      </select>
+                    </label>
+                    <Button variant="outline" disabled={updateEmailPreferences.isPending || (!reminderTime && !reminderTimezone)} onClick={() => updateEmailPreferences.mutate({ dailyFollowTime: reminderTime ?? emailPreferences?.dailyFollowTime ?? '07:00', timezone: reminderTimezone ?? emailPreferences?.timezone ?? 'Asia/Taipei' })}>儲存時間</Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -257,10 +266,13 @@ const MePage = () => {
                       disabled={sendTestEmail.isPending}
                     >
                       <Send className="h-4 w-4" />
-                      {emailProviderStatus?.canSend ? '寄測試信' : '預覽測試信'}
+                      {emailProviderStatus?.canSend ? '寄一封給自己' : '預覽提醒信'}
                     </Button>
                   </div>
 
+                  {emailPreferences?.lastReminderDelivery && <p role="status" className="mt-3 text-sm text-muted-foreground">
+                    {emailPreferences.lastReminderDelivery.day}：{emailPreferences.lastReminderDelivery.status === 'accepted' ? '提醒已交付寄信服務，請確認收件匣。' : '寄送結果尚未確認，未自動重寄。'}
+                  </p>}
                   {emailPreview && (
                     <div className="mt-4 rounded-lg border border-sky-100 bg-card p-4">
                       <p className="text-xs font-semibold text-sky-600">測試信預覽</p>

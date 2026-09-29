@@ -11,6 +11,7 @@ import { WeChurchIcon } from '@/components/icons/WeChurchLogo';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest } from '@/lib/queryClient';
+import { canComposeEmail } from '@shared/email';
 
 type AdminStep = 'auth' | 'dashboard' | 'cards' | 'message-cards' | 'feature-toggles' | 'mail' | 'inbox';
 
@@ -109,8 +110,10 @@ export const AdminPage: React.FC = () => {
               {([
                 ...(isAdmin ? [{ icon: BookOpen, label: '每日靈修課表', desc: '課表、短文與發佈', action: () => navigate('/admin/church-devotions'), testId: 'button-church-devotions' }] : []),
                 { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
-                ...(isSystemAdmin ? [
+                ...(canComposeEmail(role) ? [
                   { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
+                ] : []),
+                ...(isSystemAdmin ? [
                   { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
                 ] : []),
                 { icon: Crown, label: '公共禱告牆', desc: '查看與分享代禱', action: () => navigate('/prayer-wall'), testId: 'button-prayer-meeting-admin' },
@@ -166,7 +169,7 @@ export const AdminPage: React.FC = () => {
       case 'mail':
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            <AdminMailComposer onBack={handleBackToDashboard} />
+            {canComposeEmail(role) && <AdminMailComposer onBack={handleBackToDashboard} />}
           </div>
         );
       case 'inbox':

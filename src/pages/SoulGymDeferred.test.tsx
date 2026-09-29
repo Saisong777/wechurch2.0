@@ -72,7 +72,9 @@ it.each(['senior_pastor', 'pastor', 'minister', 'leader', 'group_leader', 'futur
   const fetcher = mount(<AdminPage />);
   await screen.findByTestId('button-crm');
   expect(screen.queryByText('系統紀錄')).toBeNull();
-  for (const id of ['button-inbox', 'button-mail-system', 'button-feature-toggles', 'button-message-cards']) expect(screen.queryByTestId(id)).toBeNull();
+  for (const id of ['button-inbox', 'button-feature-toggles', 'button-message-cards']) expect(screen.queryByTestId(id)).toBeNull();
+  if (['pastor', 'senior_pastor'].includes(role)) expect(screen.getByTestId('button-mail-system')).toBeVisible();
+  else expect(screen.queryByTestId('button-mail-system')).toBeNull();
   expect(fetcher.mock.calls.some(([url]) => String(url).includes('/api/admin/inbox'))).toBe(false);
   if (role === 'senior_pastor') expect(screen.getByTestId('button-church-devotions')).toBeVisible();
 });
