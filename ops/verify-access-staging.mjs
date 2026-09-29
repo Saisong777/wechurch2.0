@@ -30,11 +30,9 @@ let result, phase = 'fixtures';
 async function journey(page, { origin, code, fixtures, output }) {
   const errors = [], checks = [];
   page.on('pageerror', e => errors.push(e.message));
-  // The CLI pauses a run at native dialogs; consent is simulated only for these synthetic fixtures.
-  // Component tests separately cover cancellation without a request.
+  // Grant creation still uses confirm. Revocation must exercise the real inline UI.
   await page.addInitScript(() => {
     window.confirm = () => true;
-    window.prompt = () => '驗收結束，撤回測試授權';
   });
   const [admin, member] = fixtures;
   const switchUser = async fixture => {
@@ -90,19 +88,59 @@ async function journey(page, { origin, code, fixtures, output }) {
   if ((await page.getByTestId('admin-role-label').textContent()) !== '同工') throw Error('Delegated ministry title is incorrect in the admin header');
   await page.screenshot({ path: output + '/coworker-admin.png', fullPage: true });
   await switchUser(admin);
-  await page.evaluate(() => localStorage.setItem('wechurch-theme', 'dark'));
+  const second = await page.context().request.post(origin + '/api/access-control/grants', { data: {
+    userId: member.id, roleId: grants[0].roleId, permissions: ['members.read'], scope: 'member',
+    church: snapshot.church, groupId: null, memberId: member.id, expiresAt: null, reason: '重疊授權撤回驗收',
+  } });
+  if (!second.ok()) throw Error('Second fixture grant failed');
+  for (const width of [320, 390, 1440]) {
+    await page.evaluate(theme => localStorage.setItem('wechurch-theme', theme), width === 390 ? 'dark' : 'light');
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(origin + '/admin/access?member=' + member.id);
+    await page.getByRole('button', { name: '撤回授權', exact: true }).first().click();
+    const form = page.getByRole('form', { name: '撤回授權確認' });
+    await form.waitFor();
+    if (await form.getByLabel('撤回原因', { exact: true }).inputValue() !== '職務調整') throw Error('Missing visible default reason');
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Revocation horizontal overflow ' + width);
+    await page.screenshot({ path: output + '/revoke-' + width + '.png', fullPage: true });
+    await form.getByRole('button', { name: '取消', exact: true }).click();
+    const cancelled = await (await page.context().request.get(origin + '/api/access-control')).json();
+    if (cancelled.grants.filter(g => g.userId === member.id && g.active).length !== 2) throw Error('Cancel mutated grants');
+    checks.push({ width, inlineRevocation: true, cancelWithoutMutation: true, horizontalOverflow: false });
+  }
   await page.setViewportSize({ width: 390, height: 900 });
+  await page.evaluate(() => localStorage.setItem('wechurch-theme', 'dark'));
   await page.goto(origin + '/admin/access?member=' + member.id);
-  await page.getByRole('button', { name: '撤回授權', exact: true }).waitFor();
-  await page.screenshot({ path: output + '/granted-dark.png', fullPage: true });
-  await page.getByRole('button', { name: '撤回授權', exact: true }).click();
+  await page.getByRole('button', { name: '撤回授權', exact: true }).first().click();
+  const revokeForm = page.getByRole('form', { name: '撤回授權確認' });
+  await revokeForm.getByLabel('撤回原因', { exact: true }).fill('撤回其中一筆測試授權');
+  await page.route('**/api/access-control/grants/*', async route => {
+    if (route.request().method() === 'DELETE') {
+      await route.fulfill({ status: 503, json: { error: '測試連線中斷，請再試一次' } });
+      await page.unroute('**/api/access-control/grants/*');
+    } else await route.continue();
+  });
+  await revokeForm.getByRole('button', { name: '確認撤回', exact: true }).click();
+  await revokeForm.getByRole('alert').getByText('測試連線中斷，請再試一次', { exact: true }).waitFor();
+  if (await revokeForm.getByLabel('撤回原因', { exact: true }).inputValue() !== '撤回其中一筆測試授權') throw Error('Retry lost reason');
+  await page.screenshot({ path: output + '/revoke-error-390.png', fullPage: true });
+  await revokeForm.getByRole('button', { name: '確認撤回', exact: true }).click();
   await page.getByText('已撤回', { exact: true }).waitFor();
+  const remaining = await (await page.context().request.get(origin + '/api/access-control')).json();
+  if (remaining.grants.filter(g => g.userId === member.id && g.active).length !== 1) throw Error('Other grant was changed');
+  await switchUser(member);
+  if ((await page.context().request.get(origin + '/api/users')).status() !== 200) throw Error('Overlapping permission was lost');
+  await switchUser(admin);
+  await page.goto(origin + '/admin/access?member=' + member.id);
+  await page.getByRole('button', { name: '撤回授權', exact: true }).click();
+  await page.getByRole('form', { name: '撤回授權確認' }).getByRole('button', { name: '確認撤回', exact: true }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('article h3 span')].filter(e => e.textContent === '已撤回').length === 2);
   await switchUser(member);
   if ((await page.context().request.get(origin + '/api/users')).status() !== 403) throw Error('Revocation did not take effect');
   const access = await (await page.context().request.get(origin + '/api/access-control/me')).json();
   if (access.permissions.length || access.canEnterAdmin) throw Error('Revoked permission remains active');
   if (errors.length) throw Error('Browser errors encountered');
-  return { checks, liveGrantAndRevoke: true, scopedDirectory: true, coworkerTitle: true, audit: true, darkMode: true, errors, actualEmailsSent: 0, physicalPhoneTested: false };
+  return { checks, liveGrantAndRevoke: true, otherGrantPreserved: true, inlineFailureAndRetry: true, scopedDirectory: true, coworkerTitle: true, audit: true, darkMode: true, errors, actualEmailsSent: 0, physicalPhoneTested: false };
 }
 try {
   stagingSql('BEGIN;\n' + fixtures.map(f => `

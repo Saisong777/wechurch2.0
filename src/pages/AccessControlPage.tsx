@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ShieldCheck, Plus, Save, Pencil, RotateCcw, Search } from 'lucide-react';
@@ -73,6 +73,26 @@ function GrantEditor({data,member,initial,close,done}:{data:Snapshot;member:Memb
   </fieldset>
  </form>;
 }
+function RevokeGrantForm({grant,done,close}:{grant:AccessGrant;done:()=>Promise<void>;close:()=>void}) {
+ const [reason,setReason]=useState('職務調整');
+ const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+ const pending=useRef(false);const form=useRef<HTMLFormElement>(null);
+ useEffect(()=>{form.current?.focus({preventScroll:true});form.current?.scrollIntoView?.({block:'nearest'});},[]);
+ return <form ref={form} tabIndex={-1} aria-label="撤回授權確認" className="space-y-3 border-l-2 border-destructive py-3 pl-3 focus:outline-none" onSubmit={async e=>{
+  e.preventDefault();if(pending.current)return;
+  if(!reason.trim()){setError('請填寫撤回原因。');return;}
+  pending.current=true;setBusy(true);setError('');
+  try{await api('/grants/'+grant.id,'DELETE',{version:grant.version,reason:reason.trim()});await done();toast.success(`已撤回「${grant.roleName}」授權`);close();}
+  catch(e){setError((e as Error).message);}
+  finally{pending.current=false;setBusy(false);}
+ }}>
+  <h4 className="font-semibold">撤回「{grant.roleName}」授權？</h4>
+  <p className="text-sm text-muted-foreground">只撤回這筆職分與權限，其他職分和既有帳號角色仍保留。</p>
+  <label className="block space-y-2 text-sm">撤回原因<Input aria-label="撤回原因" maxLength={500} disabled={busy} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+  {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+  <div className="flex flex-wrap gap-2"><Button type="submit" variant="destructive" disabled={busy}>{busy?'撤回中…':'確認撤回'}</Button><Button type="button" variant="outline" disabled={busy} onClick={close}>取消</Button></div>
+ </form>;
+}
 function TemplateEditor({data,initial,done,close}:{data:Snapshot;initial?:AccessTemplate;done:()=>Promise<void>;close:()=>void}) {
  const[name,setName]=useState(initial?.name || '');const[permissions,setPermissions]=useState<Permission[]>(initial?.permissions || []);const[busy,setBusy]=useState(false);const[error,setError]=useState('');
  return <form className="space-y-4 border-y py-5" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{await api(initial?'/roles/'+initial.id:'/roles',initial?'PUT':'POST',{name,permissions,...(initial?{version:initial.version}:{church:data.church})});await done();close();toast.success('職分範本已儲存，既有授權未改動');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
@@ -87,6 +107,8 @@ export default function AccessControlPage(){
  const [params]=useSearchParams();
  const [tab,setTab]=useState('members');const [search,setSearch]=useState('');const [memberId,setMember]=useState(params.get('member')||'');const [roleFilter,setRoleFilter]=useState('');
  const [editing,setEditing]=useState<AccessGrant|'new'|null>(null);const [template,setTemplate]=useState<AccessTemplate|'new'|null>(null);const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+ const [revoking,setRevoking]=useState<string|null>(null);
+ useEffect(()=>setRevoking(null),[memberId,tab]);
  const q=useQuery<Snapshot>({queryKey:['access-control-admin',user?.id],enabled:!!user&&isAdmin,queryFn:()=>api(''),retry:false});
  const data=q.data; const selected=data?.users.find(m=>m.id===memberId);
  const done=async()=>{await q.refetch();await client.invalidateQueries({queryKey:['access-control-me']});await client.invalidateQueries({queryKey:['unified-members']});};
@@ -102,7 +124,11 @@ export default function AccessControlPage(){
  <section className="min-w-0 space-y-5">{!selected?<p className="py-8 text-muted-foreground">選擇一位成員</p>:<><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">{selected.name}</h2><p className="break-all text-sm text-muted-foreground">{selected.email}</p></div><Button disabled={!data.roles.length||busy||!!editing} onClick={()=>setEditing('new')}><Plus className="mr-2 h-4 w-4"/>新增職分</Button></div>
  <details className="border-y py-3"><summary className="cursor-pointer text-sm font-medium">既有帳號角色：{crmRoleLabels[selected.role]}</summary><div className="mt-3 space-y-3"><p className="text-sm text-muted-foreground">此角色原有權限仍生效。要完全收回管理權，請一併檢查額外授權、小家職務與舊有授權。</p><select aria-label="既有帳號角色" className={selectClass} value={selected.role} disabled={busy||(!data.isSystemAdmin&&['admin','senior_pastor'].includes(selected.role))} onChange={e=>{const role=e.target.value;if(window.confirm(`將 ${selected.name} 的既有角色改為 ${crmRoleLabels[role as keyof typeof crmRoleLabels]}？`))void act(()=>api('/account-role/'+selected.id,'PUT',{role}));}}>{Object.entries(crmRoleLabels).filter(([k])=>k!=='leader'&&(data.isSystemAdmin||!['admin','senior_pastor'].includes(k)||k===selected.role)).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div></details>
  {editing&&<GrantEditor key={editing==='new'?'new':editing.id} data={data} member={selected} initial={editing==='new'?undefined:editing} close={()=>setEditing(null)} done={done}/>}
- <div className="divide-y">{data.grants.filter(g=>g.userId===selected.id).map(g=><article key={g.id} className="space-y-3 py-4"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{g.roleName} <span className="text-xs font-normal text-muted-foreground">{live(g)?'生效中':g.active?'已到期':'已撤回'}</span></h3>{live(g)&&(data.isSystemAdmin||g.scope!=='site')&&<div className="flex gap-2"><Button size="icon" variant="ghost" aria-label={`編輯${g.roleName}授權`} title="編輯授權" disabled={busy} onClick={()=>setEditing(g)}><Pencil className="h-4 w-4"/></Button><Button variant="outline" size="sm" disabled={busy} onClick={()=>{const reason=window.prompt(`撤回 ${g.roleName} 授權的原因（不影響其他授權）`);if(reason?.trim())void act(()=>api('/grants/'+g.id,'DELETE',{version:g.version,reason}));}}>撤回授權</Button></div>}</div><p className="text-sm text-muted-foreground">{scopeLabels[g.scope]} · {g.scope==='site'?'所有教會的公共內容':g.scopeName}{g.expiresAt&&` · ${new Date(g.expiresAt).toLocaleDateString()} 到期`}</p><ul className="grid gap-1 text-sm sm:grid-cols-2">{g.permissions.map(p=><li key={p}>{permissionLabels[p]}</li>)}</ul>{!g.permissions.length&&<p className="text-sm text-muted-foreground">職分標記，沒有額外管理權限</p>}</article>)}</div>
+ <div className="divide-y">{data.grants.filter(g=>g.userId===selected.id).map(g=><article key={g.id} className="space-y-3 py-4">
+  <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{g.roleName} <span className="text-xs font-normal text-muted-foreground">{live(g)?'生效中':g.active?'已到期':'已撤回'}</span></h3>{live(g)&&(data.isSystemAdmin||g.scope!=='site')&&<div className="flex gap-2"><Button size="icon" variant="ghost" aria-label={`編輯${g.roleName}授權`} title="編輯授權" disabled={busy||revoking===g.id} onClick={()=>setEditing(g)}><Pencil className="h-4 w-4"/></Button><Button variant="outline" size="sm" disabled={busy||revoking===g.id} onClick={()=>setRevoking(g.id)}>撤回授權</Button></div>}</div>
+  {revoking===g.id&&live(g)&&<RevokeGrantForm key={g.id} grant={g} done={done} close={()=>setRevoking(null)}/>}
+  <p className="text-sm text-muted-foreground">{scopeLabels[g.scope]} · {g.scope==='site'?'所有教會的公共內容':g.scopeName}{g.expiresAt&&` · ${new Date(g.expiresAt).toLocaleDateString()} 到期`}</p><ul className="grid gap-1 text-sm sm:grid-cols-2">{g.permissions.map(p=><li key={p}>{permissionLabels[p]}</li>)}</ul>{!g.permissions.length&&<p className="text-sm text-muted-foreground">職分標記，沒有額外管理權限</p>}
+ </article>)}</div>
  {data.legacyScopes.filter(s=>s.userId===selected.id).map(s=><div key={s.id} className="space-y-2 border-t py-3 text-sm"><p>舊有授權 · {s.scopeName}</p><p className="text-muted-foreground">{[s.canManageMembers&&'會員管理',s.canManageCare&&'牧養關懷',s.canViewPersonal&&'個資欄位與已分享牧養資料'].filter(Boolean).join('、')}</p><Button variant="outline" size="sm" disabled={busy} onClick={()=>{if(window.confirm('撤回這筆舊有授權？其他角色和小家職務仍保留。'))void act(async()=>{const r=await fetch('/api/crm/scope-assignments/'+s.id,{method:'DELETE'});if(!r.ok)throw new Error('無法撤回舊有授權');});}}>撤回舊有授權</Button></div>)}
  {data.appointments.filter(g=>g.leaderId===selected.id||g.pastorId===selected.id).map(g=><p key={g.id} className="border-t py-3 text-sm">小家職務 · {g.name} <Link className="ml-2 underline" to="/groups?manage=1">前往小家管理</Link></p>)}
  </>}</section></div>}
