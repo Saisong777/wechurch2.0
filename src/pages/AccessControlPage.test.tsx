@@ -81,18 +81,18 @@ it('does not grant when confirmation is cancelled', async () => {
 });
 
 it('opens inline confirmation and cancels without native dialogs or a revoke request',async()=>{
-  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權',exact:true}))[0]);
+  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權'}))[0]);
   expect(screen.getByRole('form',{name:'撤回授權確認'})).toBeInTheDocument();
   expect(screen.getByLabelText('撤回原因')).toHaveValue('職務調整');
   expect(window.prompt).not.toHaveBeenCalled();expect(window.confirm).not.toHaveBeenCalled();
   expect(revoked).toHaveLength(0);
-  fireEvent.click(screen.getByRole('button',{name:'取消',exact:true}));
+  fireEvent.click(screen.getByRole('button',{name:'取消'}));
   expect(screen.queryByRole('form',{name:'撤回授權確認'})).toBeNull();
   expect(revoked).toHaveLength(0);
 });
 
 it('revokes only the confirmed grant, preserves the other role and sends its version and reason',async()=>{
-  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權',exact:true}))[0]);
+  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權'}))[0]);
   fireEvent.change(screen.getByLabelText('撤回原因'),{target:{value:'  重複授權  '}});
   const form=screen.getByRole('form',{name:'撤回授權確認'});
   fireEvent.submit(form);fireEvent.submit(form);
@@ -104,7 +104,7 @@ it('revokes only the confirmed grant, preserves the other role and sends its ver
 });
 
 it('shows an empty reason error in place without sending a request',async()=>{
-  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權',exact:true}))[0]);
+  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權'}))[0]);
   fireEvent.change(screen.getByLabelText('撤回原因'),{target:{value:'   '}});
   fireEvent.click(screen.getByRole('button',{name:'確認撤回'}));
   expect(screen.getByRole('alert')).toHaveTextContent('請填寫撤回原因');
@@ -112,7 +112,7 @@ it('shows an empty reason error in place without sending a request',async()=>{
 });
 
 it.each(['連線失敗，請重試','授權已更新或撤回，請重新載入。'])('keeps the reason and shows the error next to the action: %s',async message=>{
-  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權',exact:true}))[0]);
+  fireEvent.click((await screen.findAllByRole('button',{name:'撤回授權'}))[0]);
   fireEvent.change(screen.getByLabelText('撤回原因'),{target:{value:'工作重新分配'}});
   deleteError=message;
   fireEvent.click(screen.getByRole('button',{name:'確認撤回'}));
