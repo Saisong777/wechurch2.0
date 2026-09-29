@@ -16,12 +16,26 @@ const fixtures = ['admin', 'member'].map(role => {
   return { id, authId, sid, email, session, cookie, role };
 });
 const sql = value => `'${String(value).replaceAll("'", "''")}'`;
-const cli = (...args) => execFileSync(path.join(process.env.HOME, '.codex/skills/playwright/scripts/playwright_cli.sh'), ['-s=access-acceptance', ...args], { cwd: root, encoding: 'utf8', timeout: 240000, maxBuffer: 4 * 1024 * 1024 });
-let result;
+const cli = (...args) => {
+  try { return execFileSync(path.join(process.env.HOME, '.codex/skills/playwright/scripts/playwright_cli.sh'), ['-s=access-acceptance', ...args], { cwd: root, encoding: 'utf8', timeout: 240000, maxBuffer: 4 * 1024 * 1024 }); }
+  catch (error) {
+    const output = String(error.stdout || '');
+    const detail = output.split('### Error\n')[1]?.split('\n###')[0]?.slice(0, 1000);
+    if (detail && ![state.app.STAGING_ACCESS_CODE, state.app.SESSION_SECRET, ...fixtures.map(f => f.cookie)].some(s => detail.includes(s))) console.error(detail);
+    console.error({ browserStep: args[0], status: error.status, code: error.code });
+    throw Error('Browser step failed');
+  }
+};
+let result, phase = 'fixtures';
 async function journey(page, { origin, code, fixtures, output }) {
   const errors = [], checks = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('dialog', d => d.accept(d.type() === 'prompt' ? '驗收結束，撤回測試授權' : undefined));
+  // The CLI pauses a run at native dialogs; consent is simulated only for these synthetic fixtures.
+  // Component tests separately cover cancellation without a request.
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+    window.prompt = () => '驗收結束，撤回測試授權';
+  });
   const [admin, member] = fixtures;
   const switchUser = async fixture => {
     await page.context().addCookies([{ name: 'connect.sid', value: fixture.cookie, url: origin, httpOnly: true, secure: true, sameSite: 'Lax' }]);
@@ -95,17 +109,23 @@ try {
     INSERT INTO auth_users(id,email) VALUES(${sql(f.authId)},${sql(f.email)});
     INSERT INTO user_roles(user_id,role) VALUES(${sql(f.id)},${sql(f.role)});
     INSERT INTO auth_sessions(sid,sess,expire) VALUES(${sql(f.sid)},${sql(JSON.stringify(f.session))},${sql(expires.toISOString())});`).join('\n') + '\nCOMMIT;');
-  cli('open', 'about:blank'); cli('snapshot');
+  phase = 'browser'; cli('open', 'about:blank'); cli('snapshot');
   const config = { origin: target.origin, code: state.app.STAGING_ACCESS_CODE, fixtures: fixtures.map(({id,cookie}) => ({id,cookie})), output };
-  const raw = cli('run-code', `async page => (${journey.toString()})(page,${JSON.stringify(config)})`);
+  phase = 'journey'; const raw = cli('run-code', `async page => (${journey.toString()})(page,${JSON.stringify(config)})`);
+  let diagnostic = raw.replaceAll(JSON.stringify(config), '[test configuration withheld]');
+  for (const secret of [state.app.STAGING_ACCESS_CODE, state.app.SESSION_SECRET, ...fixtures.map(f => f.cookie)]) {
+    if (secret) diagnostic = diagnostic.replaceAll(secret, '[redacted]');
+  }
+  fs.writeFileSync(path.join(output, 'browser-output.txt'), diagnostic, { mode: 0o600 });
   const serialized = raw.split('### Result\n')[1]?.split('\n###')[0];
   if (!serialized) {
     const message = raw.split('### Error\n')[1]?.split('\n###')[0]?.slice(0, 1000);
     if (message && ![state.app.STAGING_ACCESS_CODE, state.app.SESSION_SECRET, ...fixtures.map(f => f.cookie)].some(s => message.includes(s))) console.error(message);
     throw Error('Access browser verification failed; sensitive output withheld');
   }
-  result = JSON.parse(serialized);
-} catch {
+  phase = 'result'; result = JSON.parse(serialized);
+} catch (error) {
+  console.error({ phase, errorType: error.name, detail: phase === 'fixtures' ? 'Fixture SQL failed' : undefined });
   throw Error('Access acceptance failed; fixture cleanup attempted and sensitive command output withheld');
 } finally {
   try { cli('close'); } catch { /* Cleanup synthetic records even if the browser closes early. */ }

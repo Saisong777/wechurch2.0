@@ -17,6 +17,11 @@ export async function verifyAccessControl(pool:Pool,makeClient:()=>Client){
  assert.equal((await worker.client('/api/access-control')).status,403);
  assert.equal((await senior.client('/api/access-control?church=Another%20Church')).status,403);
  assert.equal((await worker.client('/api/access-control/presets','POST',{church:'IM 行動教會'})).status,403);
+ const mixedAdmin=(await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'admin') RETURNING id",[worker.id])).rows[0].id;
+ try{
+  assert.equal((await senior.client('/api/access-control/account-role/'+worker.id,'PUT',{role:'member'})).status,403,'senior pastor cannot downgrade an admin hidden behind a legacy member row');
+  assert.equal((await senior.client('/api/user-roles/'+worker.id,'PUT',{role:'member'})).status,403);
+ }finally{await pool.query('DELETE FROM user_roles WHERE id=$1',[mixedAdmin]);}
  const data=await (await admin.client('/api/access-control')).json();
  assert(data.roles.some((r:{name:string})=>r.name==='同工'));
  const roleId=data.roles.find((r:{name:string})=>r.name==='同工').id;
