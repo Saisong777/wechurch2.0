@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ChurchDevotionAdminPage from './ChurchDevotionAdminPage';
-import { type ImportSheet } from '@shared/churchDevotion';
+import { type DevotionEntry, type ImportSheet } from '@shared/churchDevotion';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'manager' }, loading: false }) }));
 vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => ({ isAdmin: true, loading: false }) }));
@@ -23,6 +23,36 @@ beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 });
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); });
+const schedule: DevotionEntry[] = ['2026-09-12', '2026-09-13'].map((date, index) => ({
+  id: `lesson-${index}`, date, planName: '九月主題', dayNumber: index + 1, scriptureReference: '約翰福音 1:1', scriptureText: '',
+  devotionalTitle: `默想 ${index}`, devotionalText: '原始短文', prayer: '', loveAction: '', status: index ? 'draft' : 'published', version: index + 2, updatedAt: date,
+}));
+async function loadSchedule() {
+  fetchMock.mockImplementation(async () => ({ ok: true, json: async () => schedule }));
+  render(<QueryClientProvider client={client}><MemoryRouter><ChurchDevotionAdminPage /></MemoryRouter></QueryClientProvider>);
+  await screen.findByRole('button', { name: '展開主題 九月主題' });
+}
+it('publishes the selected collapsed topic with original ids and versions only after confirmation', async () => {
+  await loadSchedule();
+  fireEvent.click(screen.getByRole('checkbox', { name: '選取主題 九月主題' }));
+  expect(screen.queryByRole('table')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '發佈所選' }));
+  expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/batch'))).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: '確認' }));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/batch'))).toBe(true));
+  const payload = JSON.parse(fetchMock.mock.calls.find(([url]) => url.endsWith('/batch'))![1].body);
+  expect(payload).toMatchObject({ action: 'publish', items: [{ id: 'lesson-0', version: 2 }, { id: 'lesson-1', version: 3 }] });
+});
+it('clears selection when filters change and auto-expands only matched search rows', async () => {
+  await loadSchedule();
+  fireEvent.click(screen.getByRole('checkbox', { name: '選取目前所有課程' }));
+  fireEvent.change(screen.getByLabelText('搜尋'), { target: { value: ' 默想 1 ' } });
+  expect(screen.getByText('0 筆已選取')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '發佈所選' })).toBeNull();
+  expect(screen.getByRole('table', { name: '九月主題 每日課程' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '編輯 2026-09-12' })).toBeNull();
+  expect(screen.getByRole('button', { name: '編輯 2026-09-13' })).toBeTruthy();
+});
 async function loadGoogleSheet() {
   render(<QueryClientProvider client={client}><MemoryRouter><ChurchDevotionAdminPage /></MemoryRouter></QueryClientProvider>);
   fireEvent.click(screen.getByRole('button', { name: '匯入課表' }));

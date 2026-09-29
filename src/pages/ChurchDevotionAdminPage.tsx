@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowLeftRight, CalendarClock, Download, FileSpreadsheet, History, Loader2, Pencil, Plus, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, CalendarClock, Download, FileSpreadsheet, History, Loader2, Plus, Upload } from 'lucide-react';
+import { DevotionSchedule } from '@/components/admin/DevotionSchedule';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,7 @@ export default function ChurchDevotionAdminPage() {
     queryKey: [base, user?.id, from, to],
     queryFn: () => request(`?from=${from}&to=${to}`, undefined, 'GET'), enabled: !!user && isAdmin && !!from && !!to && from <= to,
   });
-  const visible = entries.filter(entry => (filter === 'all' || entry.status === filter) && `${entry.planName} ${entry.scriptureReference} ${entry.devotionalTitle}`.includes(search));
+  const visible = entries.filter(entry => (filter === 'all' || entry.status === filter) && `${entry.planName} ${entry.scriptureReference} ${entry.devotionalTitle}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const gaps = devotionGaps(entries, from, to);
   const chosen = entries.filter(entry => selected.includes(entry.id));
   const sheet = sheets[sheetIndex];
@@ -128,22 +129,17 @@ export default function ChurchDevotionAdminPage() {
           <summary className="cursor-pointer font-medium">課表待補：{gaps.filter(g => g.status === 'missing').length} 天未排定、{gaps.filter(g => g.status === 'draft').length} 天未發布（所選範圍前 366 天）</summary>
           <ul className="mt-2 max-h-48 overflow-y-auto divide-y">{gaps.map(g => <li key={g.date} className="flex min-h-11 items-center justify-between gap-3"><span>{g.date} · {g.status === 'missing' ? '未排定' : '草稿'}</span><Button size="sm" variant="ghost" onClick={() => { openEditor(entries.find(e => e.date === g.date)); if(g.status === 'missing') setDraft({...initialDraft(),date:g.date}); }}>{g.status === 'missing' ? '補上課程' : '檢查草稿'}</Button></li>)}</ul>
         </details>}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground"><span>{visible.length} 筆課程 · {chosen.length} 筆已選取</span><a href={`${base}/export.xlsx?from=${from}&to=${to}`} className="inline-flex min-h-10 items-center gap-2"><Download className="h-4 w-4" />匯出 Excel</a></div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground"><span>{chosen.length} 筆已選取</span><a href={`${base}/export.xlsx?from=${from}&to=${to}`} className="inline-flex min-h-10 items-center gap-2"><Download className="h-4 w-4" />匯出 Excel</a></div>
         {chosen.length > 0 && <fieldset disabled={busy} className="flex flex-wrap items-center gap-2 border-y bg-muted/30 py-3">
           <Button size="sm" onClick={() => batch('publish')}>發佈所選</Button><Button size="sm" variant="outline" onClick={() => batch('draft')}>撤回草稿</Button>
           <Input aria-label="調整天數，負數為提前" type="number" min={-366} max={366} value={days} onChange={e => setDays(Number(e.target.value))} className="w-24" />
           <Button size="sm" variant="outline" disabled={!days || Math.abs(days) > 366} onClick={() => batch('shift')}><CalendarClock className="mr-2 h-4 w-4" />調整日期</Button>
           <Button size="sm" variant="outline" disabled={chosen.length !== 2} onClick={() => batch('swap')}><ArrowLeftRight className="mr-2 h-4 w-4" />交換日期</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected([])}>清除選取</Button>
         </fieldset>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {isPending ? <p role="status">正在載入課表…</p> : isError ? <div role="alert"><p>無法載入課表，請確認資料庫已更新。</p><Button variant="outline" onClick={() => refetch()}>重新載入</Button></div> : (
-          <div className="relative overflow-x-auto rounded-md border">
-            <table className="devotion-schedule-table w-full text-left text-sm">
-              <thead className="border-b bg-muted/40"><tr><th className="p-3"><input type="checkbox" aria-label="選取目前所有課程" checked={visible.length > 0 && visible.every(entry => selected.includes(entry.id))} onChange={e => setSelected(e.target.checked ? visible.map(entry => entry.id) : [])} /></th><th className="p-3">日期</th><th className="p-3">課表／進度</th><th className="p-3">經文與短文</th><th className="p-3">狀態</th><th className="p-3"><span className="sr-only">編輯</span></th></tr></thead>
-              <tbody>{visible.map(entry => <tr key={entry.id} className="border-b last:border-0 hover:bg-muted/20"><td className="p-3"><input type="checkbox" aria-label={`選取 ${entry.date}`} checked={selected.includes(entry.id)} onChange={e => setSelected(current => e.target.checked ? [...current, entry.id] : current.filter(id => id !== entry.id))} /></td><td data-label="日期" className="whitespace-nowrap p-3">{entry.date}</td><td data-label="課表" className="max-w-52 p-3"><p>{entry.planName}</p><p className="text-muted-foreground">第 {entry.dayNumber} 天</p></td><td data-label="靈修" className="max-w-80 p-3"><p className="font-medium">{entry.devotionalTitle}</p><p className="text-muted-foreground">{entry.scriptureReference}</p></td><td data-label="狀態" className="whitespace-nowrap p-3 text-muted-foreground">{entry.status === 'published' ? '已發佈' : '草稿'}</td><td className="p-2"><Button variant="ghost" size="icon" title={`編輯 ${entry.date}`} aria-label={`編輯 ${entry.date}`} onClick={() => openEditor(entry)}><Pencil className="h-4 w-4" /></Button></td></tr>)}</tbody>
-            </table>
-            {!visible.length && <p className="p-8 text-center text-sm text-muted-foreground">這段日期尚無課程。</p>}
-          </div>
+          <DevotionSchedule key={`${from}|${to}|${filter}|${search.trim()}`} entries={visible} selected={selected} onSelect={setSelected} onEdit={openEditor} today={today} searching={!!search.trim()} busy={busy} />
         )}
       </main>
 
