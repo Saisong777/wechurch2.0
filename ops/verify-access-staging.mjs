@@ -87,6 +87,7 @@ async function journey(page, { origin, code, fixtures, output }) {
   if ((await page.context().request.get(origin + '/api/access-control')).status() !== 403) throw Error('Delegated user could grant authority');
   await page.goto(origin + '/admin');
   await page.getByTestId('button-crm').waitFor();
+  if ((await page.getByTestId('admin-role-label').textContent()) !== '同工') throw Error('Delegated ministry title is incorrect in the admin header');
   await page.screenshot({ path: output + '/coworker-admin.png', fullPage: true });
   await switchUser(admin);
   await page.evaluate(() => localStorage.setItem('wechurch-theme', 'dark'));

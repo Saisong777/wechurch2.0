@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { apiRequest } from '@/lib/queryClient';
 import { canComposeEmail } from '@shared/email';
 import { useAccessControl } from '@/hooks/useAccessControl';
+import { crmRoleLabels } from '@/lib/crm-members';
 
 type AdminStep = 'auth' | 'dashboard' | 'cards' | 'message-cards' | 'feature-toggles' | 'mail' | 'inbox';
 
@@ -42,6 +43,10 @@ export const AdminPage: React.FC = () => {
   const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
   const isSystemAdmin = role === 'admin';
   const access = useAccessControl();
+  const roleLabel = [...new Set([
+    ...(role && role !== 'member' ? [crmRoleLabels[role]] : []),
+    ...(access.data?.grants.map(grant => grant.roleName) || []),
+  ])].join('、') || '會友';
   const canEnterAdmin = canCreateSession || !!access.data?.canEnterAdmin;
   const canMail = canComposeEmail(role) || !!access.data?.permissions?.includes('email.send');
   const canDevotions = isAdmin || !!access.data?.permissions?.includes('devotions.manage');
@@ -236,18 +241,8 @@ export const AdminPage: React.FC = () => {
             {user && (
               <>
                 {role && (
-                  <span className="text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden md:inline">
-                    {role === 'admin'
-                      ? '系統管理員'
-                      : role === 'senior_pastor'
-                        ? '主任牧師'
-                        : role === 'pastor'
-                          ? '牧師'
-                          : role === 'minister'
-                            ? '傳道人'
-                            : role === 'group_leader' || role === 'leader'
-                              ? '小家長'
-                              : '儲備'}
+                  <span data-testid="admin-role-label" title={roleLabel} className="max-w-40 truncate text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hidden md:inline">
+                    {roleLabel}
                   </span>
                 )}
                 <span className="text-xs sm:text-sm opacity-90 hidden lg:inline truncate max-w-32">
