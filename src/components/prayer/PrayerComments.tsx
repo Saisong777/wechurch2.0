@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { usePrayerComments, useCreateComment, useDeleteComment } from '@/hooks/usePrayerComments';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAccessControl } from '@/hooks/useAccessControl';
 import { COMMENT_LABELS, STICKER_LABELS, type PrayerSticker } from '@shared/prayerInteraction';
 
 const stickerIcons = { praying: HandHeart, together: HeartHandshake, peace: Sun };
@@ -28,7 +29,8 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
   const formId = useId();
   const request = useRef<{signature:string;id:string}>();
   const comments = usePrayerComments(prayerId,expanded);
-  const create = useCreateComment(); const remove = useDeleteComment(); const {isAdmin} = useUserRole();
+  const create = useCreateComment(); const remove = useDeleteComment(); const {isAdmin:legacyAdmin} = useUserRole();
+  const access=useAccessControl();const isAdmin=legacyAdmin || !!access.data?.permissions?.includes('wall.moderate');
   async function send() {
     if (create.isPending || (kind !== 'sticker' && !content.trim())) return;
     const input = {content:kind === 'sticker' ? '' : content.trim(),kind,...(kind === 'sticker' ? {sticker} : {})};

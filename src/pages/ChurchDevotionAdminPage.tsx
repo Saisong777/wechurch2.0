@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowLeftRight, CalendarClock, Download, FileSpreadsheet, History, Loader2, Plus, Upload } from 'lucide-react';
 import { DevotionSchedule } from '@/components/admin/DevotionSchedule';
+import { useAccessControl } from '@/hooks/useAccessControl';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,9 @@ const initialDraft = (): DevotionInput => ({ date: taipeiToday(), planName: '教
 
 export default function ChurchDevotionAdminPage() {
   const { user, loading: authLoading } = useAuth();
-  const { isAdmin, loading: roleLoading } = useUserRole();
+  const { isAdmin: legacyAdmin, loading: roleLoading } = useUserRole();
+  const access = useAccessControl();
+  const isAdmin = legacyAdmin || !!access.data?.permissions?.includes('devotions.manage');
   const client = useQueryClient();
   const today = taipeiToday();
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
@@ -102,7 +105,7 @@ export default function ChurchDevotionAdminPage() {
     } });
   }
 
-  if (authLoading || roleLoading) return <p role="status" className="p-6">正在確認權限…</p>;
+  if (authLoading || roleLoading || (!!user && !legacyAdmin && access.isPending)) return <p role="status" className="p-6">正在確認權限…</p>;
   if (!user) return <div className="p-6"><Button asChild><Link to="/login">登入管理後台</Link></Button></div>;
   if (!isAdmin) return <div className="space-y-4 p-6"><p role="alert">每日靈修課表限管理員與主任牧師管理。</p><Link to="/">返回首頁</Link></div>;
 

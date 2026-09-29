@@ -5,6 +5,7 @@ import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
 import { PrayerComments } from './PrayerComments';
 vi.mock('@/contexts/AuthContext',()=>({useAuth:()=>({user:{id:'actor'}})}));
 vi.mock('@/hooks/useUserRole',()=>({useUserRole:()=>({isAdmin:false})}));
+vi.mock('@/hooks/useAccessControl',()=>({useAccessControl:()=>({data:undefined})}));
 let fail=false; let posts:any[]=[]; let rows:any[]=[]; const clients:QueryClient[]=[];
 beforeEach(()=>{fail=false;posts=[];rows=[];localStorage.clear();vi.stubGlobal('fetch',vi.fn(async(_path:string,options?:RequestInit)=>{
   if(options?.method==='POST'){

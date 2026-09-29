@@ -7,6 +7,7 @@ export interface CrmUser {
   displayName: string | null;
   church: string | null;
   createdAt: string;
+  ministryRoles?: string[];
 }
 
 export interface CrmSnapshot {
@@ -38,7 +39,7 @@ export function mergeCrmMembers({ users, roles, potentialMembers }: CrmSnapshot)
       id: user.id, type: 'registered', userId: user.id,
       email: user.email || '', name: user.displayName || user.email?.split('@')[0] || '',
       gender: contact?.gender || null, church: user.church || contact?.church || null,
-      role: roleByUser.get(user.id) || 'member', status: 'member',
+      role: roleByUser.get(user.id) || 'member', status: 'member', ministryRoles: user.ministryRoles || [],
       subscribed: contact?.subscribed ?? true, sessionsCount: contact?.sessionsCount || 0,
       firstJoinedAt: user.createdAt, lastSessionAt: contact?.lastSessionAt || null,
       createdAt: user.createdAt, potentialMemberId: contact?.id || null,
@@ -73,7 +74,7 @@ export function filterCrmMembers(members: UnifiedMember[], filters: {
     }
     if (filters.subscribed !== undefined && filters.subscribed !== 'all' && member.subscribed !== filters.subscribed) return false;
     const haystack = [member.name, member.email, member.church, member.gender,
-      member.role, member.role ? crmRoleLabels[member.role] : '', member.status,
+      member.role, member.role ? crmRoleLabels[member.role] : '', ...(member.ministryRoles || []), member.status,
       statusLabels[member.status], member.type === 'registered' ? '已註冊 會員' : '潛在會員',
     ].join(' ').toLocaleLowerCase();
     return words.every(word => haystack.includes(word));

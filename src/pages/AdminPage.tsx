@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest } from '@/lib/queryClient';
 import { canComposeEmail } from '@shared/email';
+import { useAccessControl } from '@/hooks/useAccessControl';
 
 type AdminStep = 'auth' | 'dashboard' | 'cards' | 'message-cards' | 'feature-toggles' | 'mail' | 'inbox';
 
@@ -40,6 +41,10 @@ export const AdminPage: React.FC = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { role, loading: roleLoading, isAdmin, canCreateSession } = useUserRole();
   const isSystemAdmin = role === 'admin';
+  const access = useAccessControl();
+  const canEnterAdmin = canCreateSession || !!access.data?.canEnterAdmin;
+  const canMail = canComposeEmail(role) || !!access.data?.permissions?.includes('email.send');
+  const canDevotions = isAdmin || !!access.data?.permissions?.includes('devotions.manage');
   const [step, setStep] = useState<AdminStep>('auth');
   const [recordsOpen, setRecordsOpen] = useState(false);
 
@@ -53,14 +58,14 @@ export const AdminPage: React.FC = () => {
     refetchInterval: 60000,
   });
 
-  const loading = authLoading || roleLoading;
+  const loading = authLoading || roleLoading || (!!user && !canCreateSession && access.isPending);
 
   // Authorization check
   useEffect(() => {
     if (!loading) {
       if (!user) {
         setStep('auth');
-      } else if (!canCreateSession) {
+      } else if (!canEnterAdmin) {
         // User is logged in but doesn't have permission
         toast.error('您沒有權限存取管理後台', {
           description: 'Unauthorized access. Only leaders and admins can access this page.',
@@ -70,7 +75,7 @@ export const AdminPage: React.FC = () => {
         setStep('dashboard');
       }
     }
-  }, [user, loading, canCreateSession, navigate]);
+  }, [user, loading, canEnterAdmin, navigate]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -108,16 +113,19 @@ export const AdminPage: React.FC = () => {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {([
-                ...(isAdmin ? [{ icon: BookOpen, label: '每日靈修課表', desc: '課表、短文與發佈', action: () => navigate('/admin/church-devotions'), testId: 'button-church-devotions' }] : []),
-                { icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' },
-                ...(canComposeEmail(role) ? [
+                ...(isAdmin ? [{ icon: Settings, label: '角色與權限', desc: '職分、授權與管理範圍', action: () => navigate('/admin/access'), testId: 'button-access-control' }] : []),
+                ...(canDevotions ? [{ icon: BookOpen, label: '每日靈修課表', desc: '課表、短文與發佈', action: () => navigate('/admin/church-devotions'), testId: 'button-church-devotions' }] : []),
+                ...(canCreateSession || access.data?.canEnterCrm ? [{ icon: Users, label: '會員管理', desc: '管理會員資料與角色', action: () => navigate('/admin/crm'), testId: 'button-crm' }] : []),
+                ...(access.data?.permissions?.includes('groups.manage') ? [{ icon: Users, label: '小家管理', desc: '小家成員與異動', action: () => navigate('/groups?manage=1'), testId: 'button-family-access' }] : []),
+                ...(access.data?.permissions?.includes('visits.manage') ? [{ icon: Users, label: '探訪安排', desc: '探訪收件匣', action: () => navigate('/care?view=visits'), testId: 'button-visits-access' }] : []),
+                ...(canMail ? [
                   { icon: Mail, label: '寄信', desc: '寄送郵件給會友', action: () => setStep('mail'), testId: 'button-mail-system' },
                 ] : []),
                 ...(isSystemAdmin ? [
                   { icon: Inbox, label: '收件匣', desc: '查看回信', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count },
                 ] : []),
                 { icon: Crown, label: '公共禱告牆', desc: '查看與分享代禱', action: () => navigate('/prayer-wall'), testId: 'button-prayer-meeting-admin' },
-                { icon: Sparkles, label: '真心話題庫', desc: '管理破冰遊戲題目', action: () => setStep('cards'), testId: 'button-cards' },
+                ...(canCreateSession ? [{ icon: Sparkles, label: '真心話題庫', desc: '管理破冰遊戲題目', action: () => setStep('cards'), testId: 'button-cards' }] : []),
                 ...(isSystemAdmin ? [
                   { icon: Image, label: '信息卡片', desc: '上傳管理信息卡片', action: () => setStep('message-cards'), testId: 'button-message-cards' },
                   { icon: ToggleLeft, label: '功能開關', desc: '啟用或停用系統功能', action: () => setStep('feature-toggles'), testId: 'button-feature-toggles' },
@@ -169,7 +177,7 @@ export const AdminPage: React.FC = () => {
       case 'mail':
         return (
           <div className="px-3 sm:px-4 md:px-6 py-6 sm:py-8">
-            {canComposeEmail(role) && <AdminMailComposer onBack={handleBackToDashboard} />}
+            {canMail && <AdminMailComposer onBack={handleBackToDashboard} />}
           </div>
         );
       case 'inbox':

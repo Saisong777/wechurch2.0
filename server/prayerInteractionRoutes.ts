@@ -2,6 +2,7 @@ import { Router, type Request, type ErrorRequestHandler } from 'express';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { pool } from './db';
+import { hasPermission } from './accessControl';
 import { GroupError } from './lifeGroupRepository';
 import { prayerInteractionInput, prayerReactionInput, prayerReactionKind } from '../shared/prayerInteraction';
 
@@ -77,7 +78,7 @@ export function prayerInteractionRoutes(resolveUserId: (req: Request) => Promise
   });
   router.delete('/:id/comments/:commentId', async (req,res) => {
     const id = z.string().uuid().parse(req.params.id); const commentId = z.string().uuid().parse(req.params.commentId);
-    const actor = res.locals.actor; const admin = await getRole(actor) === 'admin';
+    const actor = res.locals.actor; const admin = await getRole(actor) === 'admin' || await hasPermission(actor,'wall.moderate','site');
     await withPrayer(id, async c => {
       const comment = (await c.query('SELECT user_id FROM prayer_comments WHERE id=$1 AND prayer_id=$2',[commentId,id])).rows[0];
       if (!comment) throw new GroupError(404,'找不到這則回應。');

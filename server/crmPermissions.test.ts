@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const query = vi.hoisted(() => vi.fn());
 vi.mock('./db', () => ({ pool: { query } }));
+vi.mock('./accessControl', () => ({ activeGrants: async () => [] }));
 import { getCrmAccessContext, filterUsersForCrmAccess, filterPotentialMembersForCrmAccess } from './crmPermissions';
 import { appendPastoralAccessCondition } from './pastoralAccess';
 

@@ -178,6 +178,8 @@ try {
   await verifyLeaderDashboardHttp(pool, makeClient);
   const { verifyEmailPermissions } = await import('./verify-email-permissions');
   await verifyEmailPermissions(pool, makeClient);
+  const { verifyAccessControl } = await import('./verify-access-control');
+  await verifyAccessControl(pool, makeClient);
   }
 } finally {
   if(server) await new Promise<void>(resolve=>server!.close(()=>resolve()));

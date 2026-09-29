@@ -100,6 +100,9 @@ import { readingPlanAccess, retiredOperations } from './readingPlanAccess';
 import { personalPrayerRoutes } from './personalPrayerRoutes';
 import { prayerSharingRoutes } from './prayerSharingRoutes';
 import { prayerInteractionRoutes } from './prayerInteractionRoutes';
+import { accessControlRoutes, changeAccountRole, hasPermission, myAccess, memberRoleNames } from './accessControl';
+import type { Permission } from '../shared/accessControl';
+import { GroupError } from './groupError';
 import { devotionWallRoutes } from './devotionWallRoutes';
 import { publicPrayerFeed, publicPrayerReceipt } from './prayerSharingRepository';
 import { lifeGroupRoutes } from './lifeGroupRoutes';
@@ -474,7 +477,7 @@ export async function registerRoutes(app: Express) {
       (req as any).legacyUserId = userId;
       (req as any).userRole = role;
       if (req.params[paramName] === userId) return next();
-      if (role && roles.includes(role as AppRole)) {
+      if ((role && roles.includes(role as AppRole)) || (req.method === 'PATCH' && await hasPermission(userId, 'members.manage'))) {
         const capability = req.method === 'GET' ? 'personal' : 'members';
         const access = await getCrmAccessForRequest(req, capability);
         const target = await storage.getUser(req.params[paramName]);
@@ -502,6 +505,22 @@ export async function registerRoutes(app: Express) {
   const requireLeader = requireRole(...crmLeaderRoles);
   const requireCrmDirector = requireRole("admin", "senior_pastor");
   const requireAdmin = requireRole("admin");
+  const requireDelegated = (permission: Permission, legacy: readonly string[]): RequestHandler => async (req,res,next) => {
+    try {
+      const userId = await resolveUserId(req);
+      if (!userId) return void res.status(401).json({error:'請先登入。'});
+      const role = await storage.getUserRole(userId);
+      if (!legacy.includes(role || '') && !await hasPermission(userId,permission)) return void res.status(403).json({error:'沒有這項權限。'});
+      (req as any).legacyUserId=userId; (req as any).userRole=role; next();
+    } catch { res.status(503).json({error:'無法確認權限。'}); }
+  };
+  const requireCrmMemberAccess: RequestHandler<Record<string,string>> = async(req,res,next)=>{
+    try {
+      const id=await resolveUserId(req); if(!id)return void res.status(401).json({error:'請先登入。'});
+      if(!(await myAccess(id)).canEnterCrm)return void res.status(403).json({error:'沒有會員管理權限。'});
+      (req as any).legacyUserId=id; next();
+    }catch{res.status(503).json({error:'無法確認權限。'});}
+  };
 
   const requireReleaseFeature = (featureKey: string): RequestHandler => async (_req, res, next) => {
     try {
@@ -718,7 +737,8 @@ export async function registerRoutes(app: Express) {
   app.use('/api', studyAccess.router);
 
   // Health check endpoint - detailed with database
-  app.use('/api/admin/church-devotions', churchDevotionRoutes(requireCrmDirector));
+  app.use('/api/access-control', accessControlRoutes(resolveUserId));
+  app.use('/api/admin/church-devotions', churchDevotionRoutes(requireDelegated('devotions.manage', ['admin','senior_pastor'])));
   app.use('/api/life-groups', lifeGroupRoutes(resolveUserId));
   app.use('/api/bible-study', bibleStudyRoutes());
   app.use('/open/api', (req, res) => res.redirect(308, `/api/bible-study${req.url.startsWith('/') ? req.url : '/'}`));
@@ -777,7 +797,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/churches", requireLeader, async (req, res) => {
+  app.get("/api/churches", requireCrmMemberAccess, async (req, res) => {
     try {
       const userId = (req as any).legacyUserId || await resolveUserId(req);
       const role = userId ? await storage.getUserRole(userId) : null;
@@ -944,8 +964,14 @@ export async function registerRoutes(app: Express) {
           OR a.potential_member_id IN(SELECT id FROM potential_members WHERE church=ANY($2::text[])))`, [req.params.id, getChurchAliases(church)])).rowCount) return res.status(403).json({ error: 'Forbidden' });
       }
       await pool.query(
-        "UPDATE crm_scope_assignments SET is_active = false, updated_at = NOW() WHERE id = $1",
-        [req.params.id]
+        `WITH previous AS (SELECT * FROM crm_scope_assignments WHERE id=$1 AND is_active FOR UPDATE),
+         revoked AS (UPDATE crm_scope_assignments SET is_active=false,updated_at=now() WHERE id IN(SELECT id FROM previous) RETURNING id)
+         INSERT INTO access_audit(church,actor_id,target_id,action,before_value,after_value)
+         SELECT coalesce(p.church,(SELECT church FROM small_groups WHERE id=p.group_id),
+           (SELECT church FROM users WHERE id=p.member_user_id),(SELECT church FROM potential_members WHERE id=p.potential_member_id),''),
+           $2,p.id,'撤回舊有授權',to_jsonb(p),'{"active":false}'::jsonb
+         FROM previous p JOIN revoked r ON r.id=p.id`,
+        [req.params.id,directorUserId]
       );
       res.json({ success: true });
     } catch (error) {
@@ -954,7 +980,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/crm/groups", requireLeader, async (req, res) => {
+  app.get("/api/crm/groups", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req);
       if (!access || !access.canEnterCrm) {
@@ -1884,7 +1910,7 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const role = userId ? await storage.getUserRole(userId) : null;
-      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole);
+      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole) || await hasPermission(userId, 'wall.moderate', 'site');
       if (!canManage) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -1930,7 +1956,7 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const role = userId ? await storage.getUserRole(userId) : null;
-      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole);
+      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole) || await hasPermission(userId, 'wall.moderate', 'site');
       if (!canManage) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -2188,7 +2214,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/potential-members", requireLeader, async (req, res) => {
+  app.get("/api/potential-members", requireCrmMemberAccess, async (req, res) => {
     try {
       const churchScope = await getCrmChurchFilter(req);
       const access = await getCrmAccessForRequest(req);
@@ -3707,7 +3733,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/users", requireLeader, async (req, res) => {
+  app.get("/api/users", requireCrmMemberAccess, async (req, res) => {
     try {
       const churchScope = await getCrmChurchFilter(req);
       const access = await getCrmAccessForRequest(req);
@@ -3717,16 +3743,18 @@ export async function registerRoutes(app: Express) {
       const users = await storage.getUsers(churchScope);
       const personal = access.personalAccess;
       const privateIds = new Set(personal?.canViewPersonal ? filterUsersForCrmAccess(users, personal).map(user => user.id) : []);
-      res.json(filterUsersForCrmAccess(users, access).map(user => privateIds.has(user.id) ? sanitizeUserRecord(user) : {
+      const visibleUsers = filterUsersForCrmAccess(users, access);
+      const ministryRoles = await memberRoleNames(visibleUsers.map(u=>u.id));
+      res.json(visibleUsers.map(user => ({...(privateIds.has(user.id) ? sanitizeUserRecord(user) : {
         id: user.id, displayName: user.displayName, avatarUrl: user.avatarUrl, church: user.church,
         createdAt: user.createdAt, updatedAt: user.updatedAt,
-      }));
+      }), ministryRoles: ministryRoles.get(user.id) || []})));
     } catch (error) {
       res.status(500).json({ error: "Failed to get users" });
     }
   });
 
-  app.get("/api/user-roles", requireLeader, async (req, res) => {
+  app.get("/api/user-roles", requireCrmMemberAccess, async (req, res) => {
     try {
       const churchScope = await getCrmChurchFilter(req);
       const access = await getCrmAccessForRequest(req);
@@ -3760,14 +3788,14 @@ export async function registerRoutes(app: Express) {
           return res.status(403).json({ error: "Forbidden" });
         }
       }
-      await storage.upsertUserRole(req.params.userId, role);
+      await changeAccountRole(directorUserId!, req.params.userId, role);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to update user role" });
+      res.status(error instanceof GroupError ? error.status : 500).json({ error: error instanceof GroupError ? error.message : "Failed to update user role" });
     }
   });
 
-  app.patch("/api/potential-members/:id", requireLeader, async (req, res) => {
+  app.patch("/api/potential-members/:id", requireCrmMemberAccess, async (req, res) => {
     try {
       const churchScope = await getCrmChurchFilter(req);
       const careOnly = Object.keys(req.body || {}).every(key => ['status','subscribed'].includes(key));
@@ -3803,7 +3831,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/potential-members/:id", requireLeader, async (req, res) => {
+  app.delete("/api/potential-members/:id", requireCrmMemberAccess, async (req, res) => {
     try {
       const churchScope = await getCrmChurchFilter(req);
       const access = await getCrmAccessForRequest(req, 'members');
@@ -3840,9 +3868,9 @@ export async function registerRoutes(app: Express) {
 
   // Profile notification endpoint using Resend integration
   const mailLimit = boundedWindowLimiter({ max: 5, windowMs: 15 * 60_000, key: apiIdentity });
-  const requireEmailStaff = requireRole(...emailStaffRoles);
+  const requireEmailStaff = requireDelegated('email.send',emailStaffRoles);
   const emailRecipientsFor = async (req: Parameters<RequestHandler>[0]) => {
-    const access = await getCrmAccessForRequest(req, 'members');
+    const access = await getCrmAccessForRequest(req, 'email');
     if (!access?.canEnterCrm || !access.canManageMembers) return [];
     return filterUsersForCrmAccess(await storage.getUsers(await getChurchScope(req)), access);
   };
@@ -3921,16 +3949,12 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const userRole = await storage.getUserRole(userId);
-      if (!userRole || !['admin', 'senior_pastor', 'pastor'].includes(userRole)) {
+      if ((!userRole || !['admin', 'senior_pastor', 'pastor'].includes(userRole)) && !await hasPermission(userId, 'email.send')) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
       const { role, church } = req.query;
       const churchScope = await getChurchScope(req);
-      const access = await getCrmAccessForRequest(req);
-      if (!access || !access.canEnterCrm) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
       const allUsers = await emailRecipientsFor(req);
       const visibleUserIds = new Set(allUsers.map((user) => user.id));
       const allRoles = (await storage.getUserRoles(churchScope)).filter((role) => visibleUserIds.has(role.userId));
@@ -4101,7 +4125,7 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const userRole = await storage.getUserRole(userId);
-      if (!userRole || !["admin", "senior_pastor", "pastor"].includes(userRole)) {
+      if ((!userRole || !["admin", "senior_pastor", "pastor"].includes(userRole)) && !await hasPermission(userId, 'email.send')) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -4159,7 +4183,7 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const userRole = await storage.getUserRole(userId);
-      if (!userRole || !['admin', 'senior_pastor', 'pastor'].includes(userRole)) {
+      if ((!userRole || !['admin', 'senior_pastor', 'pastor'].includes(userRole)) && !await hasPermission(userId, 'email.send')) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -4928,7 +4952,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/pastoral/framework", requireLeader, async (req, res) => {
+  app.get("/api/pastoral/framework", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req);
       if (!access || !access.canEnterCrm) {
@@ -4974,7 +4998,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/pastoral/persons/:personId/stage", requireLeader, async (req, res) => {
+  app.patch("/api/pastoral/persons/:personId/stage", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req, 'care');
       if (!access || (!access.canManageCare && !access.canManageMembers)) {
@@ -4997,7 +5021,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/pastoral/persons", requireLeader, async (req, res) => {
+  app.get("/api/pastoral/persons", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req);
       if (!access || !access.canEnterCrm) {
@@ -5054,7 +5078,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/pastoral/persons/:personId", requireLeader, async (req, res) => {
+  app.get("/api/pastoral/persons/:personId", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req);
       if (!access || !access.canEnterCrm) {
@@ -5079,7 +5103,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/pastoral/persons/:personId/love-journey/start", requireLeader, async (req, res) => {
+  app.post("/api/pastoral/persons/:personId/love-journey/start", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req, 'care');
       if (!access || (!access.canManageCare && !access.canManageMembers)) {
@@ -5109,7 +5133,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/pastoral/journey-progress/:progressId", requireLeader, async (req, res) => {
+  app.patch("/api/pastoral/journey-progress/:progressId", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
@@ -5138,7 +5162,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/pastoral/journey-milestones/:milestoneId", requireLeader, async (req, res) => {
+  app.patch("/api/pastoral/journey-milestones/:milestoneId", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
@@ -5167,9 +5191,9 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/pastoral/persons/:personId/tasks", requireLeader, async (req, res) => {
+  app.get("/api/pastoral/persons/:personId/tasks", requireCrmMemberAccess, async (req, res) => {
     try {
-      const access = await getCrmAccessForRequest(req);
+      const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -5184,7 +5208,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/pastoral/persons/:personId/tasks", requireLeader, async (req, res) => {
+  app.post("/api/pastoral/persons/:personId/tasks", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
@@ -5219,7 +5243,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/pastoral/persons/:personId/tasks/next-step", requireLeader, async (req, res) => {
+  app.post("/api/pastoral/persons/:personId/tasks/next-step", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {
@@ -5239,7 +5263,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/pastoral/tasks/:taskId", requireLeader, async (req, res) => {
+  app.patch("/api/pastoral/tasks/:taskId", requireCrmMemberAccess, async (req, res) => {
     try {
       const access = await getCrmAccessForRequest(req, 'care');
       if (!access || !access.canManageCare) {

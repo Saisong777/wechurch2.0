@@ -8,6 +8,7 @@ import { usePrayerReaction, useUrgentPrayer, useClosePrayer, type Prayer, useDel
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAccessControl } from '@/hooks/useAccessControl';
 import { cn, vibrate } from '@/lib/utils';
 import { PrayerComments } from './PrayerComments';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -22,6 +23,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
   const { isAdmin } = useUserRole();
+  const access=useAccessControl();
   const deleteMutation = useDeletePrayer();
   const toggleAmenMutation = useToggleAmen();
   const togglePinMutation = useTogglePinPrayer();
@@ -35,7 +37,7 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
   const actionsId = useId();
   const managementTrigger = useRef<HTMLButtonElement>(null);
   const closed = isClosedPrayer(prayer);
-  const canDelete = prayer.isOwner || isAdmin;
+  const canDelete = prayer.isOwner || isAdmin || !!access.data?.permissions?.includes('wall.moderate');
   const managementBusy = deleteMutation.isPending || togglePinMutation.isPending || markAnsweredMutation.isPending || urgentMutation.isPending || closeMutation.isPending;
   const summary = prayer.content.trim().split(/\r?\n/)[0];
   const timeAgo = formatDistanceToNow(new Date(prayer.createdAt), { addSuffix: true, locale: zhTW });

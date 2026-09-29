@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { PublicWallTabs } from '@/components/prayer/PublicWallTabs';
 import { useDevotionWall,useWithdrawDevotionShare } from '@/hooks/useDevotionWall';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAccessControl } from '@/hooks/useAccessControl';
 
 export default function DevotionWallPage() {
   const {user}=useAuth();const wall=useDevotionWall();const withdraw=useWithdrawDevotionShare();
+  const access=useAccessControl();const moderator=user?.role==='admin'||!!access.data?.permissions?.includes('wall.moderate');
   return <FeatureGate featureKeys={['we_share','we_learn']} title="靈修牆維護中" description="請稍後再試"><div className="min-h-screen bg-background"><Header title="分享牆" backTo="/" /><main className="container mx-auto px-3 py-6 sm:px-6">
     <PublicWallTabs /><section className="mx-auto max-w-3xl space-y-6">
       <header className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-start gap-3"><div><h1 className="flex items-center gap-2 text-2xl font-bold"><BookOpen className="h-6 w-6 text-teal-700" />今日靈修牆</h1><p className="mt-2 text-sm text-muted-foreground">{!wall.expired && wall.data?.day} · 台灣時間每日 00:00 換日</p><p className="mt-1 text-sm text-muted-foreground">全站登入成員可見；換日後公開分享移除，個人筆記仍保留。</p></div><Button variant="outline" size="icon" aria-label="更新靈修牆" title="更新靈修牆" disabled={wall.isFetching} onClick={()=>wall.refetch()}><RefreshCw className={`h-4 w-4 ${wall.isFetching?'animate-spin':''}`} /></Button></header>
@@ -21,7 +23,7 @@ export default function DevotionWallPage() {
         <div className="space-y-4">{wall.posts.map(post=><article key={post.id} aria-label={`靈修分享：${post.title}`} className="rounded-lg border bg-card p-4 sm:p-5 [overflow-wrap:anywhere]">
           <div className="mb-3 flex items-center justify-between gap-3"><span className="text-sm font-medium">{post.authorName}</span><span className="text-xs text-muted-foreground">{new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit'}).format(new Date(post.createdAt))}</span></div>
           <h2 className="text-lg font-semibold">{post.title}</h2><p className="mt-1 text-sm text-teal-700">{post.reference}</p><p className="mt-4 whitespace-pre-wrap text-base leading-7">{post.body}</p>
-          {post.isOwner && <div className="mt-4 flex justify-end border-t pt-3"><Button variant="ghost" size="sm" className="gap-2" disabled={withdraw.isPending} onClick={()=>{if(window.confirm('撤回這篇公開分享？個人筆記不受影響。'))withdraw.mutate(post.id);}}><Undo2 className="h-4 w-4" />撤回分享</Button></div>}
+          {(post.isOwner||moderator) && <div className="mt-4 flex justify-end border-t pt-3"><Button variant="ghost" size="sm" className="gap-2" disabled={withdraw.isPending} onClick={()=>{if(window.confirm('撤回這篇公開分享？個人筆記不受影響。'))withdraw.mutate(post.id);}}><Undo2 className="h-4 w-4" />{post.isOwner?'撤回分享':'移除公開分享'}</Button></div>}
         </article>)}</div>
         {wall.hasNextPage && <Button variant="outline" disabled={wall.isFetching} onClick={()=>wall.fetchNextPage()}><ChevronDown className="mr-2 h-4 w-4" />{wall.isFetchingNextPage?'載入中…':'載入更多分享'}</Button>}
       </>}

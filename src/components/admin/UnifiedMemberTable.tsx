@@ -1,4 +1,5 @@
 import { churchDisplayName } from '@shared/churches';
+import { Link } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -139,6 +140,7 @@ export const UnifiedMemberTable = ({
                     )}
                   </div>
                   <p className="mt-1 break-all text-xs text-muted-foreground">{member.email || '未提供 Email'}</p>
+                  {!!member.ministryRoles?.length && <div className="mt-1 flex flex-wrap gap-1">{member.ministryRoles.map(name=><Badge key={name} variant="secondary">{name}</Badge>)}</div>}
                 </TableCell>
                 <TableCell>
                   {isRegistered && member.role ? (
@@ -170,6 +172,7 @@ export const UnifiedMemberTable = ({
                       <DropdownMenuItem disabled={!member.email} onClick={() => onCopyEmail?.(member)}>
                         <Copy className="mr-2 h-4 w-4" />複製 Email
                       </DropdownMenuItem>
+                      {isRegistered && isAdmin && <DropdownMenuItem asChild><Link to={`/admin/access?member=${member.userId}`}><Shield className="mr-2 h-4 w-4"/>職分與授權</Link></DropdownMenuItem>}
                       {isRegistered && member.userId && isAdmin && (
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger><Shield className="mr-2 h-4 w-4" />變更角色</DropdownMenuSubTrigger>

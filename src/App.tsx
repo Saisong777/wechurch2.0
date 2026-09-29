@@ -44,6 +44,7 @@ const DiscipleQuizPage = lazyNamed(() => import("./pages/DiscipleQuizPage"), "Di
 const AdminPage = lazyNamed(() => import("./pages/AdminPage"), "AdminPage");
 const CRMPage = lazyPage(() => import("./pages/CRMPage"));
 const ChurchDevotionAdminPage = lazyPage(() => import('./pages/ChurchDevotionAdminPage'));
+const AccessControlPage = lazyPage(() => import('./pages/AccessControlPage'));
 const LifeGroupsPage = lazyPage(() => import('./pages/LifeGroupsPage'));
 const PastoralPersonPage = lazyPage(() => import("./pages/PastoralPersonPage"));
 const MePage = lazyPage(() => import("./pages/MePage"));
@@ -100,6 +101,7 @@ const router = createBrowserRouter([{ path: '*', element: (
                     <Route path="/user/notebook" element={<Navigate to="/learn/my-notes" replace />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/admin/crm" element={<CRMPage />} />
+                    <Route path="/admin/access" element={<AccessControlPage />} />
                     <Route path="/admin/church-devotions" element={<ChurchDevotionAdminPage />} />
                     <Route path="/groups" element={<LifeGroupsPage />} />
                     <Route path="/groups/:groupId" element={<LifeGroupsPage />} />

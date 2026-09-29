@@ -66,6 +66,25 @@ export const userRoles = pgTable("user_roles", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const accessRoles = pgTable('access_roles', {
+  id: uuid('id').primaryKey().defaultRandom(), church: text('church').notNull(), name: text('name').notNull(),
+  permissions: jsonb('permissions').notNull().default(sql`'[]'::jsonb`), version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => ({ nameUnique: unique().on(t.church,t.name) }));
+export const accessGrants = pgTable('access_grants', {
+  id: uuid('id').primaryKey().defaultRandom(), userId: uuid('user_id').notNull().references(()=>users.id),
+  roleId: uuid('role_id').notNull().references(()=>accessRoles.id), church: text('church').notNull(), scope: text('scope').notNull(),
+  groupId: uuid('group_id').references(()=>smallGroups.id), memberId: uuid('member_id').references(()=>users.id),
+  permissions: jsonb('permissions').notNull().default(sql`'[]'::jsonb`), expiresAt: timestamp('expires_at',{withTimezone:true}),
+  active: boolean('active').notNull().default(true), version: integer('version').notNull().default(1), reason: text('reason').notNull(),
+  createdAt: timestamp('created_at',{withTimezone:true}).notNull().defaultNow(), updatedAt: timestamp('updated_at',{withTimezone:true}).notNull().defaultNow(),
+});
+export const accessAudit = pgTable('access_audit', {
+  id: uuid('id').primaryKey().defaultRandom(), church:text('church').notNull(), actorId:uuid('actor_id').notNull().references(()=>users.id),
+  targetId:uuid('target_id'), action:text('action').notNull(), beforeValue:jsonb('before_value'), afterValue:jsonb('after_value'),
+  createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+});
+
 export const userEmailPreferences = pgTable("user_email_preferences", {
   userId: uuid("user_id").primaryKey().references(() => users.id).notNull(),
   dailyFollowEnabled: boolean("daily_follow_enabled").default(false).notNull(),

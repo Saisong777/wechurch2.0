@@ -82,6 +82,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs,TabsContent,TabsList,TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAccessControl } from '@/hooks/useAccessControl';
 import { PotentialMember,UnifiedMember,useUnifiedMembers } from '@/hooks/useUnifiedMembers';
 import { AppRole,useUserRole } from '@/hooks/useUserRole';
 import { filterCrmMembers,getMemberPage,type CrmBatchAction } from '@/lib/crm-members';
@@ -157,14 +158,20 @@ const StatTile = ({
 const CRMPage = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { role: currentRole, isLeader, isAdmin, isSystemAdmin, loading: roleLoading } = useUserRole();
+  const { role: currentRole, isLeader: legacyLeader, isAdmin, isSystemAdmin, loading: roleLoading } = useUserRole();
+  const access = useAccessControl();
+  const isLeader = legacyLeader || !!access.data?.canEnterCrm;
   const isMobile = useIsMobile();
 
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview');
+  useEffect(() => {
+    if (!roleLoading && !legacyLeader) setWorkspaceTab('members');
+  }, [roleLoading, legacyLeader]);
   const [memberTab, setMemberTab] = useState<MemberTab>('all');
 
   const [status, setStatus] = useState<StatusFilter>('all');
   const [role, setRole] = useState<AppRole | 'all'>('all');
+  const [ministryRole,setMinistryRole] = useState('');
   const [selectedChurch, setSelectedChurch] = useState<string>('all');
   const [churches, setChurches] = useState<ChurchOption[]>([]);
   const [search, setSearch] = useState('');
@@ -260,7 +267,7 @@ const CRMPage = () => {
   });
 
   useEffect(() => {
-    if (!isLeader || !churchScopeInitialized) return;
+    if (!legacyLeader || !churchScopeInitialized) return;
     const controller = new AbortController();
     setActiveSessionId(null);
     const fetchActiveSession = async () => {
@@ -278,24 +285,25 @@ const CRMPage = () => {
 
     fetchActiveSession();
     return () => controller.abort();
-  }, [selectedChurch, isLeader, churchScopeInitialized]);
+  }, [selectedChurch, legacyLeader, churchScopeInitialized]);
 
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [memberTab, status, role, search, selectedChurch, pageSize]);
+  }, [memberTab, status, role, ministryRole, search, selectedChurch, pageSize]);
 
   const members = useMemo(() => {
-    return filterCrmMembers(rawMembers, { tab: 'all', search: deferredSearch });
-  }, [rawMembers, deferredSearch]);
+    return filterCrmMembers(rawMembers, { tab: 'all', search: deferredSearch }).filter(m=>!ministryRole||m.ministryRoles?.includes(ministryRole));
+  }, [rawMembers, deferredSearch, ministryRole]);
   const memberPage = getMemberPage(members, page, pageSize);
   const pageMembers = memberPage.rows;
-  const hasFilters = !!search.trim() || status !== 'all' || role !== 'all';
-  const resetFilters = () => { setSearch(''); setStatus('all'); setRole('all'); };
+  const hasFilters = !!search.trim() || status !== 'all' || role !== 'all' || !!ministryRole;
+  const resetFilters = () => { setSearch(''); setStatus('all'); setRole('all'); setMinistryRole(''); };
   const changeMemberTab = (value: string) => {
     setMemberTab(value as MemberTab);
     setStatus('all');
     setRole('all');
+    setMinistryRole('');
   };
   const changePage = (next: number) => { setSelectedIds(new Set()); setPage(next); };
   const writesPending = bulkAction.isPending || updateRole.isPending || updatePotentialMember.isPending || deleteMember.isPending || groupActionBusy;
@@ -480,7 +488,7 @@ const CRMPage = () => {
     catch { toast.error('無法複製 Email，請確認剪貼簿權限'); }
   };
 
-  if (authLoading || roleLoading) {
+  if (authLoading || roleLoading || (!!user && !legacyLeader && access.isPending)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
@@ -629,14 +637,14 @@ const CRMPage = () => {
                 <SelectTrigger aria-label="CRM 工作區"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="members">會員</SelectItem>
-                  <SelectItem value="care">關懷</SelectItem>
+                  {legacyLeader && <SelectItem value="care">關懷</SelectItem>}
                   <SelectItem value="groups">小家</SelectItem>
-                  <SelectItem value="overview">總覽</SelectItem>
+                  {legacyLeader && <SelectItem value="overview">總覽</SelectItem>}
                   <SelectItem value="journey">個人/門訓</SelectItem>
                   <SelectItem value="prayers">代求</SelectItem>
-                  <SelectItem value="gatherings">聚會</SelectItem>
+                  {legacyLeader && <SelectItem value="gatherings">聚會</SelectItem>}
                   <SelectItem value="framework">框架</SelectItem>
-                  <SelectItem value="line">LINE</SelectItem>
+                  {legacyLeader && <SelectItem value="line">LINE</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
@@ -645,18 +653,18 @@ const CRMPage = () => {
                 <UserCheck className="h-4 w-4" />
                 會員
               </TabsTrigger>
-              <TabsTrigger value="care" className="gap-2">
+              {legacyLeader && <TabsTrigger value="care" className="gap-2">
                 <HeartHandshake className="h-4 w-4" />
                 關懷
-              </TabsTrigger>
+              </TabsTrigger>}
               <TabsTrigger value="groups" className="gap-2">
                 <Users className="h-4 w-4" />
                 小家
               </TabsTrigger>
-              <TabsTrigger value="overview" className="gap-2">
+              {legacyLeader && <TabsTrigger value="overview" className="gap-2">
                 <Activity className="h-4 w-4" />
                 總覽
-              </TabsTrigger>
+              </TabsTrigger>}
               <TabsTrigger value="journey" className="gap-2">
                 <BookOpen className="h-4 w-4" />
                 個人/門訓
@@ -665,18 +673,18 @@ const CRMPage = () => {
                 <ClipboardList className="h-4 w-4" />
                 代求
               </TabsTrigger>
-              <TabsTrigger value="gatherings" className="gap-2">
+              {legacyLeader && <TabsTrigger value="gatherings" className="gap-2">
                 <CalendarDays className="h-4 w-4" />
                 聚會
-              </TabsTrigger>
+              </TabsTrigger>}
               <TabsTrigger value="framework" className="gap-2">
                 <Target className="h-4 w-4" />
                 框架
               </TabsTrigger>
-              <TabsTrigger value="line" className="gap-2">
+              {legacyLeader && <TabsTrigger value="line" className="gap-2">
                 <MessageCircle className="h-4 w-4" />
                 LINE
-              </TabsTrigger>
+              </TabsTrigger>}
             </TabsList>
           </div>
 
@@ -748,6 +756,7 @@ const CRMPage = () => {
                     {search && <Button variant="ghost" size="icon" className="absolute right-0 top-0" title="清除搜尋" aria-label="清除搜尋" onClick={() => setSearch('')}><X className="h-4 w-4" /></Button>}
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {(memberTab==='all'||memberTab==='registered') && <Select value={ministryRole||'all'} onValueChange={v=>setMinistryRole(v==='all'?'':v)}><SelectTrigger aria-label="篩選職分" className="w-[140px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">全部職分</SelectItem>{[...new Set(['同工',...allMembers.flatMap(m=>m.ministryRoles || [])])].map(name=><SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>}
                     {(memberTab === 'all' || memberTab === 'registered') && isAdmin && (
                       <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
                         <SelectTrigger aria-label="篩選角色" className="w-[140px]">
@@ -858,6 +867,7 @@ const CRMPage = () => {
                                   </Badge>
                                 </div>
                                 <h3 className="mt-2 truncate font-semibold">{member.name}</h3>
+                                {!!member.ministryRoles?.length&&<div className="mt-1 flex flex-wrap gap-1">{member.ministryRoles.map(name=><Badge key={name} variant="secondary">{name}</Badge>)}</div>}
                                 <p className="mt-1 truncate text-sm text-muted-foreground">{member.email}</p>
                                 <p className="mt-2 text-xs text-muted-foreground">
                                   {member.role ? roleLabels[member.role] : statusLabels[member.status]} ・ 出席 {member.sessionsCount} 次
@@ -871,6 +881,7 @@ const CRMPage = () => {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem disabled={!member.email} onClick={() => void handleCopyMemberEmail(member)}><Copy className="mr-2 h-4 w-4" />複製 Email</DropdownMenuItem>
+                                  {isAdmin&&member.userId&&<DropdownMenuItem onClick={()=>navigate(`/admin/access?member=${member.userId}`)}><Shield className="mr-2 h-4 w-4"/>職分與授權</DropdownMenuItem>}
                                   {member.type === 'potential' && (
                                     <>
                                       <DropdownMenuLabel>潛在會員</DropdownMenuLabel>

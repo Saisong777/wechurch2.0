@@ -19,6 +19,7 @@ import { LogOut, User, Settings, Shield, ChevronLeft } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAccessControl } from '@/hooks/useAccessControl';
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
 
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   const mobileHeader = useContext(MobileHeaderContext);
   const { profile } = useUserProfile();
   const { isAdmin, isLeader } = useUserRole();
+  const access = useAccessControl();
   const navigate = useNavigate();
   const location = useLocation();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
@@ -107,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Settings className="w-4 h-4 mr-2" />
               個人設定
             </DropdownMenuItem>
-            {(isAdmin || isLeader) && (
+            {(isAdmin || isLeader || access.data?.canEnterAdmin) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

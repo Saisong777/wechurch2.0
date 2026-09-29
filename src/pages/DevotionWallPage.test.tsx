@@ -9,6 +9,7 @@ import MySharingPage from './MySharingPage';
 const wall = vi.hoisted(() => ({ posts: [], data: { day: '2026-09-27' }, expired: false, isPending: false, isError: false,
   hasNextPage: true, isFetching: false, isFetchingNextPage: false, fetchNextPage: vi.fn(), refetch: vi.fn() }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'actor' }, loading: false }) }));
+vi.mock('@/hooks/useAccessControl',()=>({useAccessControl:()=>({data:undefined})}));
 vi.mock('@/hooks/useDevotionWall', () => ({ useDevotionWall: () => wall, useWithdrawDevotionShare: () => ({ isPending: false }) }));
 vi.mock('@/components/layout/Header', () => ({ Header: () => null }));
 vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: ({ children }: { children: ReactNode }) => children }));

@@ -11,6 +11,7 @@ vi.mock('@/components/ui/avatar',()=>({
   AvatarFallback:({children}:React.PropsWithChildren)=><span>{children}</span>,
 }));
 vi.mock('@/hooks/useUserRole', () => ({useUserRole:()=>({isAdmin:state.admin})}));
+vi.mock('@/hooks/useAccessControl',()=>({useAccessControl:()=>({data:undefined})}));
 vi.mock('@/hooks/usePrayerWall', () => {
   const mutation = () => ({mutate:state.mutate,isPending:state.busy});
   return { usePrayerReaction:mutation,useUrgentPrayer:mutation,useClosePrayer:mutation,useDeletePrayer:mutation,useToggleAmen:mutation,useTogglePinPrayer:mutation,useMarkPrayerAnswered:mutation,CATEGORY_LABELS:{supplication:'代求'} };

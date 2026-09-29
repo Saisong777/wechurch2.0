@@ -1,5 +1,8 @@
 import { pool } from "./db";
 import { getChurchAliases, normalizeChurch } from "./churches";
+import { activeGrants } from './accessControl';
+import { canComposeEmail } from '../shared/email';
+import type { Permission } from '../shared/accessControl';
 
 export type CrmRole =
   | "admin"
@@ -66,10 +69,10 @@ const addNormalized = (set: Set<string>, value?: string | null) => {
   if (normalized) set.add(normalized);
 };
 
-export type CrmCapability = 'personal' | 'care' | 'members' | 'careOrMembers';
+export type CrmCapability = 'personal' | 'care' | 'members' | 'careOrMembers' | 'email' | 'groups';
 export async function getCrmAccessContext(userId: string, roleInput?: string | null, capability?: CrmCapability): Promise<CrmAccessContext> {
   const role: CrmRole = isCrmRole(roleInput) ? roleInput : "member";
-  const canEnterCrm = isCrmEntryRole(role);
+  let canEnterCrm = isCrmEntryRole(role);
   const canAssignScopes = canAssignCrmScopes(role);
 
   const currentUserResult = await pool.query(
@@ -85,7 +88,8 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   const potentialMemberIds = new Set<string>();
   const memberEmails = new Set<string>();
 
-  const roleGrant = capability === 'personal' || capability === 'care' || capability === 'careOrMembers' ? role === 'pastor' || role === 'minister' : capability === 'members' ? role === 'pastor' : true;
+  const memberCapability = capability === 'members' || capability === 'email' || capability === 'groups';
+  const roleGrant = capability === 'personal' || capability === 'care' || capability === 'careOrMembers' ? role === 'pastor' || role === 'minister' : memberCapability ? role === 'pastor' : true;
   if (roleGrant) {
     if (currentUser?.email) memberEmails.add(String(currentUser.email).trim().toLowerCase());
     userIds.add(userId);
@@ -146,7 +150,7 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   for (const assignment of assignmentsResult.rows) {
     // A role's intrinsic appointment capabilities must not widen a separately
     // delegated scope. Each explicit assignment grants only its selected abilities.
-    const granted = !capability || (capability === 'careOrMembers' ? assignment.can_manage_care || assignment.can_manage_members : assignment[capability === 'personal' ? 'can_view_personal' : capability === 'care' ? 'can_manage_care' : 'can_manage_members']);
+    const granted = (capability !== 'email' || canComposeEmail(role)) && (!capability || (capability === 'careOrMembers' ? assignment.can_manage_care || assignment.can_manage_members : assignment[capability === 'personal' ? 'can_view_personal' : capability === 'care' ? 'can_manage_care' : 'can_manage_members']));
     if (!granted) continue;
     if (assignment.scope_type === "church") addNormalized(churchScopes, assignment.church);
     if (assignment.scope_type === "group" && assignment.group_id) groupIds.add(assignment.group_id);
@@ -169,6 +173,20 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   for (const group of ownedGroupsResult.rows) {
     if (capability && !roleGrant && !((capability === 'care' || capability === 'careOrMembers') && (role === 'group_leader' || role === 'leader'))) continue;
     groupIds.add(group.id);
+  }
+  const delegated = await activeGrants(userId);
+  const required: Permission[] = capability === 'personal' ? [] : capability === 'members' ? ['members.manage']
+    : capability === 'groups' ? ['groups.manage'] : capability === 'email' ? ['email.send']
+    : capability === 'care' ? ['care.manage'] : capability === 'careOrMembers' ? ['care.manage','members.manage']
+    : ['members.read','members.manage','groups.manage','care.manage'];
+  for (const grant of delegated) {
+    if (!grant.permissions.some(p => required.includes(p))) continue;
+    canEnterCrm = true;
+    if (grant.scope === 'church') addNormalized(churchScopes, grant.church);
+    if (grant.scope === 'group' && grant.groupId) groupIds.add(grant.groupId);
+    if (grant.scope === 'member' && grant.memberId) userIds.add(grant.memberId);
+    canManageMembers ||= grant.permissions.includes(capability === 'email' ? 'email.send' : capability === 'groups' ? 'groups.manage' : 'members.manage');
+    canManageCare ||= grant.permissions.includes('care.manage');
   }
   if (groupIds.size > 0 && (role === "group_leader" || role === "leader")) {
     canManageCare = true;

@@ -16,7 +16,7 @@ const denied = () => new GroupError(403, '不在你的小家管理範圍內。')
 const conflict = () => new GroupError(409, '資料已更新，請重新載入後再試。');
 const fields = `g.id,g.name,g.church,g.description,g.meeting,g.announcement,g.is_listed AS listed,g.lifecycle AS status,g.version,g.leader_user_id AS "leaderId"`;
 export async function familyAccess(actor: string) {
-  return getCrmAccessContext(actor, await storage.getUserRole(actor), 'members');
+  return getCrmAccessContext(actor, await storage.getUserRole(actor), 'groups');
 }
 function churchAllowed(access: CrmAccessContext, church: string) {
   return access.canEnterCrm && access.canManageMembers && (access.role === 'admin' || access.churchScopes.includes(normalizeChurch(church) || ''));

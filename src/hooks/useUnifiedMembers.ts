@@ -30,6 +30,7 @@ export interface UnifiedMember {
   church: string | null;
   userId: string | null;
   role: AppRole | null;
+  ministryRoles?: string[];
   status: 'pending' | 'member' | 'declined';
   subscribed: boolean;
   sessionsCount: number;

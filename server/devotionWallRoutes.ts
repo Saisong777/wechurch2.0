@@ -1,6 +1,7 @@
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import { z } from 'zod';
 import { pool } from './db';
+import { hasPermission } from './accessControl';
 import { GroupError } from './lifeGroupRepository';
 import { devotionDayWindow, devotionWallShareInput, devotionWallPageInput, devotionWallCursor } from '../shared/devotionWall';
 
@@ -61,7 +62,8 @@ export function devotionWallRoutes(resolveUserId:(req:Request)=>Promise<string|n
   });
   router.delete('/:id',async(req,res)=>{
     const id=z.string().uuid().parse(req.params.id);
-    const result=await pool.query('UPDATE devotion_wall_posts SET withdrawn_at=COALESCE(withdrawn_at,now()) WHERE id=$1 AND user_id=$2 RETURNING id',[id,res.locals.actor]);
+    const moderator=await hasPermission(res.locals.actor,'wall.moderate','site') || (await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[res.locals.actor])).rowCount!>0;
+    const result=await pool.query('UPDATE devotion_wall_posts SET withdrawn_at=COALESCE(withdrawn_at,now()) WHERE id=$1 AND (user_id=$2 OR $3) RETURNING id',[id,res.locals.actor,moderator]);
     if(!result.rowCount)throw new GroupError(404,'找不到本人的分享。');
     res.json({ok:true});
   });

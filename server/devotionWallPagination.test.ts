@@ -5,6 +5,7 @@ import { devotionWallCursor, devotionWallPageInput } from '../shared/devotionWal
 
 const db = vi.hoisted(() => ({ query: vi.fn(), connect: vi.fn() }));
 vi.mock('./db', () => ({ pool: db }));
+vi.mock('./accessControl', () => ({ hasPermission: async () => false }));
 type Handler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 type Layer = { route?: { path: string | string[]; methods: Record<string, boolean>; stack: Array<{ handle: Handler }> } };
 const actor = '00000000-0000-4000-8000-000000000001';
@@ -61,7 +62,7 @@ it('does not carry an old cursor into a new Taipei day', async () => {
   expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ day, posts: [], nextCursor: null }));
 });
 it('keeps withdrawal owner-scoped', async () => {
-  db.query.mockReset().mockResolvedValue({ rowCount: 1 });
+  db.query.mockReset().mockResolvedValueOnce({ rowCount: 0 }).mockResolvedValueOnce({ rowCount: 1 });
   await handler('delete', '/:id')({ params: { id: id(2) } } as unknown as Request, response(), vi.fn());
-  expect(db.query).toHaveBeenCalledWith(expect.stringContaining('WHERE id=$1 AND user_id=$2'), [id(2), actor]);
+  expect(db.query).toHaveBeenCalledWith(expect.stringContaining('WHERE id=$1 AND (user_id=$2 OR $3)'), [id(2), actor, false]);
 });

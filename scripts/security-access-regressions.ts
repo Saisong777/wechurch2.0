@@ -142,6 +142,7 @@ export async function runSecurityAccessRegressions() {
   await handler('patch', '/api/users/:id/profile', common)(self, response());
   assert.deepEqual(plain(writes.pop()), { church: '火樂' });
   const list = handler('get', '/api/users', { ...common, getCrmChurchFilter: async () => null,
+    memberRoleNames: async () => new Map(),
     getCrmAccessForRequest: async () => ({ ...baseAccess, personalAccess: access }), filterUsersForCrmAccess,
     sanitizeUserRecord: helperSanitizer(),
   });
