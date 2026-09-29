@@ -45,7 +45,7 @@ export const AdminPage: React.FC = () => {
   const access = useAccessControl();
   const roleLabel = [...new Set([
     ...(role && role !== 'member' ? [crmRoleLabels[role]] : []),
-    ...(access.data?.grants.map(grant => grant.roleName) || []),
+    ...(access.data?.grants?.map(grant => grant.roleName) || []),
   ])].join('、') || '會友';
   const canEnterAdmin = canCreateSession || !!access.data?.canEnterAdmin;
   const canMail = canComposeEmail(role) || !!access.data?.permissions?.includes('email.send');
