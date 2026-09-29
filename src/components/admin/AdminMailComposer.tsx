@@ -66,7 +66,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendRequest = useRef<{ payload: string; id: string } | null>(null);
-  const { data: emailStatus } = useQuery<EmailProviderStatus>({ queryKey: ['/api/email-provider-status'] });
+  const { data: emailStatus, isError: emailStatusError } = useQuery<EmailProviderStatus>({ queryKey: ['/api/email-provider-status'] });
 
   const { data: allUsers = [], isLoading: usersLoading } = useQuery<EmailUser[]>({
     queryKey: ['/api/admin/users-for-email'],
@@ -334,8 +334,8 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
 
           {recipientMode === 'individual' && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-0 w-full sm:w-auto sm:flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="搜尋姓名、Email 或教會..."
@@ -364,20 +364,18 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
                     filteredUsers.map(u => (
                       <label
                         key={u.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
+                        className="flex min-w-0 items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
                         data-testid={`user-row-${u.id}`}
                       >
                         <Checkbox
                           checked={selectedUserIds.has(u.id)}
                           onCheckedChange={() => toggleUser(u.id)}
                         />
-                        <span className="text-sm truncate flex-1">
-                          {u.displayName || u.email}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate max-w-32">
-                          {u.displayName ? u.email : ''}
-                        </span>
-                        <Badge variant="outline" className="text-xs shrink-0">
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-sm break-words">{u.displayName || u.email}</span>
+                          {u.displayName && <span className="block text-xs text-muted-foreground break-all">{u.email}</span>}
+                        </div>
+                        <Badge variant="outline" className="hidden sm:inline-flex text-xs shrink-0">
                           {ROLE_LABELS[u.role] || u.role}
                         </Badge>
                       </label>
@@ -394,7 +392,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
               {usersLoading ? '載入中...' : `將寄給 ${recipients.length} 人`}
             </span>
           </div>
-          {emailStatus && !emailStatus.canSend && <p role="status" className="text-sm text-muted-foreground">{emailStatus.message}</p>}
+          {!emailStatus?.canSend && <p role="status" className="text-sm text-muted-foreground">{emailStatus?.message || (emailStatusError ? '無法確認寄信服務，請重新整理後再試。' : '正在確認寄信服務…')}</p>}
           {recipients.length > 100 && <p role="alert" className="text-sm text-destructive">每次最多 100 人，請縮小選取範圍。</p>}
         </CardContent>
       </Card>

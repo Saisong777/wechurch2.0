@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPollingInterval } from '@/lib/retry-utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPublicBaseUrl } from '@/lib/url-helpers';
+import type { EmailProviderStatus } from '@shared/email';
 
 type IncompleteType = 'unverified' | 'incomplete_profile' | 'potential';
 
@@ -33,6 +33,8 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
+  const notificationRequests = useRef(new Map<string, string>());
+  const { data: emailStatus } = useQuery<EmailProviderStatus>({ queryKey: ['/api/email-provider-status'] });
 
   // Fetch incomplete members from multiple sources using API
   const { data: incompleteMembers, isLoading, isError, refetch } = useQuery({
@@ -94,15 +96,15 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
   // Send notification mutation using API
   const sendNotification = useMutation({
     mutationFn: async (member: IncompleteMember) => {
+      if (!emailStatus?.canSend) throw new Error(emailStatus?.message || '寄信服務狀態尚未確認');
       const typeMap: Record<IncompleteType, string> = {
         unverified: 'unverified_email',
         incomplete_profile: 'incomplete_profile',
         potential: 'potential_member',
       };
 
-      // Use public base URL to avoid auth-bridge redirect issues
-      const publicBaseUrl = getPublicBaseUrl();
-      
+      const requestKey = JSON.stringify([member.email, member.name, member.type]);
+      if (!notificationRequests.current.has(requestKey)) notificationRequests.current.set(requestKey, crypto.randomUUID());
       const response = await fetch('/api/send-profile-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,19 +112,20 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
           email: member.email,
           name: member.name,
           type: typeMap[member.type],
-          redirectUrl: `${publicBaseUrl}/login`,
+          requestId: notificationRequests.current.get(requestKey),
+          redirectUrl: '/login',
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || '發送失敗');
+        throw new Error(errorData.message || errorData.error || '發送失敗');
       }
 
       return await response.json();
     },
     onSuccess: (_, member) => {
-      toast.success(`已發送通知給 ${member.email}`);
+      toast.success('寄信服務已接受通知，尚非送達確認');
     },
     onError: (error, member) => {
       toast.error(`發送失敗: ${error.message}`);
@@ -132,13 +135,20 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
   // Bulk send notifications
   const sendBulkNotifications = async () => {
     if (!incompleteMembers) return;
+    if (!emailStatus?.canSend) { toast.error(emailStatus?.message || '寄信服務狀態尚未確認'); return; }
     
     const selectedMembers = incompleteMembers.filter(m => selectedIds.has(m.id));
+    if (!selectedMembers.length) return;
+    if (selectedMembers.length > 5) { toast.error('每次最多選擇5位提醒對象'); return; }
+    if (!window.confirm(`確定發送 ${selectedMembers.length} 封帳號資料提醒？`)) return;
+    let accepted = 0;
     
-    for (const member of selectedMembers) {
+    for (const [index, member] of selectedMembers.entries()) {
+      if (index) await new Promise(resolve => setTimeout(resolve, 600));
       setSendingIds(prev => new Set([...prev, member.id]));
       try {
         await sendNotification.mutateAsync(member);
+        accepted++;
       } catch {
         // Error already handled in mutation
       }
@@ -150,7 +160,8 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
     }
     
     setSelectedIds(new Set());
-    toast.success(`已完成 ${selectedMembers.length} 封通知發送`);
+    if (accepted === selectedMembers.length) toast.success(`服務已接受 ${accepted} 封通知`);
+    else toast.warning(`服務已接受 ${accepted} 封，未確認 ${selectedMembers.length - accepted} 封`);
   };
 
   const handleToggleSelect = (id: string) => {
@@ -218,6 +229,7 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {emailStatus && !emailStatus.canSend && <p role="status" className="text-sm text-muted-foreground">{emailStatus.message}</p>}
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-muted/50 rounded-lg p-3 text-center">
@@ -307,7 +319,7 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
                   variant="ghost"
                   size="sm"
                   onClick={() => sendNotification.mutate(member)}
-                  disabled={sendingIds.has(member.id)}
+                  disabled={sendingIds.has(member.id) || sendNotification.isPending || !emailStatus?.canSend}
                 >
                   {sendingIds.has(member.id) ? (
                     <RefreshCw className="h-4 w-4 animate-spin" />

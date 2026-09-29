@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { bulkEmailInput, emailPreferencesInput } from '@shared/email';
+import { bulkEmailInput, emailPreferencesInput, profileNotificationInput } from '@shared/email';
 import { dailyEmailDue, emailAppUrl, emailProviderStatus, escapeEmailHtml, senderAddress } from './emailPolicy';
 
 const configured = { RESEND_API_KEY: 'test-key', RESEND_FROM_EMAIL: 'WeChurch <mail@example.test>', RESEND_REPLY_TO: 'reply@example.test' };
 const preference = { dailyFollowEnabled: true, dailyFollowTime: '07:00', timezone: 'Asia/Taipei', lastDailyFollowSentAt: null };
 
 describe('email policy', () => {
+  it('retains the existing incomplete-member notification types', () => {
+    for (const type of ['unverified_email', 'incomplete_profile', 'potential_member']) {
+      expect(profileNotificationInput.safeParse({ email: 'member@example.test', name: 'Member', type, redirectUrl: '/login' }).success).toBe(true);
+    }
+    expect(profileNotificationInput.safeParse({ email: 'member@example.test', name: 'Member', type: 'arbitrary' }).success).toBe(false);
+  });
   it('requires a sender and reply address, not just an API key', () => {
     expect(emailProviderStatus({ RESEND_API_KEY: 'test' }).canSend).toBe(false);
     expect(emailProviderStatus(configured).canSend).toBe(true);

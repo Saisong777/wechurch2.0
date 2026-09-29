@@ -48,15 +48,26 @@ async function journey(page, { origin, code, cookie, id, email, output }) {
     await page.screenshot({ path: output + '/personal-' + width + '.png', fullPage: true });
     await page.goto(origin + '/admin');
     await page.getByTestId('button-mail-system').click();
+    await page.getByText('B 測試站只提供預覽，不會寄出郵件。', { exact: true }).waitFor();
     await page.getByTestId('text-recipient-count').waitFor();
     if (!(await page.getByTestId('text-recipient-count').innerText()).includes('0')) throw Error('Recipients preselected');
     if (!await page.getByTestId('button-send-email').isDisabled()) throw Error('B send button enabled');
+    await page.getByTestId('user-row-' + id).waitFor();
     await page.getByTestId('button-select-all').click();
+    if (!(await page.getByTestId('text-recipient-count').innerText()).includes('1')) throw Error('Fixture recipient not selected');
     if (!await page.getByTestId('button-send-email').isDisabled()) throw Error('Selection bypassed B protection');
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw Error('Composer horizontal overflow ' + width);
     await page.screenshot({ path: output + '/composer-' + width + '.png', fullPage: true });
     checks.push({ width, personalPreview: true, safeComposer: true, horizontalOverflow: false });
   }
+  await page.evaluate(() => localStorage.setItem('wechurch-theme', 'dark'));
+  await page.goto(origin + '/me');
+  await page.getByRole('button', { name: '預覽測試信', exact: true }).waitFor();
+  await page.screenshot({ path: output + '/personal-dark.png', fullPage: true });
+  await page.goto(origin + '/admin');
+  await page.getByTestId('button-mail-system').click();
+  await page.getByTestId('user-row-' + id).waitFor();
+  await page.screenshot({ path: output + '/composer-dark.png', fullPage: true });
   if (errors.length) throw Error('Browser errors encountered');
   return { checks, errors, actualEmailsSent: 0, physicalPhoneTested: false };
 }
@@ -70,7 +81,11 @@ try {
   const config = { origin: target.origin, code: state.app.STAGING_ACCESS_CODE, cookie, id, email, output };
   const raw = cli('run-code', `async page => (${journey.toString()})(page,${JSON.stringify(config)})`);
   const serialized = raw.split('### Result\n')[1]?.split('\n###')[0];
-  if (!serialized) throw Error('Browser verification failed; credential-bearing output withheld');
+  if (!serialized) {
+    const diagnostic = raw.split('### Error\n')[1]?.split('\n###')[0]?.slice(0, 1000);
+    if (diagnostic && ![cookie, state.app.STAGING_ACCESS_CODE, state.app.SESSION_SECRET].some(value => diagnostic.includes(value))) console.error(diagnostic);
+    throw Error('Browser verification failed; credential-bearing output withheld');
+  }
   result = JSON.parse(serialized);
 } catch (error) {
   if (error instanceof Error && 'stdout' in error) throw Error('Browser command failed; credential-bearing output withheld');

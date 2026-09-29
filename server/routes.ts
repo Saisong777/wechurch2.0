@@ -8,7 +8,7 @@ import fs from "fs";
 import { uploadRoot, messageCardRoot } from './uploadPaths';
 import { rasterExtension, rasterOnly, setMediaHeaders } from './uploadSafety';
 import { apiIdentity, boundedWindowLimiter, clientAddress } from './requestLimits';
-import { bulkEmailInput, emailPreferencesInput, mailbox } from '@shared/email';
+import { bulkEmailInput, emailPreferencesInput, profileNotificationInput } from '@shared/email';
 import { dailyEmailDue, emailAppUrl, emailProviderStatus, escapeEmailHtml } from './emailPolicy';
 import { randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
@@ -3842,7 +3842,7 @@ export async function registerRoutes(app: Express) {
   const mailLimit = boundedWindowLimiter({ max: 5, windowMs: 15 * 60_000, key: apiIdentity });
   app.post("/api/send-profile-notification", requireAdmin, mailLimit, async (req, res) => {
     try {
-      const parsed = z.object({ email: mailbox, name: z.string().trim().max(200), type: z.enum(['welcome', 'session_invite', 'notification']), redirectUrl: z.string().max(2000).default('/') }).safeParse(req.body);
+      const parsed = profileNotificationInput.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: '通知內容格式不正確' });
       let redirectUrl: string;
       try { redirectUrl = escapeEmailHtml(emailAppUrl(parsed.data.redirectUrl)); }
@@ -3859,6 +3859,7 @@ export async function registerRoutes(app: Express) {
 
       switch (type) {
         case 'welcome':
+        case 'potential_member':
           subject = '歡迎加入 WeChurch';
           html = `
             <h1>歡迎 ${name}!</h1>
@@ -3866,6 +3867,11 @@ export async function registerRoutes(app: Express) {
             <p>點擊下方連結開始您的信仰之旅：</p>
             <a href="${redirectUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0ea5e9; color: white; text-decoration: none; border-radius: 8px;">開始使用</a>
           `;
+          break;
+        case 'unverified_email':
+        case 'incomplete_profile':
+          subject = 'WeChurch 帳號資料提醒';
+          html = `<h1>${name}，你好</h1><p>請登入 WeChurch，確認你的帳號與個人資料。</p><a href="${redirectUrl}">登入查看</a>`;
           break;
         case 'session_invite':
           subject = '您收到了一個聚會邀請';
@@ -3887,10 +3893,11 @@ export async function registerRoutes(app: Express) {
       await sendEmail({
         to: email,
         subject,
-        html
+        html,
+        ...(parsed.data.requestId ? { idempotencyKey: `profile/${parsed.data.requestId}` } : {}),
       });
 
-      res.json({ success: true, message: "郵件已發送" });
+      res.json({ success: true, acceptedOnly: true, message: "寄信服務已接受通知，尚非送達確認" });
     } catch (error: any) {
       console.error('Error sending notification:', error);
       res.status(500).json({ error: "Failed to send notification", message: error.message });

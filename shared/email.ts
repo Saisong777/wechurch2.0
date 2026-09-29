@@ -9,6 +9,12 @@ export type EmailProviderStatus = {
 };
 
 export const mailbox = z.string().trim().email().max(254);
+export const profileNotificationInput = z.object({
+  email: mailbox, name: z.string().trim().max(200),
+  requestId: z.string().uuid().optional(),
+  type: z.enum(['welcome', 'session_invite', 'notification', 'unverified_email', 'incomplete_profile', 'potential_member']),
+  redirectUrl: z.string().max(2000).default('/'),
+});
 export const emailPreferencesInput = z.object({
   dailyFollowEnabled: z.boolean().optional(),
   dailyFollowTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
