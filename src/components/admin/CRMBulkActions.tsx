@@ -27,6 +27,7 @@ interface CRMBulkActionsProps {
   onBulkUpdateSubscription: (subscribed: boolean) => void;
   onBulkDelete: () => void;
   isUpdating?: boolean;
+  canDelete?: boolean;
 }
 
 export const CRMBulkActions = ({
@@ -36,6 +37,7 @@ export const CRMBulkActions = ({
   onBulkUpdateSubscription,
   onBulkDelete,
   isUpdating,
+  canDelete = false,
 }: CRMBulkActionsProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -46,17 +48,19 @@ export const CRMBulkActions = ({
 
   return (
     <>
-      <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
+      <div className="flex flex-wrap items-center gap-2 p-3 bg-primary/10 rounded-md border border-primary/20">
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8"
           onClick={onClearSelection}
+          disabled={isUpdating}
+          aria-label="取消選取"
         >
           <X className="h-4 w-4" />
         </Button>
         <span className="text-sm font-medium">
-          已選擇 {selectedCount} 項
+          {isUpdating ? '處理中' : '本頁已選'} {selectedCount} 項
         </span>
         <div className="flex-1" />
         
@@ -109,7 +113,8 @@ export const CRMBulkActions = ({
           variant="destructive"
           size="sm"
           onClick={() => setDeleteDialogOpen(true)}
-          disabled={isUpdating}
+          disabled={isUpdating || !canDelete}
+          title={!canDelete ? '只有管理員可以刪除' : undefined}
         >
           <Trash2 className="h-4 w-4 mr-1" />
           刪除

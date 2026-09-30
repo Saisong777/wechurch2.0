@@ -1,0 +1,127 @@
+{
+  "releaseId": "public-20260926-v3",
+  "databaseHash": "c2bbdf5f4bb7b9cc809472515f6070c432061d87382a20d95971eb68df55313f",
+  "inventoryHash": "769fc01eab03cbe891e1540eeffd7cae53c30336353bbbc2b54e22ae33b8a68a",
+  "files": [
+    {
+      "file": "NOTICE.md",
+      "sha256": "3e83a967a2eda0d3e86e86e7bbd801ad03f0e80ddc1a7d89fad41b51e824e54a"
+    },
+    {
+      "file": "VALIDATION.json",
+      "sha256": "3cea904f0050771e8a5b7d623ccb7923411b357c7f88452f72df18d3383140f7"
+    },
+    {
+      "file": "data/cmn-cu89t-source.zip",
+      "sha256": "49aca5dffaeeb27c24f05ec30a7e64080f36c0e132095b83f2773b2c9b4455b7"
+    },
+    {
+      "file": "data/cmnfeb-source.zip",
+      "sha256": "0d241664fdfdbbbd12c61f7b6df876d5b0bba3f6f558d2b31d0d3d823bb0a510"
+    },
+    {
+      "file": "data/core.sqlite",
+      "sha256": "c2bbdf5f4bb7b9cc809472515f6070c432061d87382a20d95971eb68df55313f"
+    },
+    {
+      "file": "data/release.json",
+      "sha256": "d1b7d36d1744608fdc86709c7ae5e3342310c9f7e0525f7ff4043e87cae32a91"
+    },
+    {
+      "file": "licenses/abbott-smith-readme.txt",
+      "sha256": "8c67a8c904d8cbf2b66a9a6eaaed19cc5462b24edec3dc07ee689d30140f2c59"
+    },
+    {
+      "file": "licenses/aquiferopenbibledictionary-zht-metadata.txt",
+      "sha256": "00ffc1850b6e0e2353cc24b31e2f635347b23aad06240b5184d6a0f072992256"
+    },
+    {
+      "file": "licenses/aquiferopenbibledictionary-zht-readme.txt",
+      "sha256": "1a9e401beff7e8c7fd15a25a46206cb0ed35029dea45a5d1768b80af0943c75c"
+    },
+    {
+      "file": "licenses/aquiferopenstudynotes-zht-metadata.txt",
+      "sha256": "f2155ff30a1b191ae108e08442bf6d9067540630e0d7c082da25c02a0df02c2e"
+    },
+    {
+      "file": "licenses/aquiferopenstudynotes-zht-readme.txt",
+      "sha256": "2b8e4f905ed70cc6cb6d4a4cb55eb9a236559c9c02825268637b8fb4c1ebfc8c"
+    },
+    {
+      "file": "licenses/biblicastudynotes-zht-metadata.txt",
+      "sha256": "8f6ee4477dd794b6f0a17911c252b6f6d3e09e9b9e86ed54a75f58f88d7ef48c"
+    },
+    {
+      "file": "licenses/biblicastudynotes-zht-readme.txt",
+      "sha256": "9baaa1e85ea764a137687ae7111875a6e0b8a10f6f61963a1b68780c7d852abd"
+    },
+    {
+      "file": "licenses/cc-by-sa.txt",
+      "sha256": "b903aecb7891ae0e0cbc50f12ac8068fd89c630cfeeb858ed19b9d376a69fc07"
+    },
+    {
+      "file": "licenses/cc-by.txt",
+      "sha256": "4942cb3b416a10adc5c46d397fa5d5dcdc1c6646ab7472325dda6eaff1d19df3"
+    },
+    {
+      "file": "licenses/cmn-cu89t-about.html",
+      "sha256": "67b67cbbebad8b3d6d12182693a120468655c01e512db96239a6c2e84b200454"
+    },
+    {
+      "file": "licenses/cmncbt.txt",
+      "sha256": "14bb3304cb3fce153f710e1fbadc634a2ef98738886bb48a26b2e1b37f40f6bc"
+    },
+    {
+      "file": "licenses/cmnfeb-about.html",
+      "sha256": "245b97b1022764efb566ded265b170837bee3bd898c48f03761962b7649f8761"
+    },
+    {
+      "file": "licenses/openbible.txt",
+      "sha256": "0326c53da406ba4f04eccf553e438ee329b79741d9d58171fbf952159219b22f"
+    },
+    {
+      "file": "licenses/oshb-pinned.txt",
+      "sha256": "131507d14e62c36c42ba0315a0cb681b76a893886065650f69d1f778ed861a6b"
+    },
+    {
+      "file": "licenses/sbl-pinned.txt",
+      "sha256": "ae671ba74e61fc314bb56c0f8ce4c1021f6ff67f413fe1f2b336601589a5d3d6"
+    },
+    {
+      "file": "licenses/sbl-readme.txt",
+      "sha256": "7ae1dc2622a8dafe55cf8b17d4935c3e39a70c46636277dd0fc46fe8b7464721"
+    },
+    {
+      "file": "licenses/step-pinned.txt",
+      "sha256": "bdeff3f76567d0a88df992ba5143c491bca0a12bafe5b907dbc82ea5ad431bca"
+    },
+    {
+      "file": "licenses/uwtranslationnotes-zht-metadata.txt",
+      "sha256": "5b0a015ade7f1761dc230dbcb68b4198b78a77949618fd082c2feecef78cdc25"
+    },
+    {
+      "file": "licenses/uwtranslationnotes-zht-readme.txt",
+      "sha256": "1921c6456e34115044ccbd2e70c011136686f8f83b9c6dfca80e02115082d937"
+    },
+    {
+      "file": "licenses/uwtranslationwords-zht-metadata.txt",
+      "sha256": "08c5aa60fdfd88797d6cdf2e199955d53133414aa104b9f11072dcebd54c593b"
+    },
+    {
+      "file": "licenses/uwtranslationwords-zht-readme.txt",
+      "sha256": "9b1d14f469027af89b44f6c8c638f3d376314fd2081c4774c2bdf8ca2deda60f"
+    },
+    {
+      "file": "licenses/web.txt",
+      "sha256": "c4a282bb726979f70ac2a9168473e21159ec408e0bdaefeafa35399df5008f12"
+    },
+    {
+      "file": "web/licenses.html",
+      "sha256": "67e91f8f456bab3e6afe588e7a70974ad873b9c62b5fbedcf98dcae7c3ec5d89"
+    },
+    {
+      "file": "web/style.css",
+      "sha256": "4d607f9613bda3e130e60e1aaa03b6046ae6adc0c669a97d8d15a1970f45ce09"
+    }
+  ]
+}

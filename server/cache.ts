@@ -1,154 +1,43 @@
-interface CacheEntry<T> {
-  data: T;
-  expiry: number;
-}
+import { BoundedCache } from './boundedCache';
 
-class SimpleCache {
-  private cache: Map<string, CacheEntry<unknown>> = new Map();
-  private defaultTTL: number;
-
-  constructor(defaultTTLSeconds: number = 300) {
-    this.defaultTTL = defaultTTLSeconds * 1000;
-    
-    const cleanupTimer = setInterval(() => this.cleanup(), 60000);
-    cleanupTimer.unref?.();
+export class SimpleCache {
+  private cache: BoundedCache<unknown>;
+  constructor(private defaultTTLSeconds = 300, maxBytes = 8 * 1024 * 1024, maxEntries = 512) {
+    this.cache = new BoundedCache(maxBytes, maxEntries);
   }
-
-  set<T>(key: string, value: T, ttlSeconds?: number): void {
-    const ttl = (ttlSeconds ?? this.defaultTTL / 1000) * 1000;
-    this.cache.set(key, {
-      data: value,
-      expiry: Date.now() + ttl,
-    });
+  set<T>(key: string, value: T, ttlSeconds = this.defaultTTLSeconds): void {
+    this.cache.set(key, value, ttlSeconds * 1000);
   }
-
-  get<T>(key: string): T | undefined {
-    const entry = this.cache.get(key);
-    if (!entry) return undefined;
-    
-    if (Date.now() > entry.expiry) {
-      this.cache.delete(key);
-      return undefined;
-    }
-    
-    return entry.data as T;
-  }
-
-  has(key: string): boolean {
-    const entry = this.cache.get(key);
-    if (!entry) return false;
-    
-    if (Date.now() > entry.expiry) {
-      this.cache.delete(key);
-      return false;
-    }
-    
-    return true;
-  }
-
-  delete(key: string): boolean {
-    return this.cache.delete(key);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
+  get<T>(key: string): T | undefined { return this.cache.get(key) as T | undefined; }
+  has(key: string): boolean { return this.cache.get(key) !== undefined; }
+  delete(key: string): boolean { return this.cache.delete(key); }
+  clear(): void { this.cache.clear(); }
   invalidatePattern(pattern: string): number {
     let count = 0;
-    for (const key of this.cache.keys()) {
-      if (key.includes(pattern)) {
-        this.cache.delete(key);
-        count++;
-      }
-    }
+    for (const key of this.cache.keys()) if (key.includes(pattern)) { this.cache.delete(key); count++; }
     return count;
   }
-
-  private cleanup(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.cache.entries()) {
-      if (now > entry.expiry) {
-        this.cache.delete(key);
-      }
-    }
-  }
-
-  getStats() {
-    return {
-      size: this.cache.size,
-      keys: Array.from(this.cache.keys()),
-    };
-  }
+  getStats() { return { ...this.cache.getStats(), keys: Array.from(this.cache.keys()) }; }
 }
 
-interface SessionCacheEntry<T> {
-  data: T;
-  expiresAt: number;
-}
-
-class SessionCache {
-  private cache = new Map<string, SessionCacheEntry<any>>();
-  private defaultTTL = 2000;
-
-  constructor() {
-    const cleanupTimer = setInterval(() => this.cleanup(), 10000);
-    cleanupTimer.unref?.();
+export class SessionCache {
+  private cache: BoundedCache<unknown>;
+  constructor(maxBytes = 8 * 1024 * 1024, maxEntries = 512) {
+    this.cache = new BoundedCache(maxBytes, maxEntries);
   }
-
-  get<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.data as T;
-  }
-
-  set<T>(key: string, data: T, ttlMs?: number): void {
-    this.cache.set(key, {
-      data,
-      expiresAt: Date.now() + (ttlMs || this.defaultTTL),
-    });
-  }
-
+  get<T>(key: string): T | null { return (this.cache.get(key) as T | undefined) ?? null; }
+  set<T>(key: string, data: T, ttlMs = 2000): void { this.cache.set(key, data, ttlMs); }
   invalidate(pattern: string): void {
-    for (const key of this.cache.keys()) {
-      if (key.startsWith(pattern)) {
-        this.cache.delete(key);
-      }
-    }
+    for (const key of this.cache.keys()) if (key.startsWith(pattern)) this.cache.delete(key);
   }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  private cleanup(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.cache.entries()) {
-      if (now > entry.expiresAt) {
-        this.cache.delete(key);
-      }
-    }
-  }
-
-  getStats() {
-    return { size: this.cache.size };
-  }
+  clear(): void { this.cache.clear(); }
+  getStats() { return this.cache.getStats(); }
 }
 
 export const sessionCache = new SessionCache();
-
 export const bibleCache = new SimpleCache(3600);
-
-// Timeline events cache - long TTL (1 hour)
 export const timelineCache = new SimpleCache(3600);
-
-// General API cache - shorter TTL (5 minutes)
 export const apiCache = new SimpleCache(300);
-
 export const prayerCache = new SimpleCache(5);
 
 // Cache key generators

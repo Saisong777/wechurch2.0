@@ -12,6 +12,9 @@ import { toast } from 'sonner';
 import { Loader2, Mail, FileDown, Send, Copy, Paperclip, X, Image, File, Clock, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { serializeCsv } from '@/lib/csv-export';
+import { useQuery } from '@tanstack/react-query';
+import { bulkEmailInput, type EmailProviderStatus } from '@shared/email';
 
 interface Download {
   id: string;
@@ -59,6 +62,8 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
   const [emailRecipients, setEmailRecipients] = useState<{ name: string; email: string }[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sendRequest = useRef<{ payload: string; id: string } | null>(null);
+  const { data: emailStatus } = useQuery<EmailProviderStatus>({ queryKey: ['/api/email-provider-status'], enabled: open });
 
   // Group downloads by email
   const groupedDownloads = useMemo(() => {
@@ -160,8 +165,8 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} 超過 10MB 限制`);
+      if (attachments.length + newAttachments.length >= 5 || [...attachments, ...newAttachments].reduce((total, a) => total + a.file.size, file.size) > 2 * 1024 * 1024) {
+        toast.error('附件最多5個，合計不可超過2MB');
         continue;
       }
 
@@ -191,6 +196,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
   };
 
   const handleSendEmail = async () => {
+    if (!emailStatus?.canSend) { toast.error(emailStatus?.message || '寄信服務狀態尚未確認'); return; }
     if (!emailSubject.trim() || !emailBody.trim()) {
       toast.error('請填寫主旨和內容');
       return;
@@ -202,6 +208,8 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
       return;
     }
 
+    if (emailRecipients.length > 100) { toast.error('每次最多寄給100位本站會員'); return; }
+    if (!window.confirm(`確定將「${emailSubject.trim()}」寄給 ${emailRecipients.length} 位會員？`)) return;
     setSending(true);
     try {
       const attachmentData = attachments
@@ -211,49 +219,45 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
           content: a.url,
         }));
 
-      // TODO: Migrate email sending to API endpoint
-      // For now, show a message that this feature requires email service setup
+      const payload = { recipients: emailRecipients, subject: emailSubject, body: emailBody, isHtml: true, attachments: attachmentData.length > 0 ? attachmentData : undefined };
+      const serialized = JSON.stringify(payload);
+      if (sendRequest.current?.payload !== serialized) sendRequest.current = { payload: serialized, id: crypto.randomUUID() };
+      const input = bulkEmailInput.safeParse({ ...payload, requestId: sendRequest.current!.id });
+      if (!input.success) throw new Error('請檢查主旨、收件人與附件格式');
       const response = await fetch('/api/send-bulk-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          recipients: emailRecipients,
-          subject: emailSubject,
-          body: emailBody,
-          isHtml: true,
-          attachments: attachmentData.length > 0 ? attachmentData : undefined,
-        }),
+        body: JSON.stringify(input.data),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || '發送失敗');
+        throw new Error(errorData.message || errorData.error || '發送失敗');
       }
 
       const data = await response.json();
 
       const sent = (data as any)?.sent ?? 0;
       const failed = (data as any)?.failed ?? 0;
-      const errors = (data as any)?.errors as Array<{ email: string; error: string }> | undefined;
 
       if (sent === 0 && failed > 0) {
         toast.error(`全部發送失敗（${failed}）`);
       } else if (failed > 0) {
-        const first = errors?.[0];
-        toast.warning(`已發送 ${sent} 封，失敗 ${failed} 封${first ? `（例：${first.email}：${first.error}）` : ''}`);
+        toast.warning(`服務已接受 ${sent} 封，未確認 ${failed} 封`);
       } else {
-        toast.success(`已發送 ${sent || emailRecipients.length} 封郵件`);
+        toast.success(`服務已接受 ${sent} 封，尚非送達確認`);
       }
 
+      if (failed > 0) return;
       setShowEmailDialog(false);
+      sendRequest.current = null;
       setEmailSubject('');
       setEmailBody('');
       setAttachments([]);
       setSelectedEmails(new Set());
     } catch (err) {
-      console.error('Error sending email:', err);
-      toast.error('發送失敗，請稍後再試');
+      toast.error(err instanceof Error ? err.message : '無法確認寄送結果，請稍後再試');
     } finally {
       setSending(false);
     }
@@ -273,10 +277,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
       format(new Date(g.lastDownloadAt), 'yyyy/MM/dd HH:mm'),
     ]);
     
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
-    ].join('\n');
+    const csvContent = serializeCsv([headers, ...rows]);
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -564,10 +565,11 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                支援圖片、PDF、Office 文件，單檔最大 10MB
+                附件最多5個，合計2MB；僅能寄給本站會員。
               </p>
             </div>
 
+            {emailStatus && !emailStatus.canSend && <p role="status" className="text-sm text-muted-foreground">{emailStatus.message}</p>}
             <div className="flex gap-2 pt-2">
               <Button
                 variant="outline"
@@ -580,7 +582,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
                 variant="gold"
                 className="flex-1"
                 onClick={handleSendEmail}
-                disabled={sending || !emailSubject.trim() || !emailBody.trim() || attachments.some(a => a.uploading)}
+                disabled={sending || !emailStatus?.canSend || !emailSubject.trim() || !emailBody.trim() || attachments.some(a => a.uploading)}
               >
                 {sending ? (
                   <>

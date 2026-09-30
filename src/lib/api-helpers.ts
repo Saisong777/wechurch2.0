@@ -1,4 +1,5 @@
 import { Session, User, StudySubmission, GroupingSettings, Group } from "@/types/bible-study";
+import { serializeCsv } from './csv-export';
 
 // Generic error message for client-side display
 const GENERIC_ERROR = "An error occurred. Please try again.";
@@ -120,54 +121,23 @@ export const updateSessionIcebreakerEnabled = async (
   }
 };
 
-// Find the group number with the fewest members (filtered by location for site isolation)
-export const findSmallestGroup = async (sessionId: string, location: string = "On-site"): Promise<number | null> => {
-  try {
-    const response = await fetch(`/api/sessions/${sessionId}/participants`);
-    if (!response.ok) return null;
-    const participants = await response.json();
-    
-    const relevant = participants.filter((p: any) => p.location === location && p.groupNumber !== null);
-    if (relevant.length === 0) return 1;
-
-    const counts = new Map<number, number>();
-    relevant.forEach((p: any) => {
-      counts.set(p.groupNumber, (counts.get(p.groupNumber) || 0) + 1);
-    });
-
-    let minGroup = 1;
-    let minCount = Infinity;
-    counts.forEach((count, gn) => {
-      if (count < minCount) {
-        minCount = count;
-        minGroup = gn;
-      }
-    });
-
-    return minGroup;
-  } catch (error) {
-    console.error("Find smallest group error:", error);
-    return null;
-  }
-};
-
 // Assign a latecomer to the smallest group
 export const assignLatecomerToGroup = async (
   participantId: string,
-  groupNumber: number,
   sessionId: string,
-  email: string
-): Promise<boolean> => {
+): Promise<number | null> => {
   try {
-    const response = await fetch(`/api/participants/${participantId}`, {
-      method: "PATCH",
+    const response = await fetch(`/api/participants/${participantId}/late-join`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, email, groupNumber, readyConfirmed: false }),
+      body: JSON.stringify({ sessionId }),
     });
-    return response.ok;
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.participant?.group_number ?? data.participant?.groupNumber ?? null;
   } catch (error) {
     console.error("Assign latecomer error:", error);
-    return false;
+    return null;
   }
 };
 
@@ -203,7 +173,10 @@ export const joinSession = async (
       body: JSON.stringify({ name, email, gender, location }),
     });
 
-    if (!joinRes.ok) return null;
+    if (!joinRes.ok) {
+      const error = await joinRes.json().catch(() => ({}));
+      throw new Error(error.error || '加入失敗，請稍後再試');
+    }
     const data = await joinRes.json();
 
     return {
@@ -218,7 +191,7 @@ export const joinSession = async (
     };
   } catch (error) {
     console.error("Join session error:", error);
-    return null;
+    throw error;
   }
 };
 
@@ -585,126 +558,6 @@ export const fetchSubmissionsPublic = async (sessionId: string): Promise<StudySu
   }
 };
 
-// AI Report functions
-export interface AIReportOptions {
-  fastMode?: boolean;
-  filledOnly?: boolean;
-  onChunk?: (chunk: string, fullContent: string) => void;
-}
-
-export const generateAIReport = async (
-  sessionId: string,
-  reportType: "group" | "overall",
-  groupNumber?: number,
-  options?: AIReportOptions,
-  _retryCount = 0
-): Promise<{ success: boolean; report?: string; reportId?: string; error?: string }> => {
-  const useStreaming = !!options?.onChunk;
-
-  try {
-    const endpoint = useStreaming
-      ? `/api/sessions/${sessionId}/reports/stream`
-      : `/api/sessions/${sessionId}/reports`;
-
-    // Gemini 2.5 Flash with thinking can take 60-90s; set generous timeout (3 min)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000);
-
-    let response: Response;
-    try {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reportType,
-          groupNumber,
-          fastMode: options?.fastMode ?? false,
-          filledOnly: options?.filledOnly ?? false,
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
-    if (response.status === 429 && _retryCount < 3) {
-      const delay = [15000, 35000, 65000][_retryCount]; // 15s, 35s, 65s (Gemini needs ~60s to reset)
-      console.warn(`[generateAIReport] 429 rate limit, retrying in ${delay}ms (attempt ${_retryCount + 1}/4)`);
-      await new Promise(r => setTimeout(r, delay));
-      return generateAIReport(sessionId, reportType, groupNumber, options, _retryCount + 1);
-    }
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { success: false, error: errorData.error || "Failed to generate report" };
-    }
-
-    // Handle streaming response (SSE)
-    if (useStreaming && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullContent = '';
-      let reportId: string | undefined;
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === 'chunk') {
-              fullContent += event.content;
-              options!.onChunk!(event.content, fullContent);
-            } else if (event.type === 'done') {
-              reportId = event.reportId;
-            } else if (event.type === 'error') {
-              return { success: false, error: event.error };
-            }
-          } catch { /* skip malformed SSE lines */ }
-        }
-      }
-      return { success: true, report: fullContent, reportId };
-    }
-
-    // Non-streaming response
-    const data = await response.json();
-    return { success: true, report: data.content, reportId: data.id };
-  } catch (error) {
-    console.error("Generate report error:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-  }
-};
-
-// Fetch AI reports for a session
-export const fetchAIReports = async (
-  sessionId: string,
-  groupNumber?: number
-): Promise<{ id: string; content: string; reportType: string; groupNumber: number | null; createdAt: Date }[]> => {
-  try {
-    const response = await fetch(`/api/admin/sessions/${sessionId}/reports`);
-    if (!response.ok) return [];
-    const data = await response.json();
-    let reports = data.map((r: any) => ({
-      id: r.id,
-      content: r.content,
-      reportType: r.reportType,
-      groupNumber: r.groupNumber,
-      createdAt: new Date(r.createdAt),
-    }));
-    if (groupNumber !== undefined) {
-      reports = reports.filter((r: any) => r.groupNumber === groupNumber);
-    }
-    return reports;
-  } catch (error) {
-    console.error('[fetchAIReports] Error:', error);
-    return [];
-  }
-};
 
 // Export submissions as CSV
 export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string => {
@@ -718,7 +571,7 @@ export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string =
     s.factsDiscovered, s.traditionalExegesis, s.inspirationFromGod,
     s.applicationInLife, s.others, s.submittedAt.toISOString(),
   ]);
-  const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+  const csvContent = serializeCsv([headers, ...rows]);
   return csvContent;
 };
 
@@ -726,6 +579,6 @@ export const exportSubmissionsAsCSV = (submissions: StudySubmission[]): string =
 export const exportStudyResponsesAsCSV = (responses: any[]): string => {
   const headers = ["User ID", "Response", "Created At"];
   const rows = responses.map(r => [r.userId, r.response, r.createdAt]);
-  const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+  const csvContent = serializeCsv([headers, ...rows]);
   return csvContent;
 };

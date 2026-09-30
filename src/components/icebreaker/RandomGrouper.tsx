@@ -75,7 +75,7 @@ export const RandomGrouper = () => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [activityDeleted, setActivityDeleted] = useState(false);
 
-  const isLeaderOrAbove = user?.role && ['leader', 'future_leader', 'admin'].includes(user.role);
+  const isLeaderOrAbove = !!user?.role && ['leader', 'future_leader', 'admin'].includes(user.role);
 
   const { data: myActivitiesData, refetch: refetchMyActivities } = useQuery<{ activities: { activity: GroupingActivity; participants: GroupingParticipant[] }[] }>({
     queryKey: ['/api/grouping/my-activities'],

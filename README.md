@@ -1,213 +1,75 @@
-# WeChurch 2.0 — 我們就是教會
+# WeChurch B 站可重建版本
 
-一個為基督教社群設計的全功能平台，整合聖經研讀、禱告分享、小組互動與 AI 輔助靈修。
+## 現役工作與驗收
 
----
+現役 B 功能分支為 `codex/bible-study-integration`，不是固定不再變動的救援分支。
+固定還原點請使用 Git tag 與 `design/releases/` 的 exact sourceCommit；最新線上狀態需以 B 的版本指紋回讀確認，不能把下列歷史快照當作目前部署。
 
-## 功能介紹
+- [全站審查、第一批修正與後續順序](design/product-audit-2026-09-29.md)
+- [每日靈修後台主題分組與收合驗收](design/devotion-topic-admin-2026-09-29.md)：依課表名稱分組，保留匯入、編輯與批次操作；B 已驗收，未更動課程內容。
+- [500 人／30 小家／5 管理範圍的完整情境與半年資料量驗收](design/church-simulation-500-2026-09-29.md)：`npm run test:church500`、`npm run test:church500:history`；只用一次性 localhost DB，不是 Railway 容量認證。
+- [AI 退役與系統紀錄](design/ai-retirement-2026-09-28.md)
+- [CI 改善稿](design/ci-proposal-2026-09-29.yml)已加入現役分支及 PostgreSQL 回歸，但目前 GitHub 憑證缺少 workflow scope，尚未啟用；本輪沿用 B 發布工具的完整本機檢查，不宣稱雲端 CI 通過。
 
-| 模組 | 說明 |
-|------|------|
-| **聖經閱讀** | 多版本聖經，支援 TTS 朗讀 |
-| **Jesus Timeline** | 互動式聖經時間軸探索 |
-| **靈修計畫** | 個人讀經計畫，附每日提醒 |
-| **Soul Gym** | 即時協作小組查經 + 隨機分組 |
-| **禱告牆** | 匿名發布禱告請求，社群互動 |
-| **Icebreaker** | 小組破冰遊戲與隨機分組工具 |
-| **靈修筆記** | 7步驟靈修格式的記錄系統 |
-| **AI 分析** | OpenAI/Gemini 驅動的查經報告與靈修分析 |
-| **筆記本** | 整合所有筆記，支援匯出 |
+## 2026-09-26 歷史驗收：新譯本及異地還原
 
----
+2026-09-26 已將原 B 網址切至替代執行服務，保留原資料庫、檔案 volume、
+登入設定與會員內容。正常發布流程亦已驗證成功，A 未發布。
 
-## 技術架構
+- 現役 B 服務：`fef7af7c-e3c3-4977-8294-c3a123a4242e`。
+- 已驗收部署：`cc831c94-08ea-4e6c-b152-c335d711a2f4`。
+- 487 檔指紋：`aaf67719382db8aa432cc798dd796cc8151e97e885431f67b91ef9a09d37866b`。
+- 預設新標點和合本（繁體），保留當代譯本及 WEB，新增免費易讀聖經（簡體・新約）；25 組研經 API、30 個資料／授權檔校驗、隱藏路徑 404、私人資料權限通過。
+- [新譯本、實機及異地備份驗收](design/bible-feb-backup-2026-09-26.md)、[精確來源與發布紀錄](design/releases/b-cc831c94-08ea-4e6c-b152-c335d711a2f4.json)
+  與 [先前恢復及後續發布方式](design/railway-b-recovery-2026-09-26.md)。Google 登入安全流程沿用先前驗收，本輪未重作 Google 授權。
 
-```
-前端：React 18 + TypeScript + Vite + Tailwind CSS + Shadcn/UI
-後端：Node.js + Express.js
-資料庫：PostgreSQL + Drizzle ORM
-AI：OpenAI API
-部署：GitHub -> Railway
-```
+`release-manifest.json` 保存程式指紋，`bible-study-asset-manifest.json` 只保存
+資料資產名稱與校驗值，不含資料內容。沿革見 [聖經整合紀錄](design/bible-integration-2026-09-25.md)，
+手機尺寸／桌面操作範圍見 [UI 驗收](design/bible-ui-acceptance-2026-09-25.md)。
+Sai 已回報 iPhone 15 Pro／Chrome 四項實機測試正常（v2；v3 新譯本另完成尺寸驗收）。
+A 發布仍須另行授權。舊服務的底層異常未由 Railway 證實；
+[支援草稿](design/railway-container-support-2026-09-25.md) 尚未送出。
 
----
+下方保留上一個 Railway B 已驗收版本的基準紀錄。不是 A 正式發布，也不包含資料庫、上傳檔案或密碼。原工作目錄中未整理的其他資料沒有被刪除。
 
-## 快速開始
+本版套用三人並肩 Logo 與 Together UI/UX。設計與驗收範圍見 [更新紀錄](design/ui-ux-refresh-2026-09-13.md)。
 
-### 前置需求
+保留同工測試邀請與小組邀請跨登入返回；2026-09-24 改為 Google 註冊／登入，真實登入已驗收。見 [Google 登入紀錄](google-staging-registration-2026-09-24.md)。LINE 未啟用，沒有將 B 會員搬到 A。
 
-- Node.js 20+
-- PostgreSQL 14+
-- npm
+## 歷史基準版本（不是目前部署）
 
-### 安裝步驟
+- B 網址：https://wechurch-staging-staging.up.railway.app
+- B 部署：`6f2da44e-0757-4b1f-bcfb-c1ea04a7f110`
+- 程式指紋：`be78c5e3595537e23186b9db465f0ffaf2a74bc69a47f8abdc5d79d1e3dff1d1`
+- 上一版包含 479 個程式檔案；應取回原驗收提交重建，不用本候選版取代舊版指紋。
+- 2026-09-25 每日靈修筆記改為同頁展開，儲存後留在原位，可隨時上滑閱讀；保留底部儲存／分享與草稿保護。見 [頁內筆記驗收](inline-note-audit-2026-09-25.md)。此項取代每日靈修的彈窗，其餘筆記入口暫保留原形式。
+- 2026-09-25 移除手機外層固定高度與衝突捲動設定，外觀選擇移至手機選單最上方；見 [手機捲動與外觀驗收](mobile-scroll-audit-2026-09-25.md)。實體 iPhone 手勢仍待驗收。
+- 2026-09-25 靈修筆記採桌面置中、手機滿版；底部「儲存（自己看）」與「分享」，可選所屬小組或公開靈修牆、選擇部分或全部內容，移除編輯器 AI 分析；見 [儲存與分享驗收](note-sharing-audit-2026-09-25.md)。本次取代先前頂端儲存配置。
+- 2026-09-25 每日靈修改為經文／靈修／禱告分頁、可調字級及分段原文；見 [閱讀頁驗收](reader-audit-2026-09-25.md)。
+- 2026-09-25 已將 9/24 快照的 62 位舊會員、105 篇筆記與 1,114 筆打卡匯入 B；見 [匯入與剩餘門檻](im-bible-b-import-2026-09-25.md)。A 尚未切換。
+- 2026-09-25 新增明亮／暗色／跟隨裝置，見 [外觀驗收](appearance-2026-09-25.md)。
+- `node ops/verify-b-checkpoint.mjs` 僅核對根目錄歷史 `release-manifest.json` 對應的 checkpoint；現役分支已變更時不適用。新版部署用 `staging:release:record` 核對發布快照與線上指紋，紀錄在 `design/releases/`。
+- `design/releases/` 保存發布紀錄時，`sourceCommit` 指向確切來源提交，不以日期或分支名稱代替。
 
-```bash
-# 1. Clone 專案
-git clone https://github.com/Saisong777/wechurch2.0.git
-cd wechurch2.0
+## A / B 工作規則
 
-# 2. 安裝依賴
-npm install
+1. `main` 只用於 A 正式站；`integration` 是 B 的整合分支；功能修改使用獨立分支。目前 B 仍採人工部署，尚未接上 GitHub 自動部署。
+2. 本分支是現役 B 功能分支；固定救援基準使用已驗收標籤。不是自動升級 A 的入口，不得直接合併 main。
+3. 開始修改前已有 GitHub 基準；修改過程小步提交到功能分支，不能等 B 全部測完才保存。
+4. CI 通過後才部署 B。每次 B 發布記錄 commit、migration、部署 ID 與實際版本指紋。
+5. B 驗收與 Sai 明確確認後，才準備 A 發布。只發布程式與相容的 migration，絕不把 B DB 覆蓋 A。
 
-# 3. 設定環境變數
-cp .env.example .env
+## 從 GitHub 重建
 
-# 4. 初始化資料庫
-npm run db:push
+1. 取回本分支或固定 B 標籤，在新的目錄核對 `release-manifest.json`。
+2. 使用 Node 22、`npm ci`，執行 `npm run typecheck`、`npm test`、`npm run test:deployment`、`npm run build`。完整驗收另以一次性 PostgreSQL 17 跑 `npm run test:integrity`；CI 擴充稿仍待 GitHub workflow 授權後啟用。
+3. 建立或選定 Railway 的 B 專用環境、B 資料庫及 B 上傳 volume；不可選 A。實際密碼從另行保管的位置取回，`.env.example` 只列範本。
+4. B 的環境需設定獨立 `SESSION_SECRET`、`DATABASE_URL`、`STAGING_ACCESS_CODE`、`APP_ENV=staging`、正確 B environment/database identity、`PUBLIC_BASE_URL`、`UPLOAD_ROOT=/data`，並禁止外部發送。
+5. 資料庫與上傳檔先在隔離位置還原、核對版本及引用，再切換 B。程式回退不會自動回復資料，不能直接把舊備份覆蓋正在新增的資料。
+6. 部署本標籤的確切版本；回讀 B 版本指紋、health，測試登入、讀經、筆記、分享、權限及手機操作。
 
-# 5. 啟動開發伺服器
-npm run dev
-```
+## 備份邊界
 
-開啟瀏覽器至 `http://localhost:5001`
+GitHub 保存程式；2026-09-26 的 DB／上傳檔／設定／只讀研經資料已另外加密存入私人 Google Drive，下載後完整還原及 96 表內容核對通過，見 [備份證據及復原步驟](design/bible-feb-backup-2026-09-26.md)。這是單次快照，不是定期備份；金鑰的獨立離線復原副本尚待保管者確認。Git 分支與版本標籤不等於資料備份。
 
----
-
-## 環境變數設定
-
-| 變數名稱 | 說明 | 取得方式 |
-|---------|------|---------|
-| DATABASE_URL | PostgreSQL 連線字串 | 本地或雲端 DB |
-| AI_INTEGRATIONS_OPENAI_API_KEY | OpenAI API 金鑰 | platform.openai.com |
-| AI_INTEGRATIONS_OPENAI_BASE_URL | OpenAI-compatible API base URL | 預設 `https://api.openai.com/v1` |
-| GEMINI_API_KEY | Gemini API 金鑰 | Google AI Studio |
-| SESSION_SECRET | Session 加密金鑰 | 隨機生成 |
-| GOOGLE_CLIENT_ID | Google OAuth Client ID | Google Cloud Console |
-| GOOGLE_CLIENT_SECRET | Google OAuth Client Secret | Google Cloud Console |
-| RESEND_WEBHOOK_SECRET | Resend webhook 驗證密鑰 | Resend |
-| PORT | 伺服器埠號 | 預設 5001，本機可不填 |
-| NODE_ENV | 執行環境 | development / production |
-
-重要：`.env` 文件絕對不能上傳至 Git。請從 `.env.example` 複製後填入本機或 Railway 的實際值。
-
----
-
-## 資料庫設定
-
-```bash
-npm run db:push      # 推送 schema
-```
-
----
-
-## 開發指令
-
-```bash
-npm run dev          # 啟動開發伺服器
-npm run build        # 建置生產版本
-npm run lint         # ESLint 檢查
-npm test             # 執行測試
-npm run db:push      # 推送 Drizzle schema
-npm run local:verify # 本機 production build 瀏覽器白屏檢查
-npm run local:db     # 用 Docker 啟動本機 PostgreSQL
-npm run db:push:local # 將 schema 推到本機 PostgreSQL
-npm run content:sync:local # 只把 Railway 內容資料同步到本機 DB
-npm run soulgym:sync:local # 只把 Railway SoulGym 資料同步到本機 DB
-npm run local:admin-password # 設定本機 admin 測試密碼
-npm run safe:check   # push 前完整檢查：build + test + audit + browser smoke
-npm run safe:check:full # 含 Docker PostgreSQL 的完整本機檢查
-```
-
-## Push 前本機驗證流程
-
-正式站更新前，請先在本機跑完整檢查：
-
-```bash
-npm run safe:check
-```
-
-這個指令會：
-
-1. 產生 production build。
-2. 跑 Vitest。
-3. 跑 `npm audit`。
-4. 用本機 production server 啟動網站。
-5. 用 headless Chrome 打開 `http://127.0.0.1:5099`，確認 React 已渲染、沒有白屏 runtime exception、沒有 CSP 擋住模組。
-
-驗證截圖會輸出到 `artifacts/local-verify.png`。如果本機沒有 Chrome，請設定：
-
-```bash
-export CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-```
-
-本機資料庫可用 Docker 啟動：
-
-```bash
-npm run local:db
-npm run local:db:wait
-npm run db:push:local
-npm run local:prod
-```
-
-開啟網站：`http://localhost:5099`
-
-本機登入測試帳號可在 Docker DB 內設定，不會影響 Railway 正式站。`local:prod` 會自動允許 localhost 使用非 HTTPS session cookie。
-
-預設本機 admin 登入：
-
-```text
-Email: saisong@gmail.com
-Password: localdev123
-```
-
-如果重新同步 SoulGym 資料後登入失效，可執行：
-
-```bash
-npm run local:admin-password
-```
-
-如果本機需要聖經與耶穌四季資料，可只同步內容資料：
-
-```bash
-npm run content:sync:local
-```
-
-這個指令只處理 `chinese_union_trad`、`blessing_verses`、`jesus_4seasons`，不會同步使用者、禱告、筆記、小組或登入資料。匯出的暫存檔會放在 `exports/content/`，此資料夾不會被 git 追蹤。
-
-如果本機需要 SoulGym 真實資料，可只同步 SoulGym 相關資料：
-
-```bash
-npm run soulgym:sync:local
-```
-
-這個指令只處理 SoulGym 的使用者、角色、查經場次、參與者、回應、AI 報告、潛在成員與破冰卡/遊戲資料，不會同步禱告牆或訊息卡資料。匯出的暫存檔會放在 `exports/soulgym/`，此資料夾不會被 git 追蹤。
-
-如果要一次跑「資料庫 + schema + build + test + audit + 瀏覽器白屏檢查」：
-
-```bash
-npm run safe:check:full
-```
-
----
-
-## 部署（Railway）
-
-此專案目前由 GitHub repo `Saisong777/wechurch2.0` 連到 Railway。
-
-Railway 會依照 `nixpacks.toml`：
-
-1. 執行 `npm run build`
-2. 以 `npm start` 啟動 Express server
-
-Railway production service 需要設定 `DATABASE_URL`、`SESSION_SECRET`、AI keys，以及 OAuth/email 相關 secrets。請在 Railway Variables 管理，不要提交到 repo。
-
----
-
-## 專案結構
-
-```
-wechurch2.0/
-├── src/          # 前端 React 應用
-├── server/       # 後端 Express API
-├── shared/       # 共用型別/邏輯
-├── public/       # 靜態資源
-├── .env.example  # 環境變數範本
-└── drizzle.config.ts
-```
-
----
-
-## 授權
-
-本專案保留所有權利。如需使用請聯繫作者。
+本次檢查針對待提交檔案及目前可用密鑰比對，不宣稱整個歷史完全沒有敏感資訊。既有 Git 歷史不重寫；舊的公開郵件設定與已存在的歷史檔案若需移除，另做專門處理。

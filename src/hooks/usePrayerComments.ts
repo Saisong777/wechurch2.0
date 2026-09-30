@@ -1,76 +1,43 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiRequest } from '@/lib/queryClient';
 import { toast } from 'sonner';
+import type { PrayerComment, PrayerSticker, COMMENT_LABELS } from '@shared/prayerInteraction';
+export type { PrayerComment } from '@shared/prayerInteraction';
 
-export interface PrayerComment {
-  id: string;
-  prayerId: string;
-  userId: string;
-  content: string;
-  createdAt: string;
-  authorName: string;
-  authorAvatar: string | null;
-  isOwner: boolean;
+async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  const response = await fetch(`/api/prayers/${path}`, { method, credentials: 'include', ...(body === undefined ? {} : {headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}) });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || '回應尚未完成，請稍後重試。');
+  return data;
 }
-
-export const usePrayerComments = (prayerId: string) => {
+export const usePrayerComments = (prayerId: string, expanded = true) => {
   const { user } = useAuth();
-  const userId = user ? ((user as any).legacyUserId || user.id) : undefined;
-
   return useQuery<PrayerComment[]>({
-    queryKey: ['/api/prayers', prayerId, 'comments'],
-    queryFn: async () => {
-      const url = userId 
-        ? `/api/prayers/${prayerId}/comments?userId=${userId}`
-        : `/api/prayers/${prayerId}/comments`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch comments');
-      return response.json();
-    },
-    enabled: !!prayerId,
+    queryKey: ['prayer-comments', prayerId, user?.id],
+    queryFn: () => request(`${prayerId}/comments`),
+    enabled: !!user && expanded, refetchInterval: expanded ? 15000 : false, retry: false,
   });
 };
-
+function useRefreshComments() {
+  const client = useQueryClient();
+  return async () => {
+    await client.invalidateQueries({queryKey:['prayer-comments']});
+    await client.invalidateQueries({queryKey:['prayer-wall']});
+  };
+}
 export const useCreateComment = () => {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-
+  const refresh = useRefreshComments();
   return useMutation({
-    mutationFn: async ({ prayerId, content }: { prayerId: string; content: string }) => {
-      if (!user) throw new Error('Not authenticated');
-      const userId = (user as any).legacyUserId || user.id;
-      await apiRequest('POST', `/api/prayers/${prayerId}/comments`, { 
-        userId,
-        content: content.trim() 
-      });
-    },
-    onSuccess: (_, { prayerId }) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/prayers', prayerId, 'comments'] });
-      toast.success('留言已發布');
-    },
-    onError: (error) => {
-      console.error('Error creating comment:', error);
-      toast.error('留言失敗');
-    },
+    mutationFn: ({ prayerId, ...input }: {prayerId:string;content:string;kind?:keyof typeof COMMENT_LABELS;sticker?:PrayerSticker;requestId:string}) => request<PrayerComment>(`${prayerId}/comments`,'POST',input),
+    onSuccess: async () => { await refresh(); toast.success('回應已送出'); },
+    onError: (e:Error) => toast.error(e.message),
   });
 };
-
 export const useDeleteComment = () => {
-  const queryClient = useQueryClient();
-
+  const refresh = useRefreshComments();
   return useMutation({
-    mutationFn: async ({ commentId, prayerId }: { commentId: string; prayerId: string }) => {
-      await apiRequest('DELETE', `/api/prayers/${prayerId}/comments/${commentId}`);
-      return prayerId;
-    },
-    onSuccess: (prayerId) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/prayers', prayerId, 'comments'] });
-      toast.success('留言已刪除');
-    },
-    onError: (error) => {
-      console.error('Error deleting comment:', error);
-      toast.error('刪除失敗');
-    },
+    mutationFn: ({commentId,prayerId}:{commentId:string;prayerId:string}) => request(`${prayerId}/comments/${commentId}`,'DELETE'),
+    onSuccess: async () => { await refresh(); toast.success('回應已撤回'); },
+    onError: (e:Error) => toast.error(e.message),
   });
 };

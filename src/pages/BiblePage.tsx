@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +16,13 @@ import { FeatureGate } from '@/components/ui/feature-gate';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { vibrate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import BibleStudyReader, { studyFetch } from '@/components/scripture/BibleStudyReader';
+import {
+  getLocalBibleBooks,
+  getLocalBibleChapters,
+  getLocalBibleVerses,
+  searchLocalBibleVerses,
+} from '@/lib/localBible';
 
 interface BibleBook {
   bookName: string;
@@ -64,11 +71,35 @@ const NEW_TESTAMENT_CATEGORIES: BookCategory[] = [
   { name: '新約先知書', books: [66], colorDot: 'bg-orange-500' },
 ];
 
+async function fetchJsonWithLocalFallback<T>(url: string, fallback: () => Promise<T>): Promise<T> {
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (res.ok) return res.json();
+  } catch {
+    // The local preview can run without the Express API; fall through to bundled Bible data.
+  }
+
+  return fallback();
+}
+
+type BibleView = { book: string | null; chapter: number | null; search: string; searching: boolean };
+// Keep only this tab's navigation state, never private notes or durable search history.
+const bibleViews = new Map<string, BibleView>();
 const BiblePage = () => {
-  const [selectedBook, setSelectedBook] = useState<string | null>(null);
-  const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const location = useLocation();
+  const study = useQuery<{ enabled: boolean }>({ queryKey: ['bible-study', 'status'], queryFn: ({ signal }) => studyFetch('status', {}, signal) });
+  if (study.isPending) return <><Header variant="compact" title="聖經" backTo="/" /><p role="status" className="container py-8">載入聖經…</p></>;
+  if (study.isError) return <><Header variant="compact" title="聖經" backTo="/" /><div className="container py-8" role="alert"><p>聖經暫時無法載入</p><Button onClick={() => study.refetch()}>重試</Button></div></>;
+  if (study.data?.enabled) return <BibleStudyReader />;
+  return <BibleReader key={location.key} entryKey={location.key} />;
+};
+
+const BibleReader = ({ entryKey }: { entryKey: string }) => {
+  const initialView = useRef(bibleViews.get(entryKey));
+  const [selectedBook, setSelectedBook] = useState<string | null>(initialView.current?.book ?? null);
+  const [selectedChapter, setSelectedChapter] = useState<number | null>(initialView.current?.chapter ?? null);
+  const [searchQuery, setSearchQuery] = useState(initialView.current?.search ?? '');
+  const [isSearching, setIsSearching] = useState(initialView.current?.searching ?? false);
   const [selectedVerseNums, setSelectedVerseNums] = useState<Set<number>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
   const [showNoteDialog, setShowNoteDialog] = useState(false);
@@ -96,20 +127,28 @@ const BiblePage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const previousSelection = useRef([selectedBook, selectedChapter, isSearching]);
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [selectedBook, selectedChapter, isSearching]);
+    const next = [selectedBook, selectedChapter, isSearching];
+    if (next.some((value, index) => value !== previousSelection.current[index])) window.scrollTo(0, 0);
+    previousSelection.current = next;
+    bibleViews.set(entryKey, { book: selectedBook, chapter: selectedChapter, search: searchQuery, searching: isSearching });
+    if (bibleViews.size > 100) bibleViews.delete(bibleViews.keys().next().value!);
+  }, [entryKey, selectedBook, selectedChapter, isSearching, searchQuery]);
 
   const { data: books = [], isError: booksError } = useQuery<BibleBook[]>({
     queryKey: ['/api/bible/books'],
+    queryFn: () => fetchJsonWithLocalFallback('/api/bible/books', getLocalBibleBooks),
   });
 
   const { data: chapters = [], isError: chaptersError } = useQuery<BibleChapter[]>({
     queryKey: ['/api/bible/chapters', selectedBook],
     queryFn: async () => {
-      const res = await fetch(`/api/bible/chapters/${encodeURIComponent(selectedBook!)}`);
-      if (!res.ok) throw new Error('Failed to fetch chapters');
-      return res.json();
+      const bookName = selectedBook!;
+      return fetchJsonWithLocalFallback(
+        `/api/bible/chapters/${encodeURIComponent(bookName)}`,
+        () => getLocalBibleChapters(bookName),
+      );
     },
     enabled: !!selectedBook,
   });
@@ -117,9 +156,12 @@ const BiblePage = () => {
   const { data: verses = [], isLoading: versesLoading, isError: versesError } = useQuery<BibleVerse[]>({
     queryKey: ['/api/bible/verses', selectedBook, selectedChapter],
     queryFn: async () => {
-      const res = await fetch(`/api/bible/verses/${encodeURIComponent(selectedBook!)}/${selectedChapter}`);
-      if (!res.ok) throw new Error('Failed to fetch verses');
-      return res.json();
+      const bookName = selectedBook!;
+      const chapter = selectedChapter!;
+      return fetchJsonWithLocalFallback(
+        `/api/bible/verses/${encodeURIComponent(bookName)}/${chapter}`,
+        () => getLocalBibleVerses(bookName, chapter),
+      );
     },
     enabled: !!selectedBook && !!selectedChapter,
   });
@@ -127,9 +169,10 @@ const BiblePage = () => {
   const { data: searchResults = [], isLoading: searchLoading, isError: searchError } = useQuery<BibleVerse[]>({
     queryKey: ['/api/bible/search', searchQuery],
     queryFn: async () => {
-      const res = await fetch(`/api/bible/search?q=${encodeURIComponent(searchQuery)}`);
-      if (!res.ok) throw new Error('Failed to search');
-      return res.json();
+      return fetchJsonWithLocalFallback(
+        `/api/bible/search?q=${encodeURIComponent(searchQuery)}`,
+        () => searchLocalBibleVerses(searchQuery),
+      );
     },
     enabled: isSearching && searchQuery.length >= 2,
   });
@@ -587,16 +630,16 @@ const BiblePage = () => {
     const totalChapters = categoryBooks.reduce((sum, b) => sum + b.chapterCount, 0);
 
     return (
-      <div key={category.name} className="bg-white rounded-2xl shadow-card mx-3 mb-3 overflow-hidden">
+      <div key={category.name} className="bg-card rounded-2xl shadow-card mx-3 mb-3 overflow-hidden">
         <button
           className="w-full flex items-center gap-2.5 px-4 py-3 text-left"
           onClick={() => toggleCategory(category.name)}
           data-testid={`button-category-${category.name}`}
         >
           <span className={`w-3 h-3 rounded-sm flex-shrink-0 ${category.colorDot}`} />
-          <span className="font-bold text-sm text-gray-800 flex-1">{category.name}</span>
-          <span className="text-xs text-gray-400">{totalChapters}章</span>
-          {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          <span className="font-bold text-sm text-foreground flex-1">{category.name}</span>
+          <span className="text-xs text-muted-foreground">{totalChapters}章</span>
+          {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </button>
         {isExpanded && (
           <div className="px-3 pb-3 grid grid-cols-3 gap-2">
@@ -605,13 +648,13 @@ const BiblePage = () => {
                 key={book.bookNumber}
                 className={`h-11 rounded-lg text-sm flex flex-col items-center justify-center transition-colors ${selectedBook === book.bookName
                   ? 'bg-brand-amber text-white font-bold'
-                  : 'bg-brand-soft text-gray-700 hover:bg-brand-sky/10'
+                  : 'bg-brand-soft text-foreground hover:bg-brand-sky/10'
                   }`}
                 onClick={() => setSelectedBook(book.bookName)}
                 data-testid={`button-book-${book.bookNumber}`}
               >
                 <span>{book.bookName}</span>
-                <span className={`text-[10px] ${selectedBook === book.bookName ? 'text-white/80' : 'text-gray-400'}`}>{book.chapterCount}章</span>
+                <span className={`text-[10px] ${selectedBook === book.bookName ? 'text-white/80' : 'text-muted-foreground'}`}>{book.chapterCount}章</span>
               </button>
             ))}
           </div>
@@ -631,7 +674,7 @@ const BiblePage = () => {
         <Header
           variant="compact"
           title={selectedBook ? `${selectedBook}${selectedChapter ? ` ${selectedChapter}章` : ''}` : '聖經閱讀'}
-          backTo="/learn"
+          backTo="/"
           rightContent={
             <div className="flex items-center gap-0.5">
               <Button
@@ -644,14 +687,14 @@ const BiblePage = () => {
                 <Search className="w-4 h-4" />
               </Button>
               <button
-                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-muted'}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 0 ? 'text-muted-foreground' : 'text-muted-foreground hover:bg-muted'}`}
                 onClick={() => changeFontSize(-1)}
                 disabled={fontSizeLevel === 0}
                 data-testid="button-font-decrease"
               >A-</button>
-              <span className="text-xs text-gray-400 w-6 text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
+              <span className="text-xs text-muted-foreground w-6 text-center">{FONT_SIZE_CONFIG[fontSizeLevel].label}</span>
               <button
-                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 3 ? 'text-gray-300' : 'text-gray-500 hover:bg-muted'}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${fontSizeLevel === 3 ? 'text-muted-foreground' : 'text-muted-foreground hover:bg-muted'}`}
                 onClick={() => changeFontSize(1)}
                 disabled={fontSizeLevel === 3}
                 data-testid="button-font-increase"
@@ -1072,7 +1115,7 @@ const BiblePage = () => {
 
         {selectedBook && selectedChapter && (
           <FloatingToolbar
-            visible={selectedVerseNums.size > 0 && !showCardModal && !searchCardVerse && !searchExpanded}
+            visible={selectedVerseNums.size > 0 && !showCardModal && !showNoteDialog && !searchCardVerse && !searchNoteVerse && !searchExpanded}
             getAnchorRect={getAnchorRect}
             selectedCount={selectedVerseNums.size}
             onCopy={async () => {

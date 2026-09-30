@@ -91,7 +91,7 @@ export function parseCategories(raw: string | null): InsightCategory[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) return parsed.filter((value): value is InsightCategory => ['PROMISE', 'COMMAND', 'WARNING', 'GOD_ATTRIBUTE'].includes(value));
   } catch {}
   if (['PROMISE', 'COMMAND', 'WARNING', 'GOD_ATTRIBUTE'].includes(raw)) {
     return [raw as InsightCategory];
@@ -103,10 +103,12 @@ export function parseNotes(raw: string | null, categories: InsightCategory[]): R
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
-    if (typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
-  } catch {}
-  if (categories.length > 0 && raw.trim()) {
-    return { [categories[0]]: raw };
+    if (parsed === null || Array.isArray(parsed)) return {};
+    if (typeof parsed === 'object') return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string,string] => typeof entry[1] === 'string'));
+    if (typeof parsed === 'string') return parsed.trim() ? { [categories[0] || 'legacy']: parsed } : {};
+  } catch { /* Older notes stored plain text instead of a category map. */ }
+  if (raw.trim()) {
+    return { [categories[0] || 'legacy']: raw };
   }
   return {};
 }

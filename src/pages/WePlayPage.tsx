@@ -67,16 +67,7 @@ export const WePlayPage = () => {
       <FeaturePortalPage
         title="小工具"
         subtitle="現場互動"
-        eyebrow="Tools for groups"
-        description="把聚會現場常用的小工具放在同一個入口，分組、破冰、問答和分享都能更快開始。"
-        icon={Gamepad2}
-        iconTone="bg-emerald-500/15 text-emerald-600"
         actions={enabledActions}
-        moments={[
-          { label: '暖場', value: '抽題、問答、門徒人格' },
-          { label: '分組', value: '快速產生小組名單' },
-          { label: '延伸', value: '可接到 SoulGym 查經流程' },
-        ]}
       />
     </FeatureGate>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getKnownChurchOptions, normalizeChurch, churchDisplayName } from '@shared/churches';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -185,7 +186,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
           birthday: birthday || null,
           userGender: userGender || null,
           address: address.trim() || null,
-          church: church.trim() || null,
+          ...(user.role === 'admin' ? { church: church.trim() || null } : {}),
         }),
       });
 
@@ -200,7 +201,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
     }
   };
 
-  const getInitials = (email: string | undefined) => {
+  const getInitials = (email: string | null | undefined) => {
     if (!email) return 'U';
     return email.charAt(0).toUpperCase();
   };
@@ -324,14 +325,18 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
               <Label htmlFor="church">
                 所屬教會 <span className="text-xs text-muted-foreground">(選填)</span>
               </Label>
-              <Input
+              <select
                 id="church"
-                value={church}
+                disabled={user?.role !== 'admin'}
+                value={normalizeChurch(church) || ''}
                 onChange={(e) => setChurch(e.target.value)}
-                placeholder="輸入您所屬的教會"
-                className="h-11"
+                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
                 data-testid="input-church"
-              />
+              >
+                <option value="">尚未設定</option>
+                {getKnownChurchOptions().map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {church && !getKnownChurchOptions().some(c => c.id === normalizeChurch(church)) && <option value={church} disabled>{churchDisplayName(church)}（已停用）</option>}
+              </select>
             </div>
 
             <div className="space-y-2">
@@ -374,12 +379,12 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
         </DialogContent>
       </Dialog>
 
-      <AvatarCropDialog
+      {selectedImageSrc && <AvatarCropDialog
         open={cropDialogOpen}
         onOpenChange={setCropDialogOpen}
         imageSrc={selectedImageSrc}
         onCropComplete={handleCropComplete}
-      />
+      />}
     </>
   );
 };

@@ -8,6 +8,70 @@
       "when": 1772698849160,
       "tag": "0000_icy_daredevil",
       "breakpoints": true
-    }
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783674732366,
+      "tag": "0001_pastoral_beta",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789128000000,
+      "tag": "0002_personal_prayers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789129800000,
+      "tag": "0003_church_devotions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789131600000,
+      "tag": "0004_life_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789133400000,
+      "tag": "0005_prayer_sharing",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789135200000,
+      "tag": "0006_prayer_interactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789137000000,
+      "tag": "0007_daily_walls",
+      "breakpoints": true
+    },
+    { "idx": 8, "version": "7", "when": 1789228800000, "tag": "0008_identity_integrity", "breakpoints": true },
+    { "idx": 9, "version": "7", "when": 1789286400000, "tag": "0009_support_requests", "breakpoints": true },
+    { "idx": 10, "version": "7", "when": 1789290000000, "tag": "0010_mentoring_contracts", "breakpoints": true },
+    { "idx": 11, "version": "7", "when": 1789308000000, "tag": "0011_devotional_note_versions", "breakpoints": true },
+    { "idx": 12, "version": "7", "when": 1790208000000, "tag": "0012_google_account_links", "breakpoints": true },
+    { "idx": 13, "version": "7", "when": 1790294400000, "tag": "0013_im_bible_import", "breakpoints": true },
+    { "idx": 14, "version": "7", "when": 1790467200000, "tag": "0014_auth_session_version", "breakpoints": true },
+    { "idx": 15, "version": "7", "when": 1790467200001, "tag": "0015_capacity_indexes", "breakpoints": true },
+    { "idx": 16, "version": "7", "when": 1790553600000, "tag": "0016_families", "breakpoints": true },
+    { "idx": 17, "version": "7", "when": 1790553600001, "tag": "0017_grace_book", "breakpoints": true },
+    { "idx": 18, "version": "7", "when": 1790553600002, "tag": "0018_care_visits", "breakpoints": true },
+    { "idx": 19, "version": "7", "when": 1790553600003, "tag": "0019_leader_dashboard", "breakpoints": true },
+    { "idx": 20, "version": "7", "when": 1790640000000, "tag": "0020_controlled_email", "breakpoints": true },
+    { "idx": 21, "version": "7", "when": 1790640000001, "tag": "0021_access_control", "breakpoints": true },
+    { "idx": 22, "version": "7", "when": 1790726400000, "tag": "0022_family_directory", "breakpoints": true }
   ]
 }

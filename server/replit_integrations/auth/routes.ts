@@ -1,51 +1,31 @@
-import type { Express, RequestHandler } from "express";
+import type { Express } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { pool } from "../../db";
 import { sendEmail } from "../../resend";
+import { googleOnlyRegistration } from '../../googleLoginPolicy';
+import { authAttemptLimits, authLoginLimits, trustedAuthJson } from '../../authRequestPolicy';
+import { consumePasswordResetToken, issuePasswordResetToken } from '../../authPasswordReset';
+import { createPasswordWorkLimiter, PasswordWorkBusyError } from '../../authPasswordWork';
+import { authErrorMetadata } from '../../authLogging';
 
 export function registerAuthRoutes(app: Express): void {
-  const authRateLimitMap = new Map<string, { count: number; resetTime: number }>();
-  const authRateLimit = (scope: string, maxAttempts = 10): RequestHandler => (req, res, next) => {
-    const identifier = typeof req.body?.email === "string"
-      ? req.body.email.trim().toLowerCase()
-      : req.ip || "unknown";
-    const key = `${scope}:${req.ip || "unknown"}:${identifier}`;
-    const now = Date.now();
-    const windowMs = 15 * 60 * 1000;
-    let entry = authRateLimitMap.get(key);
-    if (!entry || now > entry.resetTime) {
-      entry = { count: 0, resetTime: now + windowMs };
-      authRateLimitMap.set(key, entry);
-    }
-    entry.count++;
-    if (entry.count > maxAttempts) {
-      return res.status(429).json({ message: "嘗試次數過多，請稍後再試" });
-    }
-    next();
-  };
-
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of authRateLimitMap.entries()) {
-      if (now > entry.resetTime) authRateLimitMap.delete(key);
-    }
-  }, 60 * 1000).unref();
-
+  const passwordWork = createPasswordWorkLimiter();
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await authStorage.getUser(userId);
       res.json(user);
     } catch (error) {
-      console.error("Error fetching user:", error);
+      console.error("[Auth] User lookup failed", authErrorMetadata(error));
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
-  app.post("/api/auth/register", authRateLimit("register", 5), async (req: any, res) => {
+  app.post("/api/auth/register", trustedAuthJson(), ...authAttemptLimits(5), async (req: any, res) => {
+    if (googleOnlyRegistration()) return res.status(403).json({ message: '請使用 Google 帳號註冊。', code: 'GOOGLE_REGISTRATION_REQUIRED' });
     try {
       const { email, password, displayName } = req.body;
 
@@ -66,12 +46,12 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).json({ message: "此電子郵件已被註冊" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await passwordWork(() => bcrypt.hash(password, 10));
 
       const userResult = await pool.query(
         `INSERT INTO users (id, email, password, display_name, created_at, updated_at)
          VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
-         RETURNING id, email, display_name`,
+         RETURNING id, email, display_name, session_version`,
         [normalizedEmail, hashedPassword, displayName || null]
       );
       const newUser = userResult.rows[0];
@@ -92,6 +72,8 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       const sessionUser: any = {
+        sessionVersion: newUser.session_version,
+        sessionUserId: newUser.id,
         claims: {
           sub: authUserId,
           email: normalizedEmail,
@@ -102,24 +84,26 @@ export function registerAuthRoutes(app: Express): void {
 
       req.login(sessionUser, (err: any) => {
         if (err) {
-          console.error("[Auth] Register session error:", err);
+          console.error("[Auth] Register session error", authErrorMetadata(err));
           return res.status(500).json({ message: "註冊成功但登入失敗，請手動登入" });
         }
         req.session.save((saveErr: any) => {
           if (saveErr) {
-            console.error("[Auth] Register session save error:", saveErr);
+            console.error("[Auth] Register session save error", authErrorMetadata(saveErr));
+            return res.status(503).json({ message: '登入狀態暫時無法儲存，請稍後再試' });
           }
-          console.log("[Auth] Registration successful for:", normalizedEmail);
+          console.log("[Auth] Registration successful");
           res.json({ message: "註冊成功", user: { id: authUserId, email: normalizedEmail, displayName: displayName || null } });
         });
       });
     } catch (error) {
-      console.error("[Auth] Register error:", error);
+      if (error instanceof PasswordWorkBusyError) return res.set('Retry-After', '1').status(503).json({ message: '登入服務忙碌，請稍後重試' });
+      console.error("[Auth] Register error", authErrorMetadata(error));
       res.status(500).json({ message: "註冊失敗，請稍後重試" });
     }
   });
 
-  app.post("/api/auth/email-login", authRateLimit("login", 10), async (req: any, res) => {
+  app.post("/api/auth/email-login", trustedAuthJson(), ...authLoginLimits(), async (req: any, res) => {
     try {
       const { email, password } = req.body;
 
@@ -133,7 +117,7 @@ export function registerAuthRoutes(app: Express): void {
       const normalizedEmail = email.trim().toLowerCase();
 
       const userResult = await pool.query(
-        "SELECT id, email, password, display_name FROM users WHERE LOWER(email) = $1",
+        "SELECT id, email, password, display_name, session_version FROM users WHERE LOWER(email) = $1",
         [normalizedEmail]
       );
 
@@ -150,19 +134,10 @@ export function registerAuthRoutes(app: Express): void {
       let passwordMatch = false;
       const isBcryptHash = dbUser.password.length === 60 && dbUser.password.startsWith("$2");
       if (isBcryptHash) {
-        passwordMatch = await bcrypt.compare(password, dbUser.password);
+        passwordMatch = await passwordWork(() => bcrypt.compare(password, dbUser.password));
       } else if (dbUser.password.length >= 6 && dbUser.password.length <= 30) {
-        const { timingSafeEqual } = await import("crypto");
-        const a = Buffer.from(password, "utf8");
-        const b = Buffer.from(dbUser.password, "utf8");
-        if (a.length === b.length) {
-          passwordMatch = timingSafeEqual(a, b);
-        }
-        if (passwordMatch) {
-          const hashedPassword = await bcrypt.hash(password, 10);
-          await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, dbUser.id]);
-          console.log("[Auth] Upgraded legacy password to bcrypt for:", normalizedEmail);
-        }
+        console.warn("[Auth] Legacy plaintext password login blocked");
+        return res.status(401).json({ message: "請使用忘記密碼重新設定密碼" });
       }
 
       if (!passwordMatch) {
@@ -185,6 +160,8 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       const sessionUser: any = {
+        sessionVersion: dbUser.session_version,
+        sessionUserId: dbUser.id,
         claims: {
           sub: authUserId,
           email: normalizedEmail,
@@ -195,24 +172,26 @@ export function registerAuthRoutes(app: Express): void {
 
       req.login(sessionUser, (err: any) => {
         if (err) {
-          console.error("[Auth] Login session error:", err);
+          console.error("[Auth] Login session error", authErrorMetadata(err));
           return res.status(500).json({ message: "登入失敗，請稍後重試" });
         }
         req.session.save((saveErr: any) => {
           if (saveErr) {
-            console.error("[Auth] Login session save error:", saveErr);
+            console.error("[Auth] Login session save error", authErrorMetadata(saveErr));
+            return res.status(503).json({ message: '登入狀態暫時無法儲存，請稍後再試' });
           }
-          console.log("[Auth] Email login successful for:", normalizedEmail);
+          console.log("[Auth] Email login successful");
           res.json({ message: "登入成功", user: { id: authUserId, email: normalizedEmail, displayName: dbUser.display_name } });
         });
       });
     } catch (error) {
-      console.error("[Auth] Email login error:", error);
+      if (error instanceof PasswordWorkBusyError) return res.set('Retry-After', '1').status(503).json({ message: '登入服務忙碌，請稍後重試' });
+      console.error("[Auth] Email login error", authErrorMetadata(error));
       res.status(500).json({ message: "登入失敗，請稍後重試" });
     }
   });
 
-  app.post("/api/auth/forgot-password", authRateLimit("forgot-password", 5), async (req, res) => {
+  app.post("/api/auth/forgot-password", ...authAttemptLimits(5), async (req, res) => {
     try {
       const { email } = req.body;
       if (!email || typeof email !== "string") {
@@ -230,18 +209,8 @@ export function registerAuthRoutes(app: Express): void {
         return res.json({ message: "ok" });
       }
 
-      await pool.query(
-        "UPDATE password_reset_tokens SET used = true WHERE email = $1 AND used = false",
-        [normalizedEmail]
-      );
-
       const token = randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
-      await pool.query(
-        "INSERT INTO password_reset_tokens (email, token, expires_at) VALUES ($1, $2, $3)",
-        [normalizedEmail, token, expiresAt]
-      );
+      if (!await issuePasswordResetToken(pool, normalizedEmail, token)) return res.json({ message: 'ok' });
 
       const baseUrl = process.env.PUBLIC_BASE_URL
         || (process.env.NODE_ENV === "production" ? "https://www.wechurch.online" : `${req.protocol}://${req.headers.host || "localhost:5001"}`);
@@ -278,15 +247,15 @@ export function registerAuthRoutes(app: Express): void {
         `,
       });
 
-      console.log("[Auth] Password reset email sent to:", normalizedEmail);
+      console.log("[Auth] Password reset email sent");
       res.json({ message: "ok" });
     } catch (error) {
-      console.error("[Auth] Forgot password error:", error);
+      console.error("[Auth] Forgot password error", authErrorMetadata(error));
       res.status(500).json({ message: "發送失敗，請稍後重試" });
     }
   });
 
-  app.post("/api/auth/reset-password", authRateLimit("reset-password", 10), async (req, res) => {
+  app.post("/api/auth/reset-password", ...authAttemptLimits(10, 'token'), async (req, res) => {
     try {
       const { token, password } = req.body;
 
@@ -298,7 +267,9 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       const tokenResult = await pool.query(
-        "SELECT id, email, expires_at, used FROM password_reset_tokens WHERE token = $1",
+        `SELECT id, email, used, (expires_at > clock_timestamp()
+         AND created_at > clock_timestamp() - INTERVAL '1 hour') AS unexpired
+         FROM password_reset_tokens WHERE token = $1`,
         [token]
       );
 
@@ -312,31 +283,26 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).json({ message: "此重設連結已使用過，請重新申請" });
       }
 
-      if (new Date(resetToken.expires_at) < new Date()) {
+      if (!resetToken.unexpired) {
         return res.status(400).json({ message: "重設連結已過期，請重新申請" });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await passwordWork(() => bcrypt.hash(password, 10));
 
-      await pool.query(
-        "UPDATE users SET password = $1, updated_at = NOW() WHERE LOWER(email) = $2",
-        [hashedPassword, resetToken.email]
-      );
+      if (!await consumePasswordResetToken(pool, token, hashedPassword)) {
+        return res.status(400).json({ message: '無效或已失效的重設連結，請重新申請' });
+      }
 
-      await pool.query(
-        "UPDATE password_reset_tokens SET used = true WHERE id = $1",
-        [resetToken.id]
-      );
-
-      console.log("[Auth] Password reset successful for:", resetToken.email);
+      console.log("[Auth] Password reset successful");
       res.json({ message: "密碼重設成功！請使用新密碼登入。" });
     } catch (error) {
-      console.error("[Auth] Reset password error:", error);
+      if (error instanceof PasswordWorkBusyError) return res.set('Retry-After', '1').status(503).json({ message: '登入服務忙碌，請稍後重試' });
+      console.error("[Auth] Reset password error", authErrorMetadata(error));
       res.status(500).json({ message: "重設失敗，請稍後重試" });
     }
   });
 
-  app.get("/api/auth/verify-reset-token", async (req, res) => {
+  app.get("/api/auth/verify-reset-token", ...authAttemptLimits(10, 'token'), async (req, res) => {
     try {
       const { token } = req.query;
 
@@ -345,7 +311,9 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       const tokenResult = await pool.query(
-        "SELECT id, email, expires_at, used FROM password_reset_tokens WHERE token = $1",
+        `SELECT id, email, used, (expires_at > clock_timestamp()
+         AND created_at > clock_timestamp() - INTERVAL '1 hour') AS unexpired
+         FROM password_reset_tokens WHERE token = $1`,
         [token]
       );
 
@@ -359,13 +327,13 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).json({ valid: false, message: "此連結已使用過" });
       }
 
-      if (new Date(resetToken.expires_at) < new Date()) {
+      if (!resetToken.unexpired) {
         return res.status(400).json({ valid: false, message: "連結已過期" });
       }
 
       res.json({ valid: true, email: resetToken.email });
     } catch (error) {
-      console.error("[Auth] Verify reset token error:", error);
+      console.error("[Auth] Verify reset token error", authErrorMetadata(error));
       res.status(500).json({ valid: false, message: "驗證失敗" });
     }
   });

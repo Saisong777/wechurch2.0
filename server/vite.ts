@@ -20,6 +20,7 @@ export function log(message: string, source = "express") {
 export async function setupVite(app: Express, server: any) {
   const vite = await createViteServer({
     server: {
+      allowedHosts: [],
       middlewareMode: true,
       hmr: { server },
     },
@@ -59,8 +60,7 @@ export async function setupVite(app: Express, server: any) {
   });
 }
 
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "..", "dist", "public");
+export function serveStatic(app: Express, distPath = path.resolve(__dirname, "..", "dist", "public")) {
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -73,10 +73,18 @@ export function serveStatic(app: Express) {
     maxAge: '1y',
     immutable: true,
   }));
+  // Stale deployment chunks must fail as assets, never as a successful HTML page.
+  app.use('/assets', (_req, res) => {
+    res.set('Cache-Control', 'no-store').status(404).type('text/plain').send('Asset not found');
+  });
 
   // Serve other static files with short cache
   app.use(express.static(distPath, {
     maxAge: '1h',
+    index: false,
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    },
   }));
 
   // SPA fallback - always return fresh index.html

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
+import { getKnownChurchOptions, normalizeChurch } from '@shared/churches';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { toast } from 'sonner';
-import { Mail, Send, Loader2, Users, Search, ChevronLeft, CheckCircle2, Paperclip, X, File, Image as ImageIcon } from 'lucide-react';
+import { Mail, Send, Loader2, Users, Search, ChevronLeft, Paperclip, X, File, Image as ImageIcon } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import type { EmailProviderStatus } from '@shared/email';
 
 interface EmailUser {
   id: string;
@@ -53,7 +55,7 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) => {
-  const [recipientMode, setRecipientMode] = useState<RecipientMode>('all');
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>('individual');
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [selectedChurch, setSelectedChurch] = useState<string>('');
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
@@ -63,16 +65,14 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sendRequest = useRef<{ payload: string; id: string } | null>(null);
+  const { data: emailStatus, isError: emailStatusError } = useQuery<EmailProviderStatus>({ queryKey: ['/api/email-provider-status'] });
 
   const { data: allUsers = [], isLoading: usersLoading } = useQuery<EmailUser[]>({
     queryKey: ['/api/admin/users-for-email'],
   });
 
-  const churches = useMemo(() => {
-    const set = new Set<string>();
-    allUsers.forEach(u => { if (u.church) set.add(u.church); });
-    return Array.from(set).sort();
-  }, [allUsers]);
+  const churches = getKnownChurchOptions();
 
   const roles = useMemo(() => {
     const set = new Set<string>();
@@ -87,7 +87,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
       case 'role':
         return selectedRole ? allUsers.filter(u => u.role === selectedRole) : [];
       case 'church':
-        return selectedChurch ? allUsers.filter(u => u.church === selectedChurch) : [];
+        return selectedChurch ? allUsers.filter(u => normalizeChurch(u.church) === selectedChurch) : [];
       case 'individual':
         return allUsers.filter(u => selectedUserIds.has(u.id));
       default:
@@ -115,21 +115,24 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
         filename: a.file.name,
         content: a.base64,
       }));
-      const res = await apiRequest('POST', '/api/send-bulk-email', {
+      const payload = {
         recipients: recipientList,
         subject,
         body,
         isHtml: true,
         ...(attachmentData.length > 0 ? { attachments: attachmentData } : {}),
-      });
+      };
+      const serialized = JSON.stringify(payload);
+      if (sendRequest.current?.payload !== serialized) sendRequest.current = { payload: serialized, id: crypto.randomUUID() };
+      const res = await apiRequest('POST', '/api/send-bulk-email', { ...payload, requestId: sendRequest.current!.id });
       return res.json();
     },
     onSuccess: (data) => {
       setSendResult({ sent: data.sent, failed: data.failed });
       if (data.failed === 0) {
-        toast.success(`成功寄出 ${data.sent} 封郵件`);
+        toast.success(`寄信服務已接受 ${data.sent} 封郵件，尚非送達確認`);
       } else {
-        toast.warning(`寄出 ${data.sent} 封，失敗 ${data.failed} 封`);
+        toast.warning(`服務已接受 ${data.sent} 封，未確認 ${data.failed} 封`);
       }
     },
     onError: (error: any) => {
@@ -138,6 +141,8 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
   });
 
   const handleSend = () => {
+    if (!emailStatus?.canSend) { toast.error(emailStatus?.message || '寄信服務狀態尚未確認'); return; }
+    if (recipients.length > 100) { toast.error('每次最多寄給 100 人，請縮小選取範圍'); return; }
     if (recipients.length === 0) {
       toast.error('請選擇收件人');
       return;
@@ -150,13 +155,14 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
       toast.error('請輸入郵件內容');
       return;
     }
-    sendMutation.mutate();
+    if (window.confirm(`確定將「${subject.trim()}」寄給 ${recipients.length} 位會員？每位收件人會分開寄送。`)) sendMutation.mutate();
   };
 
   const handleReset = () => {
     setSubject('');
     setBody('');
-    setRecipientMode('all');
+    setRecipientMode('individual');
+    sendRequest.current = null;
     setSelectedRole('');
     setSelectedChurch('');
     setSelectedUserIds(new Set());
@@ -194,14 +200,17 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    let total = attachments.reduce((sum, attachment) => sum + attachment.file.size, 0);
+    let count = attachments.length;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} 超過 10MB 限制`);
+      if (count >= 5 || total + file.size > 2 * 1024 * 1024) {
+        toast.error('附件最多 5 個，合計不可超過 2MB');
         continue;
       }
       try {
         const base64 = await fileToBase64(file);
+        total += file.size; count++;
         setAttachments(prev => [...prev, { file, base64 }]);
       } catch {
         toast.error(`無法讀取 ${file.name}`);
@@ -229,14 +238,15 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
       <div className="max-w-2xl mx-auto">
         <Card>
           <CardContent className="pt-8 pb-8 text-center space-y-4">
-            <CheckCircle2 className="w-16 h-16 mx-auto text-green-500" />
-            <h3 className="text-xl font-semibold">郵件已寄出</h3>
+            <Mail className="w-12 h-12 mx-auto text-primary" />
+            <h3 className="text-xl font-semibold">{sendResult.sent > 0 ? '寄送結果' : '郵件尚未寄出'}</h3>
             <div className="flex justify-center gap-4">
-              <Badge variant="default" className="text-base px-3 py-1">成功 {sendResult.sent} 封</Badge>
+              <Badge variant="default" className="text-base px-3 py-1">服務已接受 {sendResult.sent} 封</Badge>
               {sendResult.failed > 0 && (
-                <Badge variant="destructive" className="text-base px-3 py-1">失敗 {sendResult.failed} 封</Badge>
+                <Badge variant="destructive" className="text-base px-3 py-1">未確認 {sendResult.failed} 封</Badge>
               )}
             </div>
+            <p className="text-sm text-muted-foreground">服務接受不代表已送達，請於 Resend 查看送達結果。</p>
             <div className="flex justify-center gap-3 pt-4">
               <Button variant="outline" onClick={onBack} data-testid="button-back-to-dashboard">
                 返回管理台
@@ -315,7 +325,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
                   <SelectItem value="_none" disabled>尚無教會資料</SelectItem>
                 ) : (
                   churches.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))
                 )}
               </SelectContent>
@@ -324,8 +334,8 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
 
           {recipientMode === 'individual' && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-0 w-full sm:w-auto sm:flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="搜尋姓名、Email 或教會..."
@@ -354,20 +364,18 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
                     filteredUsers.map(u => (
                       <label
                         key={u.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
+                        className="flex min-w-0 items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
                         data-testid={`user-row-${u.id}`}
                       >
                         <Checkbox
                           checked={selectedUserIds.has(u.id)}
                           onCheckedChange={() => toggleUser(u.id)}
                         />
-                        <span className="text-sm truncate flex-1">
-                          {u.displayName || u.email}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate max-w-32">
-                          {u.displayName ? u.email : ''}
-                        </span>
-                        <Badge variant="outline" className="text-xs shrink-0">
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-sm break-words">{u.displayName || u.email}</span>
+                          {u.displayName && <span className="block text-xs text-muted-foreground break-all">{u.email}</span>}
+                        </div>
+                        <Badge variant="outline" className="hidden sm:inline-flex text-xs shrink-0">
                           {ROLE_LABELS[u.role] || u.role}
                         </Badge>
                       </label>
@@ -384,6 +392,8 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
               {usersLoading ? '載入中...' : `將寄給 ${recipients.length} 人`}
             </span>
           </div>
+          {!emailStatus?.canSend && <p role="status" className="text-sm text-muted-foreground">{emailStatus?.message || (emailStatusError ? '無法確認寄信服務，請重新整理後再試。' : '正在確認寄信服務…')}</p>}
+          {recipients.length > 100 && <p role="alert" className="text-sm text-destructive">每次最多 100 人，請縮小選取範圍。</p>}
         </CardContent>
       </Card>
 
@@ -459,7 +469,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              支援圖片、PDF、Office 文件，單檔最大 10MB
+              附件最多 5 個，合計 2MB
             </p>
           </div>
         </CardContent>
@@ -471,7 +481,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
         </Button>
         <Button
           onClick={handleSend}
-          disabled={sendMutation.isPending || recipients.length === 0}
+          disabled={sendMutation.isPending || recipients.length === 0 || recipients.length > 100 || !emailStatus?.canSend}
           className="gap-2"
           data-testid="button-send-email"
         >

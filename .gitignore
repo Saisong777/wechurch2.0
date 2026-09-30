@@ -4,6 +4,17 @@
 .env.*.local
 .env.production
 .env.staging
+.env.*
+!.env.example
+!.env.local.example
+uploads/
+*.dump
+*.sql.gz
+*.backup
+*.sqlite
+*.sqlite3
+bible-study-data/
+public/message-cards/
 *.pem
 *.key
 *.cert
@@ -37,6 +48,9 @@ out/
 coverage/
 .nyc_output/
 artifacts/
+.playwright-cli/
+output/
+outputs/
 exports/
 
 # ── 日誌

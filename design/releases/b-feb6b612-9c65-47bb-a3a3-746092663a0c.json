@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "environment": "staging",
+  "origin": "https://wechurch-staging-staging.up.railway.app",
+  "deploymentId": "feb6b612-9c65-47bb-a3a3-746092663a0c",
+  "verifiedAt": "2026-09-24T16:40:13.620Z",
+  "fingerprint": "5c34b770b44dfe88adadd583a500f6d2a843db50881e69854949d5c5b7db6f28",
+  "sourceCommit": "6e64bc8ab33e07cfcc9c981bb894765f54b36c59",
+  "baseCommit": "6e64bc8ab33e07cfcc9c981bb894765f54b36c59",
+  "sourceMatchesCommit": true,
+  "productionApproved": false,
+  "migrations": [
+    {
+      "file": "migrations/0000_icy_daredevil.sql",
+      "sha256": "7d04a2bd96808dfab6bc42108ebb28540705e687eb1e483bddb3176c1e29d8b8"
+    },
+    {
+      "file": "migrations/0001_pastoral_beta.sql",
+      "sha256": "95cc44103bff9a5bed1279831f160c7d903af55b632c1594228094893cd9d6a5"
+    },
+    {
+      "file": "migrations/0002_personal_prayers.sql",
+      "sha256": "16a066057d9d03a22e1c37faf71420fbd5d911ddf8687f23835d7eb9dcb28006"
+    },
+    {
+      "file": "migrations/0003_church_devotions.sql",
+      "sha256": "9ad8d56d8c2382a06188cf5b7391733b50a2ba9ca3cb13d60fadaf21e3636078"
+    },
+    {
+      "file": "migrations/0004_life_groups.sql",
+      "sha256": "b9e2e187a35693c5440c88577f63600966f954b3e2b84e16b61b0759b9cf3cf5"
+    },
+    {
+      "file": "migrations/0005_prayer_sharing.sql",
+      "sha256": "140801d4b129e2d8a40937f82790a236b4be4250e8320c4fd40fd384fefd1e3b"
+    },
+    {
+      "file": "migrations/0006_prayer_interactions.sql",
+      "sha256": "18d6c9c3384b6eced0f75ff5139ec60cc7124eca1a5a75b4941988feb072fd2c"
+    },
+    {
+      "file": "migrations/0007_daily_walls.sql",
+      "sha256": "2cf3824f763f391d1096d0ef0f1332771498a4fa02e1e07ad700a05d06bec803"
+    },
+    {
+      "file": "migrations/0008_identity_integrity.sql",
+      "sha256": "828c2e021704cdb2465325bb20460976d7a19882ff7427a25631d3fd3c560569"
+    },
+    {
+      "file": "migrations/0009_support_requests.sql",
+      "sha256": "721dbeb5f0b0c304a6878f75fec2132474f13f45b66887b6645043d6cd67c83f"
+    },
+    {
+      "file": "migrations/0010_mentoring_contracts.sql",
+      "sha256": "4fb5e84f4183e7be989097f99dbd7d517a6c036ef460c7fc3256005913fc3940"
+    },
+    {
+      "file": "migrations/0011_devotional_note_versions.sql",
+      "sha256": "b69c8c62760b25c49916fb9019f2bd94f0db2708931a516a9d04da65d3ef4a8f"
+    },
+    {
+      "file": "migrations/0012_google_account_links.sql",
+      "sha256": "3697406ada26980dcdaa285f38a30ffff52ca1fb4d20af247158659d44f89225"
+    },
+    {
+      "file": "migrations/0013_im_bible_import.sql",
+      "sha256": "846a190ed11c22b3430be007abf023192edec7d4f85fbaa84784644ad2aefd1a"
+    }
+  ],
+  "checks": {
+    "railwaySuccess": true,
+    "health": true,
+    "liveFingerprintMatches": true,
+    "uiAcceptance": "separate evidence required"
+  },
+  "productionDeploymentObserved": "a8a4db29-527f-4cc3-8d17-caed230f69cb"
+}

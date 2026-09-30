@@ -4,7 +4,15 @@ import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
+import { startEmailReminderScheduler } from './emailReminders';
+import { drainServer } from './shutdown';
+import { permissionsPolicy, publicError } from './httpSafety';
+import { contentSecurityPolicy } from './contentSecurityPolicy';
+import { createSecuritySignals, securitySummaryMessage } from './securitySignals';
 import { recordErrorEvent, requestContext } from "./observability";
+import { assertDeploymentSafety, isTestDeployment, stagingAccessGate } from './deploymentSafety';
+
+assertDeploymentSafety();
 
 // Catch any uncaught errors so they show in Railway App Logs
 process.on("uncaughtException", (err) => {
@@ -18,24 +26,20 @@ process.on("unhandledRejection", (reason) => {
 
 const app = express();
 app.disable("x-powered-by");
+const securitySignals = createSecuritySignals(summary => {
+  console.warn(JSON.stringify({ event: 'security.request-burst', ...summary }));
+  void recordErrorEvent({ source: 'security', level: 'warning', message: securitySummaryMessage(summary) });
+});
+setInterval(() => securitySignals.flush(), 60000).unref();
+app.use(securitySignals.middleware);
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Permissions-Policy", permissionsPolicy);
   res.setHeader(
     "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://www.wechurch.online",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
+    contentSecurityPolicy(process.env.NODE_ENV === 'development'),
   );
   if (process.env.NODE_ENV === "production") {
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
@@ -44,6 +48,8 @@ app.use((_req, res, next) => {
 });
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '5mb' }));
 app.use(express.urlencoded({ extended: false }));
+app.use(stagingAccessGate());
+app.get('/api/deployment', (_req, res) => res.set('Cache-Control', 'no-store').json({ staging: isTestDeployment() }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -78,7 +84,6 @@ app.use((req, res, next) => {
         statusCode: res.statusCode,
         sessionId: context.sessionId,
         participantId: context.participantId,
-        metadata: { response: capturedJsonResponse || null },
         userAgent: context.userAgent,
         ipHash: context.ipHash,
       });
@@ -103,10 +108,10 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const context = requestContext(_req);
-    const status = err.status || err.statusCode || 500;
+    const { status, message: responseMessage } = publicError(err);
     const message = err.message || "Internal Server Error";
     if (!res.headersSent) {
-      res.status(status).json({ message });
+      res.status(status).json({ message: responseMessage });
     }
     void recordErrorEvent({
       source: "server",
@@ -138,6 +143,7 @@ app.use((req, res, next) => {
   server.listen(port, "::", () => {
     log(`serving on port ${port}`);
   });
+  const stopEmailReminders = startEmailReminderScheduler();
 
   // Graceful shutdown — close connections cleanly during Railway deploys
   let isShuttingDown = false;
@@ -145,17 +151,19 @@ app.use((req, res, next) => {
     if (isShuttingDown) return;
     isShuttingDown = true;
     log(`${signal} received, shutting down gracefully...`);
-    server.close(() => {
-      log('HTTP server closed');
-    });
+    const deadline = setTimeout(() => process.exit(1), 10000);
+    deadline.unref();
     try {
-      await pool.end();
-      log('DB pool closed');
+      await stopEmailReminders();
+      await drainServer(server, pool);
+      clearTimeout(deadline);
+      log('HTTP server and DB pool closed');
+      process.exit(0);
     } catch (e) {
       console.error('[Shutdown] Error closing DB pool:', e);
+      clearTimeout(deadline);
+      process.exit(1);
     }
-    // Force exit after 10s if something hangs
-    setTimeout(() => process.exit(0), 10000).unref();
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));

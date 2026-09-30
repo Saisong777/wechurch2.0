@@ -1,276 +1,118 @@
-import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import React, { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, Trash2, User, Pin, PartyPopper, Check, BookOpen } from 'lucide-react';
+import { Heart, Trash2, User, Pin, Check, BookOpen, HandHeart, HeartHandshake, Sprout, AlertCircle, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { REACTION_LABELS, isUrgentPrayer, isClosedPrayer, type PrayerReaction } from '@shared/prayerInteraction';
+import { usePrayerReaction, useUrgentPrayer, useClosePrayer, type Prayer, useDeletePrayer, useToggleAmen, useTogglePinPrayer, useMarkPrayerAnswered, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { Prayer, useDeletePrayer, useToggleAmen, useTogglePinPrayer, useMarkPrayerAnswered, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAccessControl } from '@/hooks/useAccessControl';
 import { cn, vibrate } from '@/lib/utils';
 import { PrayerComments } from './PrayerComments';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-
-interface PrayerCardProps {
-  prayer: Prayer;
-}
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  thanksgiving: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  supplication: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  praise: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  other: 'bg-muted text-muted-foreground',
+  thanksgiving: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300',
+  supplication: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300',
+  praise: 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-300',
+  other: 'border-border bg-muted text-muted-foreground',
 };
 
-export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer }) => {
+export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
   const { isAdmin } = useUserRole();
+  const access=useAccessControl();
   const deleteMutation = useDeletePrayer();
   const toggleAmenMutation = useToggleAmen();
   const togglePinMutation = useTogglePinPrayer();
   const markAnsweredMutation = useMarkPrayerAnswered();
+  const reactionMutation = usePrayerReaction();
+  const urgentMutation = useUrgentPrayer();
+  const closeMutation = useClosePrayer();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const detailsId = useId();
+  const actionsId = useId();
+  const managementTrigger = useRef<HTMLButtonElement>(null);
+  const closed = isClosedPrayer(prayer);
+  const canDelete = prayer.isOwner || isAdmin || !!access.data?.permissions?.includes('wall.moderate');
+  const managementBusy = deleteMutation.isPending || togglePinMutation.isPending || markAnsweredMutation.isPending || urgentMutation.isPending || closeMutation.isPending;
+  const summary = prayer.content.trim().split(/\r?\n/)[0];
+  const timeAgo = formatDistanceToNow(new Date(prayer.createdAt), { addSuffix: true, locale: zhTW });
 
-  const canDelete = prayer.isOwner || isAdmin;
-  const canPin = prayer.isOwner;
-  const canMarkAnswered = prayer.isOwner;
-
-  const handleToggleAmen = () => {
-    vibrate(50);
-    toggleAmenMutation.mutate({
-      prayerId: prayer.id,
-      hasAmened: prayer.hasAmened,
-    });
-  };
-
-  const handleTogglePin = () => {
-    togglePinMutation.mutate({
-      prayerId: prayer.id,
-      isPinned: prayer.isPinned,
-    });
-  };
-
-  const handleMarkAnswered = () => {
-    markAnsweredMutation.mutate({
-      prayerId: prayer.id,
-      isAnswered: prayer.isAnswered,
-    });
-  };
-
-  const handleDelete = () => {
-    deleteMutation.mutate(prayer.id);
-  };
-
-  const timeAgo = formatDistanceToNow(new Date(prayer.createdAt), {
-    addSuffix: true,
-    locale: zhTW,
-  });
-
-  return (
-    <Card className={cn(
-      "transition-all hover:shadow-md overflow-hidden",
-      prayer.isPinned && "ring-2 ring-amber-400 dark:ring-amber-500",
-      prayer.isAnswered && "ring-2 ring-emerald-400 dark:ring-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20"
-    )}>
-      <CardContent className="p-0">
-        {/* Answered celebration banner */}
-        {prayer.isAnswered && (
-          <div className="px-4 py-2 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
-            <PartyPopper className="h-4 w-4" />
-            <span className="text-sm font-medium">感謝主！禱告已蒙應允</span>
-            <PartyPopper className="h-4 w-4" />
-          </div>
-        )}
-        {/* Category Banner with Pin indicator */}
-        <div className={cn('px-4 py-2 flex items-center justify-between', CATEGORY_COLORS[prayer.category] || CATEGORY_COLORS.other)}>
-          <span className="text-xs font-medium">{CATEGORY_LABELS[prayer.category]}</span>
-          <div className="flex items-center gap-2">
-            {prayer.isPinned && (
-              <span className="flex items-center gap-1 text-xs font-medium">
-                <Pin className="h-3 w-3" />
-                置頂
-              </span>
-            )}
-          </div>
+  return <article aria-label={`代禱：${prayer.content.split('\n')[0]}`} className="min-w-0 bg-card">
+    <div className="px-3 pt-2 md:hidden">
+      <button type="button" className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={mobileExpanded} aria-controls={`${detailsId} ${actionsId}`} aria-label={`${mobileExpanded ? '收合' : '展開'}代禱：${prayer.authorName}，${summary}`} onClick={() => setMobileExpanded(value => !value)}>
+        <Avatar className="h-8 w-8 shrink-0" aria-hidden="true">
+          {!prayer.isAnonymous && prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt="" />}
+          <AvatarFallback className="bg-primary/10 text-xs text-primary">{prayer.isAnonymous ? <User className="h-4 w-4" /> : prayer.authorName.charAt(0).toUpperCase()}</AvatarFallback>
+        </Avatar>
+        <span className="max-w-[28%] shrink-0 truncate text-sm font-semibold" title={prayer.authorName}>{prayer.authorName}</span>
+        {isUrgentPrayer(prayer) && <AlertCircle role="img" aria-label="緊急代禱" className="h-3.5 w-3.5 shrink-0 text-red-700 dark:text-red-300" />}
+        {prayer.isPinned && <Pin role="img" aria-label="置頂" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+        <span className="min-w-0 flex-1 truncate text-sm">{summary}</span>
+        <span className="flex shrink-0 items-center gap-0.5 text-xs text-primary">{mobileExpanded ? '收合' : '展開'}{mobileExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</span>
+      </button>
+    </div>
+    <div id={detailsId} className={cn('space-y-3 p-3 sm:p-4', !mobileExpanded && 'hidden md:block')}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 self-center text-xs text-muted-foreground [overflow-wrap:anywhere] md:hidden">{prayer.authorName} · {timeAgo}</p>
+        <div className="hidden min-w-0 items-center gap-2 md:flex">
+          <Avatar className="h-8 w-8 shrink-0">
+            {!prayer.isAnonymous && prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt={prayer.authorName} />}
+            <AvatarFallback className="bg-primary/10 text-xs text-primary">{prayer.isAnonymous ? <User className="h-4 w-4" /> : prayer.authorName.charAt(0).toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0"><p className="break-words text-sm font-semibold">{prayer.authorName}</p><p className="text-xs text-muted-foreground">{timeAgo}</p></div>
         </div>
-
-        <div className="p-4 space-y-4">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
-                {prayer.authorAvatar ? (
-                  <AvatarImage src={prayer.authorAvatar} alt={prayer.authorName} />
-                ) : null}
-                <AvatarFallback
-                  className={cn(
-                    prayer.isAnonymous
-                      ? 'bg-muted text-muted-foreground'
-                      : 'bg-primary/10 text-primary'
-                  )}
-                >
-                  {prayer.isAnonymous ? (
-                    <User className="h-5 w-5" />
-                  ) : (
-                    prayer.authorName.charAt(0).toUpperCase()
-                  )}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p
-                  className={cn(
-                    'font-medium text-sm',
-                    prayer.isAnonymous && 'text-muted-foreground italic'
-                  )}
-                >
-                  {prayer.authorName}
-                </p>
-                <p className="text-xs text-muted-foreground">{timeAgo}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {/* Mark Answered Button */}
-              {canMarkAnswered && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "h-8 w-8",
-                          prayer.isAnswered
-                            ? "text-emerald-500 hover:text-emerald-600"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        onClick={handleMarkAnswered}
-                        disabled={markAnsweredMutation.isPending}
-                      >
-                        <Check className={cn("h-4 w-4", prayer.isAnswered && "fill-current")} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {prayer.isAnswered ? '取消應允標記' : '標記為已蒙應允'}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {/* Pin Button */}
-              {canPin && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "h-8 w-8",
-                          prayer.isPinned
-                            ? "text-amber-500 hover:text-amber-600"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        onClick={handleTogglePin}
-                        disabled={togglePinMutation.isPending}
-                      >
-                        <Pin className={cn("h-4 w-4", prayer.isPinned && "fill-current")} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {prayer.isPinned ? '取消置頂' : '置頂禱告'}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              {/* Delete Button */}
-              {canDelete && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>確定要刪除這個禱告嗎？</AlertDialogTitle>
-                      <AlertDialogDescription>此操作無法復原。</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>取消</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDelete}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        刪除
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-          </div>
-
-          {/* Content */}
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{prayer.content}</p>
-
-          {/* Scripture Reference */}
-          {prayer.scriptureReference && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/10">
-              <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
-              <p className="text-sm text-primary font-medium">{prayer.scriptureReference}</p>
-            </div>
-          )}
-
-          {/* Footer - Amen Button and Comments Toggle */}
-          <div className="flex items-center justify-between pt-2">
-            {/* Comments Toggle - Left Side */}
-            <PrayerComments prayerId={prayer.id} />
-
-            {/* Amen Button - Right Side */}
-            <Button
-              variant={prayer.hasAmened ? 'default' : 'outline'}
-              size="sm"
-              onClick={handleToggleAmen}
-              disabled={toggleAmenMutation.isPending}
-              className={cn(
-                'gap-2 transition-all',
-                prayer.hasAmened &&
-                'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
-              )}
-            >
-              <Heart
-                className={cn('h-4 w-4 transition-all', prayer.hasAmened && 'fill-current')}
-              />
-              <span>阿門</span>
-              {prayer.amenCount > 0 && (
-                <span className="bg-background/20 px-1.5 py-0.5 rounded-full text-xs font-bold">
-                  {prayer.amenCount}
-                </span>
-              )}
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        {canDelete && <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button ref={managementTrigger} variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="管理禱告" title="管理禱告"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {prayer.isOwner && <>
+              {!closed && <>
+                <DropdownMenuItem disabled={managementBusy} className="min-h-11 gap-2" onSelect={() => {
+                  if (window.confirm('標記為蒙應允並移出公開牆？本人仍可查看紀錄。')) markAnsweredMutation.mutate({ prayerId: prayer.id, isAnswered: prayer.isAnswered });
+                }}><Check className="h-4 w-4" />標記蒙應允</DropdownMenuItem>
+                <DropdownMenuItem disabled={managementBusy} className="min-h-11 gap-2" onSelect={() => togglePinMutation.mutate({ prayerId: prayer.id, isPinned: prayer.isPinned })}><Pin className="h-4 w-4" />{prayer.isPinned ? '取消置頂' : '置頂'}</DropdownMenuItem>
+                <DropdownMenuItem disabled={managementBusy} className="min-h-11 gap-2" onSelect={() => urgentMutation.mutate({ prayerId: prayer.id, isUrgent: !prayer.isUrgent })}><AlertCircle className="h-4 w-4" />{prayer.isUrgent ? '解除緊急' : '標記緊急'}</DropdownMenuItem>
+              </>}
+              <DropdownMenuItem disabled={managementBusy} className="min-h-11 gap-2" onSelect={() => {
+                if (window.confirm(closed ? '重新公開此代禱與原有回應，邀請大家繼續守望？' : '結束這則代禱並移出公開牆？本人仍可查看紀錄。')) closeMutation.mutate({ prayerId: prayer.id, isClosed: !closed });
+              }}><Check className="h-4 w-4" />{closed ? '重新公開' : '結束代禱'}</DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>}
+            <DropdownMenuItem disabled={managementBusy} className="min-h-11 gap-2 text-destructive focus:text-destructive" onSelect={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4" />刪除</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <Badge variant="outline" className={CATEGORY_COLORS[prayer.category] || CATEGORY_COLORS.other}>{CATEGORY_LABELS[prayer.category]}</Badge>
+        {isUrgentPrayer(prayer) && <Badge className="gap-1 bg-red-700 text-white"><AlertCircle className="h-3 w-3" />緊急代禱</Badge>}
+        {prayer.isPinned && <Badge variant="outline" className="gap-1"><Pin className="h-3 w-3" />置頂</Badge>}
+        <Badge variant="outline">{prayer.isAnswered ? '已蒙應允' : closed ? '已結束 · 僅本人可見' : '守望中'}</Badge>
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-7 [overflow-wrap:anywhere]">{prayer.content}</p>
+      {prayer.scriptureReference && <p className="flex items-start gap-2 text-sm text-primary"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" /><span className="[overflow-wrap:anywhere]">{prayer.scriptureReference}</span></p>}
+    </div>
+    <div className={cn('space-y-2 px-3 sm:px-4 md:border-t md:py-3', mobileExpanded ? 'border-t py-3' : 'pb-1')}>
+      {!closed && <div className="grid grid-cols-3 gap-1" role="group" aria-label="關懷回應">{(Object.keys(REACTION_LABELS) as PrayerReaction[]).map(kind => {
+        const reaction = prayer.reactions?.find(r => r.kind === kind);
+        const Icon = { heart: Heart, support: HeartHandshake, strength: Sprout }[kind];
+        return <Button key={kind} variant={reaction?.selected ? 'secondary' : 'ghost'} size="sm" className="min-h-11 min-w-0 gap-1 px-1 text-xs sm:text-sm" aria-pressed={!!reaction?.selected} title={`${reaction?.selected ? '撤回' : '送出'}${REACTION_LABELS[kind]}`} disabled={reactionMutation.isPending} onClick={() => reactionMutation.mutate({ prayerId: prayer.id, kind, selected: !reaction?.selected })}><Icon className={cn('h-4 w-4', kind === 'heart' ? 'text-rose-600 dark:text-rose-300' : kind === 'support' ? 'text-teal-700 dark:text-teal-300' : 'text-green-700 dark:text-green-300', reaction?.selected && kind === 'heart' && 'fill-current')} />{REACTION_LABELS[kind]}<span className="tabular-nums">{reaction?.count || 0}</span></Button>;
+      })}</div>}
+      <div id={actionsId} className={cn('flex-wrap gap-2 md:flex', mobileExpanded ? 'flex' : 'hidden')}>
+        {!closed && <Button variant="outline" className={cn('min-h-11 min-w-0 flex-1 gap-1.5 px-2', prayer.hasAmened && 'border-primary/30 bg-primary/10 text-primary disabled:opacity-100')} aria-pressed={prayer.hasAmened} disabled={toggleAmenMutation.isPending || prayer.hasAmened} onClick={() => { vibrate(50); toggleAmenMutation.mutate({ prayerId: prayer.id, hasAmened: prayer.hasAmened }); }}>
+          {prayer.hasAmened ? <Check className="h-4 w-4" /> : <HandHeart className="h-4 w-4" />}{prayer.hasAmened ? '已為你禱告' : '為你禱告'}{prayer.amenCount > 0 && <span className="text-xs tabular-nums">{prayer.amenCount}</span>}
+        </Button>}
+        <PrayerComments prayerId={prayer.id} count={prayer.commentCount} anonymousOwner={prayer.isOwner && prayer.isAnonymous} readOnly={closed} />
+      </div>
+    </div>
+    {canDelete && <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialogContent onCloseAutoFocus={event => { event.preventDefault(); managementTrigger.current?.focus(); }}>
+        <AlertDialogHeader><AlertDialogTitle>確定要刪除這個禱告嗎？</AlertDialogTitle><AlertDialogDescription>此操作無法復原。</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction onClick={() => deleteMutation.mutate(prayer.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">刪除</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>}
+  </article>;
 };
