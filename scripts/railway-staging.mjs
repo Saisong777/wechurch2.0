@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { readBackupKey, unseal } from './backup-envelope.mjs';
 import { verifyAssets, releaseId as bibleReleaseId } from './bible-study-assets.mjs';
 import { assertReleaseBaseline, assertKnownMigrations } from './staging-release-baseline.mjs';
+import { assertCloudReleaseCheck, assertHomepageOnlyChanges } from './staging-cloud-check.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'fef7af7c-e3c3-4977-8294-c3a123a4242e', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
@@ -183,24 +184,45 @@ function snapshot(referenceAssets, baseFingerprint) {
 
 async function main() {
   const command = process.argv[2] || 'check';
-  if (!['check', 'configure', 'backup', 'migrate', 'deploy'].includes(command) || process.argv.length > 3) throw new Error('Usage: tsx scripts/railway-staging.mjs [check|configure|backup|migrate|deploy]. Production is intentionally unsupported.');
+  if (!['check', 'configure', 'backup', 'migrate', 'deploy', 'deploy-ci'].includes(command) || process.argv.length > 3) throw new Error('Usage: tsx scripts/railway-staging.mjs [check|configure|backup|migrate|deploy|deploy-ci]. Production is intentionally unsupported.');
   const { app, database, productionDeployment } = inspectStaging();
   if (command === 'check') console.log({ stagingIsolated: true, target, productionDeployment });
   if (command === 'configure') configure(app);
   if (command === 'backup') backup();
   if (command === 'migrate') await migrate(database);
-  if (command === 'deploy') {
+  if (command === 'deploy' || command === 'deploy-ci') {
+    if (command === 'deploy-ci') {
+      const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+      if (git(['status', '--porcelain'])) throw new Error('Cloud-verified release requires a clean committed checkout');
+      const commit = git(['rev-parse', 'HEAD']);
+      const gh = args => JSON.parse(execFileSync('gh', args, { cwd: root, encoding: 'utf8' }));
+      const runs = gh(['run', 'list', '--workflow', 'ci.yml', '--commit', commit, '--json', 'databaseId,status,conclusion']);
+      const run = runs.find(item => item.status === 'completed' && item.conclusion === 'success');
+      if (!run) throw new Error('No successful GitHub CI run for this source commit');
+      const details = gh(['run', 'view', String(run.databaseId), '--json', 'headSha,event,status,conclusion,jobs,url']);
+      assertCloudReleaseCheck(details, commit);
+      save('cloud-verification.json', { sourceCommit: commit, runId: run.databaseId, url: details.url, verifiedAt: new Date().toISOString() });
+    }
     const { assertDeploymentSafety } = await import('../server/deploymentSafety.ts');
     assertDeploymentSafety(app);
     const config = json(['environment', 'config', '-e', target.environment, '--json']);
     const source = config.services[target.app]?.source;
     if (source?.branch && source.branch !== 'integration') throw new Error('B must not auto-deploy from the production branch.');
     const baseFingerprint = verifyStagingReleaseBase();
+    if (command === 'deploy-ci') {
+      const records = fs.readdirSync(path.join(root, 'design/releases')).filter(name => /^b-.*\.json$/.test(name))
+        .map(name => JSON.parse(fs.readFileSync(path.join(root, 'design/releases', name), 'utf8')));
+      const base = records.find(record => record.fingerprint === baseFingerprint && record.sourceMatchesCommit &&
+        spawnSync('git', ['merge-base', '--is-ancestor', record.sourceCommit, 'HEAD'], { cwd: root }).status === 0);
+      if (!base) throw new Error('No ancestor source for the verified live B baseline');
+      const changed = execFileSync('git', ['diff', '--name-only', base.sourceCommit, 'HEAD'], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+      assertHomepageOnlyChanges(changed);
+    }
       const applied = JSON.parse(stagingSql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT hash,created_at FROM drizzle.__drizzle_migrations) t"));
       const journal = JSON.parse(fs.readFileSync(path.join(root, 'migrations/meta/_journal.json'), 'utf8')).entries;
       assertKnownMigrations(applied, journal.map(entry => ({ when: entry.when, hash: sha(fs.readFileSync(path.join(root, 'migrations', `${entry.tag}.sql`))) })));
       for (const entry of journal) if (!applied.some(row => Number(row.created_at) === entry.when && row.hash === sha(fs.readFileSync(path.join(root, 'migrations', `${entry.tag}.sql`))))) throw new Error(`Run staging:backup and staging:migrate first: ${entry.tag}`);
-    for (const step of ['typecheck', 'test', 'test:deployment', 'test:integrity', 'build']) {
+    for (const step of command === 'deploy-ci' ? [] : ['typecheck', 'test', 'test:deployment', 'test:integrity', 'build']) {
       const result = spawnSync('npm', ['run', step], { cwd: root, stdio: 'inherit' });
       if (result.status !== 0) throw new Error(`Release check failed: ${step}`);
     }

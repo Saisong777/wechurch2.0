@@ -1238,40 +1238,68 @@
   .dark :where(.border-gray-200) { @apply border-gray-400/30; }
 }
 
-/* Approved 2026-09-28: Handshake A homepage. Scoped structure, shared semantic colors. */
+/* Homepage v3: preserve the brand and shared navigation; use an unframed daily layout. */
 @layer components {
   .wechurch-handshake-logo { object-fit: contain; }
   .dark .wechurch-handshake-logo { filter: brightness(0) invert(1); }
-  .daily-home .home-intro { padding: 4px 0 24px; }
+  .dashboard-surface:has(.daily-home) { background: hsl(var(--card)); }
+  .daily-home { max-width: 1100px; --home-prayer: 6 64% 43%; --home-care: 184 75% 28%; }
+  .dark .daily-home { --home-prayer: 8 89% 74%; --home-care: 174 57% 65%; }
+  .daily-home .home-intro { padding: 4px 0 28px; }
   .daily-home .home-date { color: hsl(var(--muted-foreground)); font-size: 0.875rem; line-height: 1.5; }
-  .daily-home .home-intro h1 { margin: 10px 0 8px; color: hsl(var(--primary)); font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: 2.125rem; line-height: 1.4; letter-spacing: 0; }
+  .daily-home .home-intro h1 { margin: 8px 0; color: hsl(var(--foreground)); font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: min(2rem, 48px); font-weight: 700; line-height: 1.5; letter-spacing: 0; text-wrap: balance; }
   .daily-home .home-tagline { color: hsl(var(--muted-foreground)); font-size: 0.9375rem; line-height: 1.6; }
-  .daily-home .home-scripture { padding: 20px; border: 1px solid hsl(var(--scripture-border)); border-radius: 8px; background: hsl(var(--scripture-surface)); }
+  .daily-home .home-daily-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .daily-home .home-scripture { min-width: 0; padding-bottom: 24px; }
   .daily-home .home-scripture h2 { color: hsl(var(--primary)); font-size: 1.125rem; }
-  .daily-home .home-scripture-reference { margin-top: 12px; font-family: 'Noto Serif TC', 'Songti TC', serif; font-weight: 700; font-size: 1.75rem; line-height: 1.4; }
+  .daily-home .home-scripture h2::after, .daily-home .home-community > h2::after { content: ''; flex: 1; min-width: 20px; height: 1px; margin-left: 12px; background: hsl(var(--border)); }
+  .daily-home .home-scripture-reference { margin-top: 18px; font-family: 'Noto Serif TC', 'Songti TC', serif; font-weight: 700; font-size: 1.75rem; line-height: 1.5; }
   .daily-home .home-scripture-caption { margin-top: 8px; color: hsl(var(--muted-foreground)); font-size: 0.8125rem; }
-  .daily-home .home-scripture-preview { font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: 1.125rem; line-height: 1.8; }
+  .daily-home .home-scripture-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: 1.25rem; line-height: 1.85; }
   .daily-home .home-reading-actions { display: grid; gap: 12px; margin-top: 20px; }
-  .daily-home .home-start { position: relative; display: flex; min-height: 48px; width: 100%; font-size: 1rem; padding: 12px 40px; justify-content: center; }
-  .daily-home .home-start svg { position: absolute; right: 16px; }
-  .daily-home .home-note-actions { display: flex; flex-wrap: wrap; column-gap: 28px; justify-content: center; border-top: 1px solid hsl(var(--scripture-border)); padding-top: 8px; }
+  .daily-home .home-start { display: flex; min-height: 48px; height: auto; width: 100%; gap: 16px; font-size: 1rem; padding: 12px 16px; white-space: normal; text-align: center; justify-content: center; }
+  .daily-home .home-note-actions { display: flex; flex-wrap: wrap; gap: 0 28px; justify-content: center; border-top: 1px solid hsl(var(--border)); padding-top: 8px; }
   .daily-home .home-link { color: hsl(var(--primary)); font-size: 0.9375rem; line-height: 1.5; }
   .daily-home .home-link:hover { text-decoration: underline; text-underline-offset: 4px; }
-  .daily-home .home-link:active, .daily-home .home-community-links a:active { background: hsl(var(--muted)); }
-  .daily-home .home-personal-section { padding: 28px 0; }
-  .daily-home .home-community { padding: 24px 0 16px; }
-  .daily-home .home-community-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
-  .daily-home .home-community-links a { display: flex; min-height: 60px; align-items: center; gap: 8px; padding: 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); color: hsl(var(--primary)); font-weight: 600; font-size: 1rem; }
+  .daily-home .home-link:active { background: hsl(var(--muted)); }
+  .daily-home .home-personal-column { min-width: 0; }
+  .daily-home .home-personal-section { padding: 22px 0; border-top: 1px solid hsl(var(--border)); }
+  .daily-home .home-personal-section h2 { font-size: 1.125rem; }
+  .daily-home .home-prayer h2, .daily-home .home-prayer h2 svg { color: hsl(var(--home-prayer)); }
+  .daily-home .home-care h2, .daily-home .home-care h2 svg { color: hsl(var(--home-care)); }
+  .daily-home .home-prayer-actions { display: flex; flex-wrap: wrap; gap: 0 18px; margin-top: 12px; padding-top: 8px; border-top: 1px solid hsl(var(--border)); }
+  .daily-home .home-community { padding: 8px 0 20px; }
+  .daily-home .home-community > h2 { font-size: 1.125rem; }
+  .daily-home .home-community-links { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; margin-top: 16px; }
+  .daily-home .home-community-link { display: block; min-width: 0; border-radius: 6px; color: hsl(var(--foreground)); }
   .daily-home .home-community-links a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
-  .daily-home .home-community-links svg { width: 20px; height: 20px; flex-shrink: 0; }
-  .daily-home .home-community-links svg:last-child { width: 16px; margin-left: auto; }
-  @media (max-width: 359px) {
-    .daily-home .home-scripture { padding: 16px; }
-    .daily-home .home-community-links { gap: 8px; }
-    .daily-home .home-community-links a { gap: 6px; padding: 10px 8px; font-size: 0.9375rem; }
-    .daily-home .home-community-links svg:first-child { width: 18px; }
+  .daily-home .home-community-photo { position: relative; display: block; overflow: hidden; aspect-ratio: 3 / 1; border-radius: 6px; background: hsl(var(--muted)); }
+  .daily-home .home-community-photo img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .daily-home .home-community-photo--journal img { object-position: bottom; }
+  .daily-home .home-photo-label { position: absolute; left: 8px; bottom: 8px; padding: 3px 6px; border-radius: 3px; background: rgb(0 0 0 / 68%); color: white; font-size: 0.6875rem; line-height: 1.5; }
+  .daily-home .home-community-title { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 1rem; font-weight: 600; line-height: 1.6; }
+  .daily-home .home-community-title svg { width: 18px; height: 18px; flex-shrink: 0; color: hsl(var(--primary)); }
+  .daily-home .home-community-title svg:last-child { margin-left: auto; }
+  .daily-home .home-community-caption { display: block; margin-top: 3px; color: hsl(var(--muted-foreground)); font-size: 0.9375rem; line-height: 1.7; }
+  .daily-home .home-community-link:hover .home-community-title { color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 4px; }
+  .daily-home .home-other-links { border-top: 1px solid hsl(var(--border)); }
+  @media (min-width: 640px) {
+    .daily-home .home-community-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (min-width: 960px) {
+    .daily-home .home-intro { padding-bottom: 32px; }
+    .daily-home .home-intro h1 { font-size: min(2.25rem, 64px); }
+    .daily-home .home-daily-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 40px; }
+    .daily-home .home-scripture { padding: 0 40px 0 0; border-right: 1px solid hsl(var(--border)); }
+    .daily-home .home-personal-section:first-child { border-top: 0; padding-top: 0; }
+    .daily-home .home-personal-section:last-child { padding-bottom: 0; }
+    .daily-home .home-community { padding-top: 32px; }
+    .daily-home .home-community-links { gap: 24px; }
   }
 }
+
+/* Keep the home wordmark intact while reading text follows the chosen text size. */
+body:has(.daily-home) .mobile-navigation-bar > a > span { font-size: min(1rem, 24px); white-space: nowrap; }
 
 /* Handshake A: compact mobile navigation, grouped by everyday use. */
 @layer components {
