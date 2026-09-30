@@ -35,7 +35,7 @@ export function MobileNavigation() {
   }, [open]);
 
   return <div ref={root} className="mobile-navigation sticky top-0 z-40 shrink-0 border-b border-border bg-background md:hidden" data-testid="mobile-navigation">
-    <div className="mx-auto grid min-h-14 max-w-xl grid-cols-[5rem_minmax(0,1fr)_5rem] items-center gap-1 px-2">
+    <div className="mobile-navigation-bar mx-auto grid min-h-14 max-w-xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 px-2">
       <button type="button" aria-label="返回上一頁" className="flex min-h-12 items-center justify-center rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => { setOpen(false); if ((window.history.state?.idx ?? 0) > 0) navigate(-1); else navigate('/', { replace: true }); }}>
         <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden="true" />返回

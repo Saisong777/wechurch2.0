@@ -106,7 +106,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
   return (
     <>
       <Card
-        className="overflow-visible cursor-pointer hover-elevate"
+        className="devotional-note-card overflow-visible cursor-pointer hover-elevate"
         onClick={() => setExpanded(!expanded)}
         data-testid={`card-devotional-note-${note.id}`}
       >
@@ -134,11 +134,11 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                   </Badge>
                 )}
               </div>
-              <CardTitle className="text-base font-medium truncate" data-testid={`text-verse-ref-${note.id}`}>
+              <CardTitle className="text-base font-medium break-words" data-testid={`text-verse-ref-${note.id}`}>
                 {note.verseReference}
               </CardTitle>
               {note.titlePhrase && (
-                <p className="text-sm text-muted-foreground mt-1 truncate" data-testid={`text-title-phrase-${note.id}`}>
+                <p className="text-sm text-muted-foreground mt-1 break-words" data-testid={`text-title-phrase-${note.id}`}>
                   {note.titlePhrase}
                 </p>
               )}
@@ -174,7 +174,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                 >
                   <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
                     <BookOpen className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="truncate">筆記保存的經文</span>
+                    <span>筆記保存的經文</span>
                   </span>
                   {showReadingContext ? (
                     <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -193,7 +193,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                         <p className="mb-2 text-xs font-semibold text-primary">經文</p>
                         <div className="space-y-2">
                           {sourceVerses.map((verse, index) => (
-                            <p key={`${verse.verse}-${index}`} className="text-sm leading-6 text-muted-foreground">
+                            <p key={`${verse.verse}-${index}`} className="reading-copy">
                               {verse.text}
                             </p>
                           ))}
@@ -209,9 +209,9 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
             {note.observation && (
               <div className="flex gap-2">
                 <Eye className="w-4 h-4 text-emerald-500 shrink-0 mt-1" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium mb-1">1. 看見</p>
-                  <p className="text-sm text-muted-foreground">{note.observation}</p>
+                  <p className="reading-copy">{note.observation}</p>
                 </div>
               </div>
             )}
@@ -219,9 +219,9 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
             {receivingText && (
               <div className="flex gap-2">
                 <Heart className="w-4 h-4 text-sky-500 shrink-0 mt-1" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium mb-1">2. 領受</p>
-                  <p className="text-sm text-muted-foreground">{receivingText}</p>
+                  <p className="reading-copy">{receivingText}</p>
                 </div>
               </div>
             )}
@@ -229,14 +229,14 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
             {note.actionPlan && (
               <div className="flex gap-2">
                 <Target className="w-4 h-4 text-amber-500 shrink-0 mt-1" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium mb-1">3. 回應</p>
-                  <p className="text-sm text-muted-foreground">{note.actionPlan}</p>
+                  <p className="reading-copy">{note.actionPlan}</p>
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-2 pt-2 border-t">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t">
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"

@@ -57,7 +57,7 @@ export function DevotionalReader({ reading, retry, onNote }: {
     tabsRef.current?.querySelector<HTMLButtonElement>(`[data-reader-tab="${value}"]`)?.focus({ preventScroll: true });
   }
 
-  return <article className="church-reader" style={{ '--reader-font-size': `${fontSize}px` } as CSSProperties}>
+  return <article className="church-reader" style={{ '--reader-font-size': `${fontSize / 16}rem` } as CSSProperties}>
     <header className="space-y-4 pb-5">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <p className="inline-flex items-center gap-2"><CalendarDays aria-hidden="true" className="h-4 w-4" />{displayedDate}</p>
@@ -77,7 +77,7 @@ export function DevotionalReader({ reading, retry, onNote }: {
 
     <div className="reader-font-control">
       <label htmlFor={fontId} className="shrink-0 text-sm font-medium">字級</label>
-      <input id={fontId} type="range" min="16" max="26" step="1" value={fontSize} aria-valuetext={`${fontSize} 像素`} onChange={event => changeFont(Number(event.target.value))} />
+      <input id={fontId} type="range" min="16" max="26" step="1" value={fontSize} aria-valuetext={`閱讀字級 ${fontSize}`} onChange={event => changeFont(Number(event.target.value))} />
       <output htmlFor={fontId} className="w-6 shrink-0 text-center text-sm tabular-nums">{fontSize}</output>
       <Button variant="ghost" size="icon" aria-label="重設閱讀字級" title="重設閱讀字級" onClick={() => changeFont(DEFAULT_SIZE)}><RotateCcw aria-hidden="true" className="h-4 w-4" /></Button>
     </div>

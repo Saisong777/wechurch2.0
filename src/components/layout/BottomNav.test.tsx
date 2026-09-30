@@ -58,7 +58,8 @@ it('prioritizes daily destinations while retaining all appearance choices', () =
   expect(daily.compareDocumentPosition(appearance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(within(daily).getAllByRole('link')).toHaveLength(6);
   expect(within(daily).getByTestId('mobile-menu-care')).toHaveAttribute('href', '/care');
-  expect(within(appearance).getAllByRole('radio').map(el => el.textContent)).toEqual(['明亮', '深色', '跟隨系統']);
+  expect(within(within(appearance).getByRole('group', { name: '顯示模式' })).getAllByRole('radio').map(el => el.textContent)).toEqual(['明亮', '深色', '跟隨系統']);
+  expect(within(appearance).getByText('文字大小與字型')).toBeInTheDocument();
   expect(within(menu).getAllByRole('group', { name: '顯示模式' })).toHaveLength(1);
   expect(within(menu).getAllByRole('link')).toHaveLength(8);
 });

@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./reading-accessibility.css";
 import { initPlatformTelemetry } from "./lib/platform-telemetry";
 import { DeploymentBanner } from './components/layout/DeploymentBanner';
 import { AppearanceProvider } from './components/theme/AppearanceProvider';

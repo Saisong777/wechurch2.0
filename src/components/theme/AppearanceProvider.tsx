@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { ThemeProvider, useTheme } from 'next-themes';
+import { ReadingPreferencesProvider } from './ReadingPreferences';
 
 function BrowserThemeColor() {
   const { resolvedTheme } = useTheme();
@@ -15,6 +16,6 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   return <ThemeProvider attribute="class" storageKey="wechurch-theme" defaultTheme="light"
     themes={['light', 'dark']} enableSystem enableColorScheme disableTransitionOnChange>
     <BrowserThemeColor />
-    {children}
+    <ReadingPreferencesProvider>{children}</ReadingPreferencesProvider>
   </ThemeProvider>;
 }

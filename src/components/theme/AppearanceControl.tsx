@@ -2,6 +2,7 @@ import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { ReadingPreferencesControl } from './ReadingPreferences';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup,
   DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -16,16 +17,16 @@ export function AppearanceControl({ inline = false }: { inline?: boolean }) {
   const selected = choices.find(choice => choice.value === theme) || choices[0];
   const Icon = theme === 'system' ? Monitor : resolvedTheme === 'dark' ? Moon : Sun;
 
-  if (inline) return <ToggleGroup type="single" value={selected.value} aria-label="顯示模式"
+  if (inline) return <div className="min-w-0 space-y-3"><ToggleGroup type="single" value={selected.value} aria-label="顯示模式"
     onValueChange={value => { if (value) setTheme(value); }}
     className="grid w-full grid-cols-3 gap-1 rounded-md border border-border bg-muted/40 p-1">
     {choices.map(choice => <ToggleGroupItem key={choice.value} value={choice.value}
-      className="min-h-11 min-w-0 gap-1 px-1 text-xs sm:text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+      className="h-auto min-h-11 min-w-0 flex-wrap gap-1 px-1 py-2 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
       <choice.icon className="h-4 w-4 shrink-0" aria-hidden="true" />{choice.label}
     </ToggleGroupItem>)}
-  </ToggleGroup>;
+  </ToggleGroup><ReadingPreferencesControl inline /></div>;
 
-  return <DropdownMenu>
+  return <div className="flex shrink-0 items-center"><ReadingPreferencesControl /><DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0"
         aria-label={`顯示模式：${selected.label}`} title="顯示模式">
@@ -40,5 +41,5 @@ export function AppearanceControl({ inline = false }: { inline?: boolean }) {
         </DropdownMenuRadioItem>)}
       </DropdownMenuRadioGroup>
     </DropdownMenuContent>
-  </DropdownMenu>;
+  </DropdownMenu></div>;
 }

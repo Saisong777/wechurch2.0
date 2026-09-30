@@ -11,7 +11,7 @@ function run(saved: string | null, systemDark: boolean, blocked = false) {
   vm.runInNewContext(source, {
     localStorage: { getItem: () => { if (blocked) throw Error(); return saved; }, removeItem: () => { cleared = true; } },
     window: { matchMedia: () => ({ matches: systemDark }) },
-    document: { documentElement: { classList: { add: (value: string) => classes.push(value) }, style },
+    document: { documentElement: { classList: { add: (value: string) => classes.push(value) }, style, dataset: {} },
       querySelector: () => ({ setAttribute: (_key: string, value: string) => { color = value; } }) },
   });
   return { classes, style, color, cleared };

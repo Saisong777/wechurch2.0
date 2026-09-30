@@ -1,0 +1,44 @@
+:root {
+  --reading-font: -apple-system, BlinkMacSystemFont, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+}
+html[data-reading-font='serif'] {
+  --reading-font: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+}
+.reading-copy {
+  font-family: var(--reading-font);
+  font-size: 1.125rem;
+  line-height: 1.85;
+  color: hsl(var(--foreground));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
+}
+.church-reader .reader-prose, .church-reader .reader-scripture-text,
+.study-verse-text, .study-parallel, .study-body,
+.daily-home .home-scripture-preview {
+  font-family: var(--reading-font);
+}
+.mobile-menu-label { line-height: 1.5; }
+.mobile-navigation-bar > a { overflow-wrap: anywhere; }
+.mobile-navigation-bar > a span { white-space: normal; overflow: visible; }
+.mobile-navigation-bar > a svg { flex-shrink: 0; }
+.reading-preferences { overflow-wrap: anywhere; }
+.reading-preferences button { max-width: 100%; }
+.text-\[9px\], .text-\[10px\], .text-\[11px\] { font-size: 0.75rem; line-height: 1.5; }
+.text-\[15px\] { font-size: 0.9375rem; }
+.text-\[16px\] { font-size: 1rem; }
+.text-\[18px\] { font-size: 1.125rem; }
+.text-\[21px\] { font-size: 1.3125rem; }
+.text-\[22px\] { font-size: 1.375rem; }
+/* Reflow text without multiplying the narrow viewport's structural gutters. */
+@media (max-width: 767px) {
+  html[data-text-size] main { padding-inline: 16px; }
+  .devotional-note-card > div { padding-inline: 16px; }
+  .devotional-note-card [data-testid^='text-filled-count'] { padding-inline: 8px; }
+  html[data-text-size='maximum'] .mobile-navigation-bar { grid-template-columns: auto minmax(0, 1fr) auto; }
+  html[data-text-size='maximum'] .mobile-navigation-bar > a { gap: 4px; font-size: 0.875rem; }
+  html[data-text-size='maximum'] .mobile-navigation-bar > a svg { display: none; }
+  html[data-text-size='maximum'] .mobile-menu-destinations { grid-template-columns: 1fr; }
+  html[data-text-size='maximum'] .reading-preferences { font-size: 0.875rem; }
+  .devotional-note-card .reading-copy { line-height: 1.85; }
+}

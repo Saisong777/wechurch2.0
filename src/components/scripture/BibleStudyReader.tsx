@@ -241,7 +241,7 @@ function ReadingSurface({ info }: { info: Info }) {
       {saved.isError && <Button variant="ghost" onClick={() => saved.refetch()}>重新載入收藏</Button>}
     </div>
     <div className={`study-layout ${tools ? 'with-tools' : ''}`}>
-      <section className={`study-scripture ${tools ? 'mobile-hidden' : ''} ${paragraph && !compare ? 'paragraph' : ''}`} aria-label="經文" style={{ fontSize }}>
+      <section className={`study-scripture ${tools ? 'mobile-hidden' : ''} ${paragraph && !compare ? 'paragraph' : ''}`} aria-label="經文" style={{ fontSize: `${fontSize / 16}rem` }}>
         <LoadState loading={available && primary.isPending} error={primary.error} retry={primary.refetch} />
         {!available && <div role="status"><p>免費易讀聖經目前僅收錄新約。</p><div className="study-actions"><Button variant="outline" onClick={() => navigate(40, 1)}>讀馬太福音</Button><Button variant="outline" onClick={() => setTranslation(info.default_translation)}>使用和合本</Button></div></div>}
         {compare && <LoadState loading={parallel.isPending} error={parallel.error} retry={parallel.refetch} />}

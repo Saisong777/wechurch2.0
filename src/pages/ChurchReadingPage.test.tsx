@@ -170,7 +170,7 @@ it('remembers the reading font size, resets it, and rejects invalid saved values
   expect(slider).toHaveValue('20');
   fireEvent.change(slider, { target: { value: '26' } });
   expect(localStorage.getItem('wechurch-devotion-font-size')).toBe('26');
-  expect(document.querySelector('article')).toHaveStyle('--reader-font-size: 26px');
+  expect(document.querySelector('article')).toHaveStyle('--reader-font-size: 1.625rem');
   first.unmount();
   show();
   expect(screen.getByRole('slider', { name: '字級' })).toHaveValue('26');
