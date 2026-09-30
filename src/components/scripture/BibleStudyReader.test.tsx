@@ -127,12 +127,15 @@ it('offers clear reading modes, keeps every verse unchanged and remembers the ch
   const scripture = screen.getByRole('region', { name: '經文' });
   expect(scripture).toHaveClass('paragraph');
   expect(scripture.querySelector('.study-paragraph')).toHaveTextContent('1–2測試合併經文 3第三節經文');
+  expect(screen.getByRole('button', { name: '第 3 節：第三節經文' }).tagName).toBe('SPAN');
+  expect(scripture.querySelector('.study-paragraph button')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '第 3 節：第三節經文' }));
   expect(screen.getByRole('button', { name: '第 3 節：第三節經文' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', { name: '查考此節' })).toBeEnabled();
   fireEvent.click(screen.getByRole('radio', { name: '逐節閱讀' }));
   expect(scripture).not.toHaveClass('paragraph');
   expect(scripture.querySelectorAll('.study-verse')).toHaveLength(2);
+  expect(screen.getByRole('button', { name: '第 3 節：第三節經文' }).tagName).toBe('BUTTON');
   expect(screen.getByRole('button', { name: '第 3 節：第三節經文' })).toHaveAttribute('aria-pressed', 'true');
   expect(localStorage.getItem('study-reading-mode')).toBe('verses');
   cleanup();
@@ -141,6 +144,21 @@ it('offers clear reading modes, keeps every verse unchanged and remembers the ch
   expect(screen.getByRole('radio', { name: '逐節閱讀' })).toHaveAttribute('aria-checked', 'true');
   fireEvent.click(screen.getByRole('radio', { name: '段落閱讀' }));
   expect(localStorage.getItem('study-reading-mode')).toBe('paragraph');
+});
+
+it('allows keyboard verse selection in continuous text without submitting or scrolling', async () => {
+  mount();
+  await screen.findByText('測試合併經文');
+  const text = screen.getByRole('button', { name: '第 1–2 節：測試合併經文' });
+  expect(text).toHaveAttribute('tabindex', '0');
+  expect(text.tagName).toBe('SPAN');
+  fireEvent.keyDown(text, { key: 'ArrowRight' });
+  expect(text).toHaveAttribute('aria-pressed', 'false');
+  expect(fireEvent.keyDown(text, { key: 'Enter' })).toBe(false);
+  expect(text).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: '查考此節' })).toBeEnabled();
+  expect(fireEvent.keyDown(text, { key: ' ' })).toBe(false);
+  expect(text).toHaveAttribute('aria-pressed', 'false');
 });
 
 it('supports paragraph comparison and merged verse notes without mixing the translations', async () => {

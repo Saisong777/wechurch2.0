@@ -172,7 +172,7 @@ function ReadingSurface({ info }: { info: Info }) {
   const [popup, setPopup] = useState<Popup | null>(null);
   const [note, setNote] = useState<{ reference: string; text: string } | null>(null);
   const [card, setCard] = useState<{ reference: string; text: string } | null>(null);
-  const verseRefs = useRef(new Map<number, HTMLButtonElement>());
+  const verseRefs = useRef(new Map<number, HTMLElement>());
   const { user } = useAuth();
   const { toast } = useToast();
   const client = useQueryClient();
@@ -217,9 +217,25 @@ function ReadingSurface({ info }: { info: Info }) {
     if (!note) setNote({ reference: excerptReference, text: `${excerptText}\n\n${citation}` });
     else document.getElementById('study-note')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  const verseButton = (v: Verse) => <button type="button" ref={el => { if (el) verseRefs.current.set(v.verse, el); else verseRefs.current.delete(v.verse); }} aria-label={`第 ${label(v)} 節：${v.body}`} aria-pressed={selection.has(v.verse)} data-current={chosen?.id === v.id} className="study-verse-text" onClick={() => { setVerse(v.verse); setSelection(previous => { const next = new Set(previous); if (next.has(v.verse)) next.delete(v.verse); else next.add(v.verse); return next; }); }}>
-    <sup>{label(v)}</sup><span>{v.body}</span>
-  </button>;
+  const verseText = (v: Verse) => {
+    const toggle = () => {
+      setVerse(v.verse);
+      setSelection(previous => { const next = new Set(previous); if (next.has(v.verse)) next.delete(v.verse); else next.add(v.verse); return next; });
+    };
+    const props = {
+      ref: (el: HTMLElement | null) => { if (el) verseRefs.current.set(v.verse, el); else verseRefs.current.delete(v.verse); },
+      'aria-label': `第 ${label(v)} 節：${v.body}`,
+      'aria-pressed': selection.has(v.verse),
+      'data-current': chosen?.id === v.id,
+      className: 'study-verse-text',
+      onClick: toggle,
+    };
+    const text = <><sup>{label(v)}</sup><span>{v.body}</span></>;
+    // Native buttons form atomic boxes, even with display:inline; spans can flow across lines.
+    return paragraph ? <span {...props} role="button" tabIndex={0} onKeyDown={event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
+    }}>{text}</span> : <button {...props} type="button">{text}</button>;
+  };
   const selectedActions = <div className="study-actions study-verse-actions">
     <Button variant="outline" onClick={() => { setTools(true); requestAnimationFrame(() => document.getElementById('study-references')?.scrollIntoView({ block: 'start' })); }}>查考此節</Button>
     {user && <Button variant="outline" onClick={openNote}><PenLine size={18} className="mr-2" />寫下筆記</Button>}
@@ -265,7 +281,7 @@ function ReadingSurface({ info }: { info: Info }) {
           <div className={`study-prose ${compare ? 'study-prose-compare' : ''}`}>
             <div lang={translation === 'engwebp' ? 'en' : translation === 'cmnfeb' ? 'zh-Hans' : 'zh-Hant'}>
               {compare && <h2 className="study-prose-translation">{info.translations[translation]}</h2>}
-              <p className="study-paragraph">{primary.data?.map(v => <span key={v.id}>{verseButton(v)}{' '}</span>)}</p>
+              <p className="study-paragraph">{primary.data?.map(v => <span key={v.id}>{verseText(v)}{' '}</span>)}</p>
             </div>
             {compare && <div lang={other === 'engwebp' ? 'en' : other === 'cmnfeb' ? 'zh-Hans' : 'zh-Hant'}>
               <h2 className="study-prose-translation">{info.translations[other]}</h2>
@@ -274,7 +290,7 @@ function ReadingSurface({ info }: { info: Info }) {
           </div>
           {chosen && selection.has(chosen.verse) && selectedActions}
         </> : primary.data?.map(v => <div className={`study-verse ${compare ? 'compare' : ''}`} key={v.id}>
-          {verseButton(v)}
+          {verseText(v)}
           {compare && <div className="study-parallel" lang={other === 'engwebp' ? 'en' : other === 'cmnfeb' ? 'zh-Hans' : 'zh-Hant'}>{parallel.data?.filter(p => p.verse <= v.end_verse && p.end_verse >= v.verse).map(p => <p key={p.id}><sup>{label(p)}</sup>{p.body}</p>)}{parallel.data && !parallel.data.some(p => p.verse <= v.end_verse && p.end_verse >= v.verse) && <p className="text-muted-foreground">此譯本未收錄本節</p>}</div>}
           {chosen?.id === v.id && selection.has(v.verse) && selectedActions}
         </div>)}

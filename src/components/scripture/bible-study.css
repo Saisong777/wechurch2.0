@@ -29,7 +29,7 @@
 .study-verse-text[data-current=true] { box-shadow: inset 3px 0 hsl(var(--primary)); }
 .study-scripture.paragraph { max-width: 760px; }
 .study-paragraph { margin: 0; line-height: 2; text-align: start; }
-.study-scripture.paragraph .study-verse-text { display: inline; width: auto; padding: 2px 0; line-height: inherit; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.study-scripture.paragraph .study-verse-text { display: inline; width: auto; padding: 2px 0; line-height: inherit; cursor: pointer; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .study-scripture.paragraph .study-verse-text[data-current=true] { box-shadow: none; }
 .study-scripture.paragraph .study-verse-text[aria-pressed=true] { background: hsl(var(--primary) / .12); box-shadow: none; }
 .study-scripture.paragraph .study-verse-text:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
