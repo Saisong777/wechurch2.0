@@ -121,7 +121,7 @@ async function journey(page, { origin, code, cookie, id, output, uxReview }) {
           await page.getByText('閱讀驗收', { exact: true }).first().waitFor();
           await page.getByRole('button', { name: '清除搜尋', exact: true }).click();
           checks.push({ route, view: 'members-search-clear', width, size, ...await metrics() });
-          if (width < 768) {
+          if (width < 768 || size === 'maximum') {
             const card = page.locator('.crm-member-card').first();
             const memberReadable = await card.evaluate(e => {
               const name = e.querySelector('h3');

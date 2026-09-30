@@ -21,6 +21,7 @@ export function parseReading(value: string | null): Preferences {
   } catch { return defaultReading; }
 }
 const ReadingContext = createContext({ preferences: defaultReading, update: (_: Preferences) => {} });
+export const useReadingPreferences = () => useContext(ReadingContext);
 export function ReadingPreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState(() => {
     try { return parseReading(localStorage.getItem(readingKey)); } catch { return defaultReading; }
@@ -46,7 +47,7 @@ export function ReadingPreferencesProvider({ children }: { children: ReactNode }
 }
 
 export function ReadingPreferencesControl({ inline = false }: { inline?: boolean }) {
-  const { preferences, update } = useContext(ReadingContext);
+  const { preferences, update } = useReadingPreferences();
   const id = useId();
   const fields = <div className="reading-preferences space-y-4">
     <fieldset><legend className="mb-2 font-semibold">全站文字大小</legend>

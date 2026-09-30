@@ -2,6 +2,7 @@ import { CrmOperationalPanel } from '@/components/admin/CrmOperationalPanel';
 import { VisitReminder } from '@/components/care/CareVisits';
 import { churchDisplayName } from '@shared/churches';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
+import { useReadingPreferences } from '@/components/theme/ReadingPreferences';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
@@ -162,6 +163,8 @@ const CRMPage = () => {
   const access = useAccessControl();
   const isLeader = legacyLeader || !!access.data?.canEnterCrm;
   const isMobile = useIsMobile();
+  const { preferences } = useReadingPreferences();
+  const useMemberCards = isMobile || preferences.size === 'extra' || preferences.size === 'maximum';
 
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview');
   useEffect(() => {
@@ -585,7 +588,7 @@ const CRMPage = () => {
           </Select>
         </section>
 
-        <section aria-label="會員摘要" className="grid grid-cols-2 gap-x-4 gap-y-3 border-b py-3 sm:grid-cols-4">
+        <section aria-label="會員摘要" className="crm-summary-grid grid grid-cols-2 gap-x-4 gap-y-3 border-b py-3 sm:grid-cols-4">
           {statsLoading ? (
             [...Array(4)].map((_, index) => <Skeleton key={index} className="h-16 rounded-md" />)
           ) : (
@@ -852,8 +855,8 @@ const CRMPage = () => {
                     <p>{hasFilters ? '找不到符合條件的會員' : '目前沒有會員資料'}</p>
                     {hasFilters && <Button variant="outline" className="mt-3" onClick={resetFilters}>清除篩選</Button>}
                   </div>
-                ) : isMobile ? (
-                  <div className="space-y-3">
+                ) : useMemberCards ? (
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
                     {pageMembers.map((member) => {
                       return (
                         <Card key={member.id} className={selectedIds.has(member.id) ? 'ring-2 ring-primary' : ''}>

@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { ReadingPreferencesControl, ReadingPreferencesProvider, parseReading, readingKey, textSizes } from './ReadingPreferences';
+import { ReadingPreferencesControl, ReadingPreferencesProvider, parseReading, readingKey, textSizes, useReadingPreferences } from './ReadingPreferences';
 
 beforeEach(() => { localStorage.clear(); document.documentElement.style.fontSize = ''; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -32,6 +32,18 @@ it('offers every size including twice the default text size', () => {
     expect(document.documentElement.style.fontSize).toBe(`${size.percent}%`);
   }
   expect(textSizes.at(-1)!.percent / textSizes[1].percent).toBe(2);
+});
+it('updates layout subscribers immediately when the reading size changes', () => {
+  function MemberLayout() {
+    const { preferences } = useReadingPreferences();
+    return <output data-testid="member-layout">{['extra', 'maximum'].includes(preferences.size) ? 'cards' : 'table'}</output>;
+  }
+  render(<ReadingPreferencesProvider><ReadingPreferencesControl inline /><MemberLayout /></ReadingPreferencesProvider>);
+  expect(screen.getByTestId('member-layout')).toHaveTextContent('table');
+  fireEvent.click(screen.getByRole('radio', { name: '特大' }));
+  expect(screen.getByTestId('member-layout')).toHaveTextContent('cards');
+  fireEvent.click(screen.getByRole('button', { name: '恢復預設文字' }));
+  expect(screen.getByTestId('member-layout')).toHaveTextContent('table');
 });
 it('rejects invalid saved settings and still works without storage access', () => {
   expect(parseReading('null')).toEqual({ size: 'standard', font: 'sans' });
