@@ -40,8 +40,8 @@ it('removes deferred destinations even when every database feature toggle is ena
 
 it('keeps the two active note types and does not fetch deferred study records', async () => {
   const fetcher = mount(<MyNotesPage />);
-  await screen.findByText('尚無經文感動');
-  expect(screen.getAllByRole('tab').map(el => el.textContent)).toEqual(['讀經計劃', '靈修筆記']);
+  await screen.findByText('還沒有靈修筆記');
+  expect(screen.getAllByRole('tab').map(el => el.textContent)).toEqual(['讀經計畫', '靈修筆記']);
   expect(screen.queryByText(/Soul ?Gym/)).toBeNull();
   expect(fetcher.mock.calls.some(([url]) => String(url).includes('/api/notebook'))).toBe(false);
 });

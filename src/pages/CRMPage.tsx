@@ -513,7 +513,7 @@ const CRMPage = () => {
           <CardContent className="pt-6 text-center">
             <Users className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <h2 className="mb-2 text-xl font-semibold">權限不足</h2>
-            <p className="mb-4 text-muted-foreground">只有領袖或管理員可以訪問教會 CRM</p>
+            <p className="mb-4 text-muted-foreground">你目前沒有會員與牧養的查看權限，請聯絡教會管理員。</p>
             <Button onClick={() => navigate('/')}>返回首頁</Button>
           </CardContent>
         </Card>
@@ -523,16 +523,16 @@ const CRMPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur">
-        <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
+      <header className="crm-header border-b bg-card">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/admin')} aria-label="返回管理後台">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Church className="h-5 w-5 text-primary" />
-                <h1 className="truncate text-lg font-semibold">教會 CRM</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <Church className="h-5 w-5 shrink-0 text-primary" />
+                <h1 className="text-lg font-semibold">會員與牧養</h1>
                 {currentRole && (
                   <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">
                     {roleLabels[currentRole]}
@@ -542,7 +542,7 @@ const CRMPage = () => {
               <p className="truncate text-sm text-muted-foreground">{currentChurchName}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <AppearanceControl />
             <Select value={selectedChurch} onValueChange={setSelectedChurch} disabled={writesPending}>
               <SelectTrigger aria-label="選擇教會" className="hidden w-[170px] sm:flex">
@@ -634,56 +634,56 @@ const CRMPage = () => {
           <div className="pb-1">
             <div className="sm:hidden">
               <Select value={workspaceTab} onValueChange={value => setWorkspaceTab(value as WorkspaceTab)} disabled={writesPending}>
-                <SelectTrigger aria-label="CRM 工作區"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="選擇管理項目"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="members">會員</SelectItem>
-                  {legacyLeader && <SelectItem value="care">關懷</SelectItem>}
-                  <SelectItem value="groups">小家</SelectItem>
-                  {legacyLeader && <SelectItem value="overview">總覽</SelectItem>}
-                  <SelectItem value="journey">個人/門訓</SelectItem>
-                  <SelectItem value="prayers">代求</SelectItem>
-                  {legacyLeader && <SelectItem value="gatherings">聚會</SelectItem>}
-                  <SelectItem value="framework">框架</SelectItem>
-                  {legacyLeader && <SelectItem value="line">LINE</SelectItem>}
+                  <SelectItem value="members">會員名單</SelectItem>
+                  {legacyLeader && <SelectItem value="care">牧養關懷</SelectItem>}
+                  <SelectItem value="groups">小家管理</SelectItem>
+                  {legacyLeader && <SelectItem value="overview">牧養總覽</SelectItem>}
+                  <SelectItem value="journey">門訓跟進</SelectItem>
+                  <SelectItem value="prayers">代禱關懷</SelectItem>
+                  {legacyLeader && <SelectItem value="gatherings">聚會紀錄</SelectItem>}
+                  <SelectItem value="framework">牧養階段</SelectItem>
+                  {legacyLeader && <SelectItem value="line">LINE 連結</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
-            <TabsList aria-label="CRM 工作區" className="hidden h-auto w-full gap-1 p-1 sm:flex sm:flex-wrap sm:justify-start">
+            <TabsList aria-label="選擇管理項目" className="hidden h-auto w-full gap-1 p-1 sm:flex sm:flex-wrap sm:justify-start">
               <TabsTrigger value="members" className="gap-2">
                 <UserCheck className="h-4 w-4" />
-                會員
+                會員名單
               </TabsTrigger>
               {legacyLeader && <TabsTrigger value="care" className="gap-2">
                 <HeartHandshake className="h-4 w-4" />
-                關懷
+                牧養關懷
               </TabsTrigger>}
               <TabsTrigger value="groups" className="gap-2">
                 <Users className="h-4 w-4" />
-                小家
+                小家管理
               </TabsTrigger>
               {legacyLeader && <TabsTrigger value="overview" className="gap-2">
                 <Activity className="h-4 w-4" />
-                總覽
+                牧養總覽
               </TabsTrigger>}
               <TabsTrigger value="journey" className="gap-2">
                 <BookOpen className="h-4 w-4" />
-                個人/門訓
+                門訓跟進
               </TabsTrigger>
               <TabsTrigger value="prayers" className="gap-2">
                 <ClipboardList className="h-4 w-4" />
-                代求
+                代禱關懷
               </TabsTrigger>
               {legacyLeader && <TabsTrigger value="gatherings" className="gap-2">
                 <CalendarDays className="h-4 w-4" />
-                聚會
+                聚會紀錄
               </TabsTrigger>}
               <TabsTrigger value="framework" className="gap-2">
                 <Target className="h-4 w-4" />
-                框架
+                牧養階段
               </TabsTrigger>
               {legacyLeader && <TabsTrigger value="line" className="gap-2">
                 <MessageCircle className="h-4 w-4" />
-                LINE
+                LINE 連結
               </TabsTrigger>}
             </TabsList>
           </div>

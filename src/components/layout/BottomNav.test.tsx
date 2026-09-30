@@ -104,6 +104,11 @@ it.each(['/login', '/admin/crm', '/user/study/session'])('preserves dedicated na
 it('labels nested destinations specifically', () => {
   expect(mobilePageTitle('/learn/church-reading')).toBe('每日靈修');
   expect(mobilePageTitle('/groups/123')).toBe('我的小家');
+  expect(mobilePageTitle('/me')).toBe('個人設定');
+  expect(mobilePageTitle('/support')).toBe('尋求陪伴');
+  expect(mobilePageTitle('/work/mentoring')).toBe('門訓陪伴');
+  expect(mobilePageTitle('/work/settings')).toBe('陪伴設定');
+  expect(mobilePageTitle('/work')).toBe('同工工作區');
   expect(mobilePageTitle('/unavailable')).toBe('WeChurch');
 });
 

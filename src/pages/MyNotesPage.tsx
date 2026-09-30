@@ -106,8 +106,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
   return (
     <>
       <Card
-        className="devotional-note-card overflow-visible cursor-pointer hover-elevate"
-        onClick={() => setExpanded(!expanded)}
+        className="devotional-note-card overflow-visible"
         data-testid={`card-devotional-note-${note.id}`}
       >
         <CardHeader className="pb-3">
@@ -125,7 +124,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
                 )}
                 {isFromReadingPlan ? (
                   <Badge variant="outline" className="text-xs">
-                    讀經計劃
+                    讀經計畫
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-xs">
@@ -147,23 +146,26 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
               <Badge variant="secondary" className="text-xs" data-testid={`text-filled-count-${note.id}`}>
                 {filledCount}/3
               </Badge>
-              {expanded ? (
-                <ChevronUp className="w-5 h-5 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-muted-foreground" />
-              )}
             </div>
           </div>
         </CardHeader>
 
-        <div className="px-6 pb-3"><Button variant="outline" size="sm" disabled={note.id.startsWith('local-devotional-') || note.syncStatus==='pending' || note.syncStatus==='blocked'} onClick={e=>{e.stopPropagation();setShareOnWall(true);}}><BookOpen className="mr-2 h-4 w-4" />分享到今日靈修牆</Button></div>
+        <div className="flex flex-wrap gap-2 px-6 pb-3">
+          <Button variant="outline" className="min-h-11" aria-expanded={expanded} aria-controls={`note-content-${note.id}`} data-testid={`button-expand-note-${note.id}`} onClick={() => setExpanded(current => !current)}>
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? '收合筆記' : '展開筆記'}
+          </Button>
+          <Button variant="ghost" className="min-h-11" disabled={note.id.startsWith('local-devotional-') || note.syncStatus==='pending' || note.syncStatus==='blocked'} onClick={() => setShareOnWall(true)}><BookOpen className="h-4 w-4" />分享到靈修牆</Button>
+        </div>
 
         {expanded && (
-          <CardContent className="pt-0 space-y-4 border-t">
+          <CardContent id={`note-content-${note.id}`} className="pt-0 space-y-4 border-t">
             {sourceVerses.length > 0 && (
               <div className="rounded-xl border bg-muted/20 p-3">
                 <Button
                   type="button"
+                  aria-expanded={showReadingContext}
+                  aria-controls={`note-scripture-${note.id}`}
                   variant="ghost"
                   size="sm"
                   className="h-auto w-full justify-between gap-3 px-0 py-0 text-left hover:bg-transparent"
@@ -185,6 +187,7 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
 
                 {showReadingContext && (
                   <div
+                    id={`note-scripture-${note.id}`}
                     className="mt-3 space-y-3 border-t pt-3"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -347,8 +350,7 @@ const MyNotesPage = () => {
 
   useEffect(() => {
     if (!loading && !user) {
-      localStorage.removeItem('login_redirect');
-      navigate('/login', { replace: true });
+      navigate('/login?returnTo=%2Flearn%2Fmy-notes', { replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -375,13 +377,13 @@ const MyNotesPage = () => {
     '今天可以先打開聖經，留下第一個可回看的行動。';
   const noteStats = [
     {
-      label: '讀經計劃',
+      label: '讀經計畫',
       value: readingPlanNotes.length,
       icon: BookOpen,
       tone: 'bg-primary/10 text-primary',
     },
     {
-      label: '經文感動',
+      label: '靈修筆記',
       value: devotionalOnlyNotes.length,
       icon: BookMarked,
       tone: 'bg-rose-500/10 text-rose-500',
@@ -404,17 +406,17 @@ const MyNotesPage = () => {
         toast({ title: '沒有可匯出的筆記', variant: 'destructive' });
         return;
       }
-      content = `# 讀經計劃筆記\n\n匯出日期: ${today}\n\n---\n\n` +
+      content = `# 讀經計畫筆記\n\n匯出日期: ${today}\n\n---\n\n` +
         readingPlanNotes.map(formatDevotionalNoteMarkdown).join('\n\n---\n\n');
-      filename = `讀經計劃筆記_${today}.md`;
+      filename = `讀經計畫筆記_${today}.md`;
     } else if (activeTab === 'devotional') {
       if (devotionalOnlyNotes.length === 0) {
         toast({ title: '沒有可匯出的筆記', variant: 'destructive' });
         return;
       }
-      content = `# 經文感動\n\n匯出日期: ${today}\n\n---\n\n` +
+      content = `# 靈修筆記\n\n匯出日期: ${today}\n\n---\n\n` +
         devotionalOnlyNotes.map(formatDevotionalNoteMarkdown).join('\n\n---\n\n');
-      filename = `經文感動_${today}.md`;
+      filename = `靈修筆記_${today}.md`;
     }
 
     if (notesError) content = '> 此次僅匯出目前可用的筆記，尚未取得完整的最新資料。\n\n' + content;
@@ -444,8 +446,6 @@ const MyNotesPage = () => {
       <div className="min-h-screen bg-background" data-testid="my-notes-page">
         <Header variant="compact" title="我的筆記" backTo="/learn" />
         <main className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-8">
-          <Link to="/groups?view=note" className="mb-4 inline-flex min-h-11 items-center text-sm font-medium text-primary">選擇筆記分享給小家</Link>
-          <Link to="/devotion-wall" className="mb-4 ml-4 inline-flex min-h-11 items-center text-sm font-medium text-primary">今日靈修牆</Link>
           <div className="max-w-2xl md:max-w-3xl mx-auto">
             <section className="mb-5 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -454,6 +454,10 @@ const MyNotesPage = () => {
               </div>
               {notesError && <NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} />}
               <Input aria-label="搜尋筆記" type="search" placeholder="搜尋經文、心得或行動" value={search} onChange={e => setSearch(e.target.value)} />
+              <nav aria-label="靈修分享" className="flex flex-wrap gap-x-5 gap-y-1">
+                <Link to="/groups?view=note" className="inline-flex min-h-11 items-center text-sm font-medium text-primary">小家靈修分享</Link>
+                <Link to="/devotion-wall" className="inline-flex min-h-11 items-center text-sm font-medium text-primary">今日靈修牆</Link>
+              </nav>
               <details className="border-b pb-3">
                 <summary className="cursor-pointer py-2 text-sm text-muted-foreground">筆記回顧與下一步</summary>
                 <div className="mt-2 space-y-2 text-sm leading-6">
@@ -469,7 +473,7 @@ const MyNotesPage = () => {
               <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
                 <TabsList className="grid grid-cols-2 flex-1 min-w-0" data-testid="notes-tabs">
                   <TabsTrigger value="reading-plan" data-testid="tab-reading-plan">
-                    讀經計劃
+                    讀經計畫
                   </TabsTrigger>
                   <TabsTrigger value="devotional" data-testid="tab-devotional">
                     靈修筆記
@@ -499,15 +503,15 @@ const MyNotesPage = () => {
                   <Card className="text-center py-12">
                     <CardContent>
                       <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium mb-2" data-testid="text-empty-reading-plan">尚無讀經計劃筆記</h3>
+                      <h3 className="text-lg font-medium mb-2" data-testid="text-empty-reading-plan">尚無讀經計畫筆記</h3>
                       <p className="text-muted-foreground text-sm mb-4">
-                        加入讀經計劃，開始每日靈修之旅
+                        加入讀經計畫，開始每日靈修之旅
                       </p>
-                      <Link to="/learn/reading-plans" data-testid="link-reading-plans">
-                        <Button data-testid="button-go-reading-plans">
-                          前往讀經計劃
+                        <Button asChild data-testid="button-go-reading-plans">
+                          <Link to="/learn/reading-plans" data-testid="link-reading-plans">
+                          前往讀經計畫
+                          </Link>
                         </Button>
-                      </Link>
                     </CardContent>
                   </Card>
                 ) : (
@@ -530,10 +534,8 @@ const MyNotesPage = () => {
                   <Card className="text-center py-12">
                     <CardContent>
                       <BookMarked className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium mb-2" data-testid="text-empty-devotional">尚無經文感動</h3>
-                      <p className="text-muted-foreground text-sm">
-                        在聖經閱讀、耶穌事蹟、今日經文等頁面點擊「筆記」即可開始記錄
-                      </p>
+                      <h3 className="text-lg font-medium mb-4" data-testid="text-empty-devotional">還沒有靈修筆記</h3>
+                      <Button asChild><Link to="/learn/church-reading"><BookOpen className="h-4 w-4" />開始今日靈修</Link></Button>
                     </CardContent>
                   </Card>
                 ) : (

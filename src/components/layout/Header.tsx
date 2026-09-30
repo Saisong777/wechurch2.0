@@ -102,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
             <DropdownMenuItem asChild>
               <Link to="/me" className="flex items-center gap-2 cursor-pointer">
                 <User className="w-4 h-4" />
-                個人管理
+                個人設定
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShowProfileSettings(true)} className="cursor-pointer">

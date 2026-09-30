@@ -61,12 +61,14 @@ export function isNavItemActive(pathname: string, item: AppNavItem) {
 
 const mobileTitles: Record<string, string> = {
   '/me/activity': '待回應', '/me/sharing': '我的分享',
+  '/support': '尋求陪伴', '/work': '同工工作區', '/work/settings': '陪伴設定',
+  '/me/mentoring': '門訓陪伴', '/work/mentoring': '門訓陪伴',
   '/': 'WeChurch', '/learn/church-reading': '每日靈修', '/learn/my-notes': '我的筆記',
   '/learn/reading-plans': '讀經計畫', '/learn/bible': '聖經', '/bible': '聖經',
   '/learn/jesus-timeline': '耶穌時間軸', '/jesus-timeline': '耶穌時間軸',
   '/prayer-meeting': '禱告會', '/walls': '分享牆', '/prayer-wall': '分享牆', '/devotion-wall': '分享牆',
-  '/grace-record': '禱告與恩典', '/groups': '我的小家', '/care': '關懷',
-  '/learn': '聖經', '/share': '禱告', '/me/love-journey': '愛的旅程', '/me': '個人管理',
+  '/grace-record': '禱告與恩典', '/groups': '我的小家', '/care': '關懷的人',
+  '/learn': '聖經', '/share': '禱告', '/me/love-journey': '愛的旅程', '/me': '個人設定',
   '/play': '工具', '/user': 'SoulGym', '/cards': '話語卡', '/card': '話語卡',
   '/icebreaker': '破冰工具', '/grouper': '分組工具', '/notebook': '筆記',
 };

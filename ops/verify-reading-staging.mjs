@@ -22,7 +22,7 @@ const cli = (...args) => {
     throw Error('Browser operation failed; command withheld');
   }
 };
-async function journey(page, { origin, code, cookie, id, output }) {
+async function journey(page, { origin, code, cookie, id, output, uxReview }) {
   const checks = [], errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const gate = await page.context().request.post(origin + '/__staging/access', { headers: { Origin: origin }, data: { code }, maxRedirects: 0 });
@@ -39,6 +39,16 @@ async function journey(page, { origin, code, cookie, id, output }) {
     data.users = data.users.filter(u => u.id === id); data.grants = []; data.history = []; data.legacyScopes = []; data.appointments = []; data.groups = [];
     await route.fulfill({ response, json: data });
   });
+  // Keep management screenshots free of real member names, roles and addresses.
+  if (uxReview) {
+    for (const endpoint of ['users', 'user-roles', 'potential-members']) {
+      await page.route(url => url.pathname === `/api/${endpoint}`, async route => {
+        const response = await route.fetch();
+        const rows = await response.json();
+        await route.fulfill({ response, json: rows.filter(row => row.id === id || row.userId === id) });
+      });
+    }
+  }
   const go = async route => {
     await page.goto(origin + route);
     await page.locator('main').first().waitFor();
@@ -57,9 +67,14 @@ async function journey(page, { origin, code, cookie, id, output }) {
     }).slice(0,8).map(e => ({ tag: e.tagName, cls: typeof e.className === 'string' ? e.className.slice(0,160) : '', test: e.getAttribute('data-testid') }));
     return { rootSize: getComputedStyle(document.documentElement).fontSize, pageOverflow: document.documentElement.scrollWidth > innerWidth + 1, offenders };
   });
+  const expandNote = async () => {
+    const button = page.getByTestId('button-expand-note-reading-fixture');
+    if (await button.count()) await button.click();
+    else await page.getByTestId('card-devotional-note-reading-fixture').click();
+  };
   await page.setViewportSize({ width: 390, height: 844 });
   await go('/learn/my-notes');
-  await page.getByTestId('card-devotional-note-reading-fixture').click();
+  await expandNote();
   const baseline = await page.getByTestId('card-devotional-note-reading-fixture').locator('.reading-copy').first().evaluate(e => parseFloat(getComputedStyle(e).fontSize));
   if (baseline < 20) throw Error('Default note text remains too small');
   await page.getByRole('button', { name: '開啟導覽選單' }).click();
@@ -76,20 +91,20 @@ async function journey(page, { origin, code, cookie, id, output }) {
   await page.screenshot({ path: output + '/mobile-reading-settings.png' });
   await page.getByRole('button', { name: '關閉導覽選單' }).click();
   await page.reload();
-  await page.getByTestId('card-devotional-note-reading-fixture').click();
+  await expandNote();
   const enlarged = await page.getByTestId('card-devotional-note-reading-fixture').locator('.reading-copy').first().evaluate(e => ({ size: parseFloat(getComputedStyle(e).fontSize), font: getComputedStyle(e).fontFamily }));
   if (enlarged.size / baseline !== 2 || !enlarged.font.includes('serif')) throw Error('Size/font persistence failed');
-  const routes = ['/', '/learn', '/learn/my-notes', '/learn/church-reading', '/learn/bible?book=43&chapter=3', '/share', '/grace-record', '/walls', '/groups', '/care', '/me', '/admin', '/admin/access'];
-  for (const width of [320, 390, 768, 1440]) {
+  const routes = uxReview === 'baseline' ? ['/learn/my-notes', '/admin', '/admin/crm', '/admin/church-devotions'] : ['/', '/learn', '/learn/my-notes', '/learn/church-reading', '/learn/bible?book=43&chapter=3', '/share', '/grace-record', '/walls', '/groups', '/care', '/me', '/admin', '/admin/access', ...(uxReview ? ['/admin/crm', '/admin/church-devotions', '/me/activity', '/me/sharing', '/support', '/learn/reading-plans', '/play'] : [])];
+  for (const width of uxReview === 'baseline' ? [390,1440] : [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     for (const size of ['standard','maximum']) {
       await page.evaluate(size => { localStorage.setItem('wechurch-reading-preferences', JSON.stringify({ size, font: size === 'maximum' ? 'serif' : 'sans' })); localStorage.setItem('wechurch-theme', size === 'maximum' ? 'dark' : 'light'); }, size);
       for (const route of routes) {
         await go(route === '/admin/access' ? route + '?member=' + id : route);
-        if (route === '/learn/my-notes') await page.getByTestId('card-devotional-note-reading-fixture').click();
+        if (route === '/learn/my-notes') await expandNote();
         const layout = await metrics();
         checks.push({ route, width, size, ...layout });
-        if ((['/learn/my-notes','/me','/learn/church-reading','/learn/bible?book=43&chapter=3'].includes(route) && width !== 768) || layout.offenders.length || layout.pageOverflow) {
+        if ((['/learn/my-notes','/me','/learn/church-reading','/learn/bible?book=43&chapter=3', ...(uxReview ? ['/admin','/admin/crm','/admin/church-devotions','/groups','/support'] : [])].includes(route) && width !== 768) || layout.offenders.length || layout.pageOverflow) {
           await page.evaluate(() => window.scrollTo(0, 0));
           await page.screenshot({ path: `${output}/${route.split('?')[0].replaceAll('/','-') || 'home'}-${width}-${size}.png`, fullPage: true });
           if (route === '/learn/my-notes') await page.screenshot({ path: `${output}/notes-viewport-${width}-${size}.png` });
@@ -99,18 +114,40 @@ async function journey(page, { origin, code, cookie, id, output }) {
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await go('/learn/my-notes');
-  await page.getByTestId('card-devotional-note-reading-fixture').click();
+  await expandNote();
   await page.getByTestId('button-edit-note-reading-fixture').click();
   await page.getByTestId('textarea-observation').waitFor();
   checks.push({ flow: 'open-note-editor', ...await metrics() });
   await page.screenshot({ path: output + '/note-editor-maximum.png' });
-  return { baseline, enlarged, checks, errors, preferencesPersist: true, noteFixtureMocked: true, wroteMemberContent: false, physicalPhoneTested: false };
+  if (uxReview && uxReview !== 'baseline') {
+    await page.evaluate(() => localStorage.setItem('wechurch-reading-preferences', JSON.stringify({ size: 'standard', font: 'sans' })));
+    await go('/learn/my-notes');
+    const expand = page.getByRole('button', { name: '展開筆記' });
+    await expand.focus(); await page.keyboard.press('Enter');
+    const text = page.getByTestId('card-devotional-note-reading-fixture').locator('.reading-copy').first();
+    await text.click();
+    if (!await text.isVisible() || await expand.getAttribute('aria-expanded') !== 'true') throw Error('Note disclosure failed');
+    await page.getByRole('button', { name: '收合筆記' }).focus(); await page.keyboard.press('Space');
+    if (await text.isVisible()) throw Error('Keyboard collapse failed');
+    checks.push({ flow: 'keyboard-disclosure-no-content-collapse', ...await metrics() });
+    await go('/admin');
+    await page.getByRole('region', { name: '會友與牧養' }).waitFor();
+    await page.getByTestId('button-cards').click();
+    await page.getByRole('button', { name: '返回管理後台', exact: true }).click();
+    await page.getByTestId('button-crm').click();
+    await page.getByRole('heading', { name: '會員與牧養', exact: true }).waitFor();
+    await page.getByRole('button', { name: '返回管理後台', exact: true }).click();
+    await page.getByRole('link', { name: '返回首頁' }).click();
+    if (new URL(page.url()).pathname !== '/') throw Error('Admin return flow failed');
+    checks.push({ flow: 'admin-tool-members-dashboard-home', ...await metrics() });
+  }
+  return { uxReview, baseline, enlarged, checks, errors, preferencesPersist: true, noteFixtureMocked: true, wroteMemberContent: false, physicalPhoneTested: false };
 }
 let result;
 try {
   stagingSql(`BEGIN; INSERT INTO users(id,email,password,display_name,church) VALUES(${sql(id)},${sql(email)},'!disabled-fixture','閱讀驗收','IM 行動教會'); INSERT INTO auth_users(id,email) VALUES(${sql(authId)},${sql(email)}); INSERT INTO user_roles(user_id,role) VALUES(${sql(id)},'admin'); INSERT INTO auth_sessions(sid,sess,expire) VALUES(${sql(sid)},${sql(JSON.stringify(session))},${sql(expires.toISOString())}); COMMIT;`);
   cli('open', 'about:blank'); cli('snapshot');
-  const config = { origin: target.origin, code: state.app.STAGING_ACCESS_CODE, cookie, id, output };
+  const config = { origin: target.origin, code: state.app.STAGING_ACCESS_CODE, cookie, id, output, uxReview: process.env.UX_REVIEW || '' };
   const raw = cli('run-code', `async page => (${journey.toString()})(page,${JSON.stringify(config)})`);
   const serialized = raw.split('### Result\n')[1]?.split('\n###')[0];
   if (!serialized) {

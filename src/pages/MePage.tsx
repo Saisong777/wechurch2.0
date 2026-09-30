@@ -154,7 +154,7 @@ const MePage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
-      <Header title="個人管理" subtitle="你的紀錄與設定" variant="compact" />
+      <Header title="個人設定" subtitle="你的紀錄與設定" variant="compact" />
 
       <main className="container mx-auto px-3 py-4 sm:px-4 md:px-6 md:py-8">
         <div className="mx-auto max-w-4xl space-y-4 sm:space-y-6">
@@ -164,7 +164,7 @@ const MePage = () => {
                 <UserRound className="h-6 w-6" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-muted-foreground">個人管理</p>
+                <p className="text-xs font-semibold text-muted-foreground">個人設定</p>
                 <h1 className="truncate text-2xl font-bold text-foreground">{displayName}</h1>
               </div>
             </div>

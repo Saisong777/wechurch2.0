@@ -257,7 +257,7 @@ const ReadingPlansPage = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="讀經計劃" variant="compact" backTo="/learn" />
+        <Header title="讀經計畫" variant="compact" backTo="/learn" />
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6">
           <div className="max-w-3xl lg:max-w-4xl mx-auto space-y-4">
             <Skeleton className="h-10 w-full rounded-lg bg-primary/10" />
@@ -271,16 +271,16 @@ const ReadingPlansPage = () => {
 
   if (!user) {
     return (
-      <FeatureGate featureKeys={["we_learn", "reading_plans"]} title="讀經計劃功能維護中" description="讀經計劃功能目前暫時關閉，請稍後再試">
+      <FeatureGate featureKeys={["we_learn", "reading_plans"]} title="讀經計畫功能維護中" description="讀經計畫功能目前暫時關閉，請稍後再試">
         <div className="min-h-screen bg-background">
-          <Header title="讀經計劃" variant="compact" backTo="/learn" />
+          <Header title="讀經計畫" variant="compact" backTo="/learn" />
           <main className="container mx-auto px-3 sm:px-4 md:px-6 py-6">
             <div className="max-w-3xl lg:max-w-4xl mx-auto">
               <Card>
                 <CardContent className="py-12 text-center">
                   <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                   <h2 className="text-lg font-semibold mb-2">請先登入</h2>
-                  <p className="text-muted-foreground mb-4">登入後即可建立和管理你的讀經計劃</p>
+                  <p className="text-muted-foreground mb-4">登入後即可建立和管理你的讀經計畫</p>
                   <Button asChild data-testid="button-login">
                     <Link to="/login">前往登入</Link>
                   </Button>
@@ -294,9 +294,9 @@ const ReadingPlansPage = () => {
   }
 
   return (
-    <FeatureGate featureKeys={["we_learn", "reading_plans"]} title="讀經計劃功能維護中" description="讀經計劃功能目前暫時關閉，請稍後再試">
+    <FeatureGate featureKeys={["we_learn", "reading_plans"]} title="讀經計畫功能維護中" description="讀經計畫功能目前暫時關閉，請稍後再試">
       <div className="min-h-screen bg-background">
-        <Header title="讀經計劃" variant="compact" backTo="/learn" />
+        <Header title="讀經計畫" variant="compact" backTo="/learn" />
 
         <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="max-w-3xl lg:max-w-4xl mx-auto">
@@ -397,7 +397,7 @@ const ReadingPlansPage = () => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>確認刪除</DialogTitle>
-              <DialogDescription>確定要刪除這個讀經計劃嗎？此操作無法復原。</DialogDescription>
+              <DialogDescription>確定要刪除這個讀經計畫嗎？此操作無法復原。</DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex gap-2">
               <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} data-testid="button-cancel-delete">
@@ -458,7 +458,7 @@ function MyPlansView({
       <Card>
         <CardContent className="py-12 text-center">
           <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-          <p className="text-muted-foreground mb-4">你還沒有任何讀經計劃</p>
+          <p className="text-muted-foreground mb-4">你還沒有任何讀經計畫</p>
           <Button onClick={onCreateClick} data-testid="button-create-first-plan">
             <Plus className="w-4 h-4 mr-1.5" />
             建立第一個計劃
@@ -868,7 +868,7 @@ function CreatePlanView({
         onClick={onSubmit}
         data-testid="button-create-plan"
       >
-        {isPending ? '建立中...' : '建立讀經計劃'}
+        {isPending ? '建立中...' : '建立讀經計畫'}
       </Button>
     </div>
   );
@@ -907,7 +907,7 @@ function BrowseTemplatesView({
       <Card>
         <CardContent className="py-12 text-center">
           <Library className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-          <p className="text-muted-foreground">暫無讀經計劃範本</p>
+          <p className="text-muted-foreground">暫無讀經計畫範本</p>
         </CardContent>
       </Card>
     );
@@ -919,7 +919,7 @@ function BrowseTemplatesView({
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
             <BookOpen className="w-5 h-5 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground text-sm">選擇一個範本快速開始讀經計劃</span>
+            <span className="text-muted-foreground text-sm">選擇一個範本快速開始讀經計畫</span>
           </div>
         </CardContent>
       </Card>

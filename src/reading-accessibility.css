@@ -26,6 +26,8 @@ html[data-reading-font='serif'] {
 .reading-preferences button { max-width: 100%; }
 .appearance-toolbar > button { width: 44px; height: 44px; }
 .appearance-toolbar > button svg { width: 24px; height: 24px; }
+html[data-text-size='maximum'] .admin-action-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+.crm-header .appearance-toolbar { flex-shrink: 0; }
 .text-\[9px\], .text-\[10px\], .text-\[11px\] { font-size: 0.75rem; line-height: 1.5; }
 .text-\[15px\] { font-size: 0.9375rem; }
 .text-\[16px\] { font-size: 1rem; }

@@ -31,7 +31,7 @@ const features: Array<FeaturePortalAction & { featureKey: string }> = [
   {
     id: 'my-notes',
     featureKey: 'we_learn',
-    title: '查看筆記',
+    title: '我的筆記',
     subtitle: '讀經筆記與查經紀錄',
     icon: BookMarked,
     href: '/learn/my-notes',
@@ -53,7 +53,7 @@ const LearnPage = () => {
       description="讀聖經功能目前暫時關閉，請稍後再試"
     >
       <FeaturePortalPage
-        title="讀聖經"
+        title="聖經"
         subtitle="學習成長"
         actions={enabledFeatures}
       />

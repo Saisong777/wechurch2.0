@@ -587,7 +587,7 @@ const Index = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/me" className="flex items-center gap-2 cursor-pointer">
                       <User className="w-4 h-4" />
-                      個人管理
+                      個人設定
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
