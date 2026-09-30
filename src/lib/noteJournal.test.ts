@@ -6,6 +6,10 @@ it('retains all receiving categories, legacy notes and original whitespace', () 
   expect(journalSections(n).map(s => s.body)).toEqual([' 原文\n下一行 ', '恩典\n愛人', '舊研讀', '舊回顧']);
   expect(journalMarkdown(n)).toContain(' 原文\n下一行 ');
   expect(journalSections(note({ coreInsightNote: '舊文字' }))[0].body).toBe('舊文字');
+  expect(journalSections(note({ coreInsightNote: '相同領受', heartbeatVerse: '相同領受' })).map(s => s.body)).toEqual(['相同領受']);
+  const distinct = note({ coreInsightNote: '領受正文', heartbeatVerse: ' 另一段原文\n保留換行 ' });
+  expect(journalSections(distinct).map(s => s.title)).toEqual(['領受', '觸動我的經文']);
+  expect(journalMarkdown(distinct)).toContain(' 另一段原文\n保留換行 ');
 });
 it('orders original reading dates before import/update dates, with Taiwan timezone for new entries', () => {
   const old = note({ sourceDevotionalDate: '2026-07-01' });

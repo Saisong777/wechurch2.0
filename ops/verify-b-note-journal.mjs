@@ -34,7 +34,7 @@ if (mode === 'prepare') {
   stagingSql(`BEGIN;
     DO $guard$ BEGIN
     IF EXISTS(SELECT 1 FROM devotional_notes WHERE id IN (${ids}) AND (user_id<>${literal(fixture.owner)} OR source_label IS DISTINCT FROM '版面驗收（測試）')) THEN RAISE EXCEPTION 'Fixture changed owner or source'; END IF;
-    IF EXISTS(SELECT 1 FROM devotion_wall_posts WHERE source_note_id IN (${ids})) OR EXISTS(SELECT 1 FROM life_group_shares WHERE source_note_id IN (${ids})) THEN RAISE EXCEPTION 'Fixture has been shared; cleanup refused'; END IF;
+    IF EXISTS(SELECT 1 FROM devotion_wall_posts WHERE source_note_id IN (${ids})) OR EXISTS(SELECT 1 FROM life_group_shares WHERE kind='note' AND source_id IN (${ids})) THEN RAISE EXCEPTION 'Fixture has been shared; cleanup refused'; END IF;
     END $guard$;
     DELETE FROM devotional_notes WHERE id IN (${ids}) AND user_id=${literal(fixture.owner)} AND source_label='版面驗收（測試）';
     COMMIT;`);

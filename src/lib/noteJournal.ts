@@ -11,13 +11,17 @@ export function receivingText(note: JournalNote): string {
   return Object.values(notes).filter(Boolean).join('\n') || note.heartbeatVerse || '';
 }
 export function journalSections(note: JournalNote) {
-  return [
+  const sections = [
     { title: '看見', body: note.observation },
     { title: '領受', body: receivingText(note) },
     { title: '回應', body: note.actionPlan },
     { title: '研讀札記', body: note.scholarsNote },
     { title: '回顧', body: note.coolDownNote },
   ].filter(section => section.body?.trim());
+  if (note.heartbeatVerse?.trim() && !sections.some(section => section.body?.trim() === note.heartbeatVerse?.trim())) {
+    sections.push({ title: '觸動我的經文', body: note.heartbeatVerse });
+  }
+  return sections;
 }
 export function hasJournalContent(note: JournalNote) {
   return journalSections(note).length > 0 || !!note.titlePhrase?.trim() || !!note.heartbeatVerse?.trim();

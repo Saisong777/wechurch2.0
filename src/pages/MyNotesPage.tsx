@@ -73,7 +73,6 @@ function NoteChapter({ note, onExport, editing, setEditing }: { note: JournalNot
       {note.verseText && <details className="note-scripture"><summary>筆記保存的經文</summary><p className="reading-copy">{note.verseText}</p></details>}
       <div id={`note-content-${note.id}`} className="note-chapter-body">
         {sections.map(section => <section key={section.title}><h3>{section.title}</h3><p className="reading-copy">{section.body}</p></section>)}
-        {note.heartbeatVerse && note.coreInsightNote && <section><h3>觸動我的經文</h3><p className="reading-copy">{note.heartbeatVerse}</p></section>}
         {!hasJournalContent(note) && <p className="text-muted-foreground">這篇尚未寫下心得。</p>}
       </div>
       <footer className="note-chapter-tools">
