@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { DailyHome, type DailyHomeProps } from './DailyHome';
 
@@ -10,7 +10,7 @@ const defaults: DailyHomeProps = {
   date: '9/11（週五）',
   scripture: { reference: '約翰福音 15:4-5', preview: '你們要常在我裡面。', href: '/learn/church-reading' },
   notesLoading: false, onOpenNote: vi.fn(), signedIn: true,
-  prayersLoading: false, prayersError: false, onRetryPrayers: vi.fn(), prayerCount: 0,
+  prayersLoading: false, prayersError: false, onRetryPrayers: vi.fn(), prayers: [],
   careLoading: false, showTools: true, showAdmin: false,
 };
 
@@ -72,13 +72,36 @@ describe('daily homepage', () => {
     expect(screen.getByRole('link', { name: '繼續今日靈修' })).toBeTruthy();
   });
 
-  it('shows only the supplied personal summary and keeps privacy visible', () => {
-    show({ prayerCount: 4, prayer: { title: '測試禱告', prayer: '測試內容' }, care: { name: '測試對象', need: '測試需要', nextAction: '測試行動' } });
-    expect(screen.getByText('測試禱告')).toBeTruthy();
-    expect(screen.getByText('4 筆正在等候')).toBeTruthy();
+  it('numbers every supplied prayer in order and keeps the complete content visible', () => {
+    const prayers = Array.from({ length: 4 }, (_, i) => ({ id: `prayer-${i}`, title: `測試禱告 ${i + 1}`, prayer: `完整內容 ${i + 1}\n第二段禱告` }));
+    show({ prayers, care: { name: '測試對象', need: '測試需要', nextAction: '測試行動' } });
+    const list = screen.getByRole('list', { name: '正在等候的禱告' });
+    expect(list.tagName).toBe('OL');
+    expect(list.classList.contains('list-decimal')).toBe(true);
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(4);
+    items.forEach((item, i) => {
+      expect(item.textContent).toContain(prayers[i].title);
+      expect(item.textContent).toContain(prayers[i].prayer);
+      expect(item.querySelector('[class*="line-clamp"]')).toBeNull();
+    });
+    expect(screen.queryByText('4 筆正在等候')).toBeNull();
     expect(screen.getByText('僅自己可見')).toBeTruthy();
     expect(screen.getByText('測試對象')).toBeTruthy();
     expect(screen.queryByText('分享給小家')).toBeNull();
+  });
+
+  it('does not repeat body-only prayers or identical titles and bodies', () => {
+    show({ prayers: [{ id: 'body', prayer: '只有禱告內容' }, { id: 'same', title: '相同內容', prayer: ' 相同內容 ' }] });
+    expect(screen.getAllByText('只有禱告內容')).toHaveLength(1);
+    expect(screen.getAllByText('相同內容')).toHaveLength(1);
+  });
+
+  it.each([{ signedIn: false }, { prayersLoading: true }, { prayersError: true }])('hides cached personal prayers when unavailable: %s', state => {
+    show({ ...state, prayers: [{ id: 'private', title: '私人禱告', prayer: '私人內容' }] });
+    expect(screen.queryByText('私人禱告')).toBeNull();
+    expect(screen.queryByText('私人內容')).toBeNull();
+    expect(screen.queryByRole('list', { name: '正在等候的禱告' })).toBeNull();
   });
 
   it('does not show an empty state during loading', () => {
@@ -90,7 +113,7 @@ describe('daily homepage', () => {
 
   it('allows retry and does not present stale data as current after a prayer error', () => {
     const onRetryPrayers = vi.fn();
-    show({ prayersError: true, onRetryPrayers, prayer: { title: '舊紀錄', prayer: '' } });
+    show({ prayersError: true, onRetryPrayers, prayers: [{ id: 'old', title: '舊紀錄', prayer: '' }] });
     expect(screen.getByRole('alert').textContent).toContain('暫時無法載入');
     expect(screen.queryByText('舊紀錄')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '重新載入' }));

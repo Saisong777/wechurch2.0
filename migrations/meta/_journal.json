@@ -72,6 +72,7 @@
     { "idx": 19, "version": "7", "when": 1790553600003, "tag": "0019_leader_dashboard", "breakpoints": true },
     { "idx": 20, "version": "7", "when": 1790640000000, "tag": "0020_controlled_email", "breakpoints": true },
     { "idx": 21, "version": "7", "when": 1790640000001, "tag": "0021_access_control", "breakpoints": true },
-    { "idx": 22, "version": "7", "when": 1790726400000, "tag": "0022_family_directory", "breakpoints": true }
+    { "idx": 22, "version": "7", "when": 1790726400000, "tag": "0022_family_directory", "breakpoints": true },
+    { "idx": 23, "version": "7", "when": 1790758800000, "tag": "0023_devotional_note_deletions", "breakpoints": true }
   ]
 }

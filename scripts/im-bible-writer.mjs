@@ -27,7 +27,9 @@ export async function readTarget(client) {
       CASE WHEN r.kind='note' THEN n.id IS NOT NULL AND n.user_id=r.user_id
       ELSE p.id IS NOT NULL AND p.user_id=r.user_id END AS "targetExists"
       FROM im_source_records r LEFT JOIN devotional_notes n ON n.id=r.note_id
-      LEFT JOIN user_reading_progress p ON p.id=r.progress_id`) };
+      LEFT JOIN user_reading_progress p ON p.id=r.progress_id
+      UNION ALL SELECT source_key,record_sha256,user_id,'note',note_id,false
+      FROM devotional_note_deletions WHERE source_key IS NOT NULL`) };
 }
 
 function validatePrepared(prepared) {
@@ -130,7 +132,8 @@ export async function importPrepared(pool, prepared, { dryRun = true } = {}) {
 
 export async function verifyImported(client,prepared) {
   validatePrepared(prepared);
-  let mismatches=0,editedNotes=0;
+  let mismatches=0,editedNotes=0,deletedNotes=0;
+  const deletions=new Map((await client.query('SELECT source_key,record_sha256,user_id FROM devotional_note_deletions WHERE source_key IS NOT NULL')).rows.map(row=>[row.source_key,row]));
   const identities=new Map((await client.query(`SELECT a.source_uid,a.user_id,a.google_subject,g.user_id AS google_user,p.user_id AS plan_user
     FROM im_source_accounts a JOIN google_account_links g ON g.google_subject=a.google_subject
     JOIN user_reading_plans p ON p.id=a.plan_id JOIN auth_users u ON u.id=g.auth_user_id WHERE a.project_id=$1`,[SOURCE_PROJECT])).rows.map(r=>[r.source_uid,r]));
@@ -147,6 +150,8 @@ export async function verifyImported(client,prepared) {
   for(const [kind,items] of [['note',prepared.bundle.notes],['read-day',prepared.bundle.readDays]]) for(const item of items) {
     const row=records.get(item.sourceKey);
     const member=prepared.bundle.members.find(m=>m.sourceUid===item.sourceUid);
+    const deletion=kind==='note'?deletions.get(item.sourceKey):null;
+    if(deletion && !row && deletion.record_sha256===item.recordSha256 && identities.get(item.sourceUid)?.user_id===deletion.user_id) {deletedNotes++;continue;}
     const target=kind==='note'?row?.note:row?.progress;
     if(!row || row.kind!==kind || row.record_sha256!==item.recordSha256 ||
       row.original_record.recordSha256!==item.recordSha256 || !sameRecord(row.original_record,item) ||
@@ -156,7 +161,7 @@ export async function verifyImported(client,prepared) {
       if(target.version>1)editedNotes++;
     } else if(target.reading_date!==item.devotionalDate || target.scripture_reference!==item.reference)mismatches++;
   }
-  return {members:prepared.bundle.members.length,notes:prepared.bundle.notes.length,readDays:prepared.bundle.readDays.length,mismatches,editedNotes};
+  return {members:prepared.bundle.members.length,notes:prepared.bundle.notes.length,readDays:prepared.bundle.readDays.length,mismatches,editedNotes,deletedNotes};
 }
 
 // Never delete accounts, plans, or post-import edits. Any reference outside this batch blocks rollback.

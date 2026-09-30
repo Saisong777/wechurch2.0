@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,11 @@ import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialo
 import { DevotionWallShareDialog } from '@/components/scripture/DevotionWallShareDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { ApiError, apiRequest } from '@/lib/queryClient';
 import { removeLocalDevotionalNote } from '@/lib/localDevotionalNotes';
 import { useDevotionalNotes } from '@/hooks/useDevotionalNotes';
 import { NotesLoadNotice } from '@/components/scripture/NotesLoadNotice';
-import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Target, MessageCircle, BookOpen, EyeOff, Download } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronUp, Loader2, Calendar, Pencil, Heart, Eye, Target, MessageCircle, BookOpen, EyeOff, Download, Trash2 } from 'lucide-react';
 import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritual-fitness';
 import { createDevotionShareDraft } from '@/lib/devotionShareDraft';
 import { format } from 'date-fns';
@@ -25,6 +25,7 @@ import { zhTW } from 'date-fns/locale';
 import { ImportedReadingHistory } from '@/components/scripture/ImportedReadingHistory';
 
 interface DevotionalNote {
+  version?: number;
   sourceDevotionalDate?: string | null;
   sourceLabel?: string | null;
   syncStatus?: 'pending' | 'blocked' | 'synced';
@@ -72,11 +73,15 @@ const countFilledFields = (note: DevotionalNote): number => {
 
 const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [showReadingContext, setShowReadingContext] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [shareOnWall, setShareOnWall] = useState(false);
   const [showHideConfirm, setShowHideConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const isLocalDraft = note.id.startsWith('local-devotional-');
   const navigate = useNavigate();
   const { toast } = useToast();
   const filledCount = countFilledFields(note);
@@ -100,6 +105,31 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
       toast({ title: '筆記已隱藏' });
       setShowHideConfirm(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!user || note.userId !== user.id) throw new Error('Invalid note owner');
+      if (!isLocalDraft) {
+        await apiRequest('DELETE', `/api/devotional-notes/${note.id}`, { version: note.version });
+      }
+      removeLocalDevotionalNote(note.id, user.id);
+    },
+    onSuccess: async () => {
+      setShowDeleteConfirm(false);
+      await queryClient.cancelQueries({ queryKey: ['/api/devotional-notes'] });
+      queryClient.setQueryData<DevotionalNote[]>(['/api/devotional-notes', user?.id], notes => notes?.filter(item => item.id !== note.id));
+      queryClient.removeQueries({ queryKey: ['/api/devotional-notes', note.id], exact: true });
+      void queryClient.invalidateQueries({ queryKey: ['/api/devotional-notes'] });
+      void queryClient.invalidateQueries({ queryKey: ['devotion-wall'] });
+      void queryClient.invalidateQueries({ predicate: query => typeof query.queryKey[0] === 'string' && /^\/api\/(devotion-wall|life-groups|user-reading-plans)/.test(query.queryKey[0]) });
+      toast({ title: '筆記已刪除' });
+    },
+    onError: error => {
+      setDeleteError(error instanceof ApiError && [409, 428].includes(error.status)
+        ? '筆記已更新，請重新載入並確認內容後再刪除。'
+        : '未能完成刪除，筆記仍保留。請稍後重試。');
     },
   });
 
@@ -156,6 +186,26 @@ const DevotionalNoteCard = ({ note }: { note: DevotionalNote }) => {
             {expanded ? '收合筆記' : '展開筆記'}
           </Button>
           <Button variant="ghost" className="min-h-11" disabled={note.id.startsWith('local-devotional-') || note.syncStatus==='pending' || note.syncStatus==='blocked'} onClick={() => setShareOnWall(true)}><BookOpen className="h-4 w-4" />分享到靈修牆</Button>
+          <AlertDialog open={showDeleteConfirm} onOpenChange={open => { if (!deleteMutation.isPending) { setShowDeleteConfirm(open); setDeleteError(''); } }}>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" className="min-h-11 text-destructive" data-testid={`button-delete-note-${note.id}`}><Trash2 className="h-4 w-4" />刪除筆記</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>刪除這則筆記？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {note.verseReference}。{isLocalDraft ? '移除此裝置的草稿後無法復原；已同步到雲端的筆記不受影響。' : '刪除後無法復原；這則筆記在小家及靈修牆的相關分享也會撤回。讀經打卡不受影響。'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteMutation.isPending}>保留筆記</AlertDialogCancel>
+                <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteMutation.isPending} onClick={event => { event.preventDefault(); setDeleteError(''); deleteMutation.mutate(); }}>
+                  {deleteMutation.isPending ? '刪除中…' : '確定刪除'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {expanded && (

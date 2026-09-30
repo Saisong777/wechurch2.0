@@ -5887,6 +5887,24 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  app.delete('/api/devotional-notes/:id', async (req, res) => {
+    try {
+      const actor = await resolveUserId(req);
+      if (!actor) return res.status(401).json({ error: '請先登入。' });
+      const id = z.string().uuid().safeParse(req.params.id);
+      if (!id.success) return res.status(400).json({ error: '筆記編號不正確。' });
+      const version = z.number().int().positive().safeParse(req.body?.version);
+      if (!version.success) return res.status(428).json({ error: '請重新載入筆記後再刪除。' });
+      const { deleteDevotionalNote } = await import('./deleteDevotionalNote');
+      const result = await deleteDevotionalNote(id.data, actor, version.data);
+      if (result === 'missing') return res.status(404).json({ error: '找不到這則筆記。' });
+      if (result === 'conflict') return res.status(409).json({ error: '這則筆記剛有更新，請重新載入並確認內容後再刪除。' });
+      return res.json({ ok: true });
+    } catch {
+      return res.status(503).json({ error: '筆記尚未刪除，請稍後重試。' });
+    }
+  });
+
   app.patch("/api/devotional-notes/:id/hidden", async (req, res) => {
     try {
       const userId = await resolveUserId(req);

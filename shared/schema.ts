@@ -712,6 +712,14 @@ export const devotionalNotes = pgTable("devotional_notes", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const devotionalNoteDeletions = pgTable('devotional_note_deletions', {
+  noteId: uuid('note_id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sourceKey: text('source_key').unique(),
+  recordSha256: text('record_sha256'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const devotionWallPosts = pgTable('devotion_wall_posts', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   sourceNoteId: uuid('source_note_id').references(() => devotionalNotes.id, { onDelete: 'set null' }),

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -11,7 +11,65 @@ vi.mock('@/components/layout/Header', () => ({ Header: () => null }));
 vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/components/scripture/DevotionalNoteDialog', () => ({ DevotionalNoteDialog: () => null }));
 vi.mock('@/components/scripture/DevotionWallShareDialog', () => ({ DevotionWallShareDialog: () => null }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); auth.signedIn = true; });
+afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); auth.signedIn = true; });
+
+function showDeletableNote(id = '00000000-0000-4000-8000-000000000001') {
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false }, mutations: { retry: false } } });
+  client.setQueryData(['/api/devotional-notes', 'reader'], [{ id, userId: 'reader', version: 3, verseReference: '測試經文', readingPlanId: null, observation: '保留到確認', updatedAt: '2026-09-30T00:00:00Z' }]);
+  client.setQueryData(['/api/im-reading-history', 'reader'], []);
+  render(<QueryClientProvider client={client}><MemoryRouter><MyNotesPage /></MemoryRouter></QueryClientProvider>);
+  return { client, id };
+}
+
+it('offers deletion without expanding and cancel never writes', () => {
+  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  const { client } = showDeletableNote();
+  fireEvent.click(screen.getByRole('button', { name: '刪除筆記' }));
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('讀經打卡不受影響');
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('相關分享也會撤回');
+  fireEvent.click(screen.getByRole('button', { name: '保留筆記' }));
+  expect(fetch).not.toHaveBeenCalled();
+  expect(screen.getByText('測試經文')).toBeVisible();
+  client.clear();
+});
+
+it('deletes only after confirmation with the current version and updates the list', async () => {
+  const fetch = vi.fn().mockImplementation(async (_url, init) => new Response(JSON.stringify(init?.method === 'DELETE' ? { ok: true } : []), { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  const { client, id } = showDeletableNote();
+  fireEvent.click(screen.getByRole('button', { name: '刪除筆記' }));
+  fireEvent.click(screen.getByRole('button', { name: '確定刪除' }));
+  await waitFor(() => expect(screen.queryByTestId(`card-devotional-note-${id}`)).toBeNull());
+  expect(fetch).toHaveBeenCalledWith(`/api/devotional-notes/${id}`, expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ version: 3 }), credentials: 'include' }));
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+  client.clear();
+});
+
+it.each([503, 409])('keeps the note and confirmation visible when deletion returns %s', async status => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status })));
+  const { client, id } = showDeletableNote();
+  fireEvent.click(screen.getByRole('button', { name: '刪除筆記' }));
+  fireEvent.click(screen.getByRole('button', { name: '確定刪除' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(status === 409 ? '筆記已更新' : '未能完成刪除');
+  expect(screen.getByTestId(`card-devotional-note-${id}`)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '保留筆記' })).toBeEnabled();
+  client.clear();
+});
+
+it('removes a device-only draft without sending a server deletion', async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response('[]', { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  const id = 'local-devotional-test';
+  localStorage.setItem('wechurch_devotional_notes_v2:reader', JSON.stringify([{ id, userId: 'reader', verseReference: '測試經文', readingPlanId: null, updatedAt: '2026-09-30T00:00:00Z', syncStatus: 'pending' }]));
+  const { client } = showDeletableNote(id);
+  fireEvent.click(screen.getByRole('button', { name: '刪除筆記' }));
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('已同步到雲端的筆記不受影響');
+  fireEvent.click(screen.getByRole('button', { name: '確定刪除' }));
+  await waitFor(() => expect(screen.queryByTestId(`card-devotional-note-${id}`)).toBeNull());
+  expect(JSON.parse(localStorage.getItem('wechurch_devotional_notes_v2:reader') || '[]')).toEqual([]);
+  expect(fetch.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
+  client.clear();
+});
 
 it('shows a recoverable error rather than claiming the reader has no notes', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 503 })));

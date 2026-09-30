@@ -638,8 +638,7 @@ const Index = () => {
             prayersLoading={prayersLoading}
             prayersError={personalPrayerError}
             onRetryPrayers={() => { void retryPrayers(); }}
-            prayerCount={activePrivatePrayerRecords.length}
-            prayer={activePrivatePrayerRecords[0]}
+            prayers={activePrivatePrayerRecords}
             careLoading={careLoading}
             careUnavailable={!!user && careError}
             care={featuredCareContact}

@@ -14,8 +14,7 @@ export interface DailyHomeProps {
   prayersLoading: boolean;
   prayersError: boolean;
   onRetryPrayers: () => void;
-  prayerCount: number;
-  prayer?: { title?: string; prayer?: string };
+  prayers: { id: string; title?: string; prayer?: string }[];
   careLoading: boolean;
   careUnavailable?: boolean;
   care?: { name: string; need: string; nextAction: string };
@@ -28,7 +27,7 @@ const quietLink = 'home-link inline-flex min-h-11 items-center gap-2 rounded-md 
 
 export function DailyHome({
   date, scripture, readingState = 'ready', note, notesLoading, onOpenNote, signedIn,
-  prayersLoading, prayersError, onRetryPrayers, prayerCount, prayer,
+  prayersLoading, prayersError, onRetryPrayers, prayers,
   careLoading, careUnavailable, care, showTools, showAdmin, showPastoral = showAdmin,
 }: DailyHomeProps) {
   const hasDraft = note?.syncStatus === 'pending' || note?.syncStatus === 'blocked';
@@ -98,12 +97,19 @@ export function DailyHome({
           </div>
         ) : prayersLoading ? (
           <div role="status" aria-label="正在載入禱告" className="mt-3 space-y-2"><Skeleton className="h-5 w-1/2" /><Skeleton className="h-4 w-3/4" /></div>
-        ) : prayer ? (
-          <Link to="/grace-record" className="mt-3 block rounded-md py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <p className="line-clamp-1 font-medium">{prayer.title || '今天的禱告'}</p>
-            {prayer.prayer && <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">{prayer.prayer}</p>}
-            <span className="mt-2 inline-flex min-h-8 items-center gap-2 text-sm text-secondary">{prayerCount} 筆正在等候<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" /></span>
-          </Link>
+        ) : prayers.length > 0 ? (
+          <ol aria-label="正在等候的禱告" role="list" className="mt-3 list-outside list-decimal space-y-4 pl-6 text-base leading-relaxed marker:font-medium">
+            {prayers.map(prayer => {
+              const title = prayer.title?.trim();
+              const body = prayer.prayer?.trim();
+              return (
+                <li key={prayer.id} className="pl-1">
+                  <p className="whitespace-pre-wrap font-medium">{title || body || '今天的禱告'}</p>
+                  {title && body && body !== title && <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{body}</p>}
+                </li>
+              );
+            })}
+          </ol>
         ) : <p className="mt-3 text-sm text-muted-foreground">目前沒有正在等候的禱告。</p>}
         <div className="home-prayer-actions">
           <Link to="/grace-record?new=1" className={quietLink}><Plus aria-hidden="true" className="h-4 w-4 shrink-0" />新增禱告</Link>

@@ -85,5 +85,18 @@ export async function verifyImImportHttp(pool: Pool,a: Client,b: Client,guest: C
   assert.equal((await importPrepared(pool,{...prepared,bundle:prepareImportBundle(changed,calendar).bundle},{dryRun:false})).ready,false);
   const collision=structuredClone(source);collision.members[0].providerData[0].uid='999999999';
   assert.equal((await importPrepared(pool,{...prepared,bundle:prepareImportBundle(collision,calendar).bundle},{dryRun:false})).ready,false);
+  const beforeHistory=await (await a('/api/im-reading-history')).json();
+  assert.equal((await a(`/api/devotional-notes/${note.id}`,'DELETE',{version:2})).status,200);
+  assert.equal((await a(`/api/devotional-notes/${note.id}`)).status,404);
+  assert.deepEqual(await (await a('/api/im-reading-history')).json(),beforeHistory);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM im_source_records WHERE note_id=$1',[note.id])).rows[0].n,0);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM user_reading_progress WHERE devotional_note_id=$1',[note.id])).rows[0].n,0);
+  const afterDelete=await verifyImported(pool,prepared);
+  assert.equal(afterDelete.mismatches,0);assert.equal(afterDelete.deletedNotes,1);
+  const replayDeleted=await importPrepared(pool,prepared,{dryRun:false});
+  assert.equal(replayDeleted.ready,false);
+  assert(replayDeleted.issues.some((issue:{code:string})=>issue.code==='TARGET_RECORD_MISSING_REQUIRES_REVIEW'));
+  assert.equal((await a(`/api/devotional-notes/${note.id}`)).status,404);
+  console.log('PASS imported note deletion: private body removed, check-ins retained, intentional deletion accounted for and replay blocked');
   console.log('PASS IM import: transaction rollback, replay, original dates/text, Google identity, owner-only HTTP, edit protection, safe batch reversal');
 }

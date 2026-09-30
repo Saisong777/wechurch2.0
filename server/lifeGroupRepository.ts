@@ -142,7 +142,7 @@ export function createShare(id: string, actor: string, shareId: string, input: z
     if (previous) { if (previous.group_id !== id || previous.author_id !== actor) throw conflict(); return { id: shareId }; }
     if (input.sourceId) {
       const table = input.kind === 'note' ? 'devotional_notes' : 'personal_prayers';
-      if (!(await c.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`, [input.sourceId, actor])).rowCount) throw missing();
+      if (!(await c.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2 FOR UPDATE`, [input.sourceId, actor])).rowCount) throw missing();
     }
     await c.query('INSERT INTO life_group_shares(id,group_id,author_id,kind,title,body,reference,source_id,is_anonymous) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)', [shareId, id, actor, input.kind, input.title, input.body, input.reference, input.sourceId, input.kind === 'prayer' && input.anonymous]);
     return { id: shareId };
