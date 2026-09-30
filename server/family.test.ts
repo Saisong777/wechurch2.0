@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
+import { familyCreateInput, familyJoinInput, familySettingsInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
 import { shareInput } from '../shared/lifeGroup';
 
 describe('family membership and community contracts', () => {
+  it('lists new official families by default with an explicit private option', () => {
+    expect(familyCreateInput.parse({ name:'同行', church:'IM 行動教會' })).toMatchObject({listed:true,audience:'unspecified'});
+    for (const audience of ['women','men','mixed','couples','other']) expect(familyCreateInput.parse({name:'同行',church:'IM 行動教會',audience,listed:false})).toMatchObject({audience,listed:false});
+    expect(familyCreateInput.safeParse({name:'同行',church:'IM 行動教會',audience:'invalid'}).success).toBe(false);
+    expect(familySettingsInput.shape.audience.safeParse('invalid').success).toBe(false);
+  });
+  it('accepts optional bounded introductions without silently approving membership', () => {
+    expect(familyJoinInput.parse({})).toEqual({message:''});
+    expect(familyJoinInput.parse({message:' 平安 ',status:'approved'})).toEqual({message:'平安'});
+    expect(familyJoinInput.safeParse({message:'a'.repeat(1001)}).success).toBe(false);
+  });
   it('accepts grouped short codes and preserves existing long invitation links', () => {
     expect(invitationToken.parse('AB12-CD34-EF56')).toBe('ab12cd34ef56');
     expect(invitationToken.parse('a'.repeat(48))).toBe('a'.repeat(48));

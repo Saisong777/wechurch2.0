@@ -62,8 +62,9 @@ export default function LifeGroupsPage() {
   return <div className="bg-background pb-6 [overflow-wrap:anywhere]">
     <Header title="我的小家" backTo="/" />
     <main className="mx-auto max-w-5xl px-4 py-5">
-      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">所有小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
-      {search.get('manage') === '1' ? <FamilyManagement /> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}`} id={groupId} initialTab={search.get('view') || 'all'} /> : q.isPending ? <p role="status">載入小家中…</p> : <>
+      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">我參與的小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
+      {search.get('manage') === '1' ? <FamilyManagement initialGroup={search.get('family')} /> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}`} id={groupId} initialTab={search.get('view') || 'all'} /> : q.isPending ? <p role="status">載入小家中…</p> : <>
+        {q.data?.groups.filter(g => (g.pendingRequestCount || 0) > 0).map(g => <Button key={g.id} asChild variant="outline" className="mb-4 mr-2"><Link to={`/groups?manage=1&family=${g.id}`}>{g.name} · {g.pendingRequestCount} 位等待審核<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>)}
         <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'all'}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小家管理' : ''}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
         {!q.data?.groups.length && <p className="py-6 text-muted-foreground">目前尚未加入小家。</p>}
         {q.data?.requests.map(r => <p key={r.id} className="border-b py-3 text-sm">{r.name} · {r.status === 'pending' ? '等待小家長確認' : '申請未通過，請聯絡小家長'}</p>)}
@@ -96,6 +97,7 @@ function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) 
   const info = q.data;
   return <>
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold">{info.name}</h2><p className="mt-1 text-sm text-muted-foreground">僅此小家成員可見 · {info.members.length} 位成員</p></div><Button variant="outline" onClick={() => setMembersOpen(true)}><Users className="mr-2 h-4 w-4" />成員{info.requests.length > 0 && ` (${info.requests.length})`}</Button></div>
+    {info.manager && info.requests.length > 0 && <Button asChild variant="outline" className="mb-4"><Link to={`/groups?manage=1&family=${id}`}>審核加入申請 · {info.requests.length}<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}
     {info.meeting && <p className="mb-4 text-sm text-muted-foreground">{info.meeting}</p>}
     {info.announcement && <section className="mb-5 border-y py-4"><h3 className="text-sm font-semibold text-primary">小家公告</h3><p className="mt-2 whitespace-pre-wrap leading-7">{info.announcement}</p></section>}
     {info.status === 'paused' && <p className="mb-4 text-sm text-muted-foreground">小家暫停聚會與招募，既有成員仍可彼此關心。</p>}

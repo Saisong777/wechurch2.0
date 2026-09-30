@@ -16,10 +16,13 @@ export async function verifyFamilyHttp(pool: Pool, makeClient: () => Client) {
     actors.push({ client,id });
   }
   const [leader,member,outsider,future] = actors;
-  const create = async (name: string) => {
-    const r = await leader.client(origin+'/management','POST',{name,church:'IM 行動教會'}); assert.equal(r.status,201); return (await r.json()).id as string;
+  const create = async (name: string, extra = {}) => {
+    const r = await leader.client(origin+'/management','POST',{name,church:'IM 行動教會',...extra}); assert.equal(r.status,201); return (await r.json()).id as string;
   };
-  const first = await create('驗證小家一'), second = await create('驗證小家二');
+  const first = await create('驗證小家一',{audience:'couples'}), second = await create('驗證小家二',{listed:false});
+  const initialDirectory = await (await member.client(origin+'/directory')).json();
+  assert.equal(initialDirectory.groups.find((g:{id:string}) => g.id === first)?.audience,'couples');
+  assert(!initialDirectory.groups.some((g:{id:string}) => g.id === second));
   const settings = { version:1, name:'驗證小家一', description:'公開簡介', meeting:'週五晚上', announcement:'私人聚會地址', listed:true, status:'active', leaderId:leader.id };
   assert.equal((await leader.client(`${origin}/management/${first}`,'PATCH',settings)).status,200);
   assert.equal((await member.client(`${origin}/management/${first}`,'PATCH',{...settings,version:2})).status,403);
@@ -36,7 +39,25 @@ export async function verifyFamilyHttp(pool: Pool, makeClient: () => Client) {
   assert(!directory.groups.some((g: {id:string})=>g.id===second));
   assert(!JSON.stringify(directory).includes('私人聚會地址'));
   assert.equal((await member.client(`${origin}/directory/${second}/join`,'POST',{})).status,404);
-  assert.equal((await member.client(`${origin}/directory/${first}/join`,'POST',{})).status,200);
+  assert.equal((await member.client(`${origin}/directory/${first}/join`,'POST',{message:'希望先認識聚會方式'})).status,200);
+  assert.equal((await member.client(`${origin}/directory/${first}/join`,'POST',{message:'重複送出不得覆蓋'})).status,200);
+  const pending = await (await leader.client(`${origin}/management/${first}`)).json();
+  assert.equal(pending.requests[0].message,'希望先認識聚會方式');
+  assert.equal((await (await leader.client(origin+'/management')).json()).groups.find((g:{id:string})=>g.id===first).pendingRequestCount,1);
+  assert.equal((await (await leader.client(origin)).json()).groups.find((g:{id:string})=>g.id===first).pendingRequestCount,1);
+  assert.equal((await member.client(`${origin}/management/${first}/requests/${member.id}`,'POST',{approve:true})).status,403);
+  assert.equal((await member.client(`${origin}/management/${first}`)).status,403);
+  const pendingDirectory = await (await member.client(origin+'/directory')).json();
+  assert.equal(pendingDirectory.groups.find((g:{id:string})=>g.id===first).membershipStatus,'pending');
+  assert(!JSON.stringify(pendingDirectory).includes('希望先認識聚會方式'));
+  assert.equal((await member.client(`${origin}/directory/${first}/join`,'DELETE')).status,200);
+  assert.equal((await member.client(`${origin}/directory/${first}/join`,'DELETE')).status,409);
+  assert.equal((await member.client(`${origin}/${first}`)).status,404);
+  await member.client(`${origin}/directory/${first}/join`,'POST',{message:'再次申請'});
+  assert.equal((await leader.client(`${origin}/management/${first}/requests/${member.id}`,'POST',{approve:false})).status,200);
+  assert.equal((await member.client(`${origin}/${first}`)).status,404);
+  assert.equal((await (await member.client(origin+'/directory')).json()).groups.find((g:{id:string})=>g.id===first).membershipStatus,'rejected');
+  assert.equal((await member.client(`${origin}/directory/${first}/join`,'POST',{message:'重新安排'})).status,200);
   assert.equal((await member.client(`${origin}/${first}/shares?kind=all`)).status,404);
   const historicalId = randomUUID();
   assert.equal((await leader.client(`${origin}/${first}/shares/${historicalId}`,'PUT',{kind:'prayer',title:'舊代禱',body:'加入前的私密內容',consent:true})).status,200);

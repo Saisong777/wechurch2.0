@@ -269,7 +269,8 @@ export const smallGroups = pgTable("small_groups", {
   description: text("description").default('').notNull(),
   meeting: text("meeting").default('').notNull(),
   announcement: text("announcement").default('').notNull(),
-  isListed: boolean("is_listed").default(false).notNull(),
+  isListed: boolean("is_listed").default(true).notNull(),
+  audience: text("audience").default('unspecified').notNull(),
   lifecycle: text("lifecycle").default('active').notNull(),
   version: integer("version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1443,6 +1444,7 @@ export const lifeGroupRequests = pgTable('life_group_requests', {
   groupId: uuid('group_id').notNull().references(() => smallGroups.id),
   userId: uuid('user_id').notNull().references(() => users.id),
   status: text('status').notNull(),
+  message: text('message').notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => ({ pk: primaryKey({ columns: [t.groupId,t.userId] }), status: check('life_group_requests_status_check', sql`${t.status} IN ('pending','approved','rejected')`) }));
 export const lifeGroupReading = pgTable('life_group_reading', {

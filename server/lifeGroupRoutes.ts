@@ -6,7 +6,7 @@ import { careInput, careUpdateInput, commentInput, groupCreateInput, shareEditIn
 import * as groups from './lifeGroupRepository';
 import { isTestDeployment, stagingTicket } from './deploymentSafety';
 import * as families from './familyRepository';
-import { familyCreateInput, familySettingsInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
+import { familyCreateInput, familySettingsInput, familyJoinInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
 import { apiIdentity, boundedWindowLimiter } from './requestLimits';
 
 export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string | null>) {
@@ -31,7 +31,8 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
   router.post('/', async (req, res) => { res.status(201).json(await groups.createGroup(res.locals.actor, groupCreateInput.parse(req.body).name)); });
   router.post('/join', boundedWindowLimiter({ max: 10, windowMs: 60000, key: apiIdentity }), async (req, res) => { res.json(await groups.requestJoin(res.locals.actor, z.object({ token: invitationToken }).parse(req.body).token)); });
   router.get('/directory', async (req, res) => { res.json(await families.familyDirectory(res.locals.actor, z.string().max(100).default('').parse(req.query.church), z.string().trim().max(100).default('').parse(req.query.search))); });
-  router.post('/directory/:id/join', async (req, res) => { res.json(await families.joinListedFamily(res.locals.actor, uuid.parse(req.params.id))); });
+  router.post('/directory/:id/join', boundedWindowLimiter({ max: 10, windowMs: 60000, key: apiIdentity }), async (req, res) => { res.json(await families.joinListedFamily(res.locals.actor, uuid.parse(req.params.id), familyJoinInput.parse(req.body).message)); });
+  router.delete('/directory/:id/join', async (req, res) => { res.json(await families.withdrawFamilyJoin(res.locals.actor, uuid.parse(req.params.id))); });
   router.get('/matching', async (_req, res) => { res.json(await families.myMatching(res.locals.actor)); });
   router.post('/matching', async (req, res) => { res.status(201).json(await families.requestMatching(res.locals.actor, matchingInput.parse(req.body))); });
   router.delete('/matching/:id', async (req, res) => { res.json(await families.cancelMatching(res.locals.actor, uuid.parse(req.params.id))); });

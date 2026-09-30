@@ -38,6 +38,7 @@ export async function canCreateGroup(actor: string) {
 }
 export async function myGroups(actor: string) {
   const groups = (await pool.query(`SELECT g.id,g.name,g.church,(g.leader_user_id=$1 OR g.pastor_user_id=$1) IS TRUE AS manager,
+    CASE WHEN g.leader_user_id=$1 OR g.pastor_user_id=$1 THEN (SELECT count(*)::int FROM life_group_requests r WHERE r.group_id=g.id AND r.status='pending') ELSE 0 END AS "pendingRequestCount",
     (SELECT count(DISTINCT uid)::int FROM (SELECT user_id AS uid FROM small_group_members WHERE group_id=g.id AND is_active UNION SELECT g.leader_user_id UNION SELECT g.pastor_user_id) a WHERE uid IS NOT NULL) AS "memberCount"
     FROM small_groups g WHERE g.is_active AND ${activeMember.replaceAll('$2', '$1')} ORDER BY g.name`, [actor])).rows;
   const requests = (await pool.query("SELECT r.group_id AS id,g.name,r.status FROM life_group_requests r JOIN small_groups g ON g.id=r.group_id WHERE r.user_id=$1 AND g.is_active AND r.status!='approved' ORDER BY r.created_at DESC", [actor])).rows;
@@ -55,7 +56,7 @@ async function members(c: PoolClient, id: string) {
     WHERE g.id=$1 ORDER BY manager DESC,name,u.id`, [id])).rows;
 }
 export function groupInfo(id: string, actor: string) {
-  return withGroup(id, actor, async (c, group) => ({ ...group, members: await members(c, id), requests: group.manager ? (await c.query(`SELECT r.user_id AS id,${nameSql('u')} AS name FROM life_group_requests r JOIN users u ON u.id=r.user_id WHERE r.group_id=$1 AND r.status='pending' ORDER BY r.created_at`, [id])).rows : [] }));
+  return withGroup(id, actor, async (c, group) => ({ ...group, members: await members(c, id), requests: group.manager ? (await c.query(`SELECT r.user_id AS id,${nameSql('u')} AS name,r.message,r.created_at AS "createdAt" FROM life_group_requests r JOIN users u ON u.id=r.user_id WHERE r.group_id=$1 AND r.status='pending' ORDER BY r.created_at`, [id])).rows : [] }));
 }
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 export function rotateInvite(id: string, actor: string) {
