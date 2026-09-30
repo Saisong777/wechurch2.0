@@ -38,15 +38,15 @@ export function MobileNavigation() {
   }, [open]);
 
   return <div ref={root} className="mobile-navigation sticky top-0 z-40 shrink-0 border-b border-border bg-background md:hidden" data-testid="mobile-navigation">
-    <div className="mobile-navigation-bar mx-auto grid min-h-14 max-w-xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 px-2">
-      <button type="button" aria-label="返回上一頁" className="flex min-h-12 items-center justify-center rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
+    <div className="mobile-navigation-bar mx-auto grid min-h-[56px] max-w-xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[4px] px-[8px]">
+      <button type="button" aria-label="返回上一頁" className="flex min-h-[48px] min-w-[44px] items-center justify-center whitespace-nowrap rounded-md text-[min(0.875rem,20px)] font-medium focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => { setOpen(false); if ((window.history.state?.idx ?? 0) > 0) navigate(-1); else navigate('/', { replace: true }); }}>
-        <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden="true" />返回
+        <ChevronLeft className="h-[20px] w-[20px] shrink-0" aria-hidden="true" />返回
       </button>
-      <Link to="/" onClick={() => setOpen(false)} aria-label={`${title}，回首頁`} className="flex min-h-12 min-w-0 items-center justify-center gap-2 text-center text-base font-semibold focus-visible:ring-2 focus-visible:ring-ring"><WeChurchLogo size={28} /><span className="truncate">{title}</span></Link>
-      <div className="flex shrink-0 items-center gap-1"><NotificationBell /><button ref={trigger} type="button" aria-expanded={open} aria-controls={menuId} aria-label={open ? '關閉導覽選單' : '開啟導覽選單'}
-        className="flex min-h-12 items-center justify-center gap-1 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setOpen(!open)}>
-        {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}選單
+      <Link to="/" onClick={() => setOpen(false)} aria-label={`${title}，回首頁`} className="flex min-h-[48px] min-w-0 items-center justify-center gap-[6px] text-center text-[min(1rem,22px)] font-semibold focus-visible:ring-2 focus-visible:ring-ring"><WeChurchLogo size={28} /><span className="truncate">{title}</span></Link>
+      <div className="flex shrink-0 items-center gap-[4px]"><NotificationBell /><button ref={trigger} type="button" aria-expanded={open} aria-controls={menuId} aria-label={open ? '關閉導覽選單' : '開啟導覽選單'}
+        className="flex min-h-[48px] min-w-[44px] items-center justify-center gap-[4px] whitespace-nowrap rounded-md text-[min(0.875rem,20px)] font-medium focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setOpen(!open)}>
+        {open ? <X className="h-[20px] w-[20px]" aria-hidden="true" /> : <Menu className="h-[20px] w-[20px]" aria-hidden="true" />}選單
       </button></div>
     </div>
     <nav id={menuId} aria-label="行動導覽選單" hidden={!open} className="mobile-navigation-menu absolute inset-x-0 top-full overflow-y-auto overscroll-contain border-t border-border bg-background shadow-md">
