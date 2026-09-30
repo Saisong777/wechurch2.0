@@ -10,7 +10,7 @@
 
 ## Release And Acceptance
 
-- Source baseline: `437b2367869f7e7eba8eabf481a1f86d5611176d`, including the latest page-load recovery.
+- Initial source baseline: `437b2367869f7e7eba8eabf481a1f86d5611176d`, including page-load recovery. The release guard detected the concurrent Bible-entry update before uploading; merged live source `a66befa0ebf081a23e5ce0b01c38bd4e5a8216f5` and its verified B release record `b3ddd348-0b84-45ef-b257-403d3a797a28` before revalidation.
 - Work in an isolated checkout, not the in-use B source checkout or the dirty legacy workspace.
 - Program checks run in the existing GitHub CI workflow, including unit tests and their deployment-check poststep. No developer-machine test server/database is started. The optional localhost database integrity suite is not run for this presentation-only change.
 - `deploy-ci` requires successful checks on the exact committed source, all four existing CI steps, a clean checkout and a strict homepage-only changed-file allowlist against the verified live release. It retains the existing Railway isolation, deployed-source ancestry, migration hash, reference asset, immutable snapshot and pre-upload concurrency gates. Backend changes must use the full release path.
