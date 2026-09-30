@@ -61,8 +61,8 @@ async function journey(page, {origin,code,actors,output,run}) {
   }
   const go=async(p,url)=>{await p.goto(origin+url);await p.locator('main').waitFor();};
   const layout=async(p,label)=>{
-    const bad=await p.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,error:!!document.querySelector('[data-testid="text-error-title"]')}));
-    expect(!bad.overflow&&!bad.error,label);await p.screenshot({path:output+'/'+label+'.png',fullPage:true});
+    const bad=await p.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,error:!!document.querySelector('[data-testid="text-error-title"]'),cardOverflow:[...document.querySelectorAll('main a[href^="/groups/"]')].some(a=>{const r=a.getBoundingClientRect();return [...a.children].some(c=>{const b=c.getBoundingClientRect();return b.left<r.left||b.right>r.right;});})}));
+    expect(!bad.overflow&&!bad.error&&!bad.cardOverflow,label);await p.screenshot({path:output+'/'+label+'.png',fullPage:true});
   };
   await go(memberPage,'/groups');
   await memberPage.getByRole('heading',{name,exact:true}).waitFor();
