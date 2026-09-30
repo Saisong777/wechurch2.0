@@ -10,6 +10,7 @@ export type EmailProviderStatus = {
   reason: 'ready' | 'staging' | 'disabled' | 'not_configured';
   message: string;
   remindersEnabled?: boolean;
+  interactionNotificationsEnabled?: boolean;
 };
 
 export const mailbox = z.string().trim().email().max(254);
@@ -20,6 +21,7 @@ export const profileNotificationInput = z.object({
   redirectUrl: z.string().max(2000).default('/'),
 });
 export const emailPreferencesInput = z.object({
+  interactionEmailEnabled: z.boolean().optional(),
   dailyFollowEnabled: z.boolean().optional(),
   dailyFollowTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
   timezone: z.string().trim().max(80).refine(value => {

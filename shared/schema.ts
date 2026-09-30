@@ -92,6 +92,8 @@ export const userEmailPreferences = pgTable("user_email_preferences", {
   timezone: text("timezone").default("Asia/Taipei").notNull(),
   lastDailyFollowSentAt: timestamp("last_daily_follow_sent_at"),
   dailyFollowConsentAt: timestamp("daily_follow_consent_at"),
+  interactionEmailEnabled: boolean('interaction_email_enabled').default(false).notNull(),
+  interactionEmailConsentAt: timestamp('interaction_email_consent_at',{withTimezone:true}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1529,3 +1531,19 @@ export const groupGatheringEvents = pgTable('group_gathering_events', {
   id: uuid('id').primaryKey().defaultRandom(), gatheringId: uuid('gathering_id').notNull().references(() => groupGatherings.id), actorId: uuid('actor_id').notNull().references(() => users.id),
   changes: jsonb('changes').notNull(), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => ({ history: index('group_gathering_events_history').on(t.gatheringId,t.createdAt) }));
+
+export const interactionNotifications = pgTable('interaction_notifications', {
+  id:uuid('id').primaryKey().defaultRandom(),userId:uuid('user_id').notNull().references(() => users.id,{onDelete:'cascade'}),
+  actorId:uuid('actor_id').notNull().references(() => users.id,{onDelete:'cascade'}),eventKey:text('event_key').notNull(),kind:text('kind').notNull(),
+  prayerId:uuid('prayer_id').references(() => prayers.id,{onDelete:'cascade'}),shareId:uuid('share_id').references(() => lifeGroupShares.id,{onDelete:'cascade'}),
+  prayerCommentId:uuid('prayer_comment_id').references(() => prayerComments.id,{onDelete:'cascade'}),familyCommentId:uuid('family_comment_id').references(() => lifeGroupComments.id,{onDelete:'cascade'}),
+  createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),readAt:timestamp('read_at',{withTimezone:true}),emailClaimedAt:timestamp('email_claimed_at',{withTimezone:true}),
+},t => ({receipt:uniqueIndex('interaction_notifications_user_id_event_key_key').on(t.userId,t.eventKey),
+  feed:index('interaction_notifications_feed').on(t.userId,t.createdAt.desc(),t.id.desc()),unread:index('interaction_notifications_unread').on(t.userId,t.createdAt.desc()).where(sql`${t.readAt} IS NULL`),
+  email:index('interaction_notifications_email').on(t.userId,t.createdAt).where(sql`${t.readAt} IS NULL AND ${t.emailClaimedAt} IS NULL`),
+  kind:check('interaction_notifications_kind_check',sql`${t.kind} IN ('prayer_amen','prayer_reaction','prayer_comment','family_prayed','family_comment')`),
+  notSelf:check('interaction_notifications_check',sql`${t.userId}<>${t.actorId}`),target:check('interaction_notifications_check1',sql`(${t.prayerId} IS NOT NULL)::int+(${t.shareId} IS NOT NULL)::int=1`) }));
+export const interactionEmailDeliveries = pgTable('interaction_email_deliveries',{
+  userId:uuid('user_id').notNull().references(() => users.id,{onDelete:'cascade'}),batchHour:timestamp('batch_hour',{withTimezone:true}).notNull(),
+  status:text('status').notNull(),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+},t => ({pk:primaryKey({columns:[t.userId,t.batchHour]}),status:check('interaction_email_deliveries_status_check',sql`${t.status} IN ('claimed','accepted','unconfirmed','skipped')`)}));

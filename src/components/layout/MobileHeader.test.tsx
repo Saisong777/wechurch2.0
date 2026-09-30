@@ -4,6 +4,7 @@ vi.mock('@/hooks/useAccessControl', () => ({ useAccessControl: () => ({ data: un
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('@/components/notifications/NotificationBell',() => ({NotificationBell:() => null}));
 import { AppLayout } from './AppLayout';
 import { Header } from './Header';
 import { MobileAccountActions } from './MobileAccountActions';

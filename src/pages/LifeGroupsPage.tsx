@@ -19,6 +19,7 @@ import { FamilyJoinPanel } from '@/components/groups/FamilyJoinPanel';
 import { FamilyManagement } from '@/components/groups/FamilyManagement';
 import { FamilyComments } from '@/components/groups/FamilyComments';
 import { familyBase as base, familyRequest as request, useFamilyQuery as useGroupQuery } from '@/lib/familyApi';
+import { notificationTargetId } from '@shared/notifications';
 
 const selectClass = 'h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm';
 function Notice({ error, retry }: { error?: Error | null; retry?: () => void }) {
@@ -64,7 +65,7 @@ export default function LifeGroupsPage() {
     <Header title="我的小家" backTo="/" />
     <main className="mx-auto max-w-5xl px-4 py-5">
       {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">我參與的小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
-      {search.get('manage') === '1' ? <FamilyManagement initialGroup={search.get('family')} /> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}`} id={groupId} initialTab={search.get('view') || 'all'} /> : q.isPending ? <p role="status">載入小家中…</p> : <>
+      {search.get('manage') === '1' ? <FamilyManagement initialGroup={search.get('family')} /> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}:${search.get('share') || ''}:${search.get('comment') || ''}`} id={groupId} initialTab={search.get('share') ? 'all' : search.get('view') || 'all'} /> : q.isPending ? <p role="status">載入小家中…</p> : <>
         {q.data?.groups.filter(g => (g.pendingRequestCount || 0) > 0).map(g => <Button key={g.id} asChild variant="outline" className="mb-4 mr-2"><Link to={`/groups?manage=1&family=${g.id}`}>{g.name} · {g.pendingRequestCount} 位等待審核<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>)}
         <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'all'}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="min-w-0 flex-1"><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小家管理' : ''}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
         {!q.data?.groups.length && <p className="py-6 text-muted-foreground">目前尚未加入小家。</p>}
@@ -152,13 +153,21 @@ function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string;
 }
 
 function ShareFeed({ id, kind, info, actor, busy, act, compose }: { id: string; kind: GroupShare['kind'] | 'all'; info: Info; actor: string; busy: boolean; act: Act; compose: (kind: GroupShare['kind'], existing?: GroupShare) => void }) {
+  const [search] = useSearchParams();
+  const targetId = notificationTargetId(search.get('share'));
+  const targetComment = notificationTargetId(search.get('comment'));
+  const target = useGroupQuery<GroupShare>(`/${id}/shares/${targetId}`,!!targetId);
   const [page, setPage] = useState(0);
   const q = useGroupQuery<GroupShare[]>(`/${id}/shares?kind=${kind}&offset=${page * 30}`);
   return <section className="space-y-4"><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => compose('note')}><Pencil className="mr-2 h-4 w-4" />分享靈修筆記</Button><Button variant="outline" onClick={() => compose('prayer')}><Heart className="mr-2 h-4 w-4" />新增小家代禱</Button><Button variant="outline" onClick={() => compose('message')}><MessageCircle className="mr-2 h-4 w-4" />生活留言</Button></div>
-    {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : q.isPending ? <p role="status">載入分享中…</p> : <>
-      {!q.data.length && <p className="py-6 text-center text-muted-foreground">{page ? '沒有更多分享。' : '還沒有分享，來和家人打聲招呼吧。'}</p>}
-      <div className="space-y-4">{q.data.map(post => <article key={post.id} className="min-w-0 rounded-lg border p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{post.authorName} · {time(post.createdAt)}{post.answered && ' · 已蒙應允'}</p><h3 className="mt-2 text-lg font-semibold">{post.title}</h3></div><div className="flex">{(post.isOwner || post.authorId === actor) && <Button size="icon" variant="ghost" title="編輯分享" aria-label={`編輯 ${post.title}`} onClick={() => compose(post.kind, post)}><Pencil className="h-4 w-4" /></Button>}{((post.isOwner || post.authorId === actor) || info.manager) && <Button size="icon" variant="ghost" title="撤回分享" aria-label={`撤回 ${post.title}`} disabled={busy} onClick={() => { if (window.confirm('撤回這則分享及其回應？私人原稿不受影響。')) void act(() => request(`/${id}/shares/${post.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></div>{post.reference && <p className="mt-2 text-sm font-medium text-primary">{post.reference}</p>}<p className="mt-3 whitespace-pre-wrap text-sm leading-7">{post.body}</p>{post.kind === 'prayer' && <div className="mt-4"><Button size="sm" variant={post.prayed ? 'secondary' : 'outline'} disabled={busy || post.prayed} onClick={() => void act(() => request(`/${id}/shares/${post.id}/prayed`, 'PUT', {}))}><Heart className="mr-2 h-4 w-4" />{post.prayed ? '已為你禱告' : '為你禱告'} · {post.prayerCount}</Button></div>}<FamilyComments groupId={id} shareId={post.id} actor={actor} manager={info.manager} count={post.commentCount} /></article>)}</div><Pages page={page} setPage={setPage} count={q.data.length} />
-    </>}
+    {q.isError && <Notice error={q.error as Error} retry={() => q.refetch()} />}
+    {q.isPending && <p role="status">載入分享中…</p>}
+    <>
+      {!q.isPending && !q.isError && !q.data?.length && !targetId && <p className="py-6 text-center text-muted-foreground">{page ? '沒有更多分享。' : '還沒有分享，來和家人打聲招呼吧。'}</p>}
+      {targetId && target.isPending && <p role="status">正在載入通知中的分享…</p>}
+      {targetId && target.isError && <Notice error={target.error as Error} retry={() => void target.refetch()} />}
+      <div className="space-y-4">{[...(!target.isError && target.data ? [target.data] : []),...(!q.isError ? q.data || [] : []).filter(post => post.id !== targetId)].map(post => <article key={post.id} className={`min-w-0 scroll-mt-32 rounded-lg border p-4 sm:p-5 ${post.id === targetId ? 'border-primary' : ''}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{post.authorName} · {time(post.createdAt)}{post.answered && ' · 已蒙應允'}</p><h3 className="mt-2 text-lg font-semibold">{post.title}</h3></div><div className="flex">{(post.isOwner || post.authorId === actor) && <Button size="icon" variant="ghost" title="編輯分享" aria-label={`編輯 ${post.title}`} onClick={() => compose(post.kind, post)}><Pencil className="h-4 w-4" /></Button>}{((post.isOwner || post.authorId === actor) || info.manager) && <Button size="icon" variant="ghost" title="撤回分享" aria-label={`撤回 ${post.title}`} disabled={busy} onClick={() => { if (window.confirm('撤回這則分享及其回應？私人原稿不受影響。')) void act(() => request(`/${id}/shares/${post.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></div>{post.reference && <p className="mt-2 text-sm font-medium text-primary">{post.reference}</p>}<p className="mt-3 whitespace-pre-wrap text-sm leading-7">{post.body}</p>{post.kind === 'prayer' && <div className="mt-4"><Button size="sm" variant={post.prayed ? 'secondary' : 'outline'} disabled={busy || post.prayed} onClick={() => void act(() => request(`/${id}/shares/${post.id}/prayed`, 'PUT', {}))}><Heart className="mr-2 h-4 w-4" />{post.prayed ? '已為你禱告' : '為你禱告'} · {post.prayerCount}</Button></div>}<FamilyComments groupId={id} shareId={post.id} actor={actor} manager={info.manager} count={post.commentCount} targetCommentId={post.id === targetId ? targetComment : ''} /></article>)}</div>{q.data && !q.isError && <Pages page={page} setPage={setPage} count={q.data.length} />}
+    </>
   </section>;
 }
 function ShareComposer({ id, groupName, kind, reference = '', existing, close }: { id: string; groupName: string; kind: GroupShare['kind']; reference?: string; existing?: GroupShare; close: () => void }) {

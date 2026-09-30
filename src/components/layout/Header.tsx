@@ -22,6 +22,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useAccessControl } from '@/hooks/useAccessControl';
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { ReadingNavigation } from '@/components/scripture/ReadingNavigation';
 
 interface HeaderProps {
@@ -244,6 +245,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
             {rightContent}
             <AppearanceControl />
+            <NotificationBell />
             {userMenu}
           </div>
         </div>

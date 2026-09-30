@@ -17,7 +17,7 @@ beforeEach(()=>{fail=false;posts=[];rows=[];localStorage.clear();vi.stubGlobal('
   return {ok:true,json:async()=>rows};
 }));});
 afterEach(()=>{cleanup();clients.forEach(c=>c.clear());clients.length=0;vi.unstubAllGlobals();});
-function show(readOnly=false){const client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});clients.push(client);render(<QueryClientProvider client={client}><PrayerComments prayerId="prayer" anonymousOwner count={2} readOnly={readOnly} /></QueryClientProvider>);}
+function show(readOnly=false,targetCommentId=''){const client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});clients.push(client);render(<QueryClientProvider client={client}><PrayerComments prayerId="prayer" anonymousOwner count={2} readOnly={readOnly} initiallyExpanded={!!targetCommentId} targetCommentId={targetCommentId} /></QueryClientProvider>);}
 async function expand(){fireEvent.click(screen.getByRole('button',{name:'寫下鼓勵 · 2'}));await screen.findByRole('textbox',{name:'回應內容'});}
 it('does not fetch every collapsed conversation',()=>{
   show();expect(fetch).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'寫下鼓勵 · 2'})).toBeTruthy();
@@ -67,4 +67,9 @@ it('retains read-only history without a composer on completed prayers',async()=>
   await screen.findByText('還沒有回應');
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(screen.queryByRole('button',{name:'送出回應'})).toBeNull();
+});
+it('expands and focuses a notified reply rather than focusing the composer',async()=>{
+  rows=[{id:'target',authorName:'家人',kind:'encouragement',content:'這則鼓勵',createdAt:new Date().toISOString()}];show(false,'target');
+  const body=await screen.findByText('這則鼓勵');await waitFor(() => expect(body.closest('article')).toHaveFocus());
+  expect(screen.getByRole('textbox',{name:'回應內容'})).not.toHaveFocus();expect(screen.queryByRole('dialog')).toBeNull();
 });

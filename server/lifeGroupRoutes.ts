@@ -64,6 +64,8 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
   router.get('/:groupId/reading', async (req, res) => { res.json(await groups.groupReading(...args(res), devotionDate.parse(req.query.date))); });
   router.put('/:groupId/reading/:devotionId', async (req, res) => { const input = z.object({ version: z.number().int().positive(), done: z.boolean() }).parse(req.body); res.json(await groups.markReading(...args(res), uuid.parse(req.params.devotionId), input.version, input.done)); });
   router.get('/:groupId/shares', async (req, res) => { res.json(await groups.listShares(...args(res), z.enum(['note','prayer','message','all']).parse(req.query.kind), offset(req))); });
+  router.get('/:groupId/shares/:shareId',async(req,res) => { res.json(await groups.getShare(...args(res),uuid.parse(req.params.shareId))); });
+  router.get('/:groupId/shares/:shareId/comments/:commentId',async(req,res) => { res.json(await groups.getShareComment(...args(res),uuid.parse(req.params.shareId),uuid.parse(req.params.commentId))); });
   router.put('/:groupId/shares/:shareId', async (req, res) => { res.json(await groups.createShare(...args(res), uuid.parse(req.params.shareId), shareInput.parse(req.body))); });
   router.patch('/:groupId/shares/:shareId', async (req, res) => { res.json(await groups.editShare(...args(res), uuid.parse(req.params.shareId), shareEditInput.parse(req.body))); });
   router.delete('/:groupId/shares/:shareId', async (req, res) => { res.json(await groups.withdrawShare(...args(res), uuid.parse(req.params.shareId))); });

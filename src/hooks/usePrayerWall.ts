@@ -22,6 +22,10 @@ export const usePrayerWall = (mine = false) => {
   const { user } = useAuth();
   return useQuery<Prayer[]>({ queryKey:['prayer-wall',user?.id,mine?'mine':'active'], enabled:!!user, queryFn:() => request(mine?'?view=my':''), refetchInterval:30000, refetchIntervalInBackground:false, retry:false });
 };
+export function usePrayerTarget(id: string) {
+  const {user} = useAuth();
+  return useQuery<Prayer>({queryKey:['prayer-wall',user?.id,'target',id],enabled:!!user && !!id,queryFn:() => request(`/${id}`),retry:false,staleTime:10000});
+}
 function useRefreshWall() {
   const client = useQueryClient();
   return async () => {

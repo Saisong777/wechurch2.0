@@ -100,6 +100,7 @@ import { readingPlanAccess, retiredOperations } from './readingPlanAccess';
 import { personalPrayerRoutes } from './personalPrayerRoutes';
 import { prayerSharingRoutes } from './prayerSharingRoutes';
 import { prayerInteractionRoutes } from './prayerInteractionRoutes';
+import { notificationRoutes } from './notificationRoutes';
 import { accessControlRoutes, changeAccountRole, hasPermission, myAccess, memberRoleNames } from './accessControl';
 import type { Permission } from '../shared/accessControl';
 import { GroupError } from './groupError';
@@ -740,6 +741,7 @@ export async function registerRoutes(app: Express) {
   app.use('/api/access-control', accessControlRoutes(resolveUserId));
   app.use('/api/admin/church-devotions', churchDevotionRoutes(requireDelegated('devotions.manage', ['admin','senior_pastor'])));
   app.use('/api/life-groups', lifeGroupRoutes(resolveUserId));
+  app.use('/api/notifications',notificationRoutes(resolveUserId));
   app.use('/api/bible-study', bibleStudyRoutes());
   app.use('/open/api', (req, res) => res.redirect(308, `/api/bible-study${req.url.startsWith('/') ? req.url : '/'}`));
   app.use('/open', bibleStudyCreditsRoutes());
@@ -4016,6 +4018,8 @@ export async function registerRoutes(app: Express) {
     timezone: "Asia/Taipei",
     lastDailyFollowSentAt: null,
     dailyFollowConsentAt: null,
+    interactionEmailEnabled: false,
+    interactionEmailConsentAt: null,
     createdAt: null,
     updatedAt: null,
   });
@@ -4060,15 +4064,21 @@ export async function registerRoutes(app: Express) {
       if (parsed.data.dailyFollowEnabled === true && !emailProviderStatus().remindersEnabled) {
         return res.status(409).json({ error: '提醒寄送尚未啟用，啟用後請再開啟訂閱。' });
       }
+      if (parsed.data.interactionEmailEnabled === true && !emailProviderStatus().interactionNotificationsEnabled) {
+        return res.status(409).json({error:'互動通知寄送尚未啟用，請稍後再開啟。'});
+      }
 
       const now = new Date();
       const consent = parsed.data.dailyFollowEnabled === true ? now : parsed.data.dailyFollowEnabled === false ? null : undefined;
+      const interactionConsent = parsed.data.interactionEmailEnabled === true ? now : parsed.data.interactionEmailEnabled === false ? null : undefined;
       const [preferences] = await db
         .insert(userEmailPreferences)
         .values({
           userId,
           dailyFollowEnabled: parsed.data.dailyFollowEnabled ?? false,
           dailyFollowConsentAt: consent ?? null,
+          interactionEmailEnabled: parsed.data.interactionEmailEnabled ?? false,
+          interactionEmailConsentAt: interactionConsent ?? null,
           dailyFollowTime: parsed.data.dailyFollowTime || "07:00",
           timezone: parsed.data.timezone || "Asia/Taipei",
           updatedAt: now,
@@ -4078,6 +4088,7 @@ export async function registerRoutes(app: Express) {
           set: {
             ...parsed.data,
             ...(consent !== undefined ? { dailyFollowConsentAt: consent } : {}),
+            ...(interactionConsent !== undefined ? { interactionEmailConsentAt: interactionConsent } : {}),
             updatedAt: now,
           },
         })

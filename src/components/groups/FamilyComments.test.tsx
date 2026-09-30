@@ -18,14 +18,15 @@ beforeEach(() => {
       return {ok:true,json:async()=>({ok:true})};
     }
     if (init.method === 'DELETE') { records = records.filter(c => !url.endsWith('/'+c.id)); return {ok:true,json:async()=>({ok:true})}; }
+    if (/\/comments\/c\d+$/.test(url)) return {ok:true,json:async() => records.find(c => url.endsWith('/'+c.id))};
     const offset = Number(new URL(url,'https://example.test').searchParams.get('offset'));
     return {ok:!failRead,json:async()=>failRead?{error:'無法讀取'}:[...records].reverse().slice(offset,offset+30)};
   }));
 });
 afterEach(()=>{cleanup(); clients.forEach(c=>c.clear()); clients.length=0; vi.restoreAllMocks(); vi.unstubAllGlobals();});
-function show(count=records.length, manager=false) {
+function show(count=records.length, manager=false,targetCommentId='') {
   const client = new QueryClient({ defaultOptions:{ queries:{retry:false},mutations:{retry:false} } }); clients.push(client);
-  render(<QueryClientProvider client={client}><FamilyComments groupId="group" shareId="share" actor="member" manager={manager} count={count}/></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><FamilyComments groupId="group" shareId="share" actor="member" manager={manager} count={count} targetCommentId={targetCommentId}/></QueryClientProvider>);
 }
 const replies = () => within(screen.getByRole('list',{name:'留言內容'}));
 async function write(body: string) {
@@ -94,4 +95,10 @@ it('does not request empty threads until the user starts a reply',async()=>{
   records=[]; show(0); expect(fetch).not.toHaveBeenCalled();
   await write('第一則留言'); await replies().findByText('第一則留言');
   expect(screen.queryByRole('dialog')).toBeNull();
+});
+it('opens a notified older comment outside the first page without opening a composer',async() => {
+  records=Array.from({length:35},(_,i)=>comment(i+1));show(35,false,'c1');
+  await screen.findByText('留言1');await waitFor(() => expect(screen.getByText('留言1').closest('li')).toHaveFocus());
+  expect(screen.queryByRole('textbox')).toBeNull();expect(screen.queryByRole('dialog')).toBeNull();
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/comments/c1'))).toBe(true);
 });

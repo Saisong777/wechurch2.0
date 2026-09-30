@@ -70,7 +70,7 @@ export function withdrawPrayerDelivery(actor: string, prayerId: string, destinat
   });
 }
 
-export async function publicPrayerFeed(actor: string, mine = false) {
+export async function publicPrayerFeed(actor: string, mine = false, id: string | null = null) {
   return (await pool.query(`SELECT p.id,p.content,p.category,p.is_anonymous AS "isAnonymous",p.is_pinned AS "isPinned",p.is_answered AS "isAnswered",p.answered_at AT TIME ZONE 'UTC' AS "answeredAt",p.scripture_reference AS "scriptureReference",p.created_at AT TIME ZONE 'UTC' AS "createdAt",
     CASE WHEN p.is_anonymous THEN NULL ELSE p.user_id END AS "userId",p.user_id=$1 AS "isOwner",
     CASE WHEN p.is_anonymous THEN '匿名' ELSE COALESCE(NULLIF(u.display_name,''),'教會成員') END AS "authorName",
@@ -81,8 +81,9 @@ export async function publicPrayerFeed(actor: string, mine = false) {
     (SELECT count(*)::int FROM prayer_comments c WHERE c.prayer_id=p.id) AS "commentCount",
     COALESCE((SELECT jsonb_agg(r) FROM (SELECT kind,count(*)::int AS count,bool_or(user_id=$1) AS selected FROM prayer_reactions WHERE prayer_id=p.id GROUP BY kind) r),'[]'::jsonb) AS reactions
     FROM prayers p JOIN users u ON u.id=p.user_id
-    WHERE CASE WHEN $2::boolean THEN p.user_id=$1 ELSE p.closed_at IS NULL AND NOT p.is_answered END
-    ORDER BY p.created_at DESC`, [actor,mine])).rows;
+    WHERE (CASE WHEN $2::boolean THEN p.user_id=$1 ELSE (p.closed_at IS NULL AND NOT p.is_answered) OR ($3::uuid IS NOT NULL AND p.user_id=$1) END)
+      AND ($3::uuid IS NULL OR p.id=$3)
+    ORDER BY p.created_at DESC`, [actor,mine,id])).rows;
 }
 
 export function publicPrayerReceipt(prayer: { id: string; isAnonymous: boolean; isPinned?: boolean; isUrgent?: boolean; isAnswered?: boolean; answeredAt?: Date | null; closedAt?: Date | null }) {

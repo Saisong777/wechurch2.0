@@ -60,6 +60,7 @@ export function isNavItemActive(pathname: string, item: AppNavItem) {
 }
 
 const mobileTitles: Record<string, string> = {
+  '/notifications': '通知',
   '/me/activity': '待回應', '/me/sharing': '我的分享',
   '/support': '尋求陪伴', '/work': '同工工作區', '/work/settings': '陪伴設定',
   '/me/mentoring': '門訓陪伴', '/work/mentoring': '門訓陪伴',

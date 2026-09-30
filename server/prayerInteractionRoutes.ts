@@ -5,6 +5,8 @@ import { pool } from './db';
 import { hasPermission } from './accessControl';
 import { GroupError } from './lifeGroupRepository';
 import { prayerInteractionInput, prayerReactionInput, prayerReactionKind } from '../shared/prayerInteraction';
+import { recordInteraction, recordCommentInteraction } from './notificationRepository';
+import { publicPrayerFeed } from './prayerSharingRepository';
 
 async function withPrayer<T>(id: string, work: (c: PoolClient) => Promise<T>, allowClosed = false) {
   const c = await pool.connect();
@@ -38,12 +40,22 @@ export function prayerInteractionRoutes(resolveUserId: (req: Request) => Promise
     }
     res.locals.actor = actor; next();
   });
+  router.get('/:id',async(req,res) => {
+    const id = z.string().uuid().parse(req.params.id);
+    const prayer = (await publicPrayerFeed(res.locals.actor,false,id))[0];
+    if (!prayer) throw new GroupError(404,'這則代禱已撤回或不再公開。');
+    res.json(prayer);
+  });
   router.put('/:id/reactions/:kind', async (req,res) => {
     const id = z.string().uuid().parse(req.params.id);
     const kind = prayerReactionKind.parse(req.params.kind);
     const {selected} = prayerReactionInput.parse(req.body);
     await withPrayer(id, async c => {
-      if (selected) await c.query('INSERT INTO prayer_reactions(prayer_id,user_id,kind) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[id,res.locals.actor,kind]);
+      if (selected) {
+        await c.query('INSERT INTO prayer_reactions(prayer_id,user_id,kind) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[id,res.locals.actor,kind]);
+        const owner = (await c.query('SELECT user_id FROM prayers WHERE id=$1',[id])).rows[0].user_id;
+        await recordInteraction(c,{recipient:owner,actor:res.locals.actor,kind:'prayer_reaction',key:`reaction/${id}/${res.locals.actor}/${kind}`,prayerId:id});
+      }
       else await c.query('DELETE FROM prayer_reactions WHERE prayer_id=$1 AND user_id=$2 AND kind=$3',[id,res.locals.actor,kind]);
     }, !selected);
     res.json({ ok: true });
@@ -52,6 +64,8 @@ export function prayerInteractionRoutes(resolveUserId: (req: Request) => Promise
     const id=z.string().uuid().parse(req.params.id);
     await withPrayer(id,async c=>{
       await c.query('INSERT INTO prayer_amens(prayer_id,user_id) SELECT $1,$2 WHERE NOT EXISTS(SELECT 1 FROM prayer_amens WHERE prayer_id=$1 AND user_id=$2)',[id,res.locals.actor]);
+      const owner = (await c.query('SELECT user_id FROM prayers WHERE id=$1',[id])).rows[0].user_id;
+      await recordInteraction(c,{recipient:owner,actor:res.locals.actor,kind:'prayer_amen',key:`amen/${id}/${res.locals.actor}`,prayerId:id});
     });
     res.status(201).json({ok:true});
   });
@@ -72,6 +86,7 @@ export function prayerInteractionRoutes(resolveUserId: (req: Request) => Promise
         if (!previous || previous.prayer_id !== id || previous.content !== input.content || previous.kind !== input.kind || previous.sticker !== (input.sticker || null)) throw new GroupError(409,'此回應已送出，請重新整理後再試。');
         commentId = previous.id;
       }
+      if (inserted.rowCount) await recordCommentInteraction(c,actor,id,commentId);
       return (await c.query(`${commentProjection} AND c.id=$3`,[id,actor,commentId])).rows[0];
     });
     res.status(201).json(comment);

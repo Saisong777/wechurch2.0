@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { MessageCircle, Send, Trash2, HandHeart, HeartHandshake, Sun, Loader2, Check } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -21,14 +21,21 @@ function Sticker({value, compact=false}:{value:PrayerSticker;compact?:boolean}) 
   return <span className={`inline-flex shrink-0 flex-col items-center justify-center gap-2 rounded-md ${compact ? 'h-20 w-full' : 'h-24 w-28'} ${stickerColors[value]}`}><Icon className={compact ? 'h-7 w-7' : 'h-10 w-10'} strokeWidth={1.7} /><span className="text-xs font-semibold sm:text-sm">{STICKER_LABELS[value]}</span></span>;
 }
 
-export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=false}:{prayerId:string;count?:number;anonymousOwner?:boolean;readOnly?:boolean}) {
-  const [expanded,setExpanded] = useState(false);
+export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=false,initiallyExpanded=false,targetCommentId=''}:{prayerId:string;count?:number;anonymousOwner?:boolean;readOnly?:boolean;initiallyExpanded?:boolean;targetCommentId?:string}) {
+  const [expanded,setExpanded] = useState(initiallyExpanded);
+  const thread = useRef<HTMLElement>(null);
+  const focused = useRef('');
   const [content,setContent] = useState('');
   const [kind,setKind] = useState<keyof typeof COMMENT_LABELS>('encouragement');
   const [sticker,setSticker] = useState<PrayerSticker>('praying');
   const formId = useId();
   const request = useRef<{signature:string;id:string}>();
   const comments = usePrayerComments(prayerId,expanded);
+  useEffect(() => {
+    if (!targetCommentId || focused.current === targetCommentId || !comments.data?.some(c => c.id === targetCommentId)) return;
+    const item = thread.current?.querySelector<HTMLElement>(`[data-comment-id="${targetCommentId}"]`);
+    if (item) { item.focus({preventScroll:true}); item.scrollIntoView?.({block:'nearest'}); focused.current = targetCommentId; }
+  },[targetCommentId,comments.data]);
   const create = useCreateComment(); const remove = useDeleteComment(); const {isAdmin:legacyAdmin} = useUserRole();
   const access=useAccessControl();const isAdmin=legacyAdmin || !!access.data?.permissions?.includes('wall.moderate');
   async function send() {
@@ -42,7 +49,7 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
   }
   return <>
     <Button variant={expanded ? 'secondary' : 'outline'} className="min-h-11 min-w-0 flex-1 gap-1.5 px-2" aria-expanded={expanded} aria-controls={formId} onClick={()=>setExpanded(!expanded)}><MessageCircle className="h-4 w-4" />{expanded ? '收起回應' : readOnly ? '查看回應' : '寫下鼓勵'}{count > 0 ? ` · ${count}` : ''}</Button>
-    {expanded && <section id={formId} className="w-full min-w-0 basis-full space-y-4 border-t pt-4" aria-label="鼓勵與禱告">
+    {expanded && <section ref={thread} id={formId} className="w-full min-w-0 basis-full space-y-4 border-t pt-4" aria-label="鼓勵與禱告">
       {!readOnly && <form onSubmit={e=>{e.preventDefault();void send();}}><fieldset disabled={create.isPending} className="min-w-0 space-y-3">
         <div role="radiogroup" aria-label="回應類型" className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">{(Object.keys(responseLabels) as (keyof typeof responseLabels)[]).map(value => <label key={value} className="min-w-0 cursor-pointer">
           <input type="radio" name={formId+'-kind'} aria-label={responseLabels[value]} value={value} checked={kind===value} onChange={()=>setKind(value)} className="peer sr-only" />
@@ -61,7 +68,8 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
         {comments.isPending && <p role="status" className="text-sm text-muted-foreground">載入回應中…</p>}
         {comments.isError && <p role="alert" className="text-sm text-destructive">回應載入失敗。<button className="ml-2 min-h-11 underline" onClick={()=>comments.refetch()}>重新載入</button></p>}
         {!comments.isPending && !comments.isError && !comments.data?.length && <p className="text-sm text-muted-foreground">還沒有回應</p>}
-        {!comments.isError && <div className="max-h-96 space-y-4 overflow-y-auto [overflow-wrap:anywhere]">{comments.data?.map(comment=><article key={comment.id} className="border-b pb-3 last:border-0">
+        {targetCommentId && !comments.isPending && !comments.isError && !comments.data?.some(c => c.id === targetCommentId) && <p role="status">這則回應已撤回。</p>}
+        {!comments.isError && <div className="max-h-96 space-y-4 overflow-y-auto [overflow-wrap:anywhere]">{comments.data?.map(comment=><article key={comment.id} data-comment-id={comment.id} tabIndex={-1} className={`scroll-mt-32 border-b pb-3 last:border-0 ${comment.id === targetCommentId ? 'border-l-2 border-primary pl-3' : ''}`}>
           <div className="mb-2 flex items-start justify-between gap-2"><div className="min-w-0 text-xs"><span className="font-semibold">{comment.authorName}</span><span className="ml-2 text-muted-foreground">{COMMENT_LABELS[comment.kind]} · {formatDistanceToNow(new Date(comment.createdAt),{addSuffix:true,locale:zhTW})}</span></div>
             {(comment.isOwner || isAdmin) && <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" disabled={remove.isPending} title="撤回回應" aria-label="撤回回應" onClick={()=>{if(window.confirm('確定撤回這則回應？')) remove.mutate({prayerId,commentId:comment.id});}}><Trash2 className="h-4 w-4" /></Button>}
           </div>

@@ -1,6 +1,7 @@
 import { pool } from './db';
 import { dailyEmailDue, emailAppUrl, emailProviderStatus, escapeEmailHtml } from './emailPolicy';
 import { sendEmail } from './resend';
+import { runInteractionEmails } from './notificationEmail';
 
 export function buildSelfReminder() {
   const home = emailAppUrl('/');
@@ -77,9 +78,19 @@ export function startEmailReminderScheduler() {
   let stopped = false;
   let running: Promise<unknown> | undefined;
   const timer = setInterval(() => {
-    if (stopped || running || !emailProviderStatus().remindersEnabled) return;
-    running = runDailyReminders({ dryRun: false, stopped: () => stopped })
-      .then(result => { if (result.total) console.info('[Email reminders]', JSON.stringify({ accepted: result.sent, unconfirmed: result.failed })); })
+    if (stopped || running || (!emailProviderStatus().remindersEnabled && !emailProviderStatus().interactionNotificationsEnabled)) return;
+    running = (async () => {
+      if (emailProviderStatus().remindersEnabled) {
+        try {
+          const result = await runDailyReminders({dryRun:false,stopped:() => stopped});
+          if (result.total) console.info('[Email reminders]',JSON.stringify({accepted:result.sent,unconfirmed:result.failed}));
+        } catch { console.error('[Email reminders] cycle failed'); }
+      }
+      if (!stopped && emailProviderStatus().interactionNotificationsEnabled) {
+        const result = await runInteractionEmails({dryRun:false,stopped:() => stopped});
+        if (result.eligible) console.info('[Interaction email]',JSON.stringify({accepted:result.accepted,unconfirmed:result.unconfirmed}));
+      }
+    })()
       .catch(() => console.error('[Email reminders] cycle failed'))
       .finally(() => { running = undefined; });
   }, 60_000);

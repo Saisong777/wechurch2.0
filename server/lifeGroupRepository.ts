@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { pool } from './db';
 import { careInput, careUpdateInput, shareInput, shareEditInput } from '../shared/lifeGroup';
 import { createFamily, familyAccess } from './familyRepository';
+import { recordInteraction, recordCommentInteraction } from './notificationRepository';
 
 import { GroupError } from './groupError';
 export { GroupError } from './groupError';
@@ -148,6 +149,18 @@ export function createShare(id: string, actor: string, shareId: string, input: z
     return { id: shareId };
   });
 }
+export function getShare(id: string, actor: string, shareId: string) {
+  return withGroup(id,actor,async c => {
+    await share(c,id,shareId,actor);
+    return (await c.query(`SELECT s.id,CASE WHEN s.is_anonymous THEN NULL ELSE s.author_id END AS "authorId",
+      CASE WHEN s.is_anonymous THEN '匿名' ELSE ${nameSql('u')} END AS "authorName",s.is_anonymous AS anonymous,s.author_id=$2 AS "isOwner",
+      s.kind,s.title,s.body,s.reference,s.answered,s.version,s.created_at AS "createdAt",
+      EXISTS(SELECT 1 FROM life_group_prayed WHERE share_id=s.id AND user_id=$2) AS prayed,
+      (SELECT count(*)::int FROM life_group_prayed WHERE share_id=s.id) AS "prayerCount",
+      (SELECT count(*)::int FROM life_group_comments WHERE share_id=s.id AND withdrawn_at IS NULL) AS "commentCount"
+      FROM life_group_shares s JOIN users u ON u.id=s.author_id WHERE s.id=$1`,[shareId,actor])).rows[0];
+  });
+}
 export function editShare(id: string, actor: string, shareId: string, input: z.infer<typeof shareEditInput>) {
   return withGroup(id, actor, async c => {
     const s = await share(c, id, shareId, actor);
@@ -168,7 +181,9 @@ export function withdrawShare(id: string, actor: string, shareId: string) {
 export function shareComments(id: string, actor: string, shareId: string, offset: number) {
   return withGroup(id, actor, async c => {
     await share(c, id, shareId, actor);
-    return (await c.query(`SELECT c.id,c.author_id AS "authorId",${nameSql('u')} AS "authorName",c.body,c.created_at AS "createdAt" FROM life_group_comments c JOIN users u ON u.id=c.author_id WHERE share_id=$1 AND withdrawn_at IS NULL ORDER BY c.created_at DESC,c.id DESC LIMIT 30 OFFSET $2`, [shareId, offset])).rows;
+    return (await c.query(`SELECT c.id,c.author_id=$3 AS "isOwner",CASE WHEN s.is_anonymous AND s.author_id=c.author_id THEN NULL ELSE c.author_id END AS "authorId",
+      CASE WHEN s.is_anonymous AND s.author_id=c.author_id THEN '匿名發文者' ELSE ${nameSql('u')} END AS "authorName",c.body,c.created_at AS "createdAt"
+      FROM life_group_comments c JOIN users u ON u.id=c.author_id JOIN life_group_shares s ON s.id=c.share_id WHERE c.share_id=$1 AND c.withdrawn_at IS NULL ORDER BY c.created_at DESC,c.id DESC LIMIT 30 OFFSET $2`, [shareId, offset,actor])).rows;
   });
 }
 export function addComment(id: string, actor: string, shareId: string, commentId: string, body: string) {
@@ -176,8 +191,19 @@ export function addComment(id: string, actor: string, shareId: string, commentId
     await share(c, id, shareId, actor);
     const existing = (await c.query('SELECT share_id,author_id FROM life_group_comments WHERE id=$1', [commentId])).rows[0];
     if (existing && (existing.share_id !== shareId || existing.author_id !== actor)) throw conflict();
-    await c.query('INSERT INTO life_group_comments(id,share_id,author_id,body) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING', [commentId, shareId, actor, body]);
+    const inserted = await c.query('INSERT INTO life_group_comments(id,share_id,author_id,body) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING RETURNING id', [commentId, shareId, actor, body]);
+    if (inserted.rowCount) await recordCommentInteraction(c,actor,shareId,commentId,true);
     return { ok: true };
+  });
+}
+export function getShareComment(id: string, actor: string, shareId: string, commentId: string) {
+  return withGroup(id,actor,async c => {
+    await share(c,id,shareId,actor);
+    const row = (await c.query(`SELECT c.id,c.author_id=$3 AS "isOwner",CASE WHEN s.is_anonymous AND s.author_id=c.author_id THEN NULL ELSE c.author_id END AS "authorId",
+      CASE WHEN s.is_anonymous AND s.author_id=c.author_id THEN '匿名發文者' ELSE ${nameSql('u')} END AS "authorName",c.body,c.created_at AS "createdAt"
+      FROM life_group_comments c JOIN users u ON u.id=c.author_id JOIN life_group_shares s ON s.id=c.share_id WHERE c.id=$1 AND c.share_id=$2 AND c.withdrawn_at IS NULL`,[commentId,shareId,actor])).rows[0];
+    if (!row) throw missing();
+    return row;
   });
 }
 export function withdrawComment(id: string, actor: string, shareId: string, commentId: string) {
@@ -192,6 +218,7 @@ export function prayForShare(id: string, actor: string, shareId: string) {
     const s = await share(c, id, shareId, actor);
     if (s.kind !== 'prayer') throw missing();
     await c.query('INSERT INTO life_group_prayed(share_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [shareId, actor]);
+    await recordInteraction(c,{recipient:s.author_id,actor,kind:'family_prayed',key:`family-prayed/${shareId}/${actor}`,shareId});
     return { ok: true };
   });
 }

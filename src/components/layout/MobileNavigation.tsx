@@ -7,6 +7,7 @@ import { MobileHeaderContext } from './MobileHeaderContext';
 import { MobileAccountActions } from './MobileAccountActions';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export function MobileNavigation() {
   const [open, setOpen] = useState(false);
@@ -43,10 +44,10 @@ export function MobileNavigation() {
         <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden="true" />返回
       </button>
       <Link to="/" onClick={() => setOpen(false)} aria-label={`${title}，回首頁`} className="flex min-h-12 min-w-0 items-center justify-center gap-2 text-center text-base font-semibold focus-visible:ring-2 focus-visible:ring-ring"><WeChurchLogo size={28} /><span className="truncate">{title}</span></Link>
-      <button ref={trigger} type="button" aria-expanded={open} aria-controls={menuId} aria-label={open ? '關閉導覽選單' : '開啟導覽選單'}
+      <div className="flex shrink-0 items-center gap-1"><NotificationBell /><button ref={trigger} type="button" aria-expanded={open} aria-controls={menuId} aria-label={open ? '關閉導覽選單' : '開啟導覽選單'}
         className="flex min-h-12 items-center justify-center gap-1 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setOpen(!open)}>
         {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}選單
-      </button>
+      </button></div>
     </div>
     <nav id={menuId} aria-label="行動導覽選單" hidden={!open} className="mobile-navigation-menu absolute inset-x-0 top-full overflow-y-auto overscroll-contain border-t border-border bg-background shadow-md">
       <div className="mobile-menu-content mx-auto max-w-xl">

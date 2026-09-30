@@ -9,6 +9,7 @@ import { mobilePageTitle } from '@/lib/navigation';
 
 vi.mock('./NetworkStatusBanner', () => ({ NetworkStatusBanner: () => null }));
 vi.mock('./MobileAccountActions', () => ({ MobileAccountActions: () => null }));
+vi.mock('@/components/notifications/NotificationBell',() => ({NotificationBell:() => null}));
 beforeEach(() => { vi.stubGlobal('scrollTo', vi.fn()); window.history.replaceState({ idx: 0 }, ''); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 

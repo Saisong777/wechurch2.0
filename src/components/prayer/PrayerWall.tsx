@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, Heart, Users, User, PartyPopper } from 'lucide-react';
-import { usePrayerWall, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
+import { usePrayerWall, usePrayerTarget, PrayerCategory, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
+import { notificationTargetId } from '@shared/notifications';
 import { PrayerCard } from './PrayerCard';
 import { CreatePrayerDialog } from './CreatePrayerDialog';
 import { MockPrayerGenerator } from './MockPrayerGenerator';
@@ -45,6 +46,9 @@ export const PrayerWall: React.FC = () => {
     return view === 'my' || view === 'answered' ? view : 'all';
   });
   const { data: prayers, isLoading, error, isFetching } = usePrayerWall(viewMode !== 'all');
+  const targetId = notificationTargetId(searchParams.get('prayer'));
+  const targetComment = notificationTargetId(searchParams.get('comment'));
+  const target = usePrayerTarget(targetId);
 
   const showCreatedPrayer = () => {
     setUrgentOnly(false);
@@ -113,6 +117,12 @@ export const PrayerWall: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 px-0">
+      {targetId && <section className="border-b pb-5" aria-label="通知中的代禱">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">通知中的代禱</h2><Button asChild variant="ghost"><Link to="/prayer-wall">查看全部代禱</Link></Button></div>
+        {target.isPending && <p role="status">正在載入代禱…</p>}
+        {target.isError && <div role="alert"><p>這則代禱已撤回，或暫時無法載入。</p><Button variant="outline" className="mt-2" onClick={() => void target.refetch()}>重新載入</Button></div>}
+        {!target.isError && target.data && <PrayerCard key={`${targetId}:${targetComment}`} prayer={target.data} focusFromNotification targetCommentId={targetComment} />}
+      </section>}
       <section className="border-b pb-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="flex items-center gap-2 text-2xl font-semibold"><Heart className="h-6 w-6 text-secondary" />公共禱告牆</h1>
@@ -283,7 +293,7 @@ export const PrayerWall: React.FC = () => {
                 <Card className="overflow-hidden rounded-lg shadow-sm">
                   <CardContent className="divide-y p-0">
                     {waitingPrayers.map((prayer) => (
-                      <PrayerCard key={`${user.id}:${prayer.id}`} prayer={prayer} />
+                      prayer.id !== targetId && <PrayerCard key={`${user.id}:${prayer.id}`} prayer={prayer} />
                     ))}
                   </CardContent>
                 </Card>
@@ -310,7 +320,7 @@ export const PrayerWall: React.FC = () => {
                 <Card className="overflow-hidden rounded-lg border-emerald-200 shadow-sm">
                   <CardContent className="divide-y p-0">
                     {answeredFilteredPrayers.map((prayer) => (
-                      <PrayerCard key={`${user.id}:${prayer.id}`} prayer={prayer} />
+                      prayer.id !== targetId && <PrayerCard key={`${user.id}:${prayer.id}`} prayer={prayer} />
                     ))}
                   </CardContent>
                 </Card>

@@ -43,6 +43,7 @@ const AccessControlPage = lazyPage(() => import('./pages/AccessControlPage'));
 const LifeGroupsPage = lazyPage(() => import('./pages/LifeGroupsPage'));
 const PastoralPersonPage = lazyPage(() => import("./pages/PastoralPersonPage"));
 const MePage = lazyPage(() => import("./pages/MePage"));
+const NotificationsPage = lazyPage(() => import('./pages/NotificationsPage'));
 const MyActivityPage = lazyPage(() => import('./pages/MyActivityPage'));
 const MySharingPage = lazyPage(() => import('./pages/MySharingPage'));
 const SupportPage = lazyPage(() => import("./pages/SupportPage"));
@@ -90,6 +91,7 @@ const router = createBrowserRouter([{ path: '*', element: (
                     <Route path="/admin/crm/person/:personId" element={<PastoralPersonPage />} />
                     <Route path="/notebook" element={<Navigate to="/learn/my-notes" replace />} />
                     <Route path="/me" element={<MePage />} />
+                    <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/me/activity" element={<MyActivityPage />} />
                     <Route path="/me/sharing" element={<MySharingPage />} />
                     <Route path="/support" element={<SupportPage />} />

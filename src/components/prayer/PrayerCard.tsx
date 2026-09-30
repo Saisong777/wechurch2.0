@@ -1,4 +1,4 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,7 +21,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: 'border-border bg-muted text-muted-foreground',
 };
 
-export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
+export const PrayerCard: React.FC<{ prayer: Prayer; focusFromNotification?: boolean; targetCommentId?: string }> = ({ prayer,focusFromNotification=false,targetCommentId='' }) => {
   const { isAdmin } = useUserRole();
   const access=useAccessControl();
   const deleteMutation = useDeletePrayer();
@@ -32,7 +32,11 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
   const urgentMutation = useUrgentPrayer();
   const closeMutation = useClosePrayer();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(focusFromNotification);
+  const article = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focusFromNotification && !targetCommentId) { article.current?.focus({preventScroll:true}); article.current?.scrollIntoView?.({block:'start'}); }
+  },[focusFromNotification,targetCommentId]);
   const detailsId = useId();
   const actionsId = useId();
   const managementTrigger = useRef<HTMLButtonElement>(null);
@@ -42,7 +46,7 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
   const summary = prayer.content.trim().split(/\r?\n/)[0];
   const timeAgo = formatDistanceToNow(new Date(prayer.createdAt), { addSuffix: true, locale: zhTW });
 
-  return <article aria-label={`代禱：${prayer.content.split('\n')[0]}`} className="min-w-0 bg-card">
+  return <article ref={article} tabIndex={-1} aria-label={`代禱：${prayer.content.split('\n')[0]}`} className="min-w-0 scroll-mt-32 bg-card">
     <div className="px-3 pt-2 md:hidden">
       <button type="button" className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={mobileExpanded} aria-controls={`${detailsId} ${actionsId}`} aria-label={`${mobileExpanded ? '收合' : '展開'}代禱：${prayer.authorName}，${summary}`} onClick={() => setMobileExpanded(value => !value)}>
         <Avatar className="h-8 w-8 shrink-0" aria-hidden="true">
@@ -105,7 +109,7 @@ export const PrayerCard: React.FC<{ prayer: Prayer }> = ({ prayer }) => {
         {!closed && <Button variant="outline" className={cn('min-h-11 min-w-0 flex-1 gap-1.5 px-2', prayer.hasAmened && 'border-primary/30 bg-primary/10 text-primary disabled:opacity-100')} aria-pressed={prayer.hasAmened} disabled={toggleAmenMutation.isPending || prayer.hasAmened} onClick={() => { vibrate(50); toggleAmenMutation.mutate({ prayerId: prayer.id, hasAmened: prayer.hasAmened }); }}>
           {prayer.hasAmened ? <Check className="h-4 w-4" /> : <HandHeart className="h-4 w-4" />}{prayer.hasAmened ? '已為你禱告' : '為你禱告'}{prayer.amenCount > 0 && <span className="text-xs tabular-nums">{prayer.amenCount}</span>}
         </Button>}
-        <PrayerComments prayerId={prayer.id} count={prayer.commentCount} anonymousOwner={prayer.isOwner && prayer.isAnonymous} readOnly={closed} />
+        <PrayerComments prayerId={prayer.id} count={prayer.commentCount} anonymousOwner={prayer.isOwner && prayer.isAnonymous} readOnly={closed} initiallyExpanded={focusFromNotification} targetCommentId={targetCommentId} />
       </div>
     </div>
     {canDelete && <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

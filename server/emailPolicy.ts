@@ -18,7 +18,7 @@ export function emailProviderStatus(env: NodeJS.ProcessEnv = process.env): Email
     disabled: '目前暫停寄送郵件，可預覽內容。',
     not_configured: '寄信服務尚未完成設定，目前僅提供預覽。',
   };
-  return { configured, canSend: reason === 'ready', remindersEnabled: reason === 'ready' && env.DAILY_EMAIL_SCHEDULER_ENABLED === '1', mode: configured ? 'resend_api_key' : 'preview_only', reason, message: messages[reason] };
+  return { configured, canSend: reason === 'ready', remindersEnabled: reason === 'ready' && env.DAILY_EMAIL_SCHEDULER_ENABLED === '1', interactionNotificationsEnabled: reason === 'ready' && env.INTERACTION_EMAIL_SCHEDULER_ENABLED === '1', mode: configured ? 'resend_api_key' : 'preview_only', reason, message: messages[reason] };
 }
 
 export function emailAppUrl(route = '/', env: NodeJS.ProcessEnv = process.env) {
