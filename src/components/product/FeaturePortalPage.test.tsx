@@ -16,7 +16,7 @@ it('keeps all feature actions once, without explanatory cards', () => {
   expect(screen.queryByText('Unnecessary explanation')).toBeNull();
 });
 it('separates personal prayer, public walls and groups in the main navigation', () => {
-  expect(appNavItems.map(item => item.href)).toEqual(['/', '/learn', '/share', '/walls', '/groups']);
+  expect(appNavItems.map(item => item.href)).toEqual(['/', '/learn/bible', '/share', '/walls', '/groups']);
   expect(appNavItems.some(item => isNavItemActive('/user', item))).toBe(false);
   expect(isNavItemActive('/learn/bible', appNavItems[1])).toBe(true);
 });

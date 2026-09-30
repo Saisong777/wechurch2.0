@@ -22,7 +22,7 @@ export const appNavItems: AppNavItem[] = [
     id: 'learn',
     label: '聖經',
     shortLabel: '聖經',
-    href: '/learn',
+    href: '/learn/bible',
     icon: BookOpen,
     match: ['/learn', '/bible', '/jesus-timeline'],
   },

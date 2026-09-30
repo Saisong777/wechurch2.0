@@ -44,7 +44,7 @@ it('keeps the menu collapsed until requested, with explicit expanded state', () 
 it('dismisses on outside interaction and keeps the existing destination order', () => {
   render(<MemoryRouter><MobileNavigation /><main>內容</main></MemoryRouter>);
   fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
-  expect(screen.getAllByRole('link').slice(1).map(el => el.getAttribute('href'))).toEqual(['/', '/learn', '/share', '/walls', '/groups', '/care', '/me', '/play']);
+  expect(screen.getAllByRole('link').slice(1).map(el => el.getAttribute('href'))).toEqual(['/', '/learn/bible', '/share', '/walls', '/groups', '/care', '/me', '/play']);
   fireEvent.pointerDown(screen.getByRole('main'));
   expect(screen.queryByRole('navigation')).toBeNull();
 });
@@ -69,7 +69,7 @@ it('navigates, closes the menu and marks the active destination', () => {
   render(<MemoryRouter><AppLayout><Location /></AppLayout></MemoryRouter>);
   fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
   fireEvent.click(screen.getByTestId('mobile-menu-learn'));
-  expect(screen.getByTestId('location')).toHaveTextContent('/learn');
+  expect(screen.getByTestId('location')).toHaveTextContent('/learn/bible');
   expect(screen.queryByRole('navigation', { name: '行動導覽選單' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
   expect(screen.getByTestId('mobile-menu-learn')).toHaveAttribute('aria-current', 'page');
