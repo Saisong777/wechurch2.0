@@ -1,0 +1,81 @@
+{
+  "date": "2026-09-30",
+  "scope": "B intuitive UI and enlarged-text regression",
+  "origin": "https://wechurch-staging-staging.up.railway.app",
+  "deploymentId": "6cb22dfd-2562-489b-b6d8-4a668775783e",
+  "sourceCommit": "1ce43f466ab77281d7b76aaacff91ccc7eabede2",
+  "fingerprint": "16ffbc490a583e92b72fa67bde69ce85df556a9f7d978ca741f255765df55384",
+  "sourceMatchesCommit": true,
+  "unitTests": 695,
+  "deploymentTests": 36,
+  "lint": {
+    "errors": 0,
+    "warnings": 287
+  },
+  "browserChecks": 187,
+  "routes": [
+    "/",
+    "/learn",
+    "/learn/my-notes",
+    "/learn/church-reading",
+    "/learn/bible?book=43&chapter=3",
+    "/share",
+    "/grace-record",
+    "/walls",
+    "/groups",
+    "/care",
+    "/me",
+    "/admin",
+    "/admin/access",
+    "/admin/crm",
+    "/admin/church-devotions",
+    "/me/activity",
+    "/me/sharing",
+    "/support",
+    "/learn/reading-plans",
+    "/play"
+  ],
+  "widths": [
+    320,
+    390,
+    768,
+    1440
+  ],
+  "variants": [
+    {
+      "size": "standard",
+      "font": "sans",
+      "theme": "light"
+    },
+    {
+      "size": "maximum",
+      "font": "serif",
+      "theme": "dark"
+    }
+  ],
+  "failures": 0,
+  "pageErrors": 0,
+  "flows": [
+    "open-note-editor",
+    "keyboard-disclosure-no-content-collapse",
+    "home-title-closes-menu",
+    "admin-tool-members-dashboard-home"
+  ],
+  "defaultNotePixels": 20.25,
+  "maximumNotePixels": 40.5,
+  "preferencesPersist": true,
+  "syntheticNote": true,
+  "memberContentWritten": false,
+  "fixtureRemoved": true,
+  "productionUnchanged": true,
+  "physicalPhoneTested": false,
+  "realFirstUseTested": false,
+  "allRoleStatesTested": false,
+  "evidenceDirectory": "output/playwright/reading/fc540338-d383-4508-a2d1-c76cd1b60d16",
+  "limits": [
+    "Does not replace real Google consent or physical iPhone/Android testing",
+    "Does not cover every member/group detail, data state or retired tool",
+    "No private-content sharing, mail or import performed by this UI run",
+    "Not a WCAG certification"
+  ]
+}
