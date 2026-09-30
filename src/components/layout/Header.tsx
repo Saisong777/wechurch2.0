@@ -22,6 +22,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useAccessControl } from '@/hooks/useAccessControl';
 import { appNavItems, isNavItemActive } from '@/lib/navigation';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
+import { ReadingNavigation } from '@/components/scripture/ReadingNavigation';
 
 interface HeaderProps {
   title?: string;
@@ -253,6 +254,7 @@ export const Header: React.FC<HeaderProps> = ({
         onOpenChange={setShowProfileSettings}
       />
     </header>
+    {['/learn/bible', '/bible', '/learn/church-reading', '/learn/my-notes'].includes(location.pathname) && <ReadingNavigation />}
     </>
   );
 };

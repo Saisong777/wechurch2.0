@@ -88,8 +88,8 @@ const bibleViews = new Map<string, BibleView>();
 const BiblePage = () => {
   const location = useLocation();
   const study = useQuery<{ enabled: boolean }>({ queryKey: ['bible-study', 'status'], queryFn: ({ signal }) => studyFetch('status', {}, signal) });
-  if (study.isPending) return <><Header variant="compact" title="聖經" backTo="/learn" /><p role="status" className="container py-8">載入聖經…</p></>;
-  if (study.isError) return <><Header variant="compact" title="聖經" backTo="/learn" /><div className="container py-8" role="alert"><p>聖經暫時無法載入</p><Button onClick={() => study.refetch()}>重試</Button></div></>;
+  if (study.isPending) return <><Header variant="compact" title="聖經" backTo="/" /><p role="status" className="container py-8">載入聖經…</p></>;
+  if (study.isError) return <><Header variant="compact" title="聖經" backTo="/" /><div className="container py-8" role="alert"><p>聖經暫時無法載入</p><Button onClick={() => study.refetch()}>重試</Button></div></>;
   if (study.data?.enabled) return <BibleStudyReader />;
   return <BibleReader key={location.key} entryKey={location.key} />;
 };
@@ -674,7 +674,7 @@ const BibleReader = ({ entryKey }: { entryKey: string }) => {
         <Header
           variant="compact"
           title={selectedBook ? `${selectedBook}${selectedChapter ? ` ${selectedChapter}章` : ''}` : '聖經閱讀'}
-          backTo="/learn"
+          backTo="/"
           rightContent={
             <div className="flex items-center gap-0.5">
               <Button

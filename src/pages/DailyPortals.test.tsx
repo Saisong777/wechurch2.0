@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import LearnPage from './LearnPage';
 import SharePage from './SharePage';
 import PublicWallsPage from './PublicWallsPage';
@@ -14,11 +14,32 @@ vi.mock('@/hooks/useFeatureToggles', () => ({ useFeatureToggles: () => ({
 vi.mock('@/components/layout/Header', () => ({ Header: ({ title }: { title: string }) => <h1>{title}</h1> }));
 afterEach(() => { cleanup(); state.disabled = []; state.loading = false; state.error = null; });
 
-it('keeps only Bible, daily devotion and notes in learning', () => {
+it('opens the Bible directly and preserves old URL references', () => {
+  function Destination() {
+    const location = useLocation();
+    return <output>{location.pathname}{location.search}{location.hash}</output>;
+  }
+  render(<MemoryRouter initialEntries={['/learn?book=43&chapter=3#v16']}><Routes>
+    <Route path="/learn" element={<LearnPage />} />
+    <Route path="/learn/bible" element={<Destination />} />
+  </Routes></MemoryRouter>);
+  expect(screen.getByRole('status')).toHaveTextContent('/learn/bible?book=43&chapter=3#v16');
+  expect(screen.queryByText('打開聖經')).toBeNull();
+});
+
+it('opens daily devotion when the Bible feature is disabled', () => {
+  state.disabled = ['bible_reading'];
+  render(<MemoryRouter initialEntries={['/learn']}><Routes>
+    <Route path="/learn" element={<LearnPage />} />
+    <Route path="/learn/church-reading" element={<h1>每日靈修</h1>} />
+  </Routes></MemoryRouter>);
+  expect(screen.getByRole('heading', { name: '每日靈修' })).toBeInTheDocument();
+});
+
+it('keeps the learning maintenance gate', () => {
+  state.disabled = ['we_learn'];
   render(<MemoryRouter><LearnPage /></MemoryRouter>);
-  expect(screen.getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(['/learn/bible', '/learn/church-reading', '/learn/my-notes']);
-  expect(screen.queryByText('接續讀經')).toBeNull();
-  expect(screen.queryByText('看耶穌四季')).toBeNull();
+  expect(screen.getByText('學習功能維護中')).toBeInTheDocument();
 });
 
 it('opens personal prayer directly without another portal', () => {

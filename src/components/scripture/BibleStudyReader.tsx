@@ -147,7 +147,7 @@ function StudyTools({ info, book, chapter, verse, translation, open }: { info: I
 export default function BibleStudyReader() {
   const info = useStudy<Info>('info');
   return <FeatureGate featureKeys={['we_learn', 'bible_reading']} title="聖經閱讀功能維護中" description="聖經閱讀功能目前暫時關閉，請稍後再試">
-    <Header variant="compact" title="聖經" backTo="/learn" />
+    <Header variant="compact" title="聖經" backTo="/" />
     <main className="study-reader"><LoadState loading={info.isPending} error={info.error} retry={info.refetch} />{info.data && <ReadingSurface info={info.data} />}</main>
   </FeatureGate>;
 }
