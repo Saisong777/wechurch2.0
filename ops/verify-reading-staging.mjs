@@ -31,7 +31,9 @@ async function journey(page, { origin, code, cookie, id, output }) {
   const me = await page.context().request.get(origin + '/api/auth/user');
   if (me.status() !== 200 || (await me.json()).legacyUserId !== id) throw Error('Fixture identity mismatch');
   // UI-only note fixture: never writes private notes or publishes to a wall.
-  await page.route('**/api/devotional-notes', route => route.fulfill({ json: [{ id: 'reading-fixture', userId: id, readingPlanId: null, verseReference: '以賽亞書 61:1-全', verseText: '主耶和華的靈在我身上。', observation: '看見身邊有需要的人，願意停下來聆聽。\n這是閱讀字級驗收用筆記。', coreInsightNote: '在每天的生活中，用耐心與溫柔陪伴彼此，也練習接納自己的有限。', actionPlan: '今天主動關心一位朋友。', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }] }));
+  const note = { id: 'reading-fixture', userId: id, readingPlanId: null, verseReference: '以賽亞書 61:1-全', verseText: '主耶和華的靈在我身上。', observation: '看見身邊有需要的人，願意停下來聆聽。\n這是閱讀字級驗收用筆記。', coreInsightNote: '在每天的生活中，用耐心與溫柔陪伴彼此，也練習接納自己的有限。', actionPlan: '今天主動關心一位朋友。', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  await page.route('**/api/devotional-notes', route => route.fulfill({ json: [note] }));
+  await page.route('**/api/devotional-notes/reading-fixture', route => route.fulfill({ json: note }));
   await page.route('**/api/access-control', async route => {
     const response = await route.fetch(); const data = await response.json();
     data.users = data.users.filter(u => u.id === id); data.grants = []; data.history = []; data.legacyScopes = []; data.appointments = []; data.groups = [];
@@ -99,8 +101,9 @@ async function journey(page, { origin, code, cookie, id, output }) {
   await go('/learn/my-notes');
   await page.getByTestId('card-devotional-note-reading-fixture').click();
   await page.getByTestId('button-edit-note-reading-fixture').click();
+  await page.getByTestId('textarea-observation').waitFor();
   checks.push({ flow: 'open-note-editor', ...await metrics() });
-  await page.screenshot({ path: output + '/note-editor-maximum.png', fullPage: true });
+  await page.screenshot({ path: output + '/note-editor-maximum.png' });
   return { baseline, enlarged, checks, errors, preferencesPersist: true, noteFixtureMocked: true, wroteMemberContent: false, physicalPhoneTested: false };
 }
 let result;

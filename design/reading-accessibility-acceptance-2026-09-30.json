@@ -1,0 +1,21 @@
+{
+  "environment": "staging",
+  "deploymentId": "10c2c42a-4490-4af4-9204-c4f14f536a72",
+  "sourceCommit": "90ed395d4df526befa29bf46b701170e6b0bfe90",
+  "fingerprint": "e566fdd991cd3dd66f3f207706ff7c2550fba0cb9500eecfe4103afe5f24fb5e",
+  "browser": "Chromium",
+  "viewports": [320, 390, 768, 1440],
+  "routeCount": 13,
+  "pageVariants": ["standard-light", "maximum-dark"],
+  "checks": 110,
+  "layoutFailures": 0,
+  "pageErrors": 0,
+  "noteFontPixels": { "standard": 20.25, "maximum": 40.5 },
+  "preferencesPersist": true,
+  "noteFixtureMocked": true,
+  "wroteMemberContent": false,
+  "fixtureRemoved": true,
+  "productionUnchanged": true,
+  "physicalPhoneTested": false,
+  "wcagCertification": false
+}
