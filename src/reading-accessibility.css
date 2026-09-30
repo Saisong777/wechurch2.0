@@ -24,12 +24,25 @@ html[data-reading-font='serif'] {
 .mobile-navigation-bar > a svg { flex-shrink: 0; }
 .reading-preferences { overflow-wrap: anywhere; }
 .reading-preferences button { max-width: 100%; }
+.appearance-toolbar > button { width: 44px; height: 44px; }
+.appearance-toolbar > button svg { width: 24px; height: 24px; }
 .text-\[9px\], .text-\[10px\], .text-\[11px\] { font-size: 0.75rem; line-height: 1.5; }
 .text-\[15px\] { font-size: 0.9375rem; }
 .text-\[16px\] { font-size: 1rem; }
 .text-\[18px\] { font-size: 1.125rem; }
 .text-\[21px\] { font-size: 1.3125rem; }
 .text-\[22px\] { font-size: 1.375rem; }
+@media (min-width: 768px) {
+  html[data-text-size='maximum'] .dashboard-header > .container,
+  html[data-text-size='maximum'] [data-testid='page-header'] > .container > div:first-child { flex-wrap: wrap; gap: 12px; }
+  html[data-text-size='maximum'] [data-testid='nav-top-index'],
+  html[data-text-size='maximum'] [data-testid='nav-top'] { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: center; }
+}
+@media (min-width: 768px) and (max-width: 1279px) {
+  html:is([data-text-size='large'], [data-text-size='extra']) .dashboard-header > .container,
+  html:is([data-text-size='large'], [data-text-size='extra']) [data-testid='page-header'] > .container > div:first-child { flex-wrap: wrap; gap: 12px; }
+  html:is([data-text-size='large'], [data-text-size='extra']) :is([data-testid='nav-top-index'], [data-testid='nav-top']) { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: center; }
+}
 /* Reflow text without multiplying the narrow viewport's structural gutters. */
 @media (max-width: 767px) {
   html[data-text-size] main { padding-inline: 16px; }
@@ -38,6 +51,22 @@ html[data-reading-font='serif'] {
   html[data-text-size='maximum'] .mobile-navigation-bar { grid-template-columns: auto minmax(0, 1fr) auto; }
   html[data-text-size='maximum'] .mobile-navigation-bar > a { gap: 4px; font-size: 0.875rem; }
   html[data-text-size='maximum'] .mobile-navigation-bar > a svg { display: none; }
+  html[data-text-size='maximum'] .mobile-navigation-bar { min-height: 56px; }
+  html[data-text-size='maximum'] .mobile-navigation-bar > button {
+    font-size: 0;
+    min-height: 48px;
+    min-width: 44px;
+    gap: 0;
+  }
+  html[data-text-size='maximum'] .mobile-navigation-bar > button svg { width: 24px; height: 24px; }
+  html[data-text-size='maximum'] .mobile-navigation-bar > a { min-height: 56px; }
+  html[data-text-size='maximum'] .devotional-note-card > div:first-child > div { flex-wrap: wrap; }
+  html[data-text-size='maximum'] .devotional-note-card > div:first-child > div > div:first-child { flex-basis: 100%; }
+  [data-testid='notes-tabs'] { flex-basis: 100%; }
+  html[data-text-size='maximum'] .access-page-header { gap: 8px; padding-inline: 16px; }
+  html[data-text-size='maximum'] .access-page-header > a { width: 44px; height: 44px; }
+  html[data-text-size='maximum'] .access-page-header > svg { display: none; }
+  html[data-text-size='maximum'] .access-page-header h1 { flex-basis: calc(100% - 52px); }
   html[data-text-size='maximum'] .mobile-menu-destinations { grid-template-columns: 1fr; }
   html[data-text-size='maximum'] .reading-preferences { font-size: 0.875rem; }
   .devotional-note-card .reading-copy { line-height: 1.85; }

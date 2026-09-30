@@ -26,7 +26,7 @@ export function AppearanceControl({ inline = false }: { inline?: boolean }) {
     </ToggleGroupItem>)}
   </ToggleGroup><ReadingPreferencesControl inline /></div>;
 
-  return <div className="flex shrink-0 items-center"><ReadingPreferencesControl /><DropdownMenu>
+  return <div className="appearance-toolbar flex shrink-0 items-center"><ReadingPreferencesControl /><DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0"
         aria-label={`顯示模式：${selected.label}`} title="顯示模式">

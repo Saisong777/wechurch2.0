@@ -15,7 +15,12 @@ const cookie = encodeURIComponent(`s:${sid}.${createHmac('sha256', state.app.SES
 const sql = value => `'${String(value).replaceAll("'", "''")}'`;
 const cli = (...args) => {
   try { return execFileSync(path.join(process.env.HOME, '.codex/skills/playwright/scripts/playwright_cli.sh'), ['-s=reading-acceptance', ...args], { cwd: root, encoding: 'utf8', timeout: 900000, maxBuffer: 8 * 1024 * 1024 }); }
-  catch { throw Error('Browser operation failed; credential-bearing output withheld'); }
+  catch (error) {
+    let detail = String(error.stdout || error.stderr || '').split('### Error\n').at(-1).split('### Ran')[0];
+    for (const secret of [cookie, state.app.STAGING_ACCESS_CODE, state.app.SESSION_SECRET]) if (secret) detail = detail.replaceAll(secret, '[redacted]');
+    console.error({ status: error.status, signal: error.signal, detail: detail.slice(0, 1000) });
+    throw Error('Browser operation failed; command withheld');
+  }
 };
 async function journey(page, { origin, code, cookie, id, output }) {
   const checks = [], errors = [];
@@ -26,7 +31,7 @@ async function journey(page, { origin, code, cookie, id, output }) {
   const me = await page.context().request.get(origin + '/api/auth/user');
   if (me.status() !== 200 || (await me.json()).legacyUserId !== id) throw Error('Fixture identity mismatch');
   // UI-only note fixture: never writes private notes or publishes to a wall.
-  await page.route('**/api/devotional-notes', route => route.fulfill({ json: [{ id: 'reading-fixture', userId: id, verseReference: '以賽亞書 61:1-全', verseText: '主耶和華的靈在我身上。', observation: '看見身邊有需要的人，願意停下來聆聽。\n這是閱讀字級驗收用筆記。', coreInsightNote: '在每天的生活中，用耐心與溫柔陪伴彼此，也練習接納自己的有限。', actionPlan: '今天主動關心一位朋友。', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }] }));
+  await page.route('**/api/devotional-notes', route => route.fulfill({ json: [{ id: 'reading-fixture', userId: id, readingPlanId: null, verseReference: '以賽亞書 61:1-全', verseText: '主耶和華的靈在我身上。', observation: '看見身邊有需要的人，願意停下來聆聽。\n這是閱讀字級驗收用筆記。', coreInsightNote: '在每天的生活中，用耐心與溫柔陪伴彼此，也練習接納自己的有限。', actionPlan: '今天主動關心一位朋友。', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }] }));
   await page.route('**/api/access-control', async route => {
     const response = await route.fetch(); const data = await response.json();
     data.users = data.users.filter(u => u.id === id); data.grants = []; data.history = []; data.legacyScopes = []; data.appointments = []; data.groups = [];
@@ -35,7 +40,7 @@ async function journey(page, { origin, code, cookie, id, output }) {
   const go = async route => {
     await page.goto(origin + route);
     await page.locator('main').first().waitFor();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
   };
   const metrics = () => page.evaluate(() => {
     const visible = e => !!e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
@@ -53,7 +58,7 @@ async function journey(page, { origin, code, cookie, id, output }) {
   await page.setViewportSize({ width: 390, height: 844 });
   await go('/learn/my-notes');
   await page.getByTestId('card-devotional-note-reading-fixture').click();
-  const baseline = await page.locator('.reading-copy').first().evaluate(e => parseFloat(getComputedStyle(e).fontSize));
+  const baseline = await page.getByTestId('card-devotional-note-reading-fixture').locator('.reading-copy').first().evaluate(e => parseFloat(getComputedStyle(e).fontSize));
   if (baseline < 20) throw Error('Default note text remains too small');
   await page.getByRole('button', { name: '開啟導覽選單' }).click();
   const menu = page.getByRole('navigation', { name: '行動導覽選單' });
@@ -66,10 +71,11 @@ async function journey(page, { origin, code, cookie, id, output }) {
   await menu.getByRole('button', { name: '恢復預設文字' }).click();
   await menu.getByRole('radio', { name: '最大', exact: true }).check();
   await menu.getByRole('radio', { name: '閱讀宋體', exact: true }).check();
+  await page.screenshot({ path: output + '/mobile-reading-settings.png' });
   await page.getByRole('button', { name: '關閉導覽選單' }).click();
   await page.reload();
   await page.getByTestId('card-devotional-note-reading-fixture').click();
-  const enlarged = await page.locator('.reading-copy').first().evaluate(e => ({ size: parseFloat(getComputedStyle(e).fontSize), font: getComputedStyle(e).fontFamily }));
+  const enlarged = await page.getByTestId('card-devotional-note-reading-fixture').locator('.reading-copy').first().evaluate(e => ({ size: parseFloat(getComputedStyle(e).fontSize), font: getComputedStyle(e).fontFamily }));
   if (enlarged.size / baseline !== 2 || !enlarged.font.includes('serif')) throw Error('Size/font persistence failed');
   const routes = ['/', '/learn', '/learn/my-notes', '/learn/church-reading', '/learn/bible?book=43&chapter=3', '/share', '/grace-record', '/walls', '/groups', '/care', '/me', '/admin', '/admin/access'];
   for (const width of [320, 390, 768, 1440]) {
@@ -82,7 +88,9 @@ async function journey(page, { origin, code, cookie, id, output }) {
         const layout = await metrics();
         checks.push({ route, width, size, ...layout });
         if ((['/learn/my-notes','/me','/learn/church-reading','/learn/bible?book=43&chapter=3'].includes(route) && width !== 768) || layout.offenders.length || layout.pageOverflow) {
+          await page.evaluate(() => window.scrollTo(0, 0));
           await page.screenshot({ path: `${output}/${route.split('?')[0].replaceAll('/','-') || 'home'}-${width}-${size}.png`, fullPage: true });
+          if (route === '/learn/my-notes') await page.screenshot({ path: `${output}/notes-viewport-${width}-${size}.png` });
         }
       }
     }
