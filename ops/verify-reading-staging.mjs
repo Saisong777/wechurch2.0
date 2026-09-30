@@ -121,6 +121,19 @@ async function journey(page, { origin, code, cookie, id, output, uxReview }) {
           await page.getByText('閱讀驗收', { exact: true }).first().waitFor();
           await page.getByRole('button', { name: '清除搜尋', exact: true }).click();
           checks.push({ route, view: 'members-search-clear', width, size, ...await metrics() });
+          if (width < 768) {
+            const card = page.locator('.crm-member-card').first();
+            const memberReadable = await card.evaluate(e => {
+              const name = e.querySelector('h3');
+              const action = e.querySelector('button');
+              return name && action && name.scrollWidth <= name.clientWidth + 1
+                && getComputedStyle(name).textOverflow !== 'ellipsis'
+                && action.getBoundingClientRect().width >= 44
+                && action.getBoundingClientRect().width <= 48;
+            });
+            if (!memberReadable) throw Error('Mobile member name or action is cramped');
+            checks.push({ route, view: 'readable-member-card', width, size, ...await metrics() });
+          }
           await page.screenshot({ path: `${output}/members-${width}-${size}.png`, fullPage: true });
         }
       }
@@ -136,7 +149,7 @@ async function journey(page, { origin, code, cookie, id, output, uxReview }) {
   if (uxReview && uxReview !== 'baseline') {
     await page.evaluate(() => localStorage.setItem('wechurch-reading-preferences', JSON.stringify({ size: 'standard', font: 'sans' })));
     await go('/learn/my-notes');
-    const expand = page.getByRole('button', { name: '展開筆記' });
+    const expand = page.getByTestId('button-expand-note-reading-fixture');
     await expand.focus(); await page.keyboard.press('Enter');
     const text = page.getByTestId('card-devotional-note-reading-fixture').locator('.reading-copy').first();
     await text.click();

@@ -718,7 +718,7 @@ const CRMPage = () => {
               <div>
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <Tabs value={memberTab} onValueChange={changeMemberTab}>
-                    <TabsList className="grid h-auto w-full grid-cols-4 sm:flex [&_svg]:hidden sm:[&_svg]:block [&_button]:px-2 sm:[&_button]:px-3">
+                    <TabsList className="crm-member-tabs grid h-auto w-full grid-cols-4 sm:flex [&_svg]:hidden sm:[&_svg]:block [&_button]:px-2 sm:[&_button]:px-3">
                       <TabsTrigger value="all" className="gap-2">
                         <Users className="h-4 w-4" />
                         全部
@@ -857,25 +857,25 @@ const CRMPage = () => {
                     {pageMembers.map((member) => {
                       return (
                         <Card key={member.id} className={selectedIds.has(member.id) ? 'ring-2 ring-primary' : ''}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between gap-3">
+                          <CardContent className="crm-member-card p-4">
+                            <div className="relative">
                               <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex min-h-[44px] flex-wrap items-center gap-2 pr-[52px]">
                                   {member.type === 'potential' && <Checkbox checked={selectedIds.has(member.id)} onCheckedChange={() => handleToggleSelect(member.id)} aria-label={`選取 ${member.name}`} />}
                                   <Badge variant={member.type === 'registered' ? 'default' : 'secondary'}>
                                     {member.type === 'registered' ? '會員' : '潛在'}
                                   </Badge>
                                 </div>
-                                <h3 className="mt-2 truncate font-semibold">{member.name}</h3>
+                                <h3 className="mt-2 break-words font-semibold">{member.name}</h3>
                                 {!!member.ministryRoles?.length&&<div className="mt-1 flex flex-wrap gap-1">{member.ministryRoles.map(name=><Badge key={name} variant="secondary">{name}</Badge>)}</div>}
-                                <p className="mt-1 truncate text-sm text-muted-foreground">{member.email}</p>
+                                <p className="mt-1 break-all text-sm text-muted-foreground">{member.email}</p>
                                 <p className="mt-2 text-xs text-muted-foreground">
                                   {member.role ? roleLabels[member.role] : statusLabels[member.status]} ・ 出席 {member.sessionsCount} 次
                                 </p>
                               </div>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" aria-label={`${member.name} 的操作`}>
+                                  <Button variant="ghost" size="icon" className="crm-member-action absolute right-0 top-0" aria-label={`${member.name} 的操作`}>
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -1028,14 +1028,14 @@ const CRMPage = () => {
                     <p role="status" className="tabular-nums text-muted-foreground">
                       {((memberPage.page - 1) * pageSize) + 1}–{Math.min(memberPage.page * pageSize, members.length)} / {members.length} 人
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="crm-pagination flex max-w-full flex-wrap items-center gap-2">
                       <Select value={String(pageSize)} onValueChange={value => setPageSize(Number(value))}>
-                        <SelectTrigger aria-label="每頁人數" className="w-[100px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger aria-label="每頁人數" className="w-auto min-w-[100px] max-w-full"><SelectValue /></SelectTrigger>
                         <SelectContent>{[25, 50, 100].map(size => <SelectItem key={size} value={String(size)}>{size} 人/頁</SelectItem>)}</SelectContent>
                       </Select>
-                      <Button variant="outline" size="icon" title="上一頁" aria-label="上一頁" disabled={memberPage.page === 1} onClick={() => changePage(memberPage.page - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="icon" className="crm-page-arrow" title="上一頁" aria-label="上一頁" disabled={memberPage.page === 1} onClick={() => changePage(memberPage.page - 1)}><ChevronLeft className="h-4 w-4" /></Button>
                       <span className="min-w-12 text-center tabular-nums">{memberPage.page}/{memberPage.pageCount}</span>
-                      <Button variant="outline" size="icon" title="下一頁" aria-label="下一頁" disabled={memberPage.page === memberPage.pageCount} onClick={() => changePage(memberPage.page + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="icon" className="crm-page-arrow" title="下一頁" aria-label="下一頁" disabled={memberPage.page === memberPage.pageCount} onClick={() => changePage(memberPage.page + 1)}><ChevronRight className="h-4 w-4" /></Button>
                     </div>
                   </div>
                 )}

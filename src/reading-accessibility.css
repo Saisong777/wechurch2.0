@@ -30,6 +30,8 @@ html[data-text-size='maximum'] .admin-action-grid { grid-template-columns: repea
 .crm-header .appearance-toolbar { flex-shrink: 0; }
 .crm-header-icon { width: 44px; height: 44px; min-height: 44px; }
 .crm-header-icon svg { width: 24px; height: 24px; }
+.crm-member-action, .crm-page-arrow { width: 44px; height: 44px; min-height: 44px; flex-shrink: 0; padding: 0; }
+.crm-member-action svg, .crm-page-arrow svg { width: 24px; height: 24px; }
 html[data-text-size='maximum'] .crm-member-filters > button[role='combobox'] { width: auto; min-width: min(100%, 9rem); max-width: 100%; }
 .text-\[9px\], .text-\[10px\], .text-\[11px\] { font-size: 0.75rem; line-height: 1.5; }
 .text-\[15px\] { font-size: 0.9375rem; }
@@ -50,6 +52,9 @@ html[data-text-size='maximum'] .crm-member-filters > button[role='combobox'] { w
 }
 /* Reflow text without multiplying the narrow viewport's structural gutters. */
 @media (max-width: 767px) {
+  .crm-member-card { padding: 16px; }
+  html:is([data-text-size='extra'], [data-text-size='maximum']) .crm-member-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-text-size='maximum'] .crm-pagination > button[role='combobox'] { flex-basis: 100%; }
   .crm-header > .container { padding-inline: 16px; }
   .crm-header > .container > div { gap: 8px; }
   html[data-text-size='maximum'] .crm-header .lucide-church { display: none; }

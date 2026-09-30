@@ -141,7 +141,7 @@ export const AdminPage: React.FC = () => {
 
             {actionGroups.filter(group => group.actions.length > 0).map(group => <section key={group.title} aria-label={group.title} className="border-t pt-5">
               <h2 className="mb-3 text-base font-semibold">{group.title}</h2>
-              <div className="admin-action-grid grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="admin-action-grid grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 gap-3">
               {group.actions.map(({ icon: Icon, label, action, testId, badge }) => (
                 <button
                   key={testId}
