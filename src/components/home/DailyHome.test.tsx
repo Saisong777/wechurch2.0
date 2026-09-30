@@ -19,6 +19,32 @@ function show(props: Partial<DailyHomeProps> = {}) {
 }
 
 describe('daily homepage', () => {
+  it('keeps both community destinations accessible and labels generated photos', () => {
+    const { container } = show();
+    expect(screen.getByRole('link', { name: '我的小家', exact: true }).getAttribute('href')).toBe('/groups');
+    expect(screen.getByRole('link', { name: '分享牆', exact: true }).getAttribute('href')).toBe('/walls');
+    expect(screen.getAllByText('AI 示意照片')).toHaveLength(2);
+    for (const image of container.querySelectorAll('.home-community-photo img')) {
+      expect(image.getAttribute('alt')).toBe('');
+      expect(image.getAttribute('loading')).toBe('lazy');
+      expect(image.getAttribute('width')).toBe('1536');
+      expect(image.getAttribute('height')).toBe('1024');
+    }
+  });
+
+  it.each(['loading', 'error', 'unpublished'] as const)('does not invent a preview when the reading is %s', readingState => {
+    show({ readingState });
+    expect(screen.queryByTestId('daily-scripture-preview')).toBeNull();
+    expect(screen.queryByTestId('start-daily-devotion')).toBeNull();
+    expect(screen.getByRole('link', { name: '查看每日靈修' }).getAttribute('href')).toBe(defaults.scripture.href);
+  });
+
+  it('keeps pastoral access distinct from administrative access', () => {
+    show({ showPastoral: true, showAdmin: false });
+    expect(screen.getByRole('link', { name: /牧養概況/ }).getAttribute('href')).toBe('/work');
+    expect(screen.queryByRole('link', { name: '主持與管理' })).toBeNull();
+  });
+
   it('has three sections, one scripture preview, and a direct reading action', () => {
     const { container } = show();
     expect(container.querySelectorAll('section')).toHaveLength(3);
