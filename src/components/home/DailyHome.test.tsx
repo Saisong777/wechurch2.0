@@ -21,8 +21,8 @@ function show(props: Partial<DailyHomeProps> = {}) {
 describe('daily homepage', () => {
   it('keeps both community destinations accessible and labels generated photos', () => {
     const { container } = show();
-    expect(screen.getByRole('link', { name: '我的小家', exact: true }).getAttribute('href')).toBe('/groups');
-    expect(screen.getByRole('link', { name: '分享牆', exact: true }).getAttribute('href')).toBe('/walls');
+    expect(screen.getByRole('link', { name: '我的小家' }).getAttribute('href')).toBe('/groups');
+    expect(screen.getByRole('link', { name: '分享牆' }).getAttribute('href')).toBe('/walls');
     expect(screen.getAllByText('AI 示意照片')).toHaveLength(2);
     for (const image of container.querySelectorAll('.home-community-photo img')) {
       expect(image.getAttribute('alt')).toBe('');
