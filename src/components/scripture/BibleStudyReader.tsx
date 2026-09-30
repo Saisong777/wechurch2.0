@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { DevotionalNoteDialog } from './DevotionalNoteDialog';
 import { ScriptureCardCreator } from './ScriptureCardCreator';
-import { ScriptureTTS } from './ScriptureTTS';
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -235,7 +234,6 @@ function ReadingSurface({ info }: { info: Info }) {
         <Button size="icon" variant="ghost" title="製作經文圖卡" aria-label="製作經文圖卡" onClick={() => setCard({ reference: `${excerptReference}\n${citation}`, text: excerptText })}><Image /></Button>
         {user ? <><Button size="icon" variant="ghost" title={currentSaved ? '取消收藏' : '收藏經文'} aria-label={currentSaved ? '取消收藏' : '收藏經文'} disabled={save.isPending || saved.isPending || saved.isError} onClick={() => save.mutate()}>{currentSaved ? <BookmarkCheck /> : <Bookmark />}</Button>
           <Button variant="outline" onClick={openNote}><PenLine size={18} className="mr-2" />寫筆記</Button></> : <Button variant="outline" asChild><Link to="/login">登入寫筆記與收藏</Link></Button>}
-        <ScriptureTTS compact label={selected.length ? '朗讀已選' : '朗讀整章'} text={(selected.length ? selected : primary.data || []).map(v => v.body).join(' ')} />
         <Button variant="ghost" size="icon" aria-label={paragraph ? '逐節閱讀' : '段落閱讀'} title={paragraph ? '逐節閱讀' : '段落閱讀'} disabled={compare} onClick={() => setParagraph(p => !p)}>{paragraph ? <List /> : <AlignLeft />}</Button>
       </>}
       {saved.isError && <Button variant="ghost" onClick={() => saved.refetch()}>重新載入收藏</Button>}

@@ -8,7 +8,6 @@ import BiblePage from './BiblePage';
 vi.mock('@/components/layout/Header', () => ({ Header: ({ title }: { title: string }) => <h1>{title}</h1> }));
 vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: ({ children }: { children: ReactNode }) => children }));
 vi.mock('@/components/scripture/DevotionalNoteDialog', () => ({ DevotionalNoteDialog: () => null }));
-vi.mock('@/components/scripture/ScriptureTTS', () => ({ ScriptureTTS: () => null }));
 vi.mock('@/components/scripture/ScriptureCardCreator', () => ({ ScriptureCardCreator: () => null }));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...await importOriginal<typeof import('@tanstack/react-query')>(),
@@ -31,6 +30,7 @@ it('returns to the selected Bible chapter without resetting the reading scroll',
   fireEvent.click(screen.getByTestId('button-book-1'));
   fireEvent.click(screen.getByTestId('button-chapter-2'));
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('創世記 2章');
+  expect(screen.queryByRole('button', { name: /朗讀/ })).not.toBeInTheDocument();
   await act(() => router.navigate('/care'));
   scroll.mockClear();
   await act(() => router.navigate(-1));

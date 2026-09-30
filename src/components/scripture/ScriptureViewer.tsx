@@ -17,10 +17,9 @@ interface ScriptureViewerProps {
   paragraphMode?: boolean;
   fontSizeClass?: string;
   onNoteForSelected?: (verseReference: string, verseText: string) => void;
-  onReadSelected?: (text: string) => void;
 }
 
-export const ScriptureViewer = ({ verses, className = '', paragraphMode = false, fontSizeClass, onNoteForSelected, onReadSelected }: ScriptureViewerProps) => {
+export const ScriptureViewer = ({ verses, className = '', paragraphMode = false, fontSizeClass, onNoteForSelected }: ScriptureViewerProps) => {
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
   const [showCardModal, setShowCardModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -154,13 +153,6 @@ export const ScriptureViewer = ({ verses, className = '', paragraphMode = false,
     onNoteForSelected?.(ref, text);
   };
 
-  const handleRead = () => {
-    const selected = getSelectedVersesList();
-    if (selected.length === 0) return;
-    const text = selected.map(v => v.text).join(' ');
-    onReadSelected?.(text);
-  };
-
   const selectedList = getSelectedVersesList();
   const hasSelection = selectedList.length > 0;
 
@@ -181,7 +173,6 @@ export const ScriptureViewer = ({ verses, className = '', paragraphMode = false,
         selectedCount={selectedList.length}
         copied={copied}
         onNote={onNoteForSelected ? handleNote : undefined}
-        onRead={onReadSelected ? handleRead : undefined}
       />
 
       {paragraphMode ? (

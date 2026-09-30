@@ -9,10 +9,9 @@ import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import {
-  ArrowLeft, Play, Pause, Square, Volume2, VolumeX, BookOpen,
-  Check, ChevronDown, ChevronUp, Loader2, SkipForward, SkipBack, Mic,
+  ArrowLeft, BookOpen,
+  Check, ChevronDown, ChevronUp, Loader2,
 } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -77,9 +76,6 @@ interface DevotionalNote {
   updatedAt: string;
 }
 
-type TtsState = 'idle' | 'playing' | 'paused';
-
-const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5];
 const RECEIVE_KEY: InsightCategory = 'GOD_ATTRIBUTE';
 
 function getReceivingText(coreInsightNote: string | null, heartbeatVerse: string | null): string {
@@ -141,14 +137,6 @@ const ReadingExperiencePage = () => {
 
   const initialDay = searchParams.get('day') ? parseInt(searchParams.get('day')!, 10) : 1;
   const [selectedDay, setSelectedDay] = useState<number>(initialDay || 1);
-  const [ttsState, setTtsState] = useState<TtsState>('idle');
-  const [autoRead, setAutoRead] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [currentVerseIndex, setCurrentVerseIndex] = useState(-1);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>(() => {
-    return localStorage.getItem('wechurch-tts-voice') || '';
-  });
   const [devotionalExpanded, setDevotionalExpanded] = useState(false);
   const [devotionalForm, setDevotionalForm] = useState({
     titlePhrase: '',
@@ -171,10 +159,6 @@ const ReadingExperiencePage = () => {
   }, []);
 
   const dayStripRef = useRef<HTMLDivElement>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const versesQueueRef = useRef<BibleVerse[]>([]);
-  const currentQueueIndexRef = useRef(0);
 
   const { data: plan, isLoading: planLoading } = useQuery<PlanInfo>({
     queryKey: ['/api/user-reading-plans', planId],
@@ -294,38 +278,6 @@ const ReadingExperiencePage = () => {
     }
   }, [selectedDay]);
 
-  useEffect(() => {
-    return () => {
-      window.speechSynthesis.cancel();
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    const loadVoices = () => {
-      const allVoices = window.speechSynthesis.getVoices();
-      const chineseVoices = allVoices.filter(v => v.lang.startsWith('zh'));
-      setVoices(chineseVoices);
-      if (!selectedVoiceURI && chineseVoices.length > 0) {
-        const twVoice = chineseVoices.find(v => v.lang === 'zh-TW');
-        setSelectedVoiceURI(twVoice?.voiceURI || chineseVoices[0].voiceURI);
-      }
-    };
-    loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-  }, [selectedVoiceURI]);
-
-  const handleVoiceChange = useCallback((voiceURI: string) => {
-    setSelectedVoiceURI(voiceURI);
-    localStorage.setItem('wechurch-tts-voice', voiceURI);
-    if (ttsState !== 'idle') {
-      window.speechSynthesis.cancel();
-      setTtsState('idle');
-      setCurrentVerseIndex(-1);
-    }
-  }, [ttsState]);
-
   const completedCount = useMemo(() => progressEntries.filter(e => e.isCompleted).length, [progressEntries]);
   const totalDays = plan?.totalDays || progressEntries.length || 1;
   const overallProgress = Math.round((completedCount / totalDays) * 100);
@@ -400,100 +352,12 @@ const ReadingExperiencePage = () => {
     }));
   }, []);
 
-  const speakVerse = useCallback((verse: BibleVerse, index: number) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(verse.text);
-    utterance.lang = 'zh-TW';
-    utterance.rate = speed;
-    if (selectedVoiceURI) {
-      const voice = voices.find(v => v.voiceURI === selectedVoiceURI);
-      if (voice) utterance.voice = voice;
-    }
-    utteranceRef.current = utterance;
-    setCurrentVerseIndex(index);
-    setTtsState('playing');
-
-    utterance.onend = () => {
-      if (autoRead && currentQueueIndexRef.current < versesQueueRef.current.length - 1) {
-        currentQueueIndexRef.current += 1;
-        const nextVerse = versesQueueRef.current[currentQueueIndexRef.current];
-        speakVerse(nextVerse, currentQueueIndexRef.current);
-      } else {
-        setTtsState('idle');
-        setCurrentVerseIndex(-1);
-      }
-    };
-
-    utterance.onerror = () => {
-      setTtsState('idle');
-      setCurrentVerseIndex(-1);
-    };
-
-    window.speechSynthesis.speak(utterance);
-  }, [speed, autoRead, selectedVoiceURI, voices]);
-
-  const handlePlay = useCallback(() => {
-    if (allVerses.length === 0) return;
-    if (ttsState === 'paused') {
-      window.speechSynthesis.resume();
-      setTtsState('playing');
-      return;
-    }
-    versesQueueRef.current = allVerses;
-    currentQueueIndexRef.current = 0;
-    speakVerse(allVerses[0], 0);
-  }, [allVerses, ttsState, speakVerse]);
-
-  const handlePause = useCallback(() => {
-    window.speechSynthesis.pause();
-    setTtsState('paused');
-  }, []);
-
-  const handleStop = useCallback(() => {
-    window.speechSynthesis.cancel();
-    setTtsState('idle');
-    setCurrentVerseIndex(-1);
-  }, []);
-
-  const handleSkipNext = useCallback(() => {
-    if (currentQueueIndexRef.current < versesQueueRef.current.length - 1) {
-      window.speechSynthesis.cancel();
-      currentQueueIndexRef.current += 1;
-      speakVerse(versesQueueRef.current[currentQueueIndexRef.current], currentQueueIndexRef.current);
-    }
-  }, [speakVerse]);
-
-  const handleSkipPrev = useCallback(() => {
-    if (currentQueueIndexRef.current > 0) {
-      window.speechSynthesis.cancel();
-      currentQueueIndexRef.current -= 1;
-      speakVerse(versesQueueRef.current[currentQueueIndexRef.current], currentQueueIndexRef.current);
-    }
-  }, [speakVerse]);
-
-  const toggleAutoRead = useCallback(() => {
-    const newState = !autoRead;
-    setAutoRead(newState);
-    if (newState && ttsState === 'idle' && allVerses.length > 0) {
-      versesQueueRef.current = allVerses;
-      currentQueueIndexRef.current = 0;
-      speakVerse(allVerses[0], 0);
-    }
-  }, [autoRead, ttsState, allVerses, speakVerse]);
-
-  const cycleSpeed = useCallback(() => {
-    const idx = SPEED_OPTIONS.indexOf(speed);
-    const next = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
-    setSpeed(next);
-  }, [speed]);
-
   const handleDaySelect = useCallback((day: number) => {
     if (day === selectedDay || savingState === 'saving') return;
     if (noteDirty) { setPendingDay(day); return; }
     noteEdited.current = false;
-    handleStop();
     setSelectedDay(day);
-  }, [handleStop, selectedDay, savingState, noteDirty]);
+  }, [selectedDay, savingState, noteDirty]);
 
   const groupedVerses = useMemo(() => {
     const groups: { bookName: string; chapter: number; verses: BibleVerse[] }[] = [];
@@ -549,7 +413,7 @@ const ReadingExperiencePage = () => {
         if (pendingDay !== null) {
           noteEdited.current = false;
           setNoteBaseline(devotionalForm);
-          handleStop(); setSelectedDay(pendingDay); setPendingDay(null);
+          setSelectedDay(pendingDay); setPendingDay(null);
         }
       }} />
       <Header variant="compact" title="每日讀經" backTo="/learn/reading-plans" />
@@ -631,94 +495,6 @@ const ReadingExperiencePage = () => {
           </Card>
         )}
 
-        <Card className="mb-4 sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b">
-          <CardContent className="py-2 px-3 sm:px-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleSkipPrev}
-                  disabled={ttsState === 'idle'}
-                  data-testid="button-skip-prev"
-                >
-                  <SkipBack className="w-4 h-4" />
-                </Button>
-                {ttsState === 'playing' ? (
-                  <Button size="icon" variant="ghost" onClick={handlePause} data-testid="button-pause">
-                    <Pause className="w-5 h-5" />
-                  </Button>
-                ) : (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={handlePlay}
-                    disabled={allVerses.length === 0}
-                    data-testid="button-play"
-                  >
-                    <Play className="w-5 h-5" />
-                  </Button>
-                )}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleStop}
-                  disabled={ttsState === 'idle'}
-                  data-testid="button-stop"
-                >
-                  <Square className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleSkipNext}
-                  disabled={ttsState === 'idle'}
-                  data-testid="button-skip-next"
-                >
-                  <SkipForward className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={cycleSpeed}
-                  className="text-xs font-mono"
-                  data-testid="button-speed"
-                >
-                  {speed}x
-                </Button>
-                {voices.length > 0 && (
-                  <Select value={selectedVoiceURI} onValueChange={handleVoiceChange}>
-                    <SelectTrigger className="h-8 w-auto max-w-[120px] text-xs gap-1" data-testid="select-voice">
-                      <Mic className="w-3 h-3 flex-shrink-0" />
-                      <SelectValue placeholder="聲音" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {voices.map((v) => (
-                        <SelectItem key={v.voiceURI} value={v.voiceURI}>
-                          {v.name.replace(/Microsoft |Google |Apple /g, '').substring(0, 20)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <Button
-                  variant={autoRead ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={toggleAutoRead}
-                  className="text-xs gap-1"
-                  data-testid="button-toggle-auto-read"
-                >
-                  {autoRead ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-                  {autoRead ? '自動朗讀' : '自己閱讀'}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         <div className="mb-6" data-testid="scripture-display">
           {versesLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -742,15 +518,10 @@ const ReadingExperiencePage = () => {
                 </h3>
                 <div className="space-y-1 leading-relaxed">
                   {group.verses.map((verse) => {
-                    const globalIndex = allVerses.indexOf(verse);
-                    const isHighlighted = globalIndex === currentVerseIndex;
                     return (
                       <span
                         key={`${verse.bookName}-${verse.chapter}-${verse.verse}`}
-                        className={cn(
-                          'inline transition-colors duration-200',
-                          isHighlighted && 'bg-yellow-200 dark:bg-yellow-800/50 rounded px-0.5'
-                        )}
+                        className="inline"
                         data-testid={`verse-${verse.bookName}-${verse.chapter}-${verse.verse}`}
                       >
                         <sup className="text-xs text-muted-foreground mr-0.5 font-medium">

@@ -11,7 +11,6 @@ vi.mock('@/components/layout/Header', () => ({ Header: () => <header>聖經</hea
 vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: ({ children }: { children: ReactNode }) => children }));
 vi.mock('./DevotionalNoteDialog', () => ({ DevotionalNoteDialog: ({ verseReference, inline }: { verseReference: string; inline: boolean }) => <section aria-label="筆記">{verseReference}{inline && '同頁編輯'}</section> }));
 vi.mock('./ScriptureCardCreator', () => ({ ScriptureCardCreator: () => null }));
-vi.mock('./ScriptureTTS', () => ({ ScriptureTTS: () => null }));
 const credit = { source_id: 'cmncbt', source_name: '當代譯本', license: 'CC-BY-SA-4.0', metadata: { attribution: 'Biblica', license_url: 'https://creativecommons.org/licenses/by-sa/4.0/' } };
 const verse = { ...credit, id: 'v1', verse: 1, end_verse: 2, body: '測試合併經文' };
 const info = { books: Array.from({ length: 66 }, (_, i) => ({ id: i + 1, name: `書卷${i + 1}`, chapters: 3 })), translations: { 'cmn-cu89t': '新標點和合本（繁體）', cmncbt: '當代譯本', engwebp: 'WEB' }, default_translation: 'cmn-cu89t', release_id: 'public-20260926-v2', note_sources: ['notes'], sources: [{ id: 'notes', name: '註釋', license: credit.license, metadata: credit.metadata }] };
@@ -54,6 +53,19 @@ it('defaults to CUV, remembers a valid selection and offers both comparison vers
   mount();
   await screen.findByText('測試合併經文');
   expect(screen.getByLabelText('譯本', { exact: true })).toHaveValue('engwebp');
+});
+
+it('keeps reading and note actions without any speech controls or speech API access', async () => {
+  const speechAccess = vi.fn(() => { throw new Error('Speech is removed'); });
+  vi.stubGlobal('speechSynthesis', { getVoices: speechAccess, speak: speechAccess, cancel: speechAccess, addEventListener: speechAccess });
+  mount();
+  await screen.findByText('測試合併經文');
+  expect(screen.queryByRole('button', { name: /朗讀|播放|暫停|停止/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '寫筆記' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '查考' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: '查考' }));
+  expect(screen.queryByRole('button', { name: /朗讀/ })).not.toBeInTheDocument();
+  expect(speechAccess).not.toHaveBeenCalled();
 });
 
 it('handles a New Testament-only translation explicitly on Old Testament routes', async () => {

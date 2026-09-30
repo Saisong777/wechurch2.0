@@ -11,7 +11,6 @@ import { apiRequest } from '@/lib/queryClient';
 import { FloatingToolbar } from '@/components/scripture/FloatingToolbar';
 import { ScriptureCardCreator } from '@/components/scripture/ScriptureCardCreator';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
-import { ScriptureTTS } from '@/components/scripture/ScriptureTTS';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { vibrate } from '@/lib/utils';
@@ -882,11 +881,6 @@ const BibleReader = ({ entryKey }: { entryKey: string }) => {
                           <AlignLeft className="w-4 h-4" />
                         </Button>
                       </div>
-                      <ScriptureTTS
-                        text={selectedVerseNums.size > 0 ? getSelectedVerses().map(v => v.text).join(' ') : verses.map(v => v.text).join(' ')}
-                        compact
-                        label={selectedVerseNums.size > 0 ? `朗讀已選(${selectedVerseNums.size}節)` : '朗讀整章'}
-                      />
                       {selectedVerseNums.size > 0 && (
                         <span className="text-xs text-muted-foreground ml-auto">已選 {selectedVerseNums.size} 節</span>
                       )}

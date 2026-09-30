@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Copy, Share2, Image, Check, X, BookMarked, Volume2 } from 'lucide-react';
+import { Copy, Share2, Image, Check, X, BookMarked } from 'lucide-react';
 
 interface FloatingToolbarProps {
   visible: boolean;
@@ -13,7 +13,6 @@ interface FloatingToolbarProps {
   selectedCount: number;
   copied: boolean;
   onNote?: () => void;
-  onRead?: () => void;
 }
 
 export const FloatingToolbar = ({
@@ -26,7 +25,6 @@ export const FloatingToolbar = ({
   selectedCount,
   copied,
   onNote,
-  onRead,
 }: FloatingToolbarProps) => {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -91,12 +89,6 @@ export const FloatingToolbar = ({
               <span className="text-xs">筆記</span>
             </Button>
           )}
-          {onRead && (
-            <Button variant="outline" size="sm" className="gap-1 shrink-0" onClick={onRead} data-testid="button-toolbar-read">
-              <Volume2 className="w-3.5 h-3.5" />
-              <span className="text-xs">朗讀</span>
-            </Button>
-          )}
         </div>
         <Button 
           variant="ghost" 
@@ -119,7 +111,6 @@ export const FloatingToolbar = ({
       onClear={onClear}
       copied={copied}
       onNote={onNote}
-      onRead={onRead}
     />
   );
 
@@ -135,7 +126,6 @@ const DesktopToolbar = ({
   onClear,
   copied,
   onNote,
-  onRead,
 }: Omit<FloatingToolbarProps, 'visible'>) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const rafRef = useRef<number>();
@@ -231,12 +221,6 @@ const DesktopToolbar = ({
         <Button variant="ghost" size="sm" className="gap-1" onClick={onNote} data-testid="button-toolbar-note">
           <BookMarked className="w-3 h-3" />
           <span className="text-xs">筆記</span>
-        </Button>
-      )}
-      {onRead && (
-        <Button variant="ghost" size="sm" className="gap-1" onClick={onRead} data-testid="button-toolbar-read">
-          <Volume2 className="w-3 h-3" />
-          <span className="text-xs">朗讀</span>
         </Button>
       )}
       <Button 
