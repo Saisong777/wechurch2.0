@@ -14,11 +14,17 @@
 - 沿用 Radix 單選切換控制及既有網站字級／顏色。
 - 經文在同一個段落中自然換行，逐節選取按鈕保持 inline，操作列放在段落外。
 - 偏好鍵：`study-reading-mode`；合法值 `paragraph`／`verses`。
-- 每节仍以原始 verse/end_verse 識別，合併經節不拆分或重複。
+- 每節仍以原始 verse/end_verse 識別，合併經節不拆分或重複。
 
 ## 驗證
 
 - 11 項讀經元件測試通過，包含 3 項新增模式／保存／對照／受限儲存測試。
 - 頁面及測試檔 lint 無錯誤；兩項原有 fast-refresh 警告仍保留。
-- 全套發布檢查及 B 線上畫面驗收：待本輪部署後補記。
-- 實體 iPhone 未重測，不以瀏覽器尺寸模擬宣称實機驗收。
+- 全套 130 檔／741 項功能測試、42 項發布檢查、隔離 DB 真實 HTTP／完整性及 build 通過；測試 DB 已清除回讀。
+- GitHub 來源：`4dc77a4`；B 部署 `41c75406-6f1e-4831-b628-42d6b8ceceff` 為 SUCCESS。
+- 快照指紋：`9eb0013e5b99f079e08ccb8b1da385791102b0ee291d08c35bc9fc7499e8371e`；GitHub-safe release manifest 已核對 live fingerprint/sourceMatchesCommit。
+- B DOM 已讀回「段落／逐節」控制、段落預設選取、創世記 1 章 31 個經節按鈕及來源授權。
+- B Google 登入／邀請邊界驗證通過；A deployment 仍 `a8a4db29-527f-4cc3-8d17-caed230f69cb`。
+- 手機／桌面視覺及完整線上操作驗收尚未完成：截圖與 viewport 工具逾時，工具回報 Mac 鎖定；已請 Sai 解鎖，未繞過鎖定。
+- 可能送出的 1440×1000 viewport 覆寫未能在鎖定時確認／清除，接續時先 reset。
+- 實體 iPhone 未重測，不以瀏覽器尺寸模擬宣稱實機驗收。
