@@ -51,4 +51,5 @@
   .note-chapter-heading h2 { font-size: 1.25rem; }
   html[data-text-size='maximum'] .note-directory-filters { grid-template-columns: minmax(0, 1fr); }
   html[data-text-size='maximum'] .note-journal-actions { flex-wrap: wrap; }
+  body:has(.note-journal) .mobile-navigation-bar > a { font-size: min(.875rem, 22px); }
 }

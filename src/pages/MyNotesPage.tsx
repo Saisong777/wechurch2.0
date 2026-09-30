@@ -137,11 +137,18 @@ function JournalReader({ userId }: { userId: string }) {
       if (focusChapter.current) { document.getElementById('journal-chapter-title')?.focus({ preventScroll: true }); focusChapter.current = false; }
       restoring.current = false;
     });
-    const remember = () => { if (!restoring.current) lastY.current = Math.max(0, window.scrollY); };
     const save = () => saveJournalPosition(userId, chapterId, lastY.current);
+    let timer = 0;
+    const remember = () => {
+      if (restoring.current) return;
+      lastY.current = Math.max(0, window.scrollY);
+      if (!timer) timer = window.setTimeout(() => { timer = 0; save(); }, 500);
+    };
+    const saveWhenHidden = () => { if (document.visibilityState === 'hidden') save(); };
     window.addEventListener('scroll', remember, { passive: true });
     window.addEventListener('pagehide', save);
-    return () => { save(); cancelAnimationFrame(frame); window.removeEventListener('scroll', remember); window.removeEventListener('pagehide', save); };
+    document.addEventListener('visibilitychange', saveWhenHidden);
+    return () => { save(); cancelAnimationFrame(frame); window.clearTimeout(timer); window.removeEventListener('scroll', remember); window.removeEventListener('pagehide', save); document.removeEventListener('visibilitychange', saveWhenHidden); };
   }, [chapterId, directory, editing, query.isLoading, userId]);
 
   const openNote = (note: JournalNote) => { focusChapter.current = true; setSelected(note.id); setDirectory(false); };
