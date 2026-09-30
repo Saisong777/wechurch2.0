@@ -32,8 +32,10 @@ function show(view: string) {
 
 it('opens the response form with a correctly bound browser UUID function', async () => {
   show('note');
-  fireEvent.click(await screen.findByRole('button', { name: '回應 0' }));
-  expect(await screen.findByRole('textbox', { name: '寫下回應' })).toBeTruthy();
+  fireEvent.click(await screen.findByRole('button', { name: '寫下留言' }));
+  expect(await screen.findByRole('textbox', { name: '寫下留言' })).toBeTruthy();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('textbox', { name: '寫下留言' })).not.toHaveFocus();
 });
 
 it('uses the shared header and preserves the group selector', async () => {

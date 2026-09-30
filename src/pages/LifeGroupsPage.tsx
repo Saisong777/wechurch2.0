@@ -11,12 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { careStatuses, type GroupCare, type GroupComment, type GroupMember, type GroupShare, type GroupSummary, type CareUpdate, type ShareSource } from '@shared/lifeGroup';
+import { careStatuses, type GroupCare, type GroupMember, type GroupShare, type GroupSummary, type CareUpdate, type ShareSource } from '@shared/lifeGroup';
 import { taipeiToday } from '@shared/churchDevotion';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import { FamilyJoinPanel } from '@/components/groups/FamilyJoinPanel';
 import { FamilyManagement } from '@/components/groups/FamilyManagement';
+import { FamilyComments } from '@/components/groups/FamilyComments';
 import { familyBase as base, familyRequest as request, useFamilyQuery as useGroupQuery } from '@/lib/familyApi';
 
 const selectClass = 'h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm';
@@ -152,13 +153,12 @@ function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string;
 
 function ShareFeed({ id, kind, info, actor, busy, act, compose }: { id: string; kind: GroupShare['kind'] | 'all'; info: Info; actor: string; busy: boolean; act: Act; compose: (kind: GroupShare['kind'], existing?: GroupShare) => void }) {
   const [page, setPage] = useState(0);
-  const [comments, setComments] = useState<GroupShare | null>(null);
   const q = useGroupQuery<GroupShare[]>(`/${id}/shares?kind=${kind}&offset=${page * 30}`);
   return <section className="space-y-4"><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => compose('note')}><Pencil className="mr-2 h-4 w-4" />分享靈修筆記</Button><Button variant="outline" onClick={() => compose('prayer')}><Heart className="mr-2 h-4 w-4" />新增小家代禱</Button><Button variant="outline" onClick={() => compose('message')}><MessageCircle className="mr-2 h-4 w-4" />生活留言</Button></div>
     {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : q.isPending ? <p role="status">載入分享中…</p> : <>
       {!q.data.length && <p className="py-6 text-center text-muted-foreground">{page ? '沒有更多分享。' : '還沒有分享，來和家人打聲招呼吧。'}</p>}
-      <div className="space-y-4">{q.data.map(post => <article key={post.id} className="min-w-0 rounded-lg border p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{post.authorName} · {time(post.createdAt)}{post.answered && ' · 已蒙應允'}</p><h3 className="mt-2 text-lg font-semibold">{post.title}</h3></div><div className="flex">{(post.isOwner || post.authorId === actor) && <Button size="icon" variant="ghost" title="編輯分享" aria-label={`編輯 ${post.title}`} onClick={() => compose(post.kind, post)}><Pencil className="h-4 w-4" /></Button>}{((post.isOwner || post.authorId === actor) || info.manager) && <Button size="icon" variant="ghost" title="撤回分享" aria-label={`撤回 ${post.title}`} disabled={busy} onClick={() => { if (window.confirm('撤回這則分享及其回應？私人原稿不受影響。')) void act(() => request(`/${id}/shares/${post.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></div>{post.reference && <p className="mt-2 text-sm font-medium text-primary">{post.reference}</p>}<p className="mt-3 whitespace-pre-wrap text-sm leading-7">{post.body}</p><div className="mt-4 flex flex-wrap gap-3 border-t pt-3">{post.kind === 'prayer' && <Button size="sm" variant={post.prayed ? 'secondary' : 'outline'} disabled={busy || post.prayed} onClick={() => void act(() => request(`/${id}/shares/${post.id}/prayed`, 'PUT', {}))}><Heart className="mr-2 h-4 w-4" />{post.prayed ? '已為你禱告' : '為你禱告'} · {post.prayerCount}</Button>}<Button size="sm" variant="ghost" onClick={() => setComments(post)}><MessageCircle className="mr-2 h-4 w-4" />回應 {post.commentCount}</Button></div></article>)}</div><Pages page={page} setPage={setPage} count={q.data.length} />
-    </>}{comments && <Comments id={id} post={comments} actor={actor} manager={info.manager} close={() => setComments(null)} />}
+      <div className="space-y-4">{q.data.map(post => <article key={post.id} className="min-w-0 rounded-lg border p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{post.authorName} · {time(post.createdAt)}{post.answered && ' · 已蒙應允'}</p><h3 className="mt-2 text-lg font-semibold">{post.title}</h3></div><div className="flex">{(post.isOwner || post.authorId === actor) && <Button size="icon" variant="ghost" title="編輯分享" aria-label={`編輯 ${post.title}`} onClick={() => compose(post.kind, post)}><Pencil className="h-4 w-4" /></Button>}{((post.isOwner || post.authorId === actor) || info.manager) && <Button size="icon" variant="ghost" title="撤回分享" aria-label={`撤回 ${post.title}`} disabled={busy} onClick={() => { if (window.confirm('撤回這則分享及其回應？私人原稿不受影響。')) void act(() => request(`/${id}/shares/${post.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></div>{post.reference && <p className="mt-2 text-sm font-medium text-primary">{post.reference}</p>}<p className="mt-3 whitespace-pre-wrap text-sm leading-7">{post.body}</p>{post.kind === 'prayer' && <div className="mt-4"><Button size="sm" variant={post.prayed ? 'secondary' : 'outline'} disabled={busy || post.prayed} onClick={() => void act(() => request(`/${id}/shares/${post.id}/prayed`, 'PUT', {}))}><Heart className="mr-2 h-4 w-4" />{post.prayed ? '已為你禱告' : '為你禱告'} · {post.prayerCount}</Button></div>}<FamilyComments groupId={id} shareId={post.id} actor={actor} manager={info.manager} count={post.commentCount} /></article>)}</div><Pages page={page} setPage={setPage} count={q.data.length} />
+    </>}
   </section>;
 }
 function ShareComposer({ id, groupName, kind, reference = '', existing, close }: { id: string; groupName: string; kind: GroupShare['kind']; reference?: string; existing?: GroupShare; close: () => void }) {
@@ -186,18 +186,6 @@ function ShareComposer({ id, groupName, kind, reference = '', existing, close }:
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button disabled={!consent || !body.trim() || !title.trim()}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{existing ? '儲存修改' : '確認分享至小家'}</Button>
     </fieldset></form>
   </section>;
-}
-function Comments({ id, post, actor, manager, close }: { id: string; post: GroupShare; actor: string; manager: boolean; close: () => void }) {
-  const [body, setBody] = useState(''); const [mutationId, setMutationId] = useState(() => crypto.randomUUID()); const [page, setPage] = useState(0);
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const client = useQueryClient();
-  const path = `/${id}/shares/${post.id}/comments`;
-  const q = useGroupQuery<GroupComment[]>(`${path}?offset=${page * 30}`);
-  return <Dialog open onOpenChange={open => { if (!open && !busy && (!body || window.confirm('放棄尚未送出的回應？'))) close(); }}><DialogContent className="max-h-[90dvh] overflow-y-auto [overflow-wrap:anywhere]"><DialogHeader><DialogTitle>小家回應</DialogTitle><DialogDescription>{post.title}</DialogDescription></DialogHeader>
-    {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : <>
-      <form onSubmit={async e => { e.preventDefault(); setBusy(true); setError(''); try { await request(`${path}/${mutationId}`, 'PUT', { body }); setBody(''); setMutationId(crypto.randomUUID()); setPage(0); await client.invalidateQueries({ queryKey: [base] }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }} className="space-y-3"><Field label="寫下回應"><Textarea required maxLength={4000} value={body} onChange={e => setBody(e.target.value)} /></Field><Button disabled={busy || !body.trim()}>送出回應</Button></form>
-      {q.data?.map(comment => <div key={comment.id} className="border-t pt-3"><div className="flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{comment.authorName} · {time(comment.createdAt)}</p>{(manager || comment.authorId === actor) && <Button disabled={busy} size="icon" variant="ghost" title="撤回回應" aria-label="撤回回應" onClick={async () => { if (!window.confirm('撤回這則回應？')) return; setBusy(true); try { await request(`${path}/${comment.id}`, 'DELETE'); await q.refetch(); await client.invalidateQueries({ queryKey: [base] }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><Trash2 className="h-4 w-4" /></Button>}</div><p className="mt-2 whitespace-pre-wrap text-sm leading-7">{comment.body}</p></div>)}<Pages page={page} setPage={setPage} count={q.data?.length || 0} />
-    </>}{error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-  </DialogContent></Dialog>;
 }
 
 function CareFeed({ id, actor, info, create, busy, act }: { id: string; actor: string; info: Info; create: () => void; busy: boolean; act: Act }) {
