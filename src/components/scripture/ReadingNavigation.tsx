@@ -16,17 +16,17 @@ export function ReadingNavigation() {
   const items = destinations.filter(item => !item.feature || isFeatureEnabled(item.feature));
 
   return <nav aria-label="讀經與靈修" className="border-b border-border/70 bg-background">
-    <div className="mx-auto grid max-w-2xl grid-flow-col auto-cols-fr px-4 sm:px-6">
+    <div className="mx-auto grid max-w-[672px] grid-flow-col auto-cols-fr px-[16px] sm:px-[24px]">
       {items.map(({ href, label, icon: Icon }) => {
         const active = location.pathname === href || (href === '/learn/bible' && location.pathname === '/bible');
         return <Link key={href}
           to={active ? `${location.pathname}${location.search}${location.hash}` : href}
           aria-current={active ? 'page' : undefined}
           className={cn(
-            'flex min-h-12 min-w-0 items-center justify-center gap-2 border-b-2 px-2 py-3 text-center text-base font-medium leading-snug transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+            'flex min-h-[48px] min-w-0 items-center justify-center gap-[8px] border-b-2 px-[4px] py-[12px] text-center text-base font-medium leading-snug transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
             active ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground',
           )}>
-          <Icon aria-hidden="true" className="hidden h-5 w-5 shrink-0 sm:block" />
+          <Icon aria-hidden="true" className="hidden h-[20px] w-[20px] shrink-0 sm:block" />
           <span className="min-w-0 break-words">{label}</span>
         </Link>;
       })}
