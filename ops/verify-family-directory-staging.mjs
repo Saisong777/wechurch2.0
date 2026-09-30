@@ -104,6 +104,8 @@ async function journey(page, {origin,code,actors,output,run}) {
       await p.setViewportSize({width,height:900});
       await p.evaluate(size=>{localStorage.setItem('wechurch-reading-preferences',JSON.stringify({size,font:'sans'}));localStorage.setItem('wechurch-theme',size==='maximum'?'dark':'light');},size);
       await go(p,route);await p.getByRole('heading',{name,exact:true}).first().waitFor();
+      if(role==='directory')await p.locator('article').getByRole('heading',{name,exact:true}).waitFor();
+      else await p.getByRole('listitem').filter({hasText:'測試申請人'}).first().waitFor();
       await layout(p,`${role}-${width}-${size}`);
     }
   }
