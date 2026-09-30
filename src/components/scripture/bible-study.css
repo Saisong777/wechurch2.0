@@ -9,6 +9,9 @@
 .study-heading, .study-actions, .study-bottom, .study-footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .study-heading { justify-content: space-between; padding: 20px 0 12px; }
 .study-heading h1 { font-size: 1.5rem; font-weight: 650; }
+.study-reading-mode { gap: 2px; padding: 3px; border: 1px solid hsl(var(--border)); border-radius: 6px; }
+.study-reading-mode button { gap: 6px; min-height: 44px; padding: 8px 12px; font-size: 1rem; }
+.study-reading-mode button[data-state=on] { background: hsl(var(--primary) / .1); color: hsl(var(--primary)); }
 .study-actions button { min-width: 44px; min-height: 44px; }
 .study-actions svg { width: 18px; height: 18px; flex-shrink: 0; }
 .study-member-actions { padding-bottom: 16px; border-bottom: 1px solid hsl(var(--border)); }
@@ -24,9 +27,19 @@
 .study-verse-text[aria-pressed=true] { background: hsl(var(--primary) / .08); box-shadow: inset 3px 0 hsl(var(--primary)); }
 .study-verse-text:hover { background: hsl(var(--muted)); }
 .study-verse-text[data-current=true] { box-shadow: inset 3px 0 hsl(var(--primary)); }
-.study-scripture.paragraph .study-verse { display: inline; border: 0; }
-.study-scripture.paragraph .study-verse-text { display: inline; width: auto; padding: 2px; }
-.study-scripture.paragraph sup { margin-right: 6px; }
+.study-scripture.paragraph { max-width: 760px; }
+.study-paragraph { margin: 0; line-height: 2; text-align: start; }
+.study-scripture.paragraph .study-verse-text { display: inline; width: auto; padding: 2px 0; line-height: inherit; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.study-scripture.paragraph .study-verse-text[data-current=true] { box-shadow: none; }
+.study-scripture.paragraph .study-verse-text[aria-pressed=true] { background: hsl(var(--primary) / .12); box-shadow: none; }
+.study-scripture.paragraph .study-verse-text:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.study-scripture.paragraph sup { color: hsl(var(--muted-foreground)); font-size: .65em; vertical-align: super; margin: 0 .35em 0 .15em; }
+.study-scripture.paragraph .study-verse-text span { white-space: pre-line; }
+.study-prose-compare { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; }
+.study-prose-translation { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: hsl(var(--muted-foreground)); }
+.study-scripture.paragraph:has(.study-prose-compare) { max-width: 100%; }
+.study-comparison-prose { white-space: pre-line; }
+.study-scripture.paragraph .study-verse-actions { margin-top: 20px; padding: 12px 0; border-top: 1px solid hsl(var(--border)); }
 .study-verse sup, .study-parallel sup { color: hsl(var(--primary)); font-size: 0.75rem; position: static; flex-shrink: 0; }
 .study-parallel { font-size: 1.0625rem; padding: 12px 8px; }
 .study-parallel sup { margin-right: 8px; }
@@ -72,5 +85,8 @@
   .study-verse.compare { grid-template-columns: minmax(0,1fr); gap: 0; }
   .study-parallel { padding-top: 0; padding-left: 32px; color: hsl(var(--muted-foreground)); }
   .study-heading h1 { font-size: 1.375rem; }
+  .study-reading-mode { order: 3; }
+  .study-prose-compare { grid-template-columns: minmax(0,1fr); }
+  .study-prose-compare > div + div { padding-top: 24px; border-top: 1px solid hsl(var(--border)); }
   .study-xrefs { column-gap: 12px; }
 }

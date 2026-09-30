@@ -5,6 +5,7 @@ import { AlignLeft, ArrowLeft, Bookmark, BookmarkCheck, ChevronLeft, ChevronRigh
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { DevotionalNoteDialog } from './DevotionalNoteDialog';
@@ -161,7 +162,10 @@ function ReadingSurface({ info }: { info: Info }) {
   const [compare, setCompare] = useState(false);
   const [comparison, setComparison] = useState('cmncbt');
   const [selection, setSelection] = useState<Set<number>>(new Set());
-  const [paragraph, setParagraph] = useState(false);
+  const [readingMode, setReadingMode] = useState<'paragraph' | 'verses'>(() => {
+    try { return localStorage.getItem('study-reading-mode') === 'verses' ? 'verses' : 'paragraph'; } catch { return 'paragraph'; }
+  });
+  const paragraph = readingMode === 'paragraph';
   const [verse, setVerse] = useState(validInt(url.get('verse'), 176));
   const [fontSize, setFontSize] = useState(() => { try { return Math.max(16, Math.min(30, Number(localStorage.getItem('study-font-size')) || 20)); } catch { return 20; } });
   const [tools, setTools] = useState(false);
@@ -197,6 +201,7 @@ function ReadingSurface({ info }: { info: Info }) {
   useEffect(() => { setSelection(new Set()); }, [book, chapter, translation]);
   useEffect(() => { try { localStorage.setItem('study-translation', translation); } catch { /* Reading still works without storage. */ } }, [translation]);
   useEffect(() => { try { localStorage.setItem('study-font-size', String(fontSize)); } catch { /* Reading still works without storage. */ } }, [fontSize]);
+  useEffect(() => { try { localStorage.setItem('study-reading-mode', readingMode); } catch { /* Reading still works without storage. */ } }, [readingMode]);
   const navigate = (b: number, ch: number) => {
     setUrl({ book: String(b), chapter: String(ch) }); setVerse(1); window.scrollTo({ top: 0 });
   };
@@ -212,6 +217,14 @@ function ReadingSurface({ info }: { info: Info }) {
     if (!note) setNote({ reference: excerptReference, text: `${excerptText}\n\n${citation}` });
     else document.getElementById('study-note')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  const verseButton = (v: Verse) => <button type="button" ref={el => { if (el) verseRefs.current.set(v.verse, el); else verseRefs.current.delete(v.verse); }} aria-label={`第 ${label(v)} 節：${v.body}`} aria-pressed={selection.has(v.verse)} data-current={chosen?.id === v.id} className="study-verse-text" onClick={() => { setVerse(v.verse); setSelection(previous => { const next = new Set(previous); if (next.has(v.verse)) next.delete(v.verse); else next.add(v.verse); return next; }); }}>
+    <sup>{label(v)}</sup><span>{v.body}</span>
+  </button>;
+  const selectedActions = <div className="study-actions study-verse-actions">
+    <Button variant="outline" onClick={() => { setTools(true); requestAnimationFrame(() => document.getElementById('study-references')?.scrollIntoView({ block: 'start' })); }}>查考此節</Button>
+    {user && <Button variant="outline" onClick={openNote}><PenLine size={18} className="mr-2" />寫下筆記</Button>}
+    <Button variant="ghost" size="icon" title="複製所選經文" aria-label="複製所選經文" onClick={copy}><Copy /></Button>
+  </div>;
   return <>
     <div className="study-controls">
       <label>書卷<select aria-label="書卷" value={book} onChange={e => navigate(Number(e.target.value), 1)}>{info.books.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
@@ -221,7 +234,12 @@ function ReadingSurface({ info }: { info: Info }) {
       <div className="study-actions"><Button variant="ghost" size="icon" title="縮小字體" aria-label="縮小字體" disabled={fontSize <= 16} onClick={() => setFontSize(f => f - 2)}><Minus /></Button><span>{fontSize}</span><Button variant="ghost" size="icon" title="放大字體" aria-label="放大字體" disabled={fontSize >= 30} onClick={() => setFontSize(f => f + 2)}><Plus /></Button></div>
       {compare && <label className="study-translation study-comparison">對照譯本<select aria-label="對照譯本" value={other} onChange={e => setComparison(e.target.value)}>{comparisonIds.map(id => <option key={id} value={id}>{info.translations[id]}</option>)}</select></label>}
     </div>
-    <div className="study-heading"><h1>{info.books[book - 1].name} {chapter}</h1><div className="study-actions">
+    <div className="study-heading"><h1>{info.books[book - 1].name} {chapter}</h1>
+      <ToggleGroup type="single" value={readingMode} onValueChange={value => { if (value === 'paragraph' || value === 'verses') setReadingMode(value); }} aria-label="閱讀模式" className="study-reading-mode">
+        <ToggleGroupItem value="paragraph" aria-label="段落閱讀"><AlignLeft size={18} />段落</ToggleGroupItem>
+        <ToggleGroupItem value="verses" aria-label="逐節閱讀"><List size={18} />逐節</ToggleGroupItem>
+      </ToggleGroup>
+      <div className="study-actions">
       <Button variant="outline" size="icon" aria-label="上一章" disabled={book === 1 && chapter === 1} onClick={() => next(-1)}><ChevronLeft /></Button>
       <Button variant="outline" size="icon" aria-label="下一章" disabled={book === 66 && chapter === info.books[65].chapters} onClick={() => next(1)}><ChevronRight /></Button>
       <Button variant={tools ? 'default' : 'outline'} onClick={() => setTools(t => !t)} aria-expanded={tools} aria-controls="study-references">查考</Button>
@@ -234,26 +252,31 @@ function ReadingSurface({ info }: { info: Info }) {
         <Button size="icon" variant="ghost" title="製作經文圖卡" aria-label="製作經文圖卡" onClick={() => setCard({ reference: `${excerptReference}\n${citation}`, text: excerptText })}><Image /></Button>
         {user ? <><Button size="icon" variant="ghost" title={currentSaved ? '取消收藏' : '收藏經文'} aria-label={currentSaved ? '取消收藏' : '收藏經文'} disabled={save.isPending || saved.isPending || saved.isError} onClick={() => save.mutate()}>{currentSaved ? <BookmarkCheck /> : <Bookmark />}</Button>
           <Button variant="outline" onClick={openNote}><PenLine size={18} className="mr-2" />寫筆記</Button></> : <Button variant="outline" asChild><Link to="/login">登入寫筆記與收藏</Link></Button>}
-        <Button variant="ghost" size="icon" aria-label={paragraph ? '逐節閱讀' : '段落閱讀'} title={paragraph ? '逐節閱讀' : '段落閱讀'} disabled={compare} onClick={() => setParagraph(p => !p)}>{paragraph ? <List /> : <AlignLeft />}</Button>
       </>}
       {saved.isError && <Button variant="ghost" onClick={() => saved.refetch()}>重新載入收藏</Button>}
     </div>
     <div className={`study-layout ${tools ? 'with-tools' : ''}`}>
-      <section className={`study-scripture ${tools ? 'mobile-hidden' : ''} ${paragraph && !compare ? 'paragraph' : ''}`} aria-label="經文" style={{ fontSize: `${fontSize / 16}rem` }}>
+      <section className={`study-scripture ${tools ? 'mobile-hidden' : ''} ${paragraph ? 'paragraph' : ''}`} aria-label="經文" style={{ fontSize: `${fontSize / 16}rem` }}>
         <LoadState loading={available && primary.isPending} error={primary.error} retry={primary.refetch} />
         {!available && <div role="status"><p>免費易讀聖經目前僅收錄新約。</p><div className="study-actions"><Button variant="outline" onClick={() => navigate(40, 1)}>讀馬太福音</Button><Button variant="outline" onClick={() => setTranslation(info.default_translation)}>使用和合本</Button></div></div>}
         {compare && <LoadState loading={parallel.isPending} error={parallel.error} retry={parallel.refetch} />}
         {primary.data && primary.data.length === 0 && <p>目前沒有本章的經文。</p>}
-        {primary.data?.map(v => <div className={`study-verse ${compare ? 'compare' : ''}`} key={v.id}>
-          <button ref={el => { if (el) verseRefs.current.set(v.verse, el); else verseRefs.current.delete(v.verse); }} aria-pressed={selection.has(v.verse)} data-current={chosen?.id === v.id} className="study-verse-text" onClick={() => { setVerse(v.verse); setSelection(previous => { const next = new Set(previous); if (next.has(v.verse)) next.delete(v.verse); else next.add(v.verse); return next; }); }}>
-            <sup>{label(v)}</sup><span>{v.body}</span>
-          </button>
+        {paragraph ? <>
+          <div className={`study-prose ${compare ? 'study-prose-compare' : ''}`}>
+            <div lang={translation === 'engwebp' ? 'en' : translation === 'cmnfeb' ? 'zh-Hans' : 'zh-Hant'}>
+              {compare && <h2 className="study-prose-translation">{info.translations[translation]}</h2>}
+              <p className="study-paragraph">{primary.data?.map(v => <span key={v.id}>{verseButton(v)}{' '}</span>)}</p>
+            </div>
+            {compare && <div lang={other === 'engwebp' ? 'en' : other === 'cmnfeb' ? 'zh-Hans' : 'zh-Hant'}>
+              <h2 className="study-prose-translation">{info.translations[other]}</h2>
+              <p className="study-paragraph study-comparison-prose">{parallel.data?.map(v => <span key={v.id}><sup>{label(v)}</sup>{v.body}{' '}</span>)}</p>
+            </div>}
+          </div>
+          {chosen && selection.has(chosen.verse) && selectedActions}
+        </> : primary.data?.map(v => <div className={`study-verse ${compare ? 'compare' : ''}`} key={v.id}>
+          {verseButton(v)}
           {compare && <div className="study-parallel" lang={other === 'engwebp' ? 'en' : other === 'cmnfeb' ? 'zh-Hans' : 'zh-Hant'}>{parallel.data?.filter(p => p.verse <= v.end_verse && p.end_verse >= v.verse).map(p => <p key={p.id}><sup>{label(p)}</sup>{p.body}</p>)}{parallel.data && !parallel.data.some(p => p.verse <= v.end_verse && p.end_verse >= v.verse) && <p className="text-muted-foreground">此譯本未收錄本節</p>}</div>}
-          {chosen?.id === v.id && selection.has(v.verse) && <div className="study-actions study-verse-actions">
-            <Button variant="outline" onClick={() => { setTools(true); requestAnimationFrame(() => document.getElementById('study-references')?.scrollIntoView({ block: 'start' })); }}>查考此節</Button>
-            {user && <Button variant="outline" onClick={openNote}><PenLine size={18} className="mr-2" />寫下筆記</Button>}
-            <Button variant="ghost" size="icon" title="複製所選經文" aria-label="複製所選經文" onClick={copy}><Copy /></Button>
-          </div>}
+          {chosen?.id === v.id && selection.has(v.verse) && selectedActions}
         </div>)}
         {primary.data?.[0] && <Credit value={primary.data[0]} />}
         {compare && parallel.data?.[0] && <Credit value={parallel.data[0]} />}

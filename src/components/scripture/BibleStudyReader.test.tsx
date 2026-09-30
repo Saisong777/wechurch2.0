@@ -14,13 +14,13 @@ vi.mock('./ScriptureCardCreator', () => ({ ScriptureCardCreator: () => null }));
 const credit = { source_id: 'cmncbt', source_name: '當代譯本', license: 'CC-BY-SA-4.0', metadata: { attribution: 'Biblica', license_url: 'https://creativecommons.org/licenses/by-sa/4.0/' } };
 const verse = { ...credit, id: 'v1', verse: 1, end_verse: 2, body: '測試合併經文' };
 const info = { books: Array.from({ length: 66 }, (_, i) => ({ id: i + 1, name: `書卷${i + 1}`, chapters: 3 })), translations: { 'cmn-cu89t': '新標點和合本（繁體）', cmncbt: '當代譯本', engwebp: 'WEB' }, default_translation: 'cmn-cu89t', release_id: 'public-20260926-v2', note_sources: ['notes'], sources: [{ id: 'notes', name: '註釋', license: credit.license, metadata: credit.metadata }] };
-function mount() {
+function mount(verses = [verse]) {
   const extendedInfo = { ...info, translations: { ...info.translations, cmnfeb: '免費易讀聖經（簡體・新約）' } };
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, queryFn: async () => [] } } });
   const fetcher = vi.fn(async (input: string | URL | Request) => {
     const url = new URL(String(input), 'http://localhost');
     const action = url.pathname.split('/').at(-1);
-    const data = action === 'info' ? extendedInfo : action === 'chapter' ? [verse] : action === 'xrefs' ? [{ start: 45005008, end: 45005008, label: '羅5:8' }] : action === 'preview' ? { verses: [{ ...verse, reference: '羅5:8' }] } : [];
+    const data = action === 'info' ? extendedInfo : action === 'chapter' ? verses : action === 'xrefs' ? [{ start: 45005008, end: 45005008, label: '羅5:8' }] : action === 'preview' ? { verses: [{ ...verse, reference: '羅5:8' }] } : [];
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
   vi.stubGlobal('fetch', fetcher);
@@ -117,4 +117,57 @@ it('rejects fractional route numbers and retains the existing Bible URL', async 
   await act(() => router.navigate('/learn/bible?book=1.5&chapter=2.7'));
   expect(await screen.findByRole('heading', { name: '書卷1 1' })).toBeInTheDocument();
   expect(screen.queryByText('進階研讀')).not.toBeInTheDocument();
+});
+
+it('offers clear reading modes, keeps every verse unchanged and remembers the choice', async () => {
+  const verses = [verse, { ...verse, id: 'v3', verse: 3, end_verse: 3, body: '第三節經文' }];
+  mount(verses);
+  await screen.findByText('第三節經文');
+  expect(screen.getByRole('radio', { name: '段落閱讀' })).toHaveAttribute('aria-checked', 'true');
+  const scripture = screen.getByRole('region', { name: '經文' });
+  expect(scripture).toHaveClass('paragraph');
+  expect(scripture.querySelector('.study-paragraph')).toHaveTextContent('1–2測試合併經文 3第三節經文');
+  fireEvent.click(screen.getByRole('button', { name: '第 3 節：第三節經文' }));
+  expect(screen.getByRole('button', { name: '第 3 節：第三節經文' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: '查考此節' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('radio', { name: '逐節閱讀' }));
+  expect(scripture).not.toHaveClass('paragraph');
+  expect(scripture.querySelectorAll('.study-verse')).toHaveLength(2);
+  expect(screen.getByRole('button', { name: '第 3 節：第三節經文' })).toHaveAttribute('aria-pressed', 'true');
+  expect(localStorage.getItem('study-reading-mode')).toBe('verses');
+  cleanup();
+  mount(verses);
+  await screen.findByText('第三節經文');
+  expect(screen.getByRole('radio', { name: '逐節閱讀' })).toHaveAttribute('aria-checked', 'true');
+  fireEvent.click(screen.getByRole('radio', { name: '段落閱讀' }));
+  expect(localStorage.getItem('study-reading-mode')).toBe('paragraph');
+});
+
+it('supports paragraph comparison and merged verse notes without mixing the translations', async () => {
+  mount();
+  await screen.findByText('測試合併經文');
+  fireEvent.click(screen.getByRole('button', { name: '第 1–2 節：測試合併經文' }));
+  fireEvent.click(screen.getByRole('button', { name: '寫下筆記' }));
+  expect(screen.getByRole('region', { name: '筆記' })).toHaveTextContent('書卷1 1:1–2');
+  fireEvent.click(screen.getByLabelText('譯本對照'));
+  await waitFor(() => expect(screen.getByRole('region', { name: '經文' }).querySelector('.study-comparison-prose')).toHaveTextContent('測試合併經文'));
+  expect(screen.getByRole('radio', { name: '段落閱讀' })).toBeEnabled();
+  expect(screen.getByRole('region', { name: '經文' }).querySelectorAll('.study-paragraph')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('radio', { name: '逐節閱讀' }));
+  expect(screen.getByRole('region', { name: '經文' }).querySelector('.study-verse.compare')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('radio', { name: '段落閱讀' }));
+  expect(screen.getByRole('region', { name: '經文' })).toHaveClass('paragraph');
+  fireEvent.click(screen.getByLabelText('譯本對照'));
+  expect(screen.getByRole('region', { name: '經文' }).querySelectorAll('.study-paragraph')).toHaveLength(1);
+});
+
+it('still allows mode switching when device storage is unavailable', async () => {
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('Blocked'); });
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Blocked'); });
+  mount();
+  await screen.findByText('測試合併經文');
+  fireEvent.click(screen.getByRole('radio', { name: '逐節閱讀' }));
+  expect(screen.getByRole('region', { name: '經文' })).not.toHaveClass('paragraph');
+  fireEvent.click(screen.getByRole('radio', { name: '段落閱讀' }));
+  expect(screen.getByRole('region', { name: '經文' })).toHaveClass('paragraph');
 });
