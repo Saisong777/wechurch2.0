@@ -1,0 +1,15 @@
+{
+  "deploymentId": "84361bbc-10ed-4772-a9df-34413696ddf6",
+  "sourceCommit": "5c6f0ab2ba78090f06552548a18d611c08156888",
+  "checks": [],
+  "maximumTextWordmark": {
+    "whiteSpace": "nowrap",
+    "fontSize": "24px",
+    "visuallySingleLine": true
+  },
+  "finalFlows": [
+    "reading-full-Isaiah61",
+    "write-note-login-boundary",
+    "community-photo-groups"
+  ]
+}
