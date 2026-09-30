@@ -25,7 +25,7 @@ const cli=(...args)=>{
   try{return execFileSync(path.join(process.env.HOME,'.codex/skills/playwright/scripts/playwright_cli.sh'),['-s=family-comments',...args],{cwd:root,encoding:'utf8',timeout:900000,maxBuffer:8*1024*1024});}
   catch(error){ console.error(redact(String(error.stdout||error.stderr||'').split('### Error\n').at(-1).split('### Ran')[0]).slice(0,1200));throw Error('Family browser operation failed; command withheld');}
 };
-async function journey(page, {origin,code,actors,output,run}) {
+async function journey(page, {origin,code,actors,output,run,commentIds}) {
   const contexts=[],checks=[],errors=[];
   const expect=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
   const api=async(ctx,route,method='GET',data)=>{
@@ -52,7 +52,7 @@ async function journey(page, {origin,code,actors,output,run}) {
   const commentPath='/'+id+'/shares/'+postIds[0]+'/comments';
   expect((await api(outsider,commentPath)).status===404,'outsider-cannot-read-comments');
   for(let i=1;i<=32;i++){
-    const cid=await page.evaluate(()=>crypto.randomUUID());
+    const cid=commentIds[i-1];
     expect((await api(leader,commentPath+'/'+cid,'PUT',{body:'家人的留言 '+i})).status===200,'seed-comment-'+i);
   }
   const m=await member.newPage(),l=await leader.newPage();
@@ -72,8 +72,10 @@ async function journey(page, {origin,code,actors,output,run}) {
   expect(await m.locator('textarea:focus').count()===0,'opening-inline-composer-no-keyboard');
   await note.getByRole('textbox',{name:'寫下留言'}).fill('收到，謝謝家人的分享。');
   await note.getByRole('button',{name:'送出留言'}).click();
-  await note.getByText('收到，謝謝家人的分享。',{exact:true}).waitFor();
-  expect(await note.getByRole('listitem').count()===33,'new-comment-keeps-loaded-history');
+  await note.getByRole('listitem').filter({hasText:'收到，謝謝家人的分享。'}).waitFor();
+  await note.locator('textarea:not([disabled])').waitFor();
+  const loadedCount=await note.getByRole('listitem').count();
+  expect(loadedCount===33,'new-comment-keeps-loaded-history-count-'+loadedCount);
   expect((await note.getByRole('listitem').last().innerText()).includes('收到，謝謝家人的分享。'),'new-comment-at-bottom');
   expect(await note.getByRole('textbox').inputValue()==='','successful-send-clears-draft');
   expect(await m.locator('textarea:focus').count()===0,'keyboard-released-after-send');
@@ -83,7 +85,7 @@ async function journey(page, {origin,code,actors,output,run}) {
   expect((await api(outsider,commentPath+'/'+own.id,'PUT',{body:'denied'})).status===404,'outsider-cannot-comment');
   expect((await api(member,commentPath+'/'+own.id,'PUT',{body:'收到，謝謝家人的分享。'})).status===200,'retry-idempotent');
   expect((await api(member,commentPath)).data.filter(c=>c.id===own.id).length===1,'no-duplicate-on-retry');
-  await l.goto(origin+'/groups/'+id);await l.getByText('收到，謝謝家人的分享。',{exact:true}).waitFor();
+  await l.goto(origin+'/groups/'+id);await l.getByRole('listitem').filter({hasText:'收到，謝謝家人的分享。'}).waitFor();
   expect(await l.getByRole('dialog').count()===0,'another-member-sees-reply-directly');
   const message=m.locator('article').filter({has:m.getByRole('heading',{name:'週末聚會分享',exact:true})});
   await message.getByRole('button',{name:'寫下留言',exact:true}).click();
@@ -96,15 +98,18 @@ async function journey(page, {origin,code,actors,output,run}) {
   await message.getByText('驗收模擬：暫時無法送出',{exact:true}).waitFor();
   expect(await input.inputValue()==='週末見，很期待一起讀經！','failed-send-keeps-draft');
   await m.unroute('**/api/life-groups/*/shares/*/comments/*');
-  await message.getByRole('button',{name:'送出留言'}).click();await message.getByText('週末見，很期待一起讀經！',{exact:true}).waitFor();
+  await message.getByRole('button',{name:'送出留言'}).click();await message.getByRole('listitem').filter({hasText:'週末見，很期待一起讀經！'}).waitFor();
+  await message.locator('textarea:not([disabled])').waitFor();
   await input.fill('我會準時到。'); await message.getByRole('button',{name:'送出留言'}).click();
-  await message.getByText('我會準時到。',{exact:true}).waitFor();
+  await message.getByRole('listitem').filter({hasText:'我會準時到。'}).waitFor();
+  await message.locator('textarea:not([disabled])').waitFor();
   expect(await message.getByRole('listitem').count()===2,'second-comment-stacks-below-first');
   expect(await m.getByRole('dialog').count()===0,'no-dialog-throughout-conversation');
   const prayer=m.locator('article').filter({has:m.getByRole('heading',{name:'本週彼此代禱',exact:true})});
   await prayer.getByRole('button',{name:'寫下留言',exact:true}).click();
   await prayer.getByRole('textbox').fill('一起為你禱告。');
-  await prayer.getByRole('button',{name:'送出留言'}).click();await prayer.getByText('一起為你禱告。',{exact:true}).waitFor();
+  await prayer.getByRole('button',{name:'送出留言'}).click();await prayer.getByRole('listitem').filter({hasText:'一起為你禱告。'}).waitFor();
+  await prayer.locator('textarea:not([disabled])').waitFor();
   expect(await prayer.getByRole('listitem').count()===1,'prayer-replies-inline');
   m.once('dialog',dialog=>dialog.accept());await prayer.getByRole('button',{name:'撤回 測試申請人 的留言'}).click();
   await prayer.getByText('一起為你禱告。',{exact:true}).waitFor({state:'hidden'});
@@ -128,7 +133,7 @@ let result;
 try{
   stagingSql('BEGIN;'+actors.map(a=>`INSERT INTO users(id,email,password,display_name,church) VALUES(${sql(a.id)},${sql(a.email)},'!disabled-fixture',${sql(a.role==='leader'?'測試小家長':'測試申請人')},${sql(a.role==='outsider'?'火樂':'IM 行動教會')}); INSERT INTO auth_users(id,email) VALUES(${sql(a.authId)},${sql(a.email)}); INSERT INTO user_roles(user_id,role) VALUES(${sql(a.id)},${sql(a.role==='member'?'member':'senior_pastor')}); INSERT INTO auth_sessions(sid,sess,expire) VALUES(${sql(a.sid)},${sql(JSON.stringify(a.session))},${sql(expires.toISOString())});`).join('')+'COMMIT;');
   cli('open','about:blank');cli('snapshot');
-  const raw=cli('run-code',`async page => (${journey.toString()})(page,${JSON.stringify({origin:target.origin,code:state.app.STAGING_ACCESS_CODE,actors:actors.map(({id,cookie,role})=>({id,cookie,role})),output,run})})`);
+  const raw=cli('run-code',`async page => (${journey.toString()})(page,${JSON.stringify({origin:target.origin,code:state.app.STAGING_ACCESS_CODE,actors:actors.map(({id,cookie,role})=>({id,cookie,role})),output,run,commentIds:Array.from({length:32},()=>randomUUID())})})`);
   const body=raw.split('### Result\n')[1]?.split('\n###')[0];
   if(!body){console.error(redact(raw.split('### Error\n')[1]?.split('\n###')[0]||'Missing browser result').slice(0,1600));throw Error('Family acceptance failed');}
   result=JSON.parse(body);

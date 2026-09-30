@@ -57,8 +57,10 @@ export function FamilyComments({ groupId, shareId, actor, manager, count }: {
       setVisibleCount(n => n + 30);
     }}><ChevronUp className="mr-2 h-4 w-4" />查看較早留言</Button>}
     <ol className="space-y-4" aria-label="留言內容">{visible.map(comment => <li key={comment.id} data-comment-id={comment.id} tabIndex={-1} className="min-w-0 border-l-2 pl-3 outline-offset-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 text-sm"><span className="font-medium">{comment.authorName}</span><time dateTime={comment.createdAt} className="ml-2 text-muted-foreground">{new Date(comment.createdAt).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div>
+      <p className="font-medium">{comment.authorName}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words leading-7">{comment.body}</p>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2">
+        <time dateTime={comment.createdAt} className="text-sm text-muted-foreground"><span className="inline-block">{new Date(comment.createdAt).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}</span>{' '}<span className="inline-block">{new Date(comment.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span></time>
         {(manager || comment.authorId === actor) && <Button size="icon" variant="ghost" className="shrink-0" title="撤回留言" aria-label={`撤回 ${comment.authorName} 的留言`} disabled={busy} onClick={async () => {
           if (locked.current || !window.confirm('撤回這則留言？')) return;
           locked.current = true; setBusy(true); setError('');
@@ -67,7 +69,6 @@ export function FamilyComments({ groupId, shareId, actor, manager, count }: {
           finally { locked.current = false; setBusy(false); }
         }}><Trash2 className="h-4 w-4" /></Button>}
       </div>
-      <p className="mt-1 whitespace-pre-wrap break-words leading-7">{comment.body}</p>
     </li>)}</ol>
     {composing && <form id={`comment-form-${shareId}`} className="space-y-3 border-t pt-3" onSubmit={async e => {
       e.preventDefault();
