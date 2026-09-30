@@ -12,7 +12,13 @@
 ## Verification
 - Targeted component tests: ordered full prayer list, duplicate text handling, private-data guards; delete/cancel/error/conflict/device draft flows.
 - Disposable DB HTTP checks: permissions, versions, injected failure rollback, share removal, stale-save rejection, imported note deletion and retained check-ins.
-- Deployment, runtime fingerprint, browser checks and remaining device limits will be recorded after release.
+- Full release run: 130 test files / 742 tests passed; 42 deployment checks, typecheck, build and isolated DB integrity passed. Lint: zero errors, 288 existing warnings. An initial course-import timeout passed in isolation and in the complete release rerun.
+- B deployment `c717ef7c-d16f-4321-9a8c-e8ff54c0be37` succeeded from `03aade7`; fingerprint `60d43a6db1ec7087aa8a0df9aec7391001d2c01a02f82719ab3ea64c0365cea5`. Matching GitHub-safe manifest is in `design/releases/`.
+- Live B synthetic private-note acceptance: 11 HTTP checks passed, fixtures removed, production deployment unchanged. An initial encrypted maintenance connection failed; subsequent readback found no stranded fixtures, and the full acceptance rerun passed.
+- `staging:verify` passed when run after fixture cleanup. Its first overlapping run detected the two temporary test accounts and correctly rejected the changing account count; do not run these checks concurrently.
+- Live authenticated Chrome: homepage decimal markers and full text visually verified on desktop; collapsed note delete controls and confirmation visually verified at 390px. Confirmation defaulted to Keep; cancelled without submitting deletion of the user's note. Browser automation had transient command timeouts; keyboard activation and final DOM readback confirmed the flow. Viewport override reset.
+- Physical iPhone acceptance remains unverified this turn; browser responsive checks are not physical-device acceptance. Screenshots containing personal data are retained outside Git only.
+- Pre-change encrypted recovery set `b-recovery-1790759763178`: five encrypted files read back successfully. Migration 0023 applied. No additional off-device upload or full restore drill performed this turn.
 
 ## Data Boundary
 Migration 0023 only creates a tombstone table. Existing member notes are not deleted during release. Deletion occurs only after the member confirms a specific note. Pre-change encrypted B backup is required. Historical encrypted backups retain their existing retention policy; this is not an erasure-from-all-backups feature.
