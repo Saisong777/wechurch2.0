@@ -8,6 +8,7 @@ import { createBrowserRouter, RouterProvider, Routes, Route, Navigate } from "re
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { PageLoader, PageLoadRecovery } from '@/components/PageLoader';
 
 // Resilient lazy loader — catches chunk load failures (bad network, deploy race)
 // and shows a reload prompt instead of white screen
@@ -16,13 +17,7 @@ function lazyPage(factory: () => Promise<{ default: ComponentType<any> }>) {
     factory().catch(() => ({
       default: () => (
         <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-          <div className="text-center space-y-4">
-            <p className="text-lg font-semibold">頁面載入失敗</p>
-            <p className="text-sm text-muted-foreground">請檢查網路連線後重新載入</p>
-            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md">
-              重新載入
-            </button>
-          </div>
+          <PageLoadRecovery />
         </div>
       ),
     }))
@@ -76,19 +71,6 @@ const MyNotesPage = lazyPage(() => import("./pages/MyNotesPage"));
 const PrayerMeetingPage = lazyPage(() => import("./pages/PrayerMeetingPage"));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 
-
-// Minimal loading fallback for Suspense
-const PageLoader = () => (
-  <div className="flex min-h-screen items-center justify-center bg-background px-6">
-    <div className="w-full max-w-sm space-y-4 rounded-lg border border-border/70 bg-card p-5 text-center shadow-[0_16px_48px_-34px_rgba(30,58,95,0.42)]">
-      <div className="mx-auto h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground">正在載入 WeChurch</p>
-        <p className="text-xs text-muted-foreground">馬上就好</p>
-      </div>
-    </div>
-  </div>
-);
 
 const router = createBrowserRouter([{ path: '*', element: (
             <ErrorBoundary fallbackTitle="頁面載入失敗">

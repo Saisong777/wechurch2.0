@@ -36,7 +36,6 @@ import { clearDeviceDraft } from '@/lib/deviceDraft';
 import { z } from 'zod';
 import { NoteConflictReview } from './NoteConflictReview';
 import { formatScriptureText } from '@/lib/scriptureDisplay';
-import './devotional-note-editor.css';
 
 interface DevotionalNoteDialogProps {
   open: boolean;
