@@ -11,6 +11,7 @@
 ## Release And Acceptance
 
 - Initial source baseline: `437b2367869f7e7eba8eabf481a1f86d5611176d`, including page-load recovery. The release guard detected the concurrent Bible-entry update before uploading; merged live source `a66befa0ebf081a23e5ce0b01c38bd4e5a8216f5` and its verified B release record `b3ddd348-0b84-45ef-b257-403d3a797a28` before revalidation.
+- Coordinated release order with the other B task, then included its final maximum-text navigation fix `8e9505bd4ada521717a9156d277161fb0bc12852` and verified release `0a63e89c-8128-4a17-a0bb-3cecfe1dc963`. Homepage acceptance begins only after the other task has finished using the shared browser.
 - Work in an isolated checkout, not the in-use B source checkout or the dirty legacy workspace.
 - Program checks run in the existing GitHub CI workflow, including unit tests and their deployment-check poststep. No developer-machine test server/database is started. The optional localhost database integrity suite is not run for this presentation-only change.
 - `deploy-ci` requires successful checks on the exact committed source, all four existing CI steps, a clean checkout and a strict homepage-only changed-file allowlist against the verified live release. It retains the existing Railway isolation, deployed-source ancestry, migration hash, reference asset, immutable snapshot and pre-upload concurrency gates. Backend changes must use the full release path.
