@@ -16,8 +16,21 @@
 - Program checks run in the existing GitHub CI workflow, including unit tests and their deployment-check poststep. No developer-machine test server/database is started. The optional localhost database integrity suite is not run for this presentation-only change.
 - `deploy-ci` requires successful checks on the exact committed source, all four existing CI steps, a clean checkout and a strict homepage-only changed-file allowlist against the verified live release. It retains the existing Railway isolation, deployed-source ancestry, migration hash, reference asset, immutable snapshot and pre-upload concurrency gates. Backend changes must use the full release path.
 - User-visible desktop/mobile acceptance is performed against the actual Railway B URL. Screenshots do not establish physical iPhone acceptance.
-- Deployment, online verification and A-unchanged evidence: pending.
-- First B release `75c1c99d-4ddc-4e8d-a342-9d5578155360` passed source/health/Google-boundary verification. Live 320px maximum-text inspection exposed a wrapping wordmark and an oversized introductory heading; added homepage-only display-type caps while leaving reading-body enlargement and the logo image unchanged. A follow-up B release will receive the final visual acceptance.
+- First B release `75c1c99d-4ddc-4e8d-a342-9d5578155360` passed source/health/Google-boundary verification. Live 320px maximum-text inspection exposed a wrapping wordmark and an oversized introductory heading; added homepage-only display-type caps while leaving reading-body enlargement and the logo image unchanged.
+- Final deployment `84361bbc-10ed-4772-a9df-34413696ddf6` reached `SUCCESS`. Source `5c6f0ab2ba78090f06552548a18d611c08156888`, fingerprint `94ac43cd3f70831e84f2aea012cd425b62be610749d453aba3a8d8abe0a34361`.
+- Release record `design/releases/b-84361bbc-10ed-4772-a9df-34413696ddf6.json` verifies source equality, health, live fingerprint and reference assets. A remained `a8a4db29-527f-4cc3-8d17-caed230f69cb`, identical to the pre-release observation. `productionApproved` remains false.
+- The follow-up upload briefly remained in Railway INITIALIZING without a build, then proceeded to SUCCESS without cancellation, service recovery, variable changes or another upload.
+
+## Verification Results
+
+- [Exact-source GitHub CI](https://github.com/Saisong777/wechurch2.0/actions/runs/36691916477): typecheck and production build passed; 722 unit tests passed, 11 skipped; 42 deployment tests passed. Lint: zero errors, 288 existing warnings. The PR merge tree was checked against the source tree. Skipped tests and the unrun optional local database suite are not counted as passes.
+- Railway B Google-boundary verification passed: invite-only perimeter, independent B callback, state/PKCE, basic identity scopes, forged/cancelled callbacks cannot create accounts or login sessions. No real Google consent was exercised.
+- Actual B browser checks: 1440px light/dark standard text, 1440px light maximum text, 390px light/dark standard text, 320px light standard text and 320px light/dark maximum text. No document or home-element horizontal overflow; desktop two columns and mobile one column. Final 320px maximum wordmark stays on one line at 24px; the introductory heading is capped at 48px. Body/Scripture enlargement is unchanged.
+- Both illustrative photos load at their 1536px natural width, with stable 3:1 crops and visible AI labels. Normal and dark screenshots inspected. Existing visible focus outlines and reduced-motion rules remain in place; no new animation added.
+- First live release: eight guest flows opened real destinations (daily reading, write note, past notes, groups, wall, care, new prayer and tools). Final style-only release rechecked full Isaiah 61 reading, note login protection and the group photo link. No membership, prayer, care or note data was written.
+- Authenticated state variants, loading/error/unpublished reading states and role-specific entries are covered by component tests. This is not a new end-to-end signed-in write acceptance or physical-device/Google-consent acceptance.
+- Evidence: `design/previews/home-v3-desktop-light.jpg`, `home-v3-mobile-light.jpg`, `home-v3-mobile-maximum-dark.jpg`, `home-v3-viewport-checks.json` and `home-v3-guest-flows.json`. Screenshots are real B viewport captures, not mockups. Full-page capture artifacts were excluded because that capture mode rendered incorrectly in the browser tool.
+- GitHub draft [PR #9](https://github.com/Saisong777/wechurch2.0/pull/9) backs up source, public-safe evidence and release records. It remains a B checkpoint, not authorization to merge/promote to A.
 
 ## Original Logo
 

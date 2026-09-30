@@ -1,0 +1,42 @@
+[
+  {
+    "action": "開始今日靈修",
+    "result": "Actual Isaiah 61 reading and devotional loaded",
+    "path": "/learn/church-reading"
+  },
+  {
+    "action": "寫筆記（未登入）",
+    "result": "Login required; no editor or private data exposed",
+    "path": "/login"
+  },
+  {
+    "action": "回看筆記（未登入）",
+    "result": "Login with preserved returnTo",
+    "path": "/login?returnTo=%2Flearn%2Fmy-notes"
+  },
+  {
+    "action": "我的小家",
+    "result": "Existing group page and sign-in action available",
+    "path": "/groups"
+  },
+  {
+    "action": "分享牆",
+    "result": "Existing devotion wall; signed-out posts protected",
+    "path": "/devotion-wall"
+  },
+  {
+    "action": "加入關心的人",
+    "result": "Private care records require sign-in",
+    "path": "/care"
+  },
+  {
+    "action": "新增禱告",
+    "result": "Private prayer page requires sign-in; no record created",
+    "path": "/grace-record?new=1"
+  },
+  {
+    "action": "工具",
+    "result": "Existing tools page loaded",
+    "path": "/play"
+  }
+]

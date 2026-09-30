@@ -1,0 +1,25 @@
+{
+  "deploymentId": "84361bbc-10ed-4772-a9df-34413696ddf6",
+  "sourceCommit": "5c6f0ab2ba78090f06552548a18d611c08156888",
+  "observationMethod": "Read-only DOM measurements on the actual B deployment, recorded from browser tool results; viewport screenshots inspected separately.",
+  "checks": [
+    { "label": "final-desktop-light", "width": 1440, "height": 1000, "documentWidth": 1440, "theme": "light", "textSize": "standard", "columns": "566.977px 493.016px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 },
+    { "label": "final-mobile-320-light-maximum", "width": 320, "height": 900, "documentWidth": 320, "theme": "light", "textSize": "maximum", "columns": "288px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 },
+    { "label": "final-desktop-light-maximum", "width": 1440, "height": 1000, "documentWidth": 1440, "theme": "light", "textSize": "maximum", "columns": "566.977px 493.016px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 },
+    { "label": "final-mobile-320-dark-maximum", "width": 320, "height": 900, "documentWidth": 320, "theme": "dark", "textSize": "maximum", "columns": "288px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 },
+    { "label": "final-desktop-dark", "width": 1440, "height": 1000, "documentWidth": 1440, "theme": "dark", "textSize": "standard", "columns": "566.977px 493.016px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 },
+    { "label": "final-mobile-390-dark", "width": 390, "height": 844, "documentWidth": 390, "theme": "dark", "textSize": "standard", "columns": "358px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 },
+    { "label": "final-mobile-390-light", "width": 390, "height": 844, "documentWidth": 390, "theme": "light", "textSize": "standard", "columns": "358px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 },
+    { "label": "final-mobile-320-light", "width": 320, "height": 900, "documentWidth": 320, "theme": "light", "textSize": "standard", "columns": "288px", "overflow": [], "loadedPhotos": 2, "photoLabels": 2 }
+  ],
+  "maximumTextWordmark": {
+    "whiteSpace": "nowrap",
+    "fontSize": "24px",
+    "visuallySingleLine": true
+  },
+  "finalFlows": [
+    "reading-full-Isaiah61",
+    "write-note-login-boundary",
+    "community-photo-groups"
+  ]
+}
