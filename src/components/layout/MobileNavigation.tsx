@@ -18,6 +18,8 @@ export function MobileNavigation() {
   const navigate = useNavigate();
   const title = mobilePageTitle(pathname);
 
+  useEffect(() => { setOpen(false); }, [pathname]);
+
   useEffect(() => {
     if (!open) return;
     const dismiss = (event: PointerEvent) => {
@@ -40,7 +42,7 @@ export function MobileNavigation() {
         onClick={() => { setOpen(false); if ((window.history.state?.idx ?? 0) > 0) navigate(-1); else navigate('/', { replace: true }); }}>
         <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden="true" />返回
       </button>
-      <Link to="/" aria-label={`${title}，回首頁`} className="flex min-h-12 min-w-0 items-center justify-center gap-2 text-center text-base font-semibold focus-visible:ring-2 focus-visible:ring-ring"><WeChurchLogo size={28} /><span className="truncate">{title}</span></Link>
+      <Link to="/" onClick={() => setOpen(false)} aria-label={`${title}，回首頁`} className="flex min-h-12 min-w-0 items-center justify-center gap-2 text-center text-base font-semibold focus-visible:ring-2 focus-visible:ring-ring"><WeChurchLogo size={28} /><span className="truncate">{title}</span></Link>
       <button ref={trigger} type="button" aria-expanded={open} aria-controls={menuId} aria-label={open ? '關閉導覽選單' : '開啟導覽選單'}
         className="flex min-h-12 items-center justify-center gap-1 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setOpen(!open)}>
         {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}選單

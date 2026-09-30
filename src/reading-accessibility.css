@@ -28,6 +28,9 @@ html[data-reading-font='serif'] {
 .appearance-toolbar > button svg { width: 24px; height: 24px; }
 html[data-text-size='maximum'] .admin-action-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
 .crm-header .appearance-toolbar { flex-shrink: 0; }
+.crm-header-icon { width: 44px; height: 44px; min-height: 44px; }
+.crm-header-icon svg { width: 24px; height: 24px; }
+html[data-text-size='maximum'] .crm-member-filters > button[role='combobox'] { width: auto; min-width: min(100%, 9rem); max-width: 100%; }
 .text-\[9px\], .text-\[10px\], .text-\[11px\] { font-size: 0.75rem; line-height: 1.5; }
 .text-\[15px\] { font-size: 0.9375rem; }
 .text-\[16px\] { font-size: 1rem; }
@@ -47,6 +50,12 @@ html[data-text-size='maximum'] .admin-action-grid { grid-template-columns: repea
 }
 /* Reflow text without multiplying the narrow viewport's structural gutters. */
 @media (max-width: 767px) {
+  .crm-header > .container { padding-inline: 16px; }
+  .crm-header > .container > div { gap: 8px; }
+  html[data-text-size='maximum'] .crm-header .lucide-church { display: none; }
+  .crm-copy-emails { width: 44px; height: 44px; min-height: 44px; padding: 0; }
+  .crm-copy-emails svg { width: 24px; height: 24px; }
+  .crm-copy-emails span { display: none; }
   html[data-text-size] main { padding-inline: 16px; }
   .devotional-note-card > div { padding-inline: 16px; }
   .devotional-note-card [data-testid^='text-filled-count'] { padding-inline: 8px; }

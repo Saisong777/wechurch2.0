@@ -65,9 +65,10 @@ async function journey(page, { origin, code, cookie, id, output, uxReview }) {
       }
       return true;
     }).slice(0,8).map(e => ({ tag: e.tagName, cls: typeof e.className === 'string' ? e.className.slice(0,160) : '', test: e.getAttribute('data-testid') }));
-    return { rootSize: getComputedStyle(document.documentElement).fontSize, pageOverflow: document.documentElement.scrollWidth > innerWidth + 1, offenders };
+    return { rootSize: getComputedStyle(document.documentElement).fontSize, pageOverflow: document.documentElement.scrollWidth > innerWidth + 1, caughtError: !!document.querySelector('[data-testid="text-error-title"]'), offenders };
   });
   const expandNote = async () => {
+    await page.getByTestId('card-devotional-note-reading-fixture').waitFor();
     const button = page.getByTestId('button-expand-note-reading-fixture');
     if (await button.count()) await button.click();
     else await page.getByTestId('card-devotional-note-reading-fixture').click();
@@ -109,6 +110,19 @@ async function journey(page, { origin, code, cookie, id, output, uxReview }) {
           await page.screenshot({ path: `${output}/${route.split('?')[0].replaceAll('/','-') || 'home'}-${width}-${size}.png`, fullPage: true });
           if (route === '/learn/my-notes') await page.screenshot({ path: `${output}/notes-viewport-${width}-${size}.png` });
         }
+        if (uxReview && uxReview !== 'baseline' && route === '/admin/crm') {
+          if (width < 640) {
+            await page.getByRole('combobox', { name: '選擇管理項目' }).click();
+            const dropdownFits = await page.getByRole('listbox').evaluate(e => { const r = e.getBoundingClientRect(); return r.top >= -1 && r.bottom <= innerHeight + 1 && r.left >= -1 && r.right <= innerWidth + 1; });
+            checks.push({ route, view: 'management-selector', width, size, dropdownFits, ...await metrics() });
+            await page.getByRole('option', { name: '會員名單', exact: true }).click();
+          } else await page.getByRole('tab', { name: '會員名單', exact: true }).click();
+          await page.getByRole('textbox', { name: '搜尋會員' }).fill('閱讀驗收');
+          await page.getByText('閱讀驗收', { exact: true }).first().waitFor();
+          await page.getByRole('button', { name: '清除搜尋', exact: true }).click();
+          checks.push({ route, view: 'members-search-clear', width, size, ...await metrics() });
+          await page.screenshot({ path: `${output}/members-${width}-${size}.png`, fullPage: true });
+        }
       }
     }
   }
@@ -130,6 +144,12 @@ async function journey(page, { origin, code, cookie, id, output, uxReview }) {
     await page.getByRole('button', { name: '收合筆記' }).focus(); await page.keyboard.press('Space');
     if (await text.isVisible()) throw Error('Keyboard collapse failed');
     checks.push({ flow: 'keyboard-disclosure-no-content-collapse', ...await metrics() });
+    if (uxReview === 'final') {
+      await page.getByRole('button', { name: '開啟導覽選單' }).click();
+      await page.getByRole('link', { name: '我的筆記，回首頁' }).click();
+      if (await page.getByRole('navigation', { name: '行動導覽選單' }).isVisible()) throw Error('Home navigation left menu open');
+      checks.push({ flow: 'home-title-closes-menu', ...await metrics() });
+    }
     await go('/admin');
     await page.getByRole('region', { name: '會友與牧養' }).waitFor();
     await page.getByTestId('button-cards').click();
@@ -163,6 +183,6 @@ try {
 }
 assert.equal(inspectStaging().productionDeployment, state.productionDeployment);
 fs.writeFileSync(path.join(output,'results.json'), JSON.stringify({ ...result, fixtureRemoved: true, productionUnchanged: true }, null,2));
-const failures = result.checks.filter(c => c.pageOverflow || c.offenders.length);
+const failures = result.checks.filter(c => c.pageOverflow || c.caughtError || c.dropdownFits === false || c.offenders.length);
 console.log(JSON.stringify({ output, checks: result.checks.length, failures, errors: result.errors, baseline: result.baseline, enlarged: result.enlarged, fixtureRemoved: true, productionUnchanged: true }));
 if (failures.length || result.errors.length) process.exitCode = 1;

@@ -526,7 +526,7 @@ const CRMPage = () => {
       <header className="crm-header border-b bg-card">
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/admin')} aria-label="返回管理後台">
+            <Button variant="ghost" size="icon" className="crm-header-icon" onClick={() => navigate('/admin')} aria-label="返回管理後台">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
@@ -539,7 +539,7 @@ const CRMPage = () => {
                   </Badge>
                 )}
               </div>
-              <p className="truncate text-sm text-muted-foreground">{currentChurchName}</p>
+              <p className="break-words text-sm text-muted-foreground">{currentChurchName}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -557,11 +557,11 @@ const CRMPage = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" aria-label="複製名單 Email" title="複製目前篩選名單的 Email" onClick={handleCopyEmails} disabled={isLoading || isError || !members.length} className="h-10 w-10 gap-2 p-0 sm:w-auto sm:px-3">
+            <Button variant="outline" size="sm" aria-label="複製名單 Email" title="複製目前篩選名單的 Email" onClick={handleCopyEmails} disabled={isLoading || isError || !members.length} className="crm-copy-emails h-11 w-11 gap-2 p-0 sm:w-auto sm:px-3">
               <Copy className="h-4 w-4" />
               <span className="hidden sm:inline">複製名單</span>
             </Button>
-            <Button variant="outline" size="icon" title="重新整理會員" aria-label="重新整理會員" onClick={() => void forceRefetch()} disabled={isRefetching || writesPending}>
+            <Button variant="outline" size="icon" className="crm-header-icon" title="重新整理會員" aria-label="重新整理會員" onClick={() => void forceRefetch()} disabled={isRefetching || writesPending}>
               <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
             </Button>
           </div>
@@ -755,7 +755,7 @@ const CRMPage = () => {
                     />
                     {search && <Button variant="ghost" size="icon" className="absolute right-0 top-0" title="清除搜尋" aria-label="清除搜尋" onClick={() => setSearch('')}><X className="h-4 w-4" /></Button>}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="crm-member-filters flex flex-wrap gap-2">
                     {(memberTab==='all'||memberTab==='registered') && <Select value={ministryRole||'all'} onValueChange={v=>setMinistryRole(v==='all'?'':v)}><SelectTrigger aria-label="篩選職分" className="w-[140px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">全部職分</SelectItem>{[...new Set(['同工',...allMembers.flatMap(m=>m.ministryRoles || [])])].map(name=><SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>}
                     {(memberTab === 'all' || memberTab === 'registered') && isAdmin && (
                       <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>

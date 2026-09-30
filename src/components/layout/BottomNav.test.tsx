@@ -112,6 +112,13 @@ it('labels nested destinations specifically', () => {
   expect(mobilePageTitle('/unavailable')).toBe('WeChurch');
 });
 
+it('closes the mobile menu when returning home through the page title', () => {
+  render(<MemoryRouter initialEntries={['/learn/my-notes']}><MobileNavigation /></MemoryRouter>);
+  fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
+  fireEvent.click(screen.getByRole('link', { name: '我的筆記，回首頁' }));
+  expect(screen.queryByRole('navigation', { name: '行動導覽選單' })).toBeNull();
+});
+
 it('keeps navigation available when a page throws and recovers on a new route', () => {
   const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
   function Page() { if (useLocation().pathname === '/') throw new Error('test page failure'); return <main>已恢復</main>; }
