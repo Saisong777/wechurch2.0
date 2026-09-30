@@ -1247,7 +1247,7 @@
   .dark .daily-home { --home-prayer: 8 89% 74%; --home-care: 174 57% 65%; }
   .daily-home .home-intro { padding: 4px 0 28px; }
   .daily-home .home-date { color: hsl(var(--muted-foreground)); font-size: 0.875rem; line-height: 1.5; }
-  .daily-home .home-intro h1 { margin: 8px 0; color: hsl(var(--foreground)); font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: 2rem; font-weight: 700; line-height: 1.5; letter-spacing: 0; text-wrap: balance; }
+  .daily-home .home-intro h1 { margin: 8px 0; color: hsl(var(--foreground)); font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: min(2rem, 48px); font-weight: 700; line-height: 1.5; letter-spacing: 0; text-wrap: balance; }
   .daily-home .home-tagline { color: hsl(var(--muted-foreground)); font-size: 0.9375rem; line-height: 1.6; }
   .daily-home .home-daily-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
   .daily-home .home-scripture { min-width: 0; padding-bottom: 24px; }
@@ -1288,7 +1288,7 @@
   }
   @media (min-width: 960px) {
     .daily-home .home-intro { padding-bottom: 32px; }
-    .daily-home .home-intro h1 { font-size: 2.25rem; }
+    .daily-home .home-intro h1 { font-size: min(2.25rem, 64px); }
     .daily-home .home-daily-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 40px; }
     .daily-home .home-scripture { padding: 0 40px 0 0; border-right: 1px solid hsl(var(--border)); }
     .daily-home .home-personal-section:first-child { border-top: 0; padding-top: 0; }
@@ -1297,6 +1297,9 @@
     .daily-home .home-community-links { gap: 24px; }
   }
 }
+
+/* Keep the home wordmark intact while reading text follows the chosen text size. */
+body:has(.daily-home) .mobile-navigation-bar > a > span { font-size: min(1rem, 24px); white-space: nowrap; }
 
 /* Handshake A: compact mobile navigation, grouped by everyday use. */
 @layer components {

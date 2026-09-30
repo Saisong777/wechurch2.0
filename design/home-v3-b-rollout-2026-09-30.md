@@ -17,6 +17,7 @@
 - `deploy-ci` requires successful checks on the exact committed source, all four existing CI steps, a clean checkout and a strict homepage-only changed-file allowlist against the verified live release. It retains the existing Railway isolation, deployed-source ancestry, migration hash, reference asset, immutable snapshot and pre-upload concurrency gates. Backend changes must use the full release path.
 - User-visible desktop/mobile acceptance is performed against the actual Railway B URL. Screenshots do not establish physical iPhone acceptance.
 - Deployment, online verification and A-unchanged evidence: pending.
+- First B release `75c1c99d-4ddc-4e8d-a342-9d5578155360` passed source/health/Google-boundary verification. Live 320px maximum-text inspection exposed a wrapping wordmark and an oversized introductory heading; added homepage-only display-type caps while leaving reading-body enlargement and the logo image unchanged. A follow-up B release will receive the final visual acceptance.
 
 ## Original Logo
 
