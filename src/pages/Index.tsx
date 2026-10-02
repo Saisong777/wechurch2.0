@@ -1189,7 +1189,7 @@ const Index = () => {
             </div>
             <div className="flex items-center gap-1">
               <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
-                v3.0.1版
+                V3.15版
               </span>
             </div>
           </div>
