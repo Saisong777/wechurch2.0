@@ -11,7 +11,7 @@ import { assertCloudReleaseCheck, assertHomepageOnlyChanges } from './staging-cl
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const target = Object.freeze({ project: '9371f53f-3043-4a19-b25f-a55d891fb46a', environment: 'ae398a3f-4f0e-4617-8c55-838d1c5b47d9', app: 'fef7af7c-e3c3-4977-8294-c3a123a4242e', database: '0d52eb1a-b8e6-4f0f-b8ba-c652ddacebc8', origin: 'https://wechurch-staging-staging.up.railway.app' });
 export const bibleVolumePath = `/data/.bible-study/${bibleReleaseId}`;
-const production = { environment: 'f4b11351-cf4c-4a95-a3c0-45b195e9a0e0', app: 'a4f9d0c6-991c-41b0-8859-3b498b077b03' };
+export const production = Object.freeze({ environment: 'f4b11351-cf4c-4a95-a3c0-45b195e9a0e0', app: 'b5a40406-1614-4d8b-9eaa-f6f0cd32cac6', origin: 'https://www.wechurch.online' });
 const evidence = path.join(root, 'artifacts', 'railway-staging');
 const sha = data => createHash('sha256').update(data).digest('hex');
 export function railway(args, options = {}) {
@@ -52,14 +52,16 @@ export function verifyStagingReleaseBase(expected) {
     isAncestor: commit => spawnSync('git', ['merge-base', '--is-ancestor', commit, 'HEAD'], { cwd: root }).status === 0 });
 }
 
-export function inspectStaging() {
-  const status = json(['status', '--json']);
+export function assertStagingIsolation({ status, app, database, live }) {
   if (status.id !== target.project) throw new Error('Wrong linked project. No writes performed.');
   const environment = status.environments.edges.map(e => e.node).find(e => e.id === target.environment && e.name === 'staging');
   if (!environment) throw new Error('Expected staging environment missing.');
-  const app = vars(target.environment, target.app);
-  const database = vars(target.environment, target.database);
-  const live = vars(production.environment, production.app);
+  const prod = status.environments.edges.map(e => e.node).find(e => e.id === production.environment);
+  const prodApp = prod?.serviceInstances.edges.map(e => e.node).find(s => s.serviceId === production.app);
+  if (!prodApp?.domains?.customDomains.some(d => d.domain === new URL(production.origin).hostname) ||
+      !prodApp.latestDeployment?.id || prodApp.latestDeployment.deploymentStopped ||
+      live.RAILWAY_ENVIRONMENT_ID !== production.environment || live.RAILWAY_SERVICE_ID !== production.app ||
+      live.PUBLIC_BASE_URL !== production.origin) throw new Error('Current production identity mismatch. No writes performed.');
   if (app.RAILWAY_ENVIRONMENT_ID !== target.environment || database.RAILWAY_ENVIRONMENT_ID !== target.environment || app.RAILWAY_SERVICE_ID !== target.app || database.RAILWAY_SERVICE_ID !== target.database) throw new Error('Service identity mismatch.');
   const appDb = new URL(app.DATABASE_URL || 'invalid:');
   const ownerDb = new URL(database.DATABASE_URL || 'invalid:');
@@ -79,8 +81,16 @@ export function inspectStaging() {
     if (channel === (live.LINE_CHANNEL_ID || live.LINE_LOGIN_CHANNEL_ID) || secret === (live.LINE_CHANNEL_SECRET || live.LINE_LOGIN_CHANNEL_SECRET)) throw new Error('Staging LINE requires its own channel and secret.');
     if (!app.LINE_PROVIDER_ID || (live.LINE_PROVIDER_ID && app.LINE_PROVIDER_ID !== live.LINE_PROVIDER_ID)) throw new Error('LINE provider configuration mismatch.');
   }
-  const prod = status.environments.edges.map(e => e.node).find(e => e.id === production.environment);
-  return { app, database, productionDeployment: prod.serviceInstances.edges.map(e => e.node).find(s => s.serviceId === production.app).latestDeployment.id };
+  return { app, database, productionDeployment: prodApp.latestDeployment.id };
+}
+
+export function inspectStaging() {
+  return assertStagingIsolation({
+    status: json(['status', '--json']),
+    app: vars(target.environment, target.app),
+    database: vars(target.environment, target.database),
+    live: vars(production.environment, production.app),
+  });
 }
 
 function configure(app) {

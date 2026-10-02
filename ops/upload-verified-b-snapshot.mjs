@@ -25,7 +25,8 @@ if (JSON.stringify(verifyRemoteBibleAssets(app.BIBLE_STUDY_DIR)) !== JSON.string
 if (!/^[a-f0-9]{64}$/.test(release.baseFingerprint || '')) throw new Error('Release baseline required; run staging:deploy again');
 verifyStagingReleaseBase(release.baseFingerprint);
 const bytes = execFileSync('tar', ['-czf', '-', '-C', directory, 'release-manifest.json', 'bible-study-asset-manifest.json', ...manifest.files.map(f => f.file)], { maxBuffer: 32 * 1024 * 1024, env: { ...process.env, COPYFILE_DISABLE: '1' } });
-const token = process.env.RAILWAY_TOKEN || process.env.RAILWAY_API_TOKEN || JSON.parse(fs.readFileSync(path.join(os.homedir(), '.railway/config.json'), 'utf8')).user?.token;
+const login = process.env.RAILWAY_TOKEN || process.env.RAILWAY_API_TOKEN ? null : JSON.parse(fs.readFileSync(path.join(os.homedir(), '.railway/config.json'), 'utf8')).user;
+const token = process.env.RAILWAY_TOKEN || process.env.RAILWAY_API_TOKEN || login?.accessToken || login?.token;
 if (!token) throw new Error('Railway login required');
 const url = new URL(`https://backboard.railway.com/project/${target.project}/environment/${target.environment}/up`);
 url.searchParams.set('serviceId', target.app);

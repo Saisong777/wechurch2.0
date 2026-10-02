@@ -30,7 +30,7 @@ export async function verifyRetiredAiHttp(pool: Pool, admin: Client, member: Cli
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     const data = await response.json();
-    const expected = (await pool.query('SELECT count(*)::int AS count FROM app_events WHERE created_at >= $1 AND created_at < $2', [data.since, data.until])).rows[0].count;
+    const expected = (await pool.query('SELECT count(*)::int AS count FROM app_events WHERE created_at >= $1 AND created_at < $2', [new Date(data.since), new Date(data.until)])).rows[0].count;
     assert.equal(data.totalEvents, expected);
     assert(data.totalEvents > data.events.reduce((sum: number, row: { count: number }) => sum + row.count, 0), 'Total cannot be the limited top-20 sum');
     assert.equal(data.events.length, 20);
