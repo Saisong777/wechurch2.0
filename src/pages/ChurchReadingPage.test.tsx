@@ -160,7 +160,7 @@ it('keeps notes and group routes available and omits an empty prayer tab', () =>
   show();
   expect(screen.queryByRole('tab', { name: '禱告' })).toBeNull();
   expect(screen.getByRole('link', { name: '回看筆記' })).toHaveAttribute('href', '/learn/my-notes');
-  expect(screen.getByRole('link', { name: '與小家一起讀經' })).toHaveAttribute('href', '/groups');
+  expect(screen.getByRole('link', { name: '與小家一起讀經' })).toHaveAttribute('href', '/groups?entry=reading&view=reading');
 });
 
 it('remembers the reading font size, resets it, and rejects invalid saved values', () => {

@@ -109,7 +109,7 @@ export function DevotionalReader({ reading, retry, onNote }: {
       </TabsContent>}
     </Tabs>
     <footer className="mt-4 border-t border-border pt-4">
-      <Button asChild variant="ghost"><Link to="/groups"><Users aria-hidden="true" className="mr-2 h-4 w-4" />與小家一起讀經</Link></Button>
+        <Button asChild variant="ghost"><Link to="/groups?entry=reading&view=reading"><Users aria-hidden="true" className="mr-2 h-4 w-4" />與小家一起讀經</Link></Button>
     </footer>
   </article>;
 }

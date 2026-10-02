@@ -2,7 +2,7 @@ import { ScriptureSection } from '@/components/scripture/ChurchScriptureSection'
 import { fetchChurchReadingForToday, type ChurchReadingSummary } from '@/lib/churchReading';
 import { useState, useEffect } from 'react';
 import { clearGroupInvitation, pendingGroupInvitation } from '@/lib/groupInvitation';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, BookOpen, Check, Copy, Heart, HandHeart, Loader2, MessageCircle, Pencil, Plus, RefreshCw, Star, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,7 +38,9 @@ export default function LifeGroupsPage() {
   const { user, loading } = useAuth();
   const { groupId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [search] = useSearchParams();
+  const readingEntry = search.get('entry') === 'reading' && !groupId && search.get('manage') !== '1';
   const q = useGroupQuery<{ groups: GroupSummary[]; requests: Array<{ id: string; name: string; status: string }>; canCreate: boolean }>('');
   const client = useQueryClient();
   const [token, setToken] = useState(pendingGroupInvitation);
@@ -60,11 +62,14 @@ export default function LifeGroupsPage() {
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   if (loading) return <><Header title="我的小家" backTo="/" /><p role="status" className="p-6">載入中…</p></>;
-  if (!user) return <><Header title="我的小家" backTo="/" /><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-semibold">{token ? '你收到一份小家邀請' : '我的小家'}</h1><Button asChild><Link to={`/login?${token ? 'mode=signup&' : ''}returnTo=${encodeURIComponent('/groups' + window.location.hash)}`}>{token ? '登入或建立帳號' : '登入小家'}</Link></Button></main></>;
+  if (!user) return <><Header title="我的小家" backTo="/" /><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-semibold">{token ? '你收到一份小家邀請' : '我的小家'}</h1><Button asChild><Link to={`/login?${token ? 'mode=signup&' : ''}returnTo=${encodeURIComponent(location.pathname + location.search + window.location.hash)}`}>{token ? '登入或建立帳號' : '登入小家'}</Link></Button></main></>;
+  if (readingEntry && !token && q.isSuccess && !q.isFetching && q.data.groups.length === 1) {
+    return <Navigate replace to={`/groups/${q.data.groups[0].id}?view=reading`} />;
+  }
   return <div className="bg-background pb-6 [overflow-wrap:anywhere]">
     <Header title="我的小家" backTo="/" />
     <main className="mx-auto max-w-5xl px-4 py-5">
-      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}` : '/groups')}><option value="">我參與的小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
+      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}${search.get('view') === 'reading' ? '?view=reading' : ''}` : '/groups')}><option value="">我參與的小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
       {search.get('manage') === '1' ? <FamilyManagement initialGroup={search.get('family')} /> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}:${search.get('share') || ''}:${search.get('comment') || ''}`} id={groupId} initialTab={search.get('share') ? 'all' : search.get('view') || 'all'} /> : q.isPending ? <p role="status">載入小家中…</p> : <>
         {q.data?.groups.filter(g => (g.pendingRequestCount || 0) > 0).map(g => <Button key={g.id} asChild variant="outline" className="mb-4 mr-2"><Link to={`/groups?manage=1&family=${g.id}`}>{g.name} · {g.pendingRequestCount} 位等待審核<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>)}
         <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'all'}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="min-w-0 flex-1"><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小家管理' : ''}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
