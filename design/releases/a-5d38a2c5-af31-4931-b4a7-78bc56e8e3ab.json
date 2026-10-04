@@ -1,0 +1,204 @@
+{
+  "format": 1,
+  "environment": "production",
+  "version": "V3.15",
+  "origin": "https://www.wechurch.online",
+  "deploymentId": "5d38a2c5-af31-4931-b4a7-78bc56e8e3ab",
+  "status": "SUCCESS",
+  "verifiedAt": "2026-10-04T14:19:01.641Z",
+  "fingerprint": "8bca1bbdeb6a66f57f7dd30a2bb7761603d7b688b247cdaed4eb00ff5d9c43ab",
+  "runtimeSourceFiles": 631,
+  "sourceCommit": "cbeb7b6aaaf3113bfe6ee0cda1f056a44f91c6d7",
+  "runtimeChangeCommit": "47f1054cbbdd59571c351109748b3f390f8a4998",
+  "sourceMatchesCommit": true,
+  "productionApproved": true,
+  "approvalBasis": "Sai explicitly requested this feedback/onboarding version promoted directly to A in the current session",
+  "stagingDeployment": "9d374e11-6160-44a9-8061-3c78ff88d7c2",
+  "immutableVerifiedBReleasePromoted": true,
+  "migrations": [
+    {
+      "file": "migrations/0000_icy_daredevil.sql",
+      "sha256": "7d04a2bd96808dfab6bc42108ebb28540705e687eb1e483bddb3176c1e29d8b8"
+    },
+    {
+      "file": "migrations/0001_pastoral_beta.sql",
+      "sha256": "95cc44103bff9a5bed1279831f160c7d903af55b632c1594228094893cd9d6a5"
+    },
+    {
+      "file": "migrations/0002_personal_prayers.sql",
+      "sha256": "16a066057d9d03a22e1c37faf71420fbd5d911ddf8687f23835d7eb9dcb28006"
+    },
+    {
+      "file": "migrations/0003_church_devotions.sql",
+      "sha256": "9ad8d56d8c2382a06188cf5b7391733b50a2ba9ca3cb13d60fadaf21e3636078"
+    },
+    {
+      "file": "migrations/0004_life_groups.sql",
+      "sha256": "b9e2e187a35693c5440c88577f63600966f954b3e2b84e16b61b0759b9cf3cf5"
+    },
+    {
+      "file": "migrations/0005_prayer_sharing.sql",
+      "sha256": "140801d4b129e2d8a40937f82790a236b4be4250e8320c4fd40fd384fefd1e3b"
+    },
+    {
+      "file": "migrations/0006_prayer_interactions.sql",
+      "sha256": "18d6c9c3384b6eced0f75ff5139ec60cc7124eca1a5a75b4941988feb072fd2c"
+    },
+    {
+      "file": "migrations/0007_daily_walls.sql",
+      "sha256": "2cf3824f763f391d1096d0ef0f1332771498a4fa02e1e07ad700a05d06bec803"
+    },
+    {
+      "file": "migrations/0008_identity_integrity.sql",
+      "sha256": "828c2e021704cdb2465325bb20460976d7a19882ff7427a25631d3fd3c560569"
+    },
+    {
+      "file": "migrations/0009_support_requests.sql",
+      "sha256": "721dbeb5f0b0c304a6878f75fec2132474f13f45b66887b6645043d6cd67c83f"
+    },
+    {
+      "file": "migrations/0010_mentoring_contracts.sql",
+      "sha256": "4fb5e84f4183e7be989097f99dbd7d517a6c036ef460c7fc3256005913fc3940"
+    },
+    {
+      "file": "migrations/0011_devotional_note_versions.sql",
+      "sha256": "b69c8c62760b25c49916fb9019f2bd94f0db2708931a516a9d04da65d3ef4a8f"
+    },
+    {
+      "file": "migrations/0012_google_account_links.sql",
+      "sha256": "3697406ada26980dcdaa285f38a30ffff52ca1fb4d20af247158659d44f89225"
+    },
+    {
+      "file": "migrations/0013_im_bible_import.sql",
+      "sha256": "846a190ed11c22b3430be007abf023192edec7d4f85fbaa84784644ad2aefd1a"
+    },
+    {
+      "file": "migrations/0014_auth_session_version.sql",
+      "sha256": "1f847bbe2308495e755a3bd658146a7287ee8605ddd1138f9b5ca543150ec29a"
+    },
+    {
+      "file": "migrations/0015_capacity_indexes.sql",
+      "sha256": "5b6a249b9551a5eee8823c9d2f60db4ab8267e221b1c2f1f8ff44037bba63c66"
+    },
+    {
+      "file": "migrations/0016_families.sql",
+      "sha256": "35dac1c32f6bf88ea0b49480817fa119af0401b137fca02cf60c16b71e4c4de0"
+    },
+    {
+      "file": "migrations/0017_grace_book.sql",
+      "sha256": "48ba4ea6d41648e1404d976753074dba25135cf3d84d6e4aaee74629f722da5b"
+    },
+    {
+      "file": "migrations/0018_care_visits.sql",
+      "sha256": "e14571165e4590fed8b4c25a4d56793b389c972d7c3e83fd2a0337f29c0f13a9"
+    },
+    {
+      "file": "migrations/0019_leader_dashboard.sql",
+      "sha256": "ced7989da28f00257885990c29551eab10e5373877d11c956299e7c7b78342bc"
+    },
+    {
+      "file": "migrations/0020_controlled_email.sql",
+      "sha256": "39610c1e9744ba820adae378b195a13d448b5fce9701f336b9b79f6df7d40b46"
+    },
+    {
+      "file": "migrations/0021_access_control.sql",
+      "sha256": "eac04baf5a027ba29cba4124c7ff231c9af9ee99c9e1b35e8639f45d11e2032a"
+    },
+    {
+      "file": "migrations/0022_family_directory.sql",
+      "sha256": "3b49350032ad8b98c28561c61b6e02a80f844a1ace130701c4007fdbb5942c44"
+    },
+    {
+      "file": "migrations/0023_devotional_note_deletions.sql",
+      "sha256": "9e1229c7498c813bf93d70896bfd4aa971fec76f8c4447099916c27ac0920d06"
+    },
+    {
+      "file": "migrations/0024_interaction_notifications.sql",
+      "sha256": "52473f5e1c4b1d6ce534ae55d084a40d9998aeefe4123cfdf95a29287ec7f6fa"
+    },
+    {
+      "file": "migrations/0025_member_feedback.sql",
+      "sha256": "3e9d5404baf755affd4a6f0621bf84036d487f9933f52e9468c56c3ba3bdec36"
+    }
+  ],
+  "checks": {
+    "verifiedAt": "2026-10-04T14:19:01.641Z",
+    "site": "A",
+    "deploymentId": "5d38a2c5-af31-4931-b4a7-78bc56e8e3ab",
+    "status": "SUCCESS",
+    "fingerprint": "8bca1bbdeb6a66f57f7dd30a2bb7761603d7b688b247cdaed4eb00ff5d9c43ab",
+    "runtimeFilesVerified": 631,
+    "everyRuntimeSourceByteHashMatches": true,
+    "immutableVerifiedBCatalogPromoted": true,
+    "backupProofAuthenticated": true,
+    "preexistingOtherTablesVerified": 109,
+    "all109OriginalTableDigestsUnchanged": true,
+    "appEventsOriginalRowsVerified": 3937,
+    "appEventsOriginalFullRowHashesUnchanged": true,
+    "appEventsAddedStrictlyAfterAuthenticatedCutoff": 1,
+    "appEventsNullTimestamps": 0,
+    "appEventsTotalRows": 3938,
+    "appendOnlyOperationalException": "app_events",
+    "authenticatedCutoffReceiptHashBound": true,
+    "prior25MigrationFullRowsUnchanged": true,
+    "appliedMigrationsVerified": 26,
+    "migration0025HashMatches": true,
+    "feedbackTwoTablesAppRoleCrud": true,
+    "curriculumCount": 116,
+    "publishedCurriculumCount": 85,
+    "curriculumFullDigestUnchanged": true,
+    "settingsAndVolumesUnchanged": true,
+    "bDeploymentUnchanged": "9d374e11-6160-44a9-8061-3c78ff88d7c2",
+    "bEveryRuntimeByteUnchanged": true,
+    "bSettingsAndVolumesUnchanged": true,
+    "bWorkerConfigurationUnchanged": true,
+    "bFeedbackAndEventsZero": true,
+    "bMigrations26Unchanged": true,
+    "bCurriculumUnchanged": true,
+    "noFixtureOrSessionWrites": true,
+    "realMemberLoginUiVerification": "pending",
+    "uploadsEveryByteHashUnchanged": true,
+    "reference30EveryByteHashUnchanged": true,
+    "liveFingerprintMatches": true,
+    "environment": "f4b11351-cf4c-4a95-a3c0-45b195e9a0e0",
+    "app": "b5a40406-1614-4d8b-9eaa-f6f0cd32cac6",
+    "postReleaseReceiptSha256": "92fcd02fce32a9f7f7bd2eab07c91fb159cda4f315eeb1420e0554b1b6b5f49c"
+  },
+  "aiWorker": {
+    "installed": false,
+    "status": "pending-explicit-feedback-payload-to-ChatGPT-authorization",
+    "automaticApprovalRejectedBeforeExecution": true,
+    "reviewedWorkerAggregate": "f39f6abdf174f8fdfef3bcecd89bcea3b0ba92525f430aca6210e4646fc78e2c",
+    "BActualSyntheticFixtureTestPassed": true,
+    "AActualInferenceVerified": false
+  },
+  "rollback": {
+    "previousDeployment": "35cca5b7-042f-49e6-8a49-5bdab3750ec7",
+    "fingerprint": "e9dc9b4783a1abcc45be5bec7d6155bb8d9eeec210051ab8dd8b593b3f59b3ff",
+    "files": 611,
+    "programOnly": true,
+    "preparedEncryptedArchiveVerified": true,
+    "performed": false
+  },
+  "backupRestore": {
+    "latestAFullEncryptedBackupVerified": true,
+    "restoredTables": 110,
+    "allTableContentDigestsMatch": true,
+    "postgresStopped": true,
+    "temporaryPlaintextRemoved": true,
+    "offsiteBackupVerified": false
+  },
+  "scope": {
+    "newMigration": "0025_member_feedback",
+    "databaseCopiedFromB": false,
+    "settingsChanged": false,
+    "volumesReplaced": false,
+    "newMemberOrSessionCreated": false
+  },
+  "verificationLimits": [
+    "real Google member/admin UI pending",
+    "physical mobile device pending",
+    "A AI worker activation awaiting explicit destination/payload authorization",
+    "10/5 final legacy data and 10/6 member cutover remain separate pending work"
+  ]
+}
