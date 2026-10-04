@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mini subscription worker: one leased member-feedback item; no paid API fallback."""
 from __future__ import annotations
-import argparse,base64,fcntl,hashlib,json,os,subprocess,tempfile,time,urllib.request,urllib.parse,uuid
+import argparse,base64,fcntl,hashlib,json,os,subprocess,tempfile,time,uuid
 from pathlib import Path
 
 SITES={
@@ -14,16 +14,21 @@ def sha(b):return hashlib.sha256(b).hexdigest()
 def child_env():
  # Only desktop runtime variables; credentials remain in the existing login files.
  return {k:os.environ[k] for k in ('HOME','PATH','TMPDIR','TMP','TEMP','LANG','LC_ALL','CODEX_HOME') if k in os.environ}
-def railway_env():
+def railway_env(force_refresh=False):
  file=Path.home()/'.railway/config.json'
  initial=file.read_bytes();config=json.loads(initial);user=config.get('user',{})
- if user.get('tokenExpiresAt',0)<time.time()+300:
+ if force_refresh or user.get('tokenExpiresAt',0)<time.time()+300:
   if not user.get('refreshToken'):raise SafeFailure('railway_login_required')
-  body=urllib.parse.urlencode({'grant_type':'refresh_token','refresh_token':user['refreshToken'],'client_id':'rlwy_oaci_onEklvmksh1hRUiCo7E2zX12'}).encode()
   try:
-   req=urllib.request.Request('https://backboard.railway.com/oauth/token',data=body,headers={'Content-Type':'application/x-www-form-urlencoded'})
-   with urllib.request.urlopen(req,timeout=30) as r:result=json.load(r)
-   if not result.get('access_token') or not result.get('expires_in'):raise ValueError()
+   # Use the same installed Node fetch transport as the verified desktop-login
+   # refresher. Railway rejects the Python urllib transport with HTTP 403.
+   # Existing refresh credentials travel only on stdin, never argv or logs.
+   code='''let input="";for await(const chunk of process.stdin)input+=chunk;try{const token=JSON.parse(input).refreshToken;const r=await fetch("https://backboard.railway.com/oauth/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"refresh_token",refresh_token:token,client_id:"rlwy_oaci_onEklvmksh1hRUiCo7E2zX12"}),signal:AbortSignal.timeout(30000)});if(!r.ok)process.exit(1);process.stdout.write(JSON.stringify(await r.json()));}catch{process.exit(1);}'''
+   refreshed=subprocess.run(['node','--input-type=module','-e',code],input=json.dumps({'refreshToken':user['refreshToken']}),env=child_env(),capture_output=True,text=True,timeout=35)
+   if refreshed.returncode:raise ValueError()
+   result=json.loads(refreshed.stdout)
+   if not isinstance(result.get('access_token'),str) or not result['access_token'] or type(result.get('expires_in')) is not int or result['expires_in']<=0:raise ValueError()
+   if result.get('refresh_token') is not None and (not isinstance(result['refresh_token'],str) or not result['refresh_token']):raise ValueError()
    if file.read_bytes()!=initial:raise ValueError()
    user.update(accessToken=result['access_token'],token=None,tokenExpiresAt=int(time.time())+result['expires_in'])
    if result.get('refresh_token'):user['refreshToken']=result['refresh_token']

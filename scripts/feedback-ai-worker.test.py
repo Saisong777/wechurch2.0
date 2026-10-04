@@ -6,6 +6,28 @@ spec=importlib.util.spec_from_file_location('worker',Path(__file__).with_name('f
 w=importlib.util.module_from_spec(spec);spec.loader.exec_module(w)
 
 class WorkerTests(unittest.TestCase):
+ def test_refresh_uses_installed_node_without_credential_argv_or_environment(self):
+  from types import SimpleNamespace
+  with tempfile.TemporaryDirectory() as d:
+   home=Path(d);folder=home/'.railway';folder.mkdir();config=folder/'config.json';config.write_text(json.dumps({'user':{'refreshToken':'fixture-refresh','accessToken':'fixture-old','tokenExpiresAt':0}}))
+   with patch.object(w.Path,'home',return_value=home),patch.object(w.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=json.dumps({'access_token':'fixture-new','expires_in':3600,'refresh_token':'fixture-next'}))) as child:
+    result=w.railway_env();self.assertEqual(result['RAILWAY_API_TOKEN'],'fixture-new')
+    self.assertEqual(child.call_args.args[0][0],'node');self.assertNotIn('fixture-refresh',' '.join(child.call_args.args[0]));self.assertNotIn('RAILWAY_API_TOKEN',child.call_args.kwargs['env']);self.assertEqual(json.loads(child.call_args.kwargs['input']),{'refreshToken':'fixture-refresh'})
+    self.assertEqual(json.loads(config.read_text())['user']['refreshToken'],'fixture-next');self.assertEqual(config.stat().st_mode&0o077,0)
+ def test_refresh_does_not_overwrite_concurrently_changed_login(self):
+  from types import SimpleNamespace
+  with tempfile.TemporaryDirectory() as d:
+   home=Path(d);folder=home/'.railway';folder.mkdir();config=folder/'config.json';config.write_text(json.dumps({'user':{'refreshToken':'fixture','tokenExpiresAt':0}}))
+   def concurrent(*args,**kwargs):
+    config.write_text('{"user":{"marker":"newer-login"}}');return SimpleNamespace(returncode=0,stdout='{"access_token":"fixture-new","expires_in":3600}')
+   with patch.object(w.Path,'home',return_value=home),patch.object(w.subprocess,'run',side_effect=concurrent),self.assertRaises(w.SafeFailure):w.railway_env()
+   self.assertEqual(json.loads(config.read_text()),{'user':{'marker':'newer-login'}})
+ def test_refresh_failure_has_no_alternate_transport_or_credential_output(self):
+  from types import SimpleNamespace
+  with tempfile.TemporaryDirectory() as d:
+   home=Path(d);folder=home/'.railway';folder.mkdir();config=folder/'config.json';raw=json.dumps({'user':{'refreshToken':'fixture-secret','tokenExpiresAt':0}});config.write_text(raw)
+   with patch.object(w.Path,'home',return_value=home),patch.object(w.subprocess,'run',return_value=SimpleNamespace(returncode=1,stdout='fixture-secret',stderr='fixture-secret')) as child,self.assertRaises(w.SafeFailure) as failure:w.railway_env()
+   self.assertEqual(str(failure.exception),'railway_login_refresh_failed');self.assertEqual(child.call_count,1);self.assertEqual(config.read_text(),raw)
  def test_remote_arguments_do_not_repeat_member_source(self):
   import base64
   from types import SimpleNamespace
