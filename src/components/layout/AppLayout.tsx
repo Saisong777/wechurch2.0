@@ -1,10 +1,12 @@
 import { ReactNode, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { MobileHeaderContext } from './MobileHeaderContext';
 import { NetworkStatusBanner } from './NetworkStatusBanner';
 import { MobileNavigation } from './MobileNavigation';
 import { ReadingScrollRestoration } from './ReadingScrollRestoration';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+
+import { IntroductionTour } from '@/components/onboarding/IntroductionTour';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -26,10 +28,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     <div className="app-shell flex flex-col bg-brand-warm">
       <ReadingScrollRestoration />
       <NetworkStatusBanner />
+      <IntroductionTour />
       {showNav && <MobileNavigation key={location.key} />}
       <div className={showNav ? "mobile-page-content flex-1" : "flex-1"}>
         <ErrorBoundary key={location.pathname} fallbackTitle="這個頁面暫時無法載入">{children}</ErrorBoundary>
       </div>
+      {showNav && <footer className="flex flex-wrap justify-center gap-6 border-t border-border bg-background px-4 py-5 text-sm"><Link to="/help" className="min-h-11 inline-flex items-center underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">使用說明</Link><Link to="/feedback" state={{from:location.pathname}} className="min-h-11 inline-flex items-center underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">意見反饋</Link></footer>}
     </div>
     </MobileHeaderContext.Provider>
   );

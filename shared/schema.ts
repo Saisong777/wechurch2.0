@@ -1547,3 +1547,26 @@ export const interactionEmailDeliveries = pgTable('interaction_email_deliveries'
   userId:uuid('user_id').notNull().references(() => users.id,{onDelete:'cascade'}),batchHour:timestamp('batch_hour',{withTimezone:true}).notNull(),
   status:text('status').notNull(),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
 },t => ({pk:primaryKey({columns:[t.userId,t.batchHour]}),status:check('interaction_email_deliveries_status_check',sql`${t.status} IN ('claimed','accepted','unconfirmed','skipped')`)}));
+
+// Product feedback is private to its submitter and platform managers.
+export const memberFeedback = pgTable('member_feedback', {
+  id:uuid('id').primaryKey().defaultRandom(),userId:uuid('user_id').notNull().references(()=>users.id),requestId:uuid('request_id').notNull(),
+  category:text('category').notNull(),title:text('title').notNull(),body:text('body').notNull(),location:text('location').notNull().default('/'),
+  urgency:text('urgency').notNull().default('normal'),consentAt:timestamp('consent_at',{withTimezone:true}).notNull().defaultNow(),
+  status:text('status').notNull().default('new'),priority:text('priority').notNull().default('P2'),publicReply:text('public_reply').notNull().default(''),
+  version:integer('version').notNull().default(1),sourceVersion:integer('source_version').notNull().default(1),contentHash:text('content_hash').notNull(),
+  analysisStatus:text('analysis_status').notNull().default('pending'),analysis:jsonb('analysis'),analysisError:text('analysis_error'),analysisModel:text('analysis_model'),analyzedAt:timestamp('analyzed_at',{withTimezone:true}),
+  leaseToken:uuid('lease_token'),leaseUntil:timestamp('lease_until',{withTimezone:true}),analysisAttempts:integer('analysis_attempts').notNull().default(0),
+  createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp('updated_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({receipt:unique('member_feedback_user_id_request_id_key').on(t.userId,t.requestId),
+  owner:index('member_feedback_owner').on(t.userId,t.createdAt.desc(),t.id.desc()),queue:index('member_feedback_queue').on(t.status,t.priority,t.createdAt,t.id),
+  analysisQueue:index('member_feedback_analysis_queue').on(t.analysisStatus,t.leaseUntil,t.createdAt).where(sql`${t.analysisStatus} IN ('pending','running','failed')`),
+  category:check('member_feedback_category_check',sql`${t.category} IN ('bug','suggestion','question','other')`),title:check('member_feedback_title_check',sql`length(${t.title}) BETWEEN 3 AND 120`),body:check('member_feedback_body_check',sql`length(${t.body}) BETWEEN 10 AND 5000`),location:check('member_feedback_location_check',sql`length(${t.location})<=200`),
+  urgency:check('member_feedback_urgency_check',sql`${t.urgency} IN ('normal','blocked','security')`),status:check('member_feedback_status_check',sql`${t.status} IN ('new','reviewing','planned','done')`),priority:check('member_feedback_priority_check',sql`${t.priority} IN ('P0','P1','P2','P3')`),reply:check('member_feedback_public_reply_check',sql`length(${t.publicReply})<=3000`),
+  version:check('member_feedback_version_check',sql`${t.version}>0`),sourceVersion:check('member_feedback_source_version_check',sql`${t.sourceVersion}>0`),contentHash:check('member_feedback_content_hash_check',sql`${t.contentHash} ~ '^[a-f0-9]{64}$'`),
+  analysisStatus:check('member_feedback_analysis_status_check',sql`${t.analysisStatus} IN ('pending','running','ready','failed')`),attempts:check('member_feedback_analysis_attempts_check',sql`${t.analysisAttempts}>=0`),
+  lease:check('member_feedback_check',sql`(${t.analysisStatus}='running' AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL) OR (${t.analysisStatus}<>'running' AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)`),
+}));
+export const memberFeedbackEvents=pgTable('member_feedback_events',{
+  id:uuid('id').primaryKey().defaultRandom(),feedbackId:uuid('feedback_id').notNull().references(()=>memberFeedback.id),actorId:uuid('actor_id').references(()=>users.id),action:text('action').notNull(),beforeData:jsonb('before_data'),afterData:jsonb('after_data'),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({history:index('member_feedback_events_history').on(t.feedbackId,t.createdAt.desc(),t.id.desc()),action:check('member_feedback_events_action_check',sql`${t.action} IN ('created','updated','reanalyze','analysis_ready','analysis_failed')`)}));

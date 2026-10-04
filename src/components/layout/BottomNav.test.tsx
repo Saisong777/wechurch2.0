@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock('@/components/onboarding/IntroductionTour', () => ({ IntroductionTour: () => null }));
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -36,7 +37,7 @@ it('keeps the menu collapsed until requested, with explicit expanded state', () 
   expect(screen.queryByRole('navigation')).toBeNull();
   fireEvent.click(button);
   expect(button).toHaveAttribute('aria-expanded', 'true');
-  expect(within(screen.getByRole('navigation', { name: '行動導覽選單' })).getAllByRole('link')).toHaveLength(8);
+  expect(within(screen.getByRole('navigation', { name: '行動導覽選單' })).getAllByRole('link')).toHaveLength(10);
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(button).toHaveFocus();
   expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -45,7 +46,7 @@ it('keeps the menu collapsed until requested, with explicit expanded state', () 
 it('dismisses on outside interaction and keeps the existing destination order', () => {
   render(<MemoryRouter><MobileNavigation /><main>內容</main></MemoryRouter>);
   fireEvent.click(screen.getByRole('button', { name: '開啟導覽選單' }));
-  expect(screen.getAllByRole('link').slice(1).map(el => el.getAttribute('href'))).toEqual(['/', '/learn/bible', '/share', '/walls', '/groups', '/care', '/me', '/play']);
+  expect(screen.getAllByRole('link').slice(1).map(el => el.getAttribute('href'))).toEqual(['/', '/learn/bible', '/share', '/walls', '/groups', '/care', '/me', '/play', '/help', '/feedback']);
   fireEvent.pointerDown(screen.getByRole('main'));
   expect(screen.queryByRole('navigation')).toBeNull();
 });
@@ -62,7 +63,7 @@ it('prioritizes daily destinations while retaining all appearance choices', () =
   expect(within(within(appearance).getByRole('group', { name: '顯示模式' })).getAllByRole('radio').map(el => el.textContent)).toEqual(['明亮', '深色', '跟隨系統']);
   expect(within(appearance).getByText('文字大小與字型')).toBeInTheDocument();
   expect(within(menu).getAllByRole('group', { name: '顯示模式' })).toHaveLength(1);
-  expect(within(menu).getAllByRole('link')).toHaveLength(8);
+  expect(within(menu).getAllByRole('link')).toHaveLength(10);
 });
 
 it('navigates, closes the menu and marks the active destination', () => {

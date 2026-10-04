@@ -113,6 +113,7 @@ import { careActionInput } from '../shared/care';
 import { mentoringRoutes } from './mentoringRoutes';
 import { assignCrmGroupMember } from './crmGroupMembership';
 import { churchDevotionRoutes } from './churchDevotionRoutes';
+import { feedbackRoutes, adminFeedbackRoutes } from './feedbackRoutes';
 import { getManagedChurchDevotion } from './churchDevotionRepository';
 import { managedDevotionBrief } from './churchDevotionPublic';
 import { withDevotionScripture } from './devotionScripture';
@@ -742,6 +743,8 @@ export async function registerRoutes(app: Express) {
   app.use('/api/admin/church-devotions', churchDevotionRoutes(requireDelegated('devotions.manage', ['admin','senior_pastor'])));
   app.use('/api/life-groups', lifeGroupRoutes(resolveUserId));
   app.use('/api/notifications',notificationRoutes(resolveUserId));
+  app.use('/api/feedback',feedbackRoutes(resolveUserId));
+  app.use('/api/admin/feedback',adminFeedbackRoutes(requireRole('admin','senior_pastor')));
   app.use('/api/bible-study', bibleStudyRoutes());
   app.use('/open/api', (req, res) => res.redirect(308, `/api/bible-study${req.url.startsWith('/') ? req.url : '/'}`));
   app.use('/open', bibleStudyCreditsRoutes());

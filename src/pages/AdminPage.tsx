@@ -110,6 +110,7 @@ export const AdminPage: React.FC = () => {
       ...(isSystemAdmin ? [{ icon: Inbox, label: '收件匣', action: () => setStep('inbox'), testId: 'button-inbox', badge: unreadData?.count }] : []),
     ] },
     { title: '工具與設定', actions: [
+      ...(isAdmin ? [{ icon: Inbox, label: '意見反饋管理', action: () => navigate('/admin/feedback'), testId: 'button-feedback' }] : []),
       ...(isAdmin ? [{ icon: Settings, label: '角色與權限', action: () => navigate('/admin/access'), testId: 'button-access-control' }] : []),
       ...(canCreateSession ? [{ icon: Sparkles, label: '真心話題庫', action: () => setStep('cards'), testId: 'button-cards' }] : []),
       ...(isSystemAdmin ? [

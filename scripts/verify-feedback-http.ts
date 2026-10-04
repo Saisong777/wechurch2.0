@@ -1,0 +1,72 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import type { Pool } from 'pg';
+import { claimFeedbackAnalysis,completeFeedbackAnalysis,failFeedbackAnalysis } from '../server/feedbackRepository';
+type Client=(path:string,method?:string,body?:unknown)=>Promise<Response>;
+export async function verifyFeedbackHttp(pool:Pool,makeClient:()=>Client) {
+  const owner=makeClient(),other=makeClient(),manager=makeClient(),guest=makeClient(),ids:string[]=[];
+  for(const c of [owner,other,manager]) {
+    const email=`feedback-${randomUUID()}@example.test`;
+    assert.equal((await c('/api/auth/register','POST',{email,password:randomUUID(),displayName:'Feedback fixture'})).status,200);
+    ids.push((await pool.query('SELECT id FROM users WHERE email=$1',[email])).rows[0].id);
+  }
+  await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'admin') ON CONFLICT DO NOTHING",[ids[2]]);
+  assert.equal((await guest('/api/feedback/me')).status,401);
+  assert.equal((await guest('/api/admin/feedback')).status,401);
+  assert.equal((await owner('/api/admin/feedback')).status,403);
+  const input={requestId:randomUUID(),category:'bug',title:'讀經按鈕沒反應',body:'我按下讀經完成按鈕後，画面沒有反應，重新登入仍然無法使用。',location:'/church-reading',urgency:'blocked',consent:true};
+  assert.equal((await owner('/api/feedback','POST',{...input,consent:false})).status,400);
+  assert.equal((await owner('/api/feedback','POST',{...input,title:'😀a'})).status,400);
+  assert.equal((await owner('/api/feedback','POST',{...input,body:'😀'.repeat(5)})).status,400);
+  assert.equal((await owner('/api/feedback','POST',{...input,location:'//evil.test/x'})).status,400);
+  assert.equal((await owner('/api/feedback','POST',{...input,location:'/church-reading?email=secret'})).status,400);
+  assert.equal((await owner('/api/feedback','POST',{...input,userId:ids[1]})).status,400);
+  const results=await Promise.all([owner('/api/feedback','POST',input),owner('/api/feedback','POST',input)]);
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,201]);
+  const f=(await results[0].json()).feedback;
+  assert.equal((await owner('/api/feedback','POST',{...input,body:input.body+'不同內容'})).status,409);
+  assert.equal((await pool.query('SELECT count(*)::int n FROM member_feedback WHERE user_id=$1 AND request_id=$2',[ids[0],input.requestId])).rows[0].n,1);
+  assert.equal((await (await other('/api/feedback/me')).json()).items.length,0);
+  const mine=await(await owner('/api/feedback/me')).json();assert.equal(mine.items[0].id,f.id);assert(!JSON.stringify(mine).includes('analysis'));assert(!JSON.stringify(mine).includes('userId'));
+  assert.equal((await other(`/api/admin/feedback/${f.id}`,'PATCH',{version:1,status:'done'})).status,403);
+  const updates=await Promise.all([manager(`/api/admin/feedback/${f.id}`,'PATCH',{version:1,status:'reviewing',publicReply:'收到，我們會確認。'}),manager(`/api/admin/feedback/${f.id}`,'PATCH',{version:1,status:'reviewing',publicReply:'收到，我們會確認。'})]);
+  assert.deepEqual(updates.map(r=>r.status).sort(),[200,409]);
+  const claims=await claimFeedbackAnalysis(1,900);assert.equal(claims.length,1);const claim=claims[0];assert.equal(claim.id,f.id);assert(!('userId' in claim));
+  assert.equal((await claimFeedbackAnalysis(1,900)).length,0);
+  const analysis={category:'bug',summary:'讀經完成按鈕失效',urgency:'high',importance:'high',reason:'阻礙每天讀經完成記錄',tags:['讀經'],nextAction:'核對讀經按鈕與完成接口。',suggestedPriority:'P1',evidence:['重新登入仍然無法使用']};
+  await assert.rejects(completeFeedbackAnalysis(claim,{analysis:{...analysis,status:'done'},model:'synthetic-test'}));
+  await assert.rejects(completeFeedbackAnalysis(claim,{analysis:{...analysis,evidence:['所有會員都不能使用']},model:'synthetic-test'}));
+  await assert.rejects(completeFeedbackAnalysis({...claim,token:randomUUID()},{analysis,model:'synthetic-test'}));
+  await completeFeedbackAnalysis(claim,{analysis,model:'synthetic-test'});
+  const after=(await(await manager('/api/admin/feedback')).json()).items.find((x:{id:string})=>x.id===f.id);
+  assert.equal(after.analysisStatus,'ready');assert.equal(after.priority,'P2');assert.equal(after.status,'reviewing');assert.equal(after.version,2);
+  assert.equal((await(await owner('/api/feedback/me')).json()).items[0].publicReply,'收到，我們會確認。');
+  const otherResponse=await owner('/api/feedback','POST',{...input,requestId:randomUUID(),category:'suggestion',title:'版面配色建議',body:'希望可以增加更多介面配色供選擇，這是非緊急的外觀建議。',urgency:'normal'});
+  assert.equal(otherResponse.status,201);const f2=(await otherResponse.json()).feedback;
+  assert.equal((await manager(`/api/admin/feedback/${f2.id}`,'PATCH',{version:1,priority:'P0'})).status,200);
+  const secondClaim=(await claimFeedbackAnalysis(1,900))[0];assert.equal(secondClaim.id,f2.id);
+  await completeFeedbackAnalysis(secondClaim,{analysis:{...analysis,category:'suggestion',suggestedPriority:'P3',evidence:['非緊急的外觀建議']},model:'synthetic-test'});
+  assert.equal((await(await manager('/api/admin/feedback?sort=manual')).json()).items[0].id,f2.id);
+  assert.equal((await(await manager('/api/admin/feedback?sort=ai')).json()).items[0].id,f.id);
+  const exportJson=await(await manager('/api/admin/feedback/export')).json();assert.equal(exportJson.schemaVersion,1);assert(!JSON.stringify(exportJson).includes('@example.test'));assert(!JSON.stringify(exportJson).includes(ids[0]));
+  const history=await(await manager(`/api/admin/feedback/${f.id}/history`)).json();assert(history.items.some((x:{action:string})=>x.action==='analysis_ready'));
+  assert.equal((await manager(`/api/admin/feedback/${f.id}/reanalyze`,'POST',{version:1})).status,409);
+  assert.equal((await manager(`/api/admin/feedback/${f.id}/reanalyze`,'POST',{version:2})).status,200);
+  const second=(await claimFeedbackAnalysis(1,60))[0];
+  await pool.query("UPDATE member_feedback SET lease_until=now()-interval '1 second' WHERE id=$1",[f.id]);
+  await assert.rejects(completeFeedbackAnalysis(second,{analysis,model:'synthetic-test'}));
+  const third=(await claimFeedbackAnalysis(1,900))[0];assert.notEqual(third.token,second.token);
+  await assert.rejects(failFeedbackAnalysis(second));await failFeedbackAnalysis(third);
+  assert.equal((await claimFeedbackAnalysis(1,900)).length,0);
+  // Admin requeue invalidates the prior worker even if its source text is unchanged.
+  assert.equal((await manager(`/api/admin/feedback/${f.id}/reanalyze`,'POST',{version:3})).status,200);
+  const fourth=(await claimFeedbackAnalysis(1,900))[0];
+  assert.equal((await manager(`/api/admin/feedback/${f.id}/reanalyze`,'POST',{version:4})).status,200);
+  await assert.rejects(completeFeedbackAnalysis(fourth,{analysis,model:'synthetic-test'}));
+  const fifth=(await claimFeedbackAnalysis(1,900))[0];await completeFeedbackAnalysis(fifth,{analysis,model:'synthetic-test'});
+  for(let i=0;i<8;i++) assert.equal((await owner('/api/feedback','POST',{...input,requestId:randomUUID()})).status,201);
+  assert.equal((await owner('/api/feedback','POST',{...input,requestId:randomUUID()})).status,429);
+  // Duplicate retry after reaching the limit must still find its successful receipt.
+  assert.equal((await owner('/api/feedback','POST',input)).status,200);
+  console.log('PASS feedback: private ownership, manager authorization, consent, URL stripping, immutable receipt, concurrent idempotency, optimistic versions, bounded queue, lease expiry/requeue, validated evidence, AI suggestion isolation and machine-readable export');
+}

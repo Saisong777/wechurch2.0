@@ -1,6 +1,6 @@
 import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Menu, X, UserRound, Wrench } from 'lucide-react';
+import { ChevronLeft, Menu, X, UserRound, Wrench, CircleHelp, MessageSquare } from 'lucide-react';
 import { mobilePageTitle } from '@/lib/navigation';
 import { MobileNavLinks } from './BottomNav';
 import { MobileHeaderContext } from './MobileHeaderContext';
@@ -57,8 +57,8 @@ export function MobileNavigation() {
           <MobileNavLinks placement="header" onNavigate={() => setOpen(false)} />
         </section>
         <div className="mobile-menu-utilities">
-          {([{ href: '/me', label: '個人設定', icon: UserRound }, { href: '/play', label: '工具', icon: Wrench }]).map(item => <Link
-            key={item.href} to={item.href} data-testid={`mobile-menu-${item.href.slice(1)}`} onClick={() => setOpen(false)} aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? 'page' : undefined}
+          {([{ href: '/me', label: '個人設定', icon: UserRound }, { href: '/play', label: '工具', icon: Wrench }, { href: '/help', label: '使用說明', icon: CircleHelp }, { href: '/feedback', label: '意見反饋', icon: MessageSquare }]).map(item => <Link
+            key={item.href} to={item.href} state={item.href === '/feedback' ? {from:pathname} : undefined} data-testid={`mobile-menu-${item.href.slice(1)}`} onClick={() => setOpen(false)} aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? 'page' : undefined}
             className="mobile-menu-utility">
             <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />{item.label}
           </Link>)}

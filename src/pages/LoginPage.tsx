@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ const LoginPage = () => {
 
   React.useEffect(() => {
     if (!loading && user) {
-      localStorage.removeItem('login_redirect');
+      try { localStorage.removeItem('login_redirect'); } catch { /* Login return works when browser storage is disabled. */ }
       navigate(consumeLoginReturn(searchParams.get('returnTo')), { replace: true });
     }
   }, [user, loading, navigate, searchParams]);
@@ -61,6 +61,8 @@ const LoginPage = () => {
         </div>
 
         <div className="w-full max-w-md">
+          <p className="mb-3 text-base leading-7 text-muted-foreground">登入後，可以保存讀經記錄與筆記，並參與小家同行。請使用原本的 Google 帳號，讓記錄接續在同一處。</p>
+          <Link to="/help" className="mb-5 inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">先看看使用說明</Link>
           <LoginForm />
         </div>
 

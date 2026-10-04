@@ -70,6 +70,9 @@ const ReadingPlansPage = lazyPage(() => import("./pages/ReadingPlansPage"));
 const ReadingExperiencePage = lazyPage(() => import("./pages/ReadingExperiencePage"));
 const MyNotesPage = lazyPage(() => import("./pages/MyNotesPage"));
 const PrayerMeetingPage = lazyPage(() => import("./pages/PrayerMeetingPage"));
+const FeedbackPage = lazyPage(() => import('./pages/FeedbackPage'));
+const FeedbackAdminPage = lazyPage(() => import('./pages/FeedbackAdminPage'));
+const HelpPage = lazyPage(() => import('./pages/HelpPage'));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 
 
@@ -82,6 +85,9 @@ const router = createBrowserRouter([{ path: '*', element: (
                     <Route path="/user" element={<Navigate to="/" replace />} />
                     <Route path="/user/study" element={<Navigate to="/" replace />} />
                     <Route path="/user/notebook" element={<Navigate to="/learn/my-notes" replace />} />
+                    <Route path="/feedback" element={<FeedbackPage />} />
+                    <Route path="/help" element={<HelpPage />} />
+                    <Route path="/admin/feedback" element={<FeedbackAdminPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/admin/crm" element={<CRMPage />} />
                     <Route path="/admin/access" element={<AccessControlPage />} />

@@ -1,0 +1,15 @@
+{
+  "type": "object", "additionalProperties": false,
+  "required": ["category","summary","urgency","importance","reason","tags","nextAction","suggestedPriority","evidence"],
+  "properties": {
+    "category":{"type":"string","enum":["bug","suggestion","question","other"]},
+    "summary":{"type":"string"},
+    "urgency":{"type":"string","enum":["low","medium","high","critical"]},
+    "importance":{"type":"string","enum":["low","medium","high"]},
+    "reason":{"type":"string"},
+    "tags":{"type":"array","items":{"type":"string"}},
+    "nextAction":{"type":"string"},
+    "suggestedPriority":{"type":"string","enum":["P0","P1","P2","P3"]},
+    "evidence":{"type":"array","items":{"type":"string"}}
+  }
+}

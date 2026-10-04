@@ -2,11 +2,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './LoginPage';
-const auth = vi.hoisted(() => ({ user: null, loading: false, signUp: vi.fn(async () => ({})), signIn: vi.fn(async () => ({})) }));
+const auth = vi.hoisted(() => ({ user: null as null | {id:string}, loading: false, signUp: vi.fn(async () => ({})), signIn: vi.fn(async () => ({})) }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => auth }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); auth.user = null; vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 it('explains Google account conflicts without exposing provider details', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ staging: true, google: true, emailRegistration: false }) })));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -31,6 +31,8 @@ it('offers one Google entry for B registration and login without a password form
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/login?mode=signup']}><LoginPage /></MemoryRouter></QueryClientProvider>);
   expect(await screen.findByRole('button', { name: '使用 Google 帳號繼續' })).toBeEnabled();
+  expect(screen.getByText(/登入後，可以保存讀經記錄與筆記/)).toBeVisible();
+  expect(screen.getByRole('link',{name:'先看看使用說明'})).toHaveAttribute('href','/help');
   expect(screen.queryByTestId('input-password')).toBeNull();
   expect(screen.queryByRole('group', { name: '帳號操作' })).toBeNull();
   expect(screen.queryByTestId('button-submit')).toBeNull();
@@ -43,4 +45,12 @@ it('does not expose a misleading registration form when configuration fails', as
   expect(await screen.findByRole('alert')).toHaveTextContent('暫時無法載入登入方式');
   expect(screen.queryByTestId('input-password')).toBeNull();
   client.clear();
+});
+
+it('returns from login to feedback even when local storage is disabled', async () => {
+  auth.user = {id:'member'};
+  vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('Storage unavailable'); });
+  vi.stubGlobal('fetch', vi.fn(async () => ({ok:true,json:async () => ({google:true,emailRegistration:false})})));
+  render(<MemoryRouter initialEntries={['/login?returnTo=%2Ffeedback']}><Routes><Route path="/login" element={<LoginPage />} /><Route path="/feedback" element={<p>回到意見草稿</p>} /></Routes></MemoryRouter>);
+  expect(await screen.findByText('回到意見草稿')).toBeVisible();
 });
