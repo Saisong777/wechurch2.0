@@ -10,6 +10,7 @@ import { zhTW } from 'date-fns/locale';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAccessControl } from '@/hooks/useAccessControl';
 import { cn, vibrate } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { PrayerComments } from './PrayerComments';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -32,10 +33,36 @@ export const PrayerCard: React.FC<{ prayer: Prayer; focusFromNotification?: bool
   const urgentMutation = useUrgentPrayer();
   const closeMutation = useClosePrayer();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [mobileExpanded, setMobileExpanded] = useState(focusFromNotification);
+  const [mobileExpanded, setMobileExpanded] = useState(focusFromNotification || !!targetCommentId);
+  useEffect(() => {
+    if (focusFromNotification || targetCommentId) setMobileExpanded(true);
+  }, [focusFromNotification, targetCommentId]);
+  const isMobile = useIsMobile();
+  const [viewportReady, setViewportReady] = useState(false);
+  useEffect(() => { setViewportReady(true); }, []);
+  const [inViewport, setInViewport] = useState(false);
+  const commentsEnabled = viewportReady && inViewport && (!isMobile || mobileExpanded);
   const article = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (focusFromNotification && !targetCommentId) { article.current?.focus({preventScroll:true}); article.current?.scrollIntoView?.({block:'start'}); }
+    if (typeof IntersectionObserver === 'undefined') {
+      const checkVisibility = () => {
+        const rect = article.current?.getBoundingClientRect();
+        setInViewport(!!rect && rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth);
+      };
+      checkVisibility();
+      window.addEventListener('scroll', checkVisibility, { capture: true, passive: true });
+      window.addEventListener('resize', checkVisibility);
+      return () => { window.removeEventListener('scroll', checkVisibility, true); window.removeEventListener('resize', checkVisibility); };
+    }
+    const observer = new IntersectionObserver(([entry]) => setInViewport(entry.isIntersecting));
+    if (article.current) observer.observe(article.current);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    if (focusFromNotification || targetCommentId) {
+      if (!targetCommentId) article.current?.focus({preventScroll:true});
+      article.current?.scrollIntoView?.({block:'start'});
+    }
   },[focusFromNotification,targetCommentId]);
   const detailsId = useId();
   const actionsId = useId();
@@ -47,29 +74,17 @@ export const PrayerCard: React.FC<{ prayer: Prayer; focusFromNotification?: bool
   const timeAgo = formatDistanceToNow(new Date(prayer.createdAt), { addSuffix: true, locale: zhTW });
 
   return <article ref={article} tabIndex={-1} aria-label={`代禱：${prayer.content.split('\n')[0]}`} className="min-w-0 scroll-mt-32 bg-card">
-    <div className="px-3 pt-2 md:hidden">
-      <button type="button" className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={mobileExpanded} aria-controls={`${detailsId} ${actionsId}`} aria-label={`${mobileExpanded ? '收合' : '展開'}代禱：${prayer.authorName}，${summary}`} onClick={() => setMobileExpanded(value => !value)}>
+    <div className="flex min-w-0 items-start justify-between gap-2 px-3 pt-3 sm:px-4 sm:pt-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <Avatar className="h-8 w-8 shrink-0" aria-hidden="true">
           {!prayer.isAnonymous && prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt="" />}
           <AvatarFallback className="bg-primary/10 text-xs text-primary">{prayer.isAnonymous ? <User className="h-4 w-4" /> : prayer.authorName.charAt(0).toUpperCase()}</AvatarFallback>
         </Avatar>
-        <span className="max-w-[28%] shrink-0 truncate text-sm font-semibold" title={prayer.authorName}>{prayer.authorName}</span>
-        {isUrgentPrayer(prayer) && <AlertCircle role="img" aria-label="緊急代禱" className="h-3.5 w-3.5 shrink-0 text-red-700 dark:text-red-300" />}
-        {prayer.isPinned && <Pin role="img" aria-label="置頂" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-        <span className="min-w-0 flex-1 truncate text-sm">{summary}</span>
-        <span className="flex shrink-0 items-center gap-0.5 text-xs text-primary">{mobileExpanded ? '收合' : '展開'}{mobileExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</span>
+        <div className="min-w-0"><p className="text-sm font-semibold [overflow-wrap:anywhere]">{prayer.authorName}</p><p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{timeAgo}</p></div>
+      </div>
+      <button type="button" className="flex min-h-11 shrink-0 items-center gap-1 rounded-md px-1 text-xs text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden" aria-expanded={mobileExpanded} aria-controls={`${detailsId} ${actionsId}`} aria-label={`${mobileExpanded ? '收合' : '展開'}代禱：${prayer.authorName}，${summary}`} onClick={() => setMobileExpanded(value => !value)}>
+        {mobileExpanded ? '收合' : '展開'}{mobileExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </button>
-    </div>
-    <div id={detailsId} className={cn('space-y-3 p-3 sm:p-4', !mobileExpanded && 'hidden md:block')}>
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 self-center text-xs text-muted-foreground [overflow-wrap:anywhere] md:hidden">{prayer.authorName} · {timeAgo}</p>
-        <div className="hidden min-w-0 items-center gap-2 md:flex">
-          <Avatar className="h-8 w-8 shrink-0">
-            {!prayer.isAnonymous && prayer.authorAvatar && <AvatarImage src={prayer.authorAvatar} alt={prayer.authorName} />}
-            <AvatarFallback className="bg-primary/10 text-xs text-primary">{prayer.isAnonymous ? <User className="h-4 w-4" /> : prayer.authorName.charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0"><p className="break-words text-sm font-semibold">{prayer.authorName}</p><p className="text-xs text-muted-foreground">{timeAgo}</p></div>
-        </div>
         {canDelete && <DropdownMenu>
           <DropdownMenuTrigger asChild><Button ref={managementTrigger} variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="管理禱告" title="管理禱告"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -89,7 +104,9 @@ export const PrayerCard: React.FC<{ prayer: Prayer; focusFromNotification?: bool
             <DropdownMenuItem disabled={managementBusy} className="min-h-11 gap-2 text-destructive focus:text-destructive" onSelect={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4" />刪除</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>}
-      </div>
+    </div>
+    {!mobileExpanded && <p className="truncate px-3 pt-2 text-sm md:hidden">{isUrgentPrayer(prayer) && <AlertCircle role="img" aria-label="緊急代禱" className="mr-1 inline h-3.5 w-3.5 text-red-700 dark:text-red-300" />}{prayer.isPinned && <Pin role="img" aria-label="置頂" className="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />}{summary}</p>}
+    <div id={detailsId} className={cn('space-y-3 p-3 sm:p-4', !mobileExpanded && 'hidden md:block')}>
       <div className="flex flex-wrap gap-1.5">
         <Badge variant="outline" className={CATEGORY_COLORS[prayer.category] || CATEGORY_COLORS.other}>{CATEGORY_LABELS[prayer.category]}</Badge>
         {isUrgentPrayer(prayer) && <Badge className="gap-1 bg-red-700 text-white"><AlertCircle className="h-3 w-3" />緊急代禱</Badge>}
@@ -103,13 +120,13 @@ export const PrayerCard: React.FC<{ prayer: Prayer; focusFromNotification?: bool
       {!closed && <div className="grid grid-cols-3 gap-1" role="group" aria-label="關懷回應">{(Object.keys(REACTION_LABELS) as PrayerReaction[]).map(kind => {
         const reaction = prayer.reactions?.find(r => r.kind === kind);
         const Icon = { heart: Heart, support: HeartHandshake, strength: Sprout }[kind];
-        return <Button key={kind} variant={reaction?.selected ? 'secondary' : 'ghost'} size="sm" className="min-h-11 min-w-0 gap-1 px-1 text-xs sm:text-sm" aria-pressed={!!reaction?.selected} title={`${reaction?.selected ? '撤回' : '送出'}${REACTION_LABELS[kind]}`} disabled={reactionMutation.isPending} onClick={() => reactionMutation.mutate({ prayerId: prayer.id, kind, selected: !reaction?.selected })}><Icon className={cn('h-4 w-4', kind === 'heart' ? 'text-rose-600 dark:text-rose-300' : kind === 'support' ? 'text-teal-700 dark:text-teal-300' : 'text-green-700 dark:text-green-300', reaction?.selected && kind === 'heart' && 'fill-current')} />{REACTION_LABELS[kind]}<span className="tabular-nums">{reaction?.count || 0}</span></Button>;
+        return <Button key={kind} variant="outline" size="sm" className={cn('min-h-11 h-auto min-w-0 flex-wrap gap-x-1 gap-y-0.5 border-border bg-transparent px-1 py-2 text-xs hover:bg-muted/50 sm:text-sm', reaction?.selected && 'border-primary/40 bg-primary/5 text-primary')} aria-pressed={!!reaction?.selected} title={`${reaction?.selected ? '撤回' : '送出'}${REACTION_LABELS[kind]}`} disabled={reactionMutation.isPending} onClick={() => reactionMutation.mutate({ prayerId: prayer.id, kind, selected: !reaction?.selected })}><Icon className={cn('h-4 w-4', kind === 'heart' ? 'text-rose-600 dark:text-rose-300' : kind === 'support' ? 'text-teal-700 dark:text-teal-300' : 'text-green-700 dark:text-green-300', reaction?.selected && kind === 'heart' && 'fill-current')} />{REACTION_LABELS[kind]}<span className="tabular-nums">{reaction?.count || 0}</span></Button>;
       })}</div>}
       <div id={actionsId} className={cn('flex-wrap gap-2 md:flex', mobileExpanded ? 'flex' : 'hidden')}>
-        {!closed && <Button variant="outline" className={cn('min-h-11 min-w-0 flex-1 gap-1.5 px-2', prayer.hasAmened && 'border-primary/30 bg-primary/10 text-primary disabled:opacity-100')} aria-pressed={prayer.hasAmened} disabled={toggleAmenMutation.isPending || prayer.hasAmened} onClick={() => { vibrate(50); toggleAmenMutation.mutate({ prayerId: prayer.id, hasAmened: prayer.hasAmened }); }}>
+        {!closed && <Button variant="outline" className={cn('min-h-11 min-w-0 flex-1 gap-1.5 px-2', 'h-auto flex-wrap border-border bg-transparent py-2 hover:bg-muted/50', prayer.hasAmened && 'border-primary/40 bg-primary/5 text-primary disabled:opacity-100')} aria-pressed={prayer.hasAmened} disabled={toggleAmenMutation.isPending || prayer.hasAmened} onClick={() => { vibrate(50); toggleAmenMutation.mutate({ prayerId: prayer.id, hasAmened: prayer.hasAmened }); }}>
           {prayer.hasAmened ? <Check className="h-4 w-4" /> : <HandHeart className="h-4 w-4" />}{prayer.hasAmened ? '已為你禱告' : '為你禱告'}{prayer.amenCount > 0 && <span className="text-xs tabular-nums">{prayer.amenCount}</span>}
         </Button>}
-        <PrayerComments prayerId={prayer.id} count={prayer.commentCount} anonymousOwner={prayer.isOwner && prayer.isAnonymous} readOnly={closed} initiallyExpanded={focusFromNotification} targetCommentId={targetCommentId} />
+        <PrayerComments prayerId={prayer.id} count={prayer.commentCount} anonymousOwner={prayer.isOwner && prayer.isAnonymous} readOnly={closed} enabled={commentsEnabled} targetCommentId={targetCommentId} />
       </div>
     </div>
     {canDelete && <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

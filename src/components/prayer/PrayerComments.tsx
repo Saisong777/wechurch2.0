@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { MessageCircle, Send, Trash2, HandHeart, HeartHandshake, Sun, Loader2, Check } from 'lucide-react';
+import { Send, Trash2, HandHeart, HeartHandshake, Sun, Loader2, Check } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,7 @@ function Sticker({value, compact=false}:{value:PrayerSticker;compact?:boolean}) 
   return <span className={`inline-flex shrink-0 flex-col items-center justify-center gap-2 rounded-md ${compact ? 'h-20 w-full' : 'h-24 w-28'} ${stickerColors[value]}`}><Icon className={compact ? 'h-7 w-7' : 'h-10 w-10'} strokeWidth={1.7} /><span className="text-xs font-semibold sm:text-sm">{STICKER_LABELS[value]}</span></span>;
 }
 
-export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=false,initiallyExpanded=false,targetCommentId=''}:{prayerId:string;count?:number;anonymousOwner?:boolean;readOnly?:boolean;initiallyExpanded?:boolean;targetCommentId?:string}) {
-  const [expanded,setExpanded] = useState(initiallyExpanded);
+export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=false,enabled=true,targetCommentId=''}:{prayerId:string;count?:number;anonymousOwner?:boolean;readOnly?:boolean;enabled?:boolean;targetCommentId?:string}) {
   const thread = useRef<HTMLElement>(null);
   const focused = useRef('');
   const [content,setContent] = useState('');
@@ -30,12 +29,12 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
   const [sticker,setSticker] = useState<PrayerSticker>('praying');
   const formId = useId();
   const request = useRef<{signature:string;id:string}>();
-  const comments = usePrayerComments(prayerId,expanded);
+  const comments = usePrayerComments(prayerId,enabled);
   useEffect(() => {
-    if (!targetCommentId || focused.current === targetCommentId || !comments.data?.some(c => c.id === targetCommentId)) return;
+    if (!enabled || !targetCommentId || focused.current === targetCommentId || !comments.data?.some(c => c.id === targetCommentId)) return;
     const item = thread.current?.querySelector<HTMLElement>(`[data-comment-id="${targetCommentId}"]`);
     if (item) { item.focus({preventScroll:true}); item.scrollIntoView?.({block:'nearest'}); focused.current = targetCommentId; }
-  },[targetCommentId,comments.data]);
+  },[targetCommentId,comments.data,enabled]);
   const create = useCreateComment(); const remove = useDeleteComment(); const {isAdmin:legacyAdmin} = useUserRole();
   const access=useAccessControl();const isAdmin=legacyAdmin || !!access.data?.permissions?.includes('wall.moderate');
   async function send() {
@@ -47,10 +46,21 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
     try { await create.mutateAsync({prayerId,...input,requestId:request.current.id}); if (kind !== 'sticker') setContent(''); request.current = undefined; }
     catch { /* Keep the draft and receipt key for an explicit retry. */ }
   }
-  return <>
-    <Button variant={expanded ? 'secondary' : 'outline'} className="min-h-11 min-w-0 flex-1 gap-1.5 px-2" aria-expanded={expanded} aria-controls={formId} onClick={()=>setExpanded(!expanded)}><MessageCircle className="h-4 w-4" />{expanded ? '收起回應' : readOnly ? '查看回應' : '寫下鼓勵'}{count > 0 ? ` · ${count}` : ''}</Button>
-    {expanded && <section ref={thread} id={formId} className="w-full min-w-0 basis-full space-y-4 border-t pt-4" aria-label="鼓勵與禱告">
-      {!readOnly && <form onSubmit={e=>{e.preventDefault();void send();}}><fieldset disabled={create.isPending} className="min-w-0 space-y-3">
+  return <section ref={thread} id={formId} className="w-full min-w-0 basis-full space-y-4 border-t pt-4" aria-label="鼓勵與禱告">
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold">大家的回應 · {comments.data?.length ?? count}</h3>
+        {comments.isPending && <p role="status" className="text-sm text-muted-foreground">載入回應中…</p>}
+        {comments.isError && <p role="alert" className="text-sm text-destructive">回應載入失敗。<button className="ml-2 min-h-11 underline" onClick={()=>comments.refetch()}>重新載入</button></p>}
+        {!comments.isPending && !comments.isError && !comments.data?.length && <p className="text-sm text-muted-foreground">還沒有回應</p>}
+        {targetCommentId && !comments.isPending && !comments.isError && !comments.data?.some(c => c.id === targetCommentId) && <p role="status">這則回應已撤回。</p>}
+        {!comments.isError && <div className="max-h-96 space-y-4 overflow-y-auto [overflow-wrap:anywhere]">{comments.data?.map(comment=><article key={comment.id} data-comment-id={comment.id} tabIndex={-1} className={`scroll-mt-32 border-b pb-3 last:border-0 ${comment.id === targetCommentId ? 'border-l-2 border-primary pl-3' : ''}`}>
+          <div className="mb-2 flex items-start justify-between gap-2"><div className="min-w-0 text-xs [overflow-wrap:anywhere]"><span className="font-semibold">{comment.authorName}</span><span className="ml-2 text-muted-foreground">{COMMENT_LABELS[comment.kind]} · {formatDistanceToNow(new Date(comment.createdAt),{addSuffix:true,locale:zhTW})}</span></div>
+            {(comment.isOwner || isAdmin) && <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" disabled={remove.isPending} title="撤回回應" aria-label="撤回回應" onClick={()=>{if(window.confirm('確定撤回這則回應？')) remove.mutate({prayerId,commentId:comment.id});}}><Trash2 className="h-4 w-4" /></Button>}
+          </div>
+          {comment.kind === 'sticker' && comment.sticker && comment.sticker in STICKER_LABELS ? <Sticker value={comment.sticker} /> : <p className="whitespace-pre-wrap text-sm leading-6">{comment.content}</p>}
+        </article>)}</div>}
+      </div>
+      {!readOnly && <form className="border-t pt-4" onSubmit={e=>{e.preventDefault();void send();}}><fieldset disabled={create.isPending} className="min-w-0 space-y-3">
         <div role="radiogroup" aria-label="回應類型" className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">{(Object.keys(responseLabels) as (keyof typeof responseLabels)[]).map(value => <label key={value} className="min-w-0 cursor-pointer">
           <input type="radio" name={formId+'-kind'} aria-label={responseLabels[value]} value={value} checked={kind===value} onChange={()=>setKind(value)} className="peer sr-only" />
           <span className="flex min-h-11 items-center justify-center rounded-md px-1 text-sm text-muted-foreground peer-checked:bg-background peer-checked:font-semibold peer-checked:text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring">{responseLabels[value]}</span>
@@ -61,21 +71,7 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
         </label>)}</div> : <Textarea aria-label="回應內容" placeholder={kind==='scripture'?'分享一句經文，並寫下出處…':kind==='prayer'?'寫下你為對方的禱告…':'寫一句鼓勵，讓對方知道你在關心…'} rows={3} maxLength={1000} value={content} onChange={e=>setContent(e.target.value)} />}
         <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{anonymousOwner ? '以匿名發文者回應' : '以你的名字回應'}</span>{kind!=='sticker' && <span>{content.length} / 1000</span>}</div>
         {create.isError && <p role="alert" className="text-sm text-destructive">尚未送出，你的內容仍保留在這裡。</p>}
-        <Button type="submit" disabled={create.isPending || (kind!=='sticker' && !content.trim())} className="min-h-11 w-full gap-2">{create.isPending?<Loader2 className="h-4 w-4 animate-spin" />:<Send className="h-4 w-4" />}送出回應</Button>
+        <Button type="submit" disabled={create.isPending || (kind!=='sticker' && !content.trim())} variant="outline" className="min-h-11 h-auto min-w-32 gap-2 border-primary/40 bg-primary/5 py-2 text-primary hover:bg-primary/10">{create.isPending?<Loader2 className="h-4 w-4 animate-spin" />:<Send className="h-4 w-4" />}送出回應</Button>
       </fieldset></form>}
-      <div className="space-y-3 border-t pt-3">
-        <h3 className="text-sm font-semibold">大家的回應 · {comments.data?.length ?? count}</h3>
-        {comments.isPending && <p role="status" className="text-sm text-muted-foreground">載入回應中…</p>}
-        {comments.isError && <p role="alert" className="text-sm text-destructive">回應載入失敗。<button className="ml-2 min-h-11 underline" onClick={()=>comments.refetch()}>重新載入</button></p>}
-        {!comments.isPending && !comments.isError && !comments.data?.length && <p className="text-sm text-muted-foreground">還沒有回應</p>}
-        {targetCommentId && !comments.isPending && !comments.isError && !comments.data?.some(c => c.id === targetCommentId) && <p role="status">這則回應已撤回。</p>}
-        {!comments.isError && <div className="max-h-96 space-y-4 overflow-y-auto [overflow-wrap:anywhere]">{comments.data?.map(comment=><article key={comment.id} data-comment-id={comment.id} tabIndex={-1} className={`scroll-mt-32 border-b pb-3 last:border-0 ${comment.id === targetCommentId ? 'border-l-2 border-primary pl-3' : ''}`}>
-          <div className="mb-2 flex items-start justify-between gap-2"><div className="min-w-0 text-xs"><span className="font-semibold">{comment.authorName}</span><span className="ml-2 text-muted-foreground">{COMMENT_LABELS[comment.kind]} · {formatDistanceToNow(new Date(comment.createdAt),{addSuffix:true,locale:zhTW})}</span></div>
-            {(comment.isOwner || isAdmin) && <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" disabled={remove.isPending} title="撤回回應" aria-label="撤回回應" onClick={()=>{if(window.confirm('確定撤回這則回應？')) remove.mutate({prayerId,commentId:comment.id});}}><Trash2 className="h-4 w-4" /></Button>}
-          </div>
-          {comment.kind === 'sticker' && comment.sticker && comment.sticker in STICKER_LABELS ? <Sticker value={comment.sticker} /> : <p className="whitespace-pre-wrap text-sm leading-6">{comment.content}</p>}
-        </article>)}</div>}
-      </div>
-    </section>}
-  </>;
+    </section>;
 }
