@@ -28,14 +28,15 @@ export const familySettingsInput = z.object({
   audience: familyAudienceInput.optional(),
   status: z.enum(['active', 'paused', 'archived']),
   leaderId: z.string().uuid().nullable(),
-});
-export const familyCreateInput = z.object({ name: z.string().trim().min(1).max(160), church: z.string().trim().min(1).max(100), audience: familyAudienceInput.default('unspecified'), description: z.string().trim().max(500).default(''), meeting: z.string().trim().max(200).default(''), listed: z.boolean().default(true) });
+  coLeaderId: z.string().uuid().nullable().optional(),
+}).refine(v => !v.leaderId || !v.coLeaderId || v.leaderId !== v.coLeaderId, { path:["coLeaderId"], message:"請選擇兩位不同的小家長" });
+export const familyCreateInput = z.object({ name: z.string().trim().min(1).max(160), church: z.string().trim().min(1).max(100), audience: familyAudienceInput.default('unspecified'), description: z.string().trim().max(500).default(''), meeting: z.string().trim().max(200).default(''), listed: z.boolean().default(true), coLeaderId: z.string().uuid().nullable().optional() });
 export const memberMoveInput = z.object({
   userId: z.string().uuid(), targetGroupId: z.string().uuid().nullable(),
   reason: z.string().trim().min(1, '請填異動原因').max(500),
 });
 export const invitationToken = z.string().trim().transform(s => s.replace(/[-\s]/g, '').toLowerCase())
   .pipe(z.string().regex(/^(?:[a-f0-9]{48}|[a-f0-9]{12})$/, '請輸入有效的小家邀請碼'));
-export type FamilyDirectoryEntry = { id: string; name: string; church: string; description: string; meeting: string; audience?: keyof typeof familyAudiences; membershipStatus?: 'approved' | 'pending' | 'rejected' | null };
+export type FamilyDirectoryEntry = { leaderName?: string | null; coLeaderName?: string | null; id: string; name: string; church: string; description: string; meeting: string; audience?: keyof typeof familyAudiences; membershipStatus?: 'approved' | 'pending' | 'rejected' | null };
 export type FamilyRequest = { id: string; church: string; availability: string; region: string; contact: string; status: keyof typeof matchingStatuses; message: string; version: number; createdAt: string; userId: string; name?: string; ownerName?: string; groupName?: string };
-export type ManagedFamily = FamilyDirectoryEntry & { status: keyof typeof familyStatuses; listed: boolean; announcement: string; version: number; leaderId: string | null; memberCount: number; pendingRequestCount?: number; canManage: boolean };
+export type ManagedFamily = FamilyDirectoryEntry & { status: keyof typeof familyStatuses; listed: boolean; announcement: string; version: number; leaderId: string | null; coLeaderId: string | null; memberCount: number; pendingRequestCount?: number; canManage: boolean };

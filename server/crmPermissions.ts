@@ -167,7 +167,7 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
     `SELECT id, church
        FROM small_groups
       WHERE is_active = true
-        AND (leader_user_id = $1 OR pastor_user_id = $1)`,
+        AND ((leader_user_id=$1 OR co_leader_user_id=$1) OR pastor_user_id = $1)`,
     [userId]
   );
   for (const group of ownedGroupsResult.rows) {

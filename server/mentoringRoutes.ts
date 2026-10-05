@@ -39,8 +39,8 @@ export function mentoringRoutes(resolveUserId:(req:Request)=>Promise<string|null
   });
   router.get('/targets',async(_req,res)=>{
     res.json((await pool.query(`SELECT g.id AS "groupId",g.name AS "groupName",u.id AS "mentorId",COALESCE(u.display_name,'陪伴者') AS "mentorName"
-      FROM small_groups g JOIN users u ON u.id=g.leader_user_id OR u.id=g.pastor_user_id
-      WHERE g.is_active AND u.id<>$1 AND (g.leader_user_id=$1 OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active))
+      FROM small_groups g JOIN users u ON u.id=g.leader_user_id OR u.id=g.co_leader_user_id OR u.id=g.pastor_user_id
+      WHERE g.is_active AND u.id<>$1 AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active))
       ORDER BY g.name,u.id`,[res.locals.actor])).rows);
   });
   router.get('/contracts',async(req,res)=>{
@@ -71,8 +71,8 @@ export function mentoringRoutes(resolveUserId:(req:Request)=>Promise<string|null
       const journey=(await db.query(`SELECT j.id,t.name FROM person_journeys j JOIN journey_templates t ON t.id=j.template_id
         WHERE j.id=$1 AND j.owner_user_id=$2 AND j.status IN ('active','paused') FOR UPDATE OF j`,[input.journeyId,actor])).rows[0];
       if(!journey||actor===input.mentorId)throw missing();
-      const group=(await db.query(`SELECT id FROM small_groups g WHERE g.id=$1 AND g.is_active AND (g.leader_user_id=$2 OR g.pastor_user_id=$2)
-        AND (g.leader_user_id=$3 OR g.pastor_user_id=$3 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$3 AND m.is_active)) FOR SHARE`,[input.groupId,input.mentorId,actor])).rows[0];
+      const group=(await db.query(`SELECT id FROM small_groups g WHERE g.id=$1 AND g.is_active AND ((g.leader_user_id=$2 OR g.co_leader_user_id=$2) OR g.pastor_user_id=$2)
+        AND ((g.leader_user_id=$3 OR g.co_leader_user_id=$3) OR g.pastor_user_id=$3 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$3 AND m.is_active)) FOR SHARE`,[input.groupId,input.mentorId,actor])).rows[0];
       if(!group)throw missing();
       if((await db.query("SELECT id FROM mentoring_contracts WHERE journey_id=$1 AND status IN ('pending','active')",[journey.id])).rowCount)throw new GroupError(409,'請先結束目前的邀請或陪伴關係，再邀請另一位。');
       await db.query('INSERT INTO mentoring_contracts(id,journey_id,learner_id,mentor_id,group_id,course_name,cadence_days,agreement) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[id,journey.id,actor,input.mentorId,input.groupId,journey.name,input.cadenceDays,input.agreement]);

@@ -24,7 +24,7 @@ export async function recordCommentInteraction(c: PoolClient, actor: string, tar
 export const visibleNotification = `(EXISTS(SELECT 1 FROM prayers p WHERE p.id=n.prayer_id AND (p.user_id=n.user_id OR (p.closed_at IS NULL AND NOT p.is_answered)))
   OR EXISTS(SELECT 1 FROM life_group_shares s JOIN small_groups g ON g.id=s.group_id
     WHERE s.id=n.share_id AND s.withdrawn_at IS NULL AND g.is_active
-    AND (g.leader_user_id=n.user_id OR g.pastor_user_id=n.user_id OR EXISTS(
+    AND ((g.leader_user_id=n.user_id OR g.co_leader_user_id=n.user_id) OR g.pastor_user_id=n.user_id OR EXISTS(
       SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=n.user_id AND m.is_active AND m.history_from<=s.created_at))))
   AND (n.family_comment_id IS NULL OR EXISTS(SELECT 1 FROM life_group_comments c WHERE c.id=n.family_comment_id AND c.share_id=n.share_id AND c.withdrawn_at IS NULL))`;
 

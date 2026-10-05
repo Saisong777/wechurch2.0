@@ -162,8 +162,9 @@ const crmGroupBodySchema = z.object({
   name: z.string().trim().min(1).max(120),
   church: z.string().trim().min(1).max(120),
   leaderUserId: z.string().uuid().optional().nullable(),
+  coLeaderUserId: z.string().uuid().optional().nullable(),
   pastorUserId: z.string().uuid().optional().nullable(),
-});
+}).refine(v => !v.leaderUserId || !v.coLeaderUserId || v.leaderUserId !== v.coLeaderUserId, { path:["coLeaderUserId"], message:"請選擇兩位不同的小家長" });
 const crmGroupMemberBodySchema = z.object({
   userId: z.string().uuid().optional().nullable(),
   potentialMemberId: z.string().uuid().optional().nullable(),
@@ -1026,16 +1027,19 @@ export async function registerRoutes(app: Express) {
           g.name,
           g.church,
           g.leader_user_id AS "leaderUserId",
+          g.co_leader_user_id AS "coLeaderUserId",
           g.pastor_user_id AS "pastorUserId",
           leader.display_name AS "leaderName",
+          co_leader.display_name AS "coLeaderName",
           pastor.display_name AS "pastorName",
           COUNT(m.id)::int AS "memberCount"
         FROM small_groups g
         LEFT JOIN users leader ON leader.id = g.leader_user_id
+        LEFT JOIN users co_leader ON co_leader.id = g.co_leader_user_id
         LEFT JOIN users pastor ON pastor.id = g.pastor_user_id
         LEFT JOIN small_group_members m ON m.group_id = g.id AND m.is_active = true
         WHERE ${conditions.join(" AND ")}
-        GROUP BY g.id, leader.display_name, pastor.display_name
+        GROUP BY g.id, leader.display_name, co_leader.display_name, pastor.display_name
         ORDER BY g.church, g.name`,
         params
       );
@@ -1061,13 +1065,23 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const result = await pool.query(
-        `INSERT INTO small_groups (church, name, leader_user_id, pastor_user_id, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, NOW(), NOW())
-         RETURNING id, name, church, leader_user_id AS "leaderUserId", pastor_user_id AS "pastorUserId"`,
-        [church, input.name, input.leaderUserId || null, input.pastorUserId || null]
-      );
-      res.status(201).json(result.rows[0]);
+      const c = await pool.connect();
+      try {
+        await c.query('BEGIN');
+        for (const appointedId of [input.leaderUserId, input.coLeaderUserId].filter(Boolean)) {
+          const appointed = (await c.query('SELECT church FROM users WHERE id=$1 FOR SHARE', [appointedId])).rows[0];
+          if (!appointed || normalizeChurch(appointed.church) !== church) throw new Error('請選擇同教會已核對帳號的小家長。');
+        }
+        const result = await c.query(
+          `INSERT INTO small_groups (church, name, leader_user_id, pastor_user_id, co_leader_user_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+           RETURNING id, name, church, leader_user_id AS "leaderUserId", co_leader_user_id AS "coLeaderUserId", pastor_user_id AS "pastorUserId"`,
+          [church, input.name, input.leaderUserId || null, input.pastorUserId || null, input.coLeaderUserId || null]
+        );
+        await c.query('COMMIT');
+        res.status(201).json(result.rows[0]);
+      } catch (error) { await c.query('ROLLBACK'); throw error; }
+      finally { c.release(); }
     } catch (error) {
       console.error("Error creating CRM group:", error);
       res.status(400).json({ error: "Failed to create CRM group" });

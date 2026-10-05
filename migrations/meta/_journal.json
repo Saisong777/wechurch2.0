@@ -75,6 +75,7 @@
     { "idx": 22, "version": "7", "when": 1790726400000, "tag": "0022_family_directory", "breakpoints": true },
     { "idx": 23, "version": "7", "when": 1790758800000, "tag": "0023_devotional_note_deletions", "breakpoints": true },
     { "idx": 24, "version": "7", "when": 1790758800001, "tag": "0024_interaction_notifications", "breakpoints": true },
-    { "idx": 25, "version": "7", "when": 1791072000000, "tag": "0025_member_feedback", "breakpoints": true }
+    { "idx": 25, "version": "7", "when": 1791072000000, "tag": "0025_member_feedback", "breakpoints": true },
+    { "idx": 26, "version": "7", "when": 1791158400000, "tag": "0026_co_leaders", "breakpoints": true }
   ]
 }

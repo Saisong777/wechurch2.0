@@ -13,7 +13,7 @@ const data = {
   church: 'IM 行動教會', isSystemAdmin: true,
   users: [{ id: 'member', name: '測試成員', email: 'fixture@example.test', role: 'member' }],
   roles: [{ id: 'coworker', name: '同工', permissions: ['email.send'], version: 1 }],
-  groups: [{ id: 'family', name: '測試小家' }], grants: [] as AccessGrant[], history: [], legacyScopes: [], appointments: [],
+  groups: [{ id: 'family', name: '測試小家' }], grants: [] as AccessGrant[], history: [], legacyScopes: [], appointments: [] as Array<{id:string;name:string;leaderId:string|null;coLeaderId?:string|null;pastorId:string|null}>,
 };
 let fail = false;
 let sent: Record<string, unknown>[] = [];
@@ -21,7 +21,7 @@ let revoked: {url:string;body:Record<string,unknown>}[]=[];
 let deleteError='';
 let client: QueryClient;
 beforeEach(() => {
-  sent = []; fail = false;revoked=[];deleteError='';
+  sent = []; fail = false;revoked=[];deleteError='';data.appointments=[];
   data.grants=['同工','全職同工'].map((roleName,i)=>({id:'grant-'+i,userId:'member',roleId:'coworker',roleName,permissions:['members.read'],scope:'church',church:'IM 行動教會',groupId:null,memberId:null,expiresAt:null,active:true,version:1,reason:'初始授權'}));
   vi.spyOn(window, 'confirm').mockReturnValue(true);
   vi.spyOn(window,'prompt').mockReturnValue(null);
@@ -123,3 +123,5 @@ it.each(['連線失敗，請重試','授權已更新或撤回，請重新載入�
   fireEvent.click(screen.getByRole('button',{name:'確認撤回'}));
   await screen.findByText('已撤回',{exact:true});
 });
+
+it('includes the equal second leader appointment without disguising it as a pastor appointment',async()=>{data.appointments=[{id:'shared-group',name:'共同負責小家',leaderId:'other',coLeaderId:'member',pastorId:null}];await client.invalidateQueries({queryKey:['access-control-admin']});expect(await screen.findByText('小家長職務 · 共同負責小家')).toBeVisible();expect(screen.queryByText('牧者職務 · 共同負責小家')).toBeNull();});

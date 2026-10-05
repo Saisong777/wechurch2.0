@@ -28,7 +28,7 @@ export const careUpdateInput = z.object({
   responsibleId: z.string().uuid().nullable(), version: z.number().int().positive(),
 });
 export const commentInput = z.object({ body: z.string().trim().min(1).max(4000) });
-export type GroupSummary = { id: string; name: string; church: string; manager: boolean; memberCount: number; pendingRequestCount?: number };
+export type GroupSummary = { leaderName?: string | null; coLeaderName?: string | null; id: string; name: string; church: string; manager: boolean; memberCount: number; pendingRequestCount?: number };
 export type GroupMember = { id: string; name: string; manager: boolean };
 export type GroupShare = { id: string; authorId: string | null; authorName: string; anonymous: boolean; isOwner: boolean; kind: 'note' | 'prayer' | 'message'; title: string; body: string; reference: string; answered: boolean; version: number; createdAt: string; prayed: boolean; prayerCount: number; commentCount: number };
 export type GroupComment = { id: string; authorId: string | null; isOwner?:boolean; authorName: string; body: string; createdAt: string };

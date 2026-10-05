@@ -87,6 +87,9 @@ try {
   const brief=await empty.json();assert.equal(brief.sourceStatus,'unpublished');assert.equal(brief.scriptureReference,'');
   const { verifySupportHttp }=await import('./verify-support-http');
   await verifySupportHttp(pool,a,b,guest,makeClient,ids[0],ids[1]);
+  // Existing support fixtures explicitly enable pastoral_beta for mentoring checks.
+  const { verifyCoLeadersHttp } = await import('./verify-co-leaders-http');
+  await verifyCoLeadersHttp(pool, makeClient);
   const { verifyMentoringHttp }=await import('./verify-mentoring-http'); await verifyMentoringHttp(pool,makeClient);
   const { verifyLineIdentity }=await import('./verify-line-identity'); await verifyLineIdentity(pool);
   const { verifyImImportHttp }=await import('./verify-im-import-http'); await verifyImImportHttp(pool,a,b,guest,ids);

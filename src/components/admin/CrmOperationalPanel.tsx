@@ -1,3 +1,4 @@
+import { groupLeaderNames } from '@/lib/groupLeaders';
 import { LeaderDashboard } from '@/components/pastoral/LeaderDashboard';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
@@ -10,6 +11,7 @@ export interface OperationalGroup {
   name: string;
   church: string;
   leaderName: string | null;
+  coLeaderName?: string | null;
   memberCount: number;
 }
 
@@ -28,7 +30,7 @@ export function CrmOperationalPanel({ view, groups, loading, error, retry, manag
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">小家管理</h2><Button variant="outline" onClick={manageMembers}>管理成員與小家</Button></div>
     {loading ? <Skeleton className="h-24" /> : error ? <div role="alert" className="flex items-center gap-3"><p>無法載入小家。</p><Button variant="outline" onClick={retry}>重試</Button></div> : groups.length === 0 ? <p className="text-sm text-muted-foreground">目前沒有可管理的小家。</p> : <ul className="divide-y border-y">
-      {groups.map(group => <li key={group.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-4"><div className="min-w-0 [overflow-wrap:anywhere]"><h3 className="font-medium">{group.name}</h3><p className="text-sm text-muted-foreground">{group.church} · {group.leaderName || '尚未指派組長'}</p></div><span className="text-sm tabular-nums">{group.memberCount} 位成員</span></li>)}
+      {groups.map(group => <li key={group.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-4"><div className="min-w-0 [overflow-wrap:anywhere]"><h3 className="font-medium">{group.name}</h3><p className="text-sm text-muted-foreground">{group.church} · 小家長：{groupLeaderNames(group)}</p></div><span className="text-sm tabular-nums">{group.memberCount} 位成員</span></li>)}
     </ul>}
   </section>;
 }

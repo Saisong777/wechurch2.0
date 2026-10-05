@@ -266,6 +266,7 @@ export const smallGroups = pgTable("small_groups", {
   church: text("church").notNull(),
   name: text("name").notNull(),
   leaderUserId: uuid("leader_user_id").references(() => users.id),
+  coLeaderUserId: uuid("co_leader_user_id").references(() => users.id),
   pastorUserId: uuid("pastor_user_id").references(() => users.id),
   isActive: boolean("is_active").default(true).notNull(),
   description: text("description").default('').notNull(),
@@ -280,6 +281,8 @@ export const smallGroups = pgTable("small_groups", {
 }, (table) => ({
   churchIdx: index("small_groups_church_idx").on(table.church),
   leaderIdx: index("small_groups_leader_user_id_idx").on(table.leaderUserId),
+  coLeaderIdx: index("small_groups_co_leader_user_id_idx").on(table.coLeaderUserId),
+  distinctLeaders: check("small_groups_distinct_leaders", sql`${table.coLeaderUserId} IS NULL OR ${table.coLeaderUserId} IS DISTINCT FROM ${table.leaderUserId}`),
 }));
 
 export const smallGroupMembers = pgTable("small_group_members", {

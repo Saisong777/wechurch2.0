@@ -17,7 +17,7 @@ beforeEach(() => {
     const path = input.replace('/api/life-groups', '');
     let data: unknown = [];
     if (!path) data = { groups: [{ id: 'group', name: '測試小家', memberCount: 1 }], requests: [], canCreate: false };
-    else if (path === '/group') data = { id: 'group', name: '測試小家', manager: false, members: [{ id: 'member', name: '測試成員' }], requests: [] };
+    else if (path === '/group') data = { id: 'group', name: '測試小家', leaderId: 'first', coLeaderId: 'second', leaderName: '領袖甲', coLeaderName: '領袖乙', manager: false, members: [{ id: 'member', name: '測試成員' }], requests: [] };
     else if (path.startsWith('/group/shares?')) data = [{ id: 'share', authorId: 'member', authorName: '測試成員', kind: 'note', title: '測試分享', body: '願意分享的內容', reference: '', answered: false, version: 1, createdAt: '2026-09-11', commentCount: 0 }];
     else if (path.startsWith('/group/care?')) data = [{ id: 'care', creatorId: 'member', name: '匿名測試對象', need: '測試需要', status: 'new', nextAction: '', dueDate: null, responsibleId: null, version: 1, watching: true, watcherCount: 1, updatedAt: '2026-09-11' }];
     return { ok: true, json: async () => data };
@@ -59,4 +59,10 @@ it('requires explicit consent even when new sharing content is filled', async ()
   expect((screen.getByRole('button', { name: '確認分享至小家' }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole('checkbox'));
   expect((screen.getByRole('button', { name: '確認分享至小家' }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it('shows both equal leaders in the member workspace without labeling a deputy', async () => {
+  show('note');
+  expect(await screen.findByText('小家長：領袖甲、領袖乙')).toBeVisible();
+  expect(screen.queryByText(/副小家長|主要小家長/)).toBeNull();
 });

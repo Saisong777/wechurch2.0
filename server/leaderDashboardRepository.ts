@@ -25,9 +25,9 @@ async function scopes(c: PoolClient, actor: string, scope = 'all') {
   const churches = new Set<string>(user.role === 'senior_pastor' ? getChurchAliases(user.church) : []);
   for (const grant of grants) if (grant.scope_type === 'church') for (const church of getChurchAliases(grant.church)) churches.add(church);
   const ids = grants.filter(g => g.scope_type === 'group').map(g => g.group_id);
-  const groups = (await c.query(`SELECT g.id,g.name,g.church,(g.leader_user_id=$1 OR g.pastor_user_id=$1 OR EXISTS(
+  const groups = (await c.query(`SELECT g.id,g.name,g.church,((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(
       SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active)) IS TRUE AS "sharedReadable"
-    FROM small_groups g WHERE g.is_active AND (g.leader_user_id=$1 OR g.pastor_user_id=$1 OR g.church=ANY($2::text[]) OR g.id=ANY($3::uuid[]))
+    FROM small_groups g WHERE g.is_active AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR g.church=ANY($2::text[]) OR g.id=ANY($3::uuid[]))
     ORDER BY g.name,g.id FOR SHARE OF g`, [actor, [...churches], ids])).rows as DashboardGroup[];
   const selected = scope === 'all' ? groups : groups.filter(g => g.id === scope);
   if (scope !== 'all' && !selected.length) throw denied();
@@ -110,7 +110,7 @@ async function roster(c: PoolClient, groupId: string, date: string) {
       WHERE e.group_id=m.group_id AND e.user_id=m.user_id AND e.action IN ('left','removed','transferred_out')
       AND e.created_at >= (m.joined_at AT TIME ZONE 'UTC')) >= $2::date)`;
   return (await c.query(`SELECT 'user:'||u.id AS key,COALESCE(NULLIF(u.display_name,''),'小家成員') AS name
-    FROM users u CROSS JOIN small_groups g WHERE g.id=$1 AND (g.leader_user_id=u.id OR g.pastor_user_id=u.id OR EXISTS(
+    FROM users u CROSS JOIN small_groups g WHERE g.id=$1 AND ((g.leader_user_id=u.id OR g.co_leader_user_id=u.id) OR g.pastor_user_id=u.id OR EXISTS(
       SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=u.id AND ${eligible}))
     UNION ALL SELECT 'membership:'||m.id,COALESCE(NULLIF(p.name,''),'未連結帳號的成員')
     FROM small_group_members m LEFT JOIN potential_members p ON p.id=m.potential_member_id WHERE m.group_id=$1 AND ${eligible} AND m.user_id IS NULL

@@ -108,6 +108,8 @@ interface CrmGroupOption {
   church: string;
   leaderUserId: string | null;
   leaderName: string | null;
+  coLeaderUserId?: string | null;
+  coLeaderName?: string | null;
   memberCount: number;
 }
 

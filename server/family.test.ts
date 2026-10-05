@@ -7,7 +7,7 @@ describe('family membership and community contracts', () => {
     expect(familyCreateInput.parse({ name:'同行', church:'IM 行動教會' })).toMatchObject({listed:true,audience:'unspecified'});
     for (const audience of ['women','men','mixed','couples','other']) expect(familyCreateInput.parse({name:'同行',church:'IM 行動教會',audience,listed:false})).toMatchObject({audience,listed:false});
     expect(familyCreateInput.safeParse({name:'同行',church:'IM 行動教會',audience:'invalid'}).success).toBe(false);
-    expect(familySettingsInput.shape.audience.safeParse('invalid').success).toBe(false);
+    expect(familySettingsInput.innerType().shape.audience.safeParse('invalid').success).toBe(false);
   });
   it('accepts optional bounded introductions without silently approving membership', () => {
     expect(familyJoinInput.parse({})).toEqual({message:''});

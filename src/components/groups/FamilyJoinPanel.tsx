@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { familyBase, familyRequest as request, useFamilyQuery, familySelectClass } from '@/lib/familyApi';
 import { familyAudiences, matchingStatuses, type FamilyDirectoryEntry, type FamilyRequest } from '@shared/family';
 import { toast } from 'sonner';
+import { groupLeaderNames } from '@/lib/groupLeaders';
 import { churchDisplayName } from '@shared/churches';
 
 export function FamilyJoinPanel({ token, setToken, join, joining }: { token: string; setToken: (s: string) => void; join: () => void; joining: boolean }) {
@@ -42,6 +43,7 @@ export function FamilyJoinPanel({ token, setToken, join, joining }: { token: str
       {!q.isPending && !q.isError && !q.data?.groups.filter(g => g.name.toLowerCase().includes(search.trim().toLowerCase()) && (audience === 'all' || (g.audience || 'unspecified') === audience)).length && <p className="py-4 text-sm text-muted-foreground">目前沒有符合條件的小家。可以改選類型，或請同工幫你安排。</p>}
       {q.data?.groups.filter(g => g.name.toLowerCase().includes(search.trim().toLowerCase()) && (audience === 'all' || (g.audience || 'unspecified') === audience)).map(g => <article key={g.id} className="space-y-3 border-b py-4">
         <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{g.name}</h3><span className="text-sm text-muted-foreground">{familyAudiences[g.audience || 'unspecified']}</span></div>
+        <p className="text-sm text-muted-foreground">小家長：{groupLeaderNames(g)}</p>
         {g.description && <p className="whitespace-pre-wrap text-sm">{g.description}</p>}{g.meeting && <p className="text-sm text-muted-foreground">{g.meeting}</p>}
         {g.membershipStatus === 'approved' ? <Button asChild variant="outline"><Link to={`/groups/${g.id}`}>進入我的小家</Link></Button> : g.membershipStatus === 'pending' ? <div className="flex flex-wrap items-center gap-3"><span role="status">等待小家長審核</span><Button disabled={busy} variant="ghost" onClick={() => { if (window.confirm('撤回這次加入申請？')) void act(() => request(`/directory/${g.id}/join`, 'DELETE')); }}>撤回申請</Button></div> : applying === g.id ? <form className="space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { await request(`/directory/${g.id}/join`, 'POST', { message }); setApplying(null); setMessage(''); }); }}>
           <label className="block space-y-2 text-sm">想對小家長說的話（選填）<Textarea maxLength={1000} value={message} onChange={e => setMessage(e.target.value)} placeholder="例如期待、方便參加的時間" /></label>

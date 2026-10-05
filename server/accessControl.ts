@@ -121,7 +121,7 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
       LEFT JOIN potential_members p ON p.id=a.potential_member_id
       WHERE a.is_active AND a.starts_at<=now() AND (a.ends_at IS NULL OR a.ends_at>now())
         AND u.church=ANY($1::text[]) AND (a.church=ANY($1::text[]) OR s.church=ANY($1::text[]) OR m.church=ANY($1::text[]) OR p.church=ANY($1::text[]))`, [aliases])).rows;
-    const appointments = (await pool.query(`SELECT id,name,leader_user_id AS "leaderId",pastor_user_id AS "pastorId" FROM small_groups WHERE is_active AND church=ANY($1::text[])`, [aliases])).rows;
+    const appointments = (await pool.query(`SELECT id,name,leader_user_id AS "leaderId",co_leader_user_id AS "coLeaderId",pastor_user_id AS "pastorId" FROM small_groups WHERE is_active AND church=ANY($1::text[])`, [aliases])).rows;
     res.json({ church, isSystemAdmin: a.role === 'admin', users, roles, groups, grants, history, legacyScopes, appointments });
   });
   router.post('/presets', async (req, res) => {

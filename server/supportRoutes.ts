@@ -15,7 +15,7 @@ async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (error) { await c.query('ROLLBACK'); throw error; } finally { c.release(); }
 }
-const receiverActiveSql = `(EXISTS(SELECT 1 FROM small_groups g WHERE g.id=r.group_id AND g.is_active AND (g.leader_user_id=r.receiver_id OR g.pastor_user_id=r.receiver_id))
+const receiverActiveSql = `(EXISTS(SELECT 1 FROM small_groups g WHERE g.id=r.group_id AND g.is_active AND ((g.leader_user_id=r.receiver_id OR g.co_leader_user_id=r.receiver_id) OR g.pastor_user_id=r.receiver_id))
   OR EXISTS(SELECT 1 FROM support_destinations d WHERE d.id=r.destination_id AND d.is_active AND d.owner_id=r.receiver_id))`;
 const projection = `r.id,r.sender_id AS "senderId",r.receiver_id AS "receiverId",r.title,r.body,r.status,r.next_action AS "nextAction",
   r.due_date::text AS "dueDate",r.version,r.updated_at AS "updatedAt",r.sender_id=$1 AS "isSender",
@@ -25,7 +25,7 @@ async function validTarget(c: PoolClient, actor: string, target: z.infer<typeof 
   if (target.receiverId === actor) throw new GroupError(400, '請選擇另一位陪伴者。');
   if (target.kind === 'group') {
     await groupAccess(c, target.id, actor);
-    if (!(await c.query('SELECT id FROM small_groups WHERE id=$1 AND is_active AND (leader_user_id=$2 OR pastor_user_id=$2) FOR SHARE', [target.id, target.receiverId])).rowCount) throw missing();
+    if (!(await c.query('SELECT id FROM small_groups WHERE id=$1 AND is_active AND ((leader_user_id=$2 OR co_leader_user_id=$2) OR pastor_user_id=$2) FOR SHARE', [target.id, target.receiverId])).rowCount) throw missing();
   } else if (!(await c.query('SELECT id FROM support_destinations WHERE id=$1 AND owner_id=$2 AND is_active FOR SHARE', [target.id, target.receiverId])).rowCount) throw missing();
 }
 async function requestAccess(c: PoolClient, id: string, actor: string) {
@@ -61,8 +61,8 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
   router.get('/targets', async (_req, res) => {
     const actor = res.locals.actor;
     const groups = (await pool.query(`SELECT 'group' AS kind,g.id,g.name,u.id AS "receiverId",COALESCE(u.display_name,'小家同工') AS "receiverName"
-      FROM small_groups g JOIN users u ON u.id=g.leader_user_id OR u.id=g.pastor_user_id
-      WHERE g.is_active AND u.id<>$1 AND (g.leader_user_id=$1 OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active)) ORDER BY g.name,u.id`, [actor])).rows;
+      FROM small_groups g JOIN users u ON u.id=g.leader_user_id OR u.id=g.co_leader_user_id OR u.id=g.pastor_user_id
+      WHERE g.is_active AND u.id<>$1 AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active)) ORDER BY g.name,u.id`, [actor])).rows;
     const destinations = (await pool.query(`SELECT 'destination' AS kind,d.id,d.name,d.owner_id AS "receiverId",COALESCE(u.display_name,'關懷同工') AS "receiverName"
       FROM support_destinations d JOIN users u ON u.id=d.owner_id WHERE d.is_active AND u.id<>$1 ORDER BY d.church,d.name`, [actor])).rows;
     res.json([...groups, ...destinations]);
@@ -72,7 +72,7 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
     const row = (await pool.query(`SELECT
       EXISTS(SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','senior_pastor')) AS "canConfigure",
       (EXISTS(SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','senior_pastor','pastor','minister','group_leader','leader','future_leader'))
-      OR EXISTS(SELECT 1 FROM small_groups WHERE is_active AND (leader_user_id=$1 OR pastor_user_id=$1))
+      OR EXISTS(SELECT 1 FROM small_groups WHERE is_active AND ((leader_user_id=$1 OR co_leader_user_id=$1) OR pastor_user_id=$1))
       OR EXISTS(SELECT 1 FROM support_destinations WHERE is_active AND owner_id=$1)) AS "canWork"`, [actor])).rows[0];
     res.json(row);
   });
