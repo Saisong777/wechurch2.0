@@ -1,0 +1,49 @@
+{
+  "site": "A",
+  "origin": "https://www.wechurch.online",
+  "versionLabel": "V3.15",
+  "status": "SUCCESS",
+  "deploymentId": "18094e15-f665-42b5-aff0-c43e76cd0aa2",
+  "verifiedAt": "2026-10-05T10:36:54.191Z",
+  "sourceCommit": "a36e17fce9fe799f4c22b27c267867b02e322039",
+  "preUploadGitBackupCommit": "145e4ad7602cb9afd3b3f4e0289d9b840d4f6d2e",
+  "sourceFingerprint": "9e02ed2a1a980762e66610067e4a598966e56ee0c2d13842526250eb09f968da",
+  "runtimeFilesVerified": 634,
+  "sourcePromotedFromBDeployment": "c9825945-4f4c-4d3b-8656-6a01b88b8d3e",
+  "migration": "0026_co_leaders",
+  "migrationCount": 27,
+  "newCatalogGroups": 19,
+  "totalGroups": 21,
+  "leaderAccountAppointments": 0,
+  "maximumEqualLeadersPerGroup": 2,
+  "originalMemberAndCurriculumDataPreserved": true,
+  "originalGroupColumnsPreserved": true,
+  "privilegesSettingsAndVolumesPreserved": true,
+  "BSourceAndGuardedDataPreserved": true,
+  "authenticatedOriginalSessionIdentityAndPayloadPreserved": true,
+  "sessionExpiryPreservation": "Same 13 hashed identities and payloads; bounded forward expiry only, original expired unchanged.",
+  "curriculumCount": 116,
+  "publishedCurriculumCount": 85,
+  "publicHealthAndProductionGoogleOptionsPassed": true,
+  "anonymousGroupAndCrmApiAccessDenied": true,
+  "independentReviewerRole": "wulang",
+  "independentReviewerNativeEntry": "/root/repo_check",
+  "evidenceSha256": {
+    "A-upgrade-verified.json": "300bdbadd8a049c37217974e5f1a4618551e2e4f24b0fe831582ae7bd32e255b",
+    "A-public-smoke-verified.json": "168bf8cf737b349d79fd85c499362010327377843b1bdf9ff2f5cb86fba5b834",
+    "A-catalog-committed.json": "54c81fa18a2c380b0132dac02c7ce9f7222d5fe975d75d96fa42495c4a3d94b5",
+    "a-migration-verified.json": "ddab56df3125e3ce9ed70dac203034728d83804256ae15c819096703134f09a0",
+    "a-upload-result.json": "0be55dc6437816607cfe9a2172fe5405dd37c82bb3028cc1d38c3f2a8a31922e",
+    "A-browser-readonly-verified.json": "af7d1daa7ada0ef8eaea3495a055b2d7ca6f8898671721168993fdbdb48e1f54"
+  },
+  "independentReview": {
+    "reportFile": "wulang-A最終實際發布複核.json",
+    "sha256": "03199a82c9405b6fe959f56d9255124a9380f521d964e855b551d8c234c57134"
+  },
+  "pending": [
+    "Verify real Google login, member and two-leader management UI on desktop and phone.",
+    "Confirm roster names against actual member accounts before leader appointments.",
+    "A feedback AI external processing remains separately pending.",
+    "Legacy final delta import and October 6 handover remain a separate ongoing task."
+  ]
+}
