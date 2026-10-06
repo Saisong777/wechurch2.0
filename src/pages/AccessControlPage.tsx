@@ -1,17 +1,17 @@
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ShieldCheck, Plus, Save, Pencil, RotateCcw, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAccessControlAdmin } from '@/hooks/useAccessControlAdmin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
 import { permissionKeys, permissionLabels, globalPermissions, type Permission, type AccessTemplate, type AccessGrant } from '@shared/accessControl';
 import { crmRoleLabels } from '@/lib/crm-members';
 import { churchDisplayName } from '@shared/churches';
-import { useChurchScopeKey } from '@/contexts/ChurchContext';
 import { memberMatchesRole, memberRoleFilterOptions, memberRoleSources, isLiveAccessGrant } from '@/lib/accessMemberRoles';
 import { toast } from 'sonner';
 
@@ -108,12 +108,12 @@ function TemplateEditor({data,initial,done,close}:{data:Snapshot;initial?:Access
 }
 export default function AccessControlPage(){
  const {user,loading}=useAuth();const {isAdmin,loading:roleLoading}=useUserRole();const client=useQueryClient();
- const [params]=useSearchParams(); const scopeKey=useChurchScopeKey();
+ const [params]=useSearchParams();
  const [tab,setTab]=useState('members');const [search,setSearch]=useState('');const [memberId,setMember]=useState(params.get('member')||'');const [roleFilter,setRoleFilter]=useState('');
  const [editing,setEditing]=useState<AccessGrant|'new'|null>(null);const [template,setTemplate]=useState<AccessTemplate|'new'|null>(null);const[busy,setBusy]=useState(false);const[error,setError]=useState('');
  const [revoking,setRevoking]=useState<string|null>(null);
  useEffect(()=>setRevoking(null),[memberId,tab]);
- const q=useQuery<Snapshot>({queryKey:['access-control-admin',user?.id,scopeKey],enabled:!!user&&isAdmin,queryFn:()=>api(''),staleTime:0,refetchInterval:30000,refetchOnWindowFocus:true,retry:false});
+ const q=useAccessControlAdmin<Snapshot>(isAdmin);
  const data=q.data; const selected=data?.users.find(m=>m.id===memberId);
  const done=async()=>{await q.refetch();await client.invalidateQueries({queryKey:['access-control-me']});await client.invalidateQueries({queryKey:['unified-members']});};
  async function act(work:()=>Promise<unknown>){if(busy)return;setBusy(true);setError('');try{await work();await done();toast.success('設定已更新');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
