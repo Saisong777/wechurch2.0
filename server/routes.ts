@@ -19,6 +19,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { careActions, careContacts, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants, userEmailPreferences } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { sessionDeadline } from './authSessionPersistence';
 import { readingPlanBodySchema } from './readingPlanInput';
 import { createReadingPlan, ReadingPlanError } from './readingPlanTransaction';
 import { soulGymAccess, visibleSubmissions, browserIdentity } from './soulGymAccess';
@@ -4643,7 +4644,7 @@ export async function registerRoutes(app: Express) {
           first_name: linked.displayName,
           profile_image_url: profile.pictureUrl ?? undefined,
         },
-        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+        expires_at: sessionDeadline(),
       };
 
       delete req.session.lineLogin;

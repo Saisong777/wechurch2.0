@@ -10,10 +10,14 @@ import { authAttemptLimits, authLoginLimits, trustedAuthJson } from '../../authR
 import { consumePasswordResetToken, issuePasswordResetToken } from '../../authPasswordReset';
 import { createPasswordWorkLimiter, PasswordWorkBusyError } from '../../authPasswordWork';
 import { authErrorMetadata } from '../../authLogging';
+import { sessionDeadline } from '../../authSessionPersistence';
 
 export function registerAuthRoutes(app: Express): void {
   const passwordWork = createPasswordWorkLimiter();
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+  app.get("/api/auth/user", (_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  }, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await authStorage.getUser(userId);
@@ -79,7 +83,7 @@ export function registerAuthRoutes(app: Express): void {
           email: normalizedEmail,
           first_name: displayName || normalizedEmail.split("@")[0],
         },
-        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+        expires_at: sessionDeadline(),
       };
 
       req.login(sessionUser, (err: any) => {
@@ -167,7 +171,7 @@ export function registerAuthRoutes(app: Express): void {
           email: normalizedEmail,
           first_name: dbUser.display_name || normalizedEmail.split("@")[0],
         },
-        expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+        expires_at: sessionDeadline(),
       };
 
       req.login(sessionUser, (err: any) => {

@@ -85,6 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await fetch('/api/auth/user', {
         credentials: 'include',
+        cache: 'no-store',
         signal: controller.signal,
       });
       if (request !== requestRef.current) return null;
@@ -130,13 +131,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let active = true;
     fetchUser(true).finally(() => { if (active) setLoading(false); });
 
-    const interval = setInterval(() => {
-      if (!changingAuthRef.current) void fetchUser(false);
-    }, SESSION_REFRESH_INTERVAL);
+    const refreshWhenActive = () => {
+      if (!changingAuthRef.current && document.visibilityState === 'visible') void fetchUser(false);
+    };
+    const interval = setInterval(refreshWhenActive, SESSION_REFRESH_INTERVAL);
+    document.addEventListener('visibilitychange', refreshWhenActive);
+    window.addEventListener('online', refreshWhenActive);
 
     return () => {
       active = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
+      window.removeEventListener('online', refreshWhenActive);
       invalidateRequest();
       authAttemptRef.current += 1;
     };

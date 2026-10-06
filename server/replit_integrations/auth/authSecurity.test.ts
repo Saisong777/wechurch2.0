@@ -69,10 +69,10 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-it('uses the shared pool, seven-day seconds for store TTL and milliseconds for cookies', () => {
+it('uses the shared pool, seven-day seconds with rolling persistence for store TTL and milliseconds for cookies', () => {
   getSession();
   expect(mocks.store).toHaveBeenCalledWith({ pool, createTableIfMissing: false, ttl: 604800, tableName: 'auth_sessions' });
-  expect(mocks.session).toHaveBeenCalledWith(expect.objectContaining({ cookie: expect.objectContaining({ maxAge: 604800000, httpOnly: true, sameSite: 'lax' }) }));
+  expect(mocks.session).toHaveBeenCalledWith(expect.objectContaining({ rolling: true, cookie: expect.objectContaining({ maxAge: 604800000, httpOnly: true, sameSite: 'lax' }) }));
 });
 
 it.each(['RAILWAY_ENVIRONMENT_ID', 'RAILWAY_ENVIRONMENT_NAME'])('bounds proxy trust to one hop on %s only', async name => {

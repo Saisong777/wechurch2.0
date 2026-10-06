@@ -10,14 +10,12 @@ import { googleLoginConfig, googleOnlyRegistration } from '../../googleLoginPoli
 import { authStorage } from './storage';
 import { createSessionVersionGuard } from '../../authSessionVersion';
 import { authErrorMetadata } from '../../authLogging';
+import { SESSION_TTL_SECONDS, SESSION_TTL_MS, sessionDeadline, sessionCookieOptions, persistAuthenticatedSession, destroyAuthenticatedSession } from '../../authSessionPersistence';
 
 export function getSession() {
-  const sessionTtlSeconds = 7 * 24 * 60 * 60;
   const pgStore = connectPg(session);
-  const sessionStore = new pgStore({ pool, createTableIfMissing: false, ttl: sessionTtlSeconds, tableName: "auth_sessions" });
-  const isDev = process.env.NODE_ENV === "development";
-  const allowInsecureLocalCookies = process.env.LOCAL_INSECURE_COOKIES === "1";
-  return session({ secret: process.env.SESSION_SECRET!, store: sessionStore, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: !(isDev || allowInsecureLocalCookies), sameSite: "lax", maxAge: sessionTtlSeconds * 1000 } });
+  const sessionStore = new pgStore({ pool, createTableIfMissing: false, ttl: SESSION_TTL_SECONDS, tableName: "auth_sessions" });
+  return session({ secret: process.env.SESSION_SECRET!, store: sessionStore, resave: false, saveUninitialized: false, rolling: true, cookie: { ...sessionCookieOptions(), maxAge: SESSION_TTL_MS } });
 }
 
 export async function setupAuth(app: Express) {
@@ -59,14 +57,14 @@ export async function setupAuth(app: Express) {
         const rc = await pool.query(`SELECT id FROM user_roles WHERE user_id=$1`, [userId]);
         if (rc.rows.length > 0) { await pool.query(`UPDATE user_roles SET role='admin',updated_at=NOW() WHERE user_id=$1`, [userId]); }
         else { await pool.query(`INSERT INTO user_roles (id,user_id,role,created_at,updated_at) VALUES (gen_random_uuid(),$1,'admin',NOW(),NOW())`, [userId]); }
-        req.login({ claims: { sub: devAuthId, email: devEmail, first_name: displayName, last_name: "" }, expires_at: Math.floor(Date.now() / 1000) + 86400 * 7 } as any, (err) => {
+        req.login({ claims: { sub: devAuthId, email: devEmail, first_name: displayName, last_name: "" }, expires_at: sessionDeadline() } as any, (err) => {
           if (err) return res.status(500).json({ message: "Login failed" });
           req.session.save(() => res.redirect("/"));
         });
       } catch (e) { console.error("[Dev Login]", authErrorMetadata(e)); return res.status(500).json({ message: "Dev login error" }); }
     });
   }
-  app.get("/api/logout", (req, res) => { req.logout(() => res.redirect("/")); });
+  app.get("/api/logout", destroyAuthenticatedSession);
   if (google.enabled && google.callbackURL) {
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -78,7 +76,7 @@ export async function setupAuth(app: Express) {
       async (_at, _rt, profile, done) => {
         try {
           const identity = await resolveGoogleIdentity(pool, profile);
-          done(null, { claims: { sub: identity.authUserId, email: identity.email, first_name: profile.name?.givenName || "", last_name: profile.name?.familyName || "", profile_image_url: profile.photos?.[0]?.value }, expires_at: Math.floor(Date.now() / 1000) + 86400 * 7 });
+          done(null, { claims: { sub: identity.authUserId, email: identity.email, first_name: profile.name?.givenName || "", last_name: profile.name?.familyName || "", profile_image_url: profile.photos?.[0]?.value }, expires_at: sessionDeadline() });
         } catch (err) {
           if (err instanceof GoogleIdentityError) return done(null, false, { message: err.code });
           done(err as Error);
@@ -104,17 +102,4 @@ export async function setupAuth(app: Express) {
   }
 }
 
-export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-  if (!req.isAuthenticated() || !user?.expires_at) return res.status(401).json({ message: "Unauthorized" });
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    // Proactively refresh expires_at when less than 1 day remaining
-    if (user.expires_at - now < 86400) {
-      user.expires_at = now + 86400 * 7;
-    }
-    if (req.session) req.session.touch();
-    return next();
-  }
-  return res.status(401).json({ message: "Session expired" });
-};
+export const isAuthenticated: RequestHandler = persistAuthenticatedSession;

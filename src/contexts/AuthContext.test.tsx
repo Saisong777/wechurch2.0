@@ -67,3 +67,25 @@ it('clears private query data when switching accounts', async () => {
   await act(async () => { await result.current.signIn('new@example.test', 'test'); });
   expect(queryClient.getQueryData(['/api/private'])).toBeUndefined();
 });
+
+
+it('checks the live cookie session on foreground return and reconnection, then removes listeners', async () => {
+  const fetcher = vi.fn().mockResolvedValue(response({ id: 'existing', email: null }));
+  vi.stubGlobal('fetch', fetcher);
+  const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  const { result, unmount } = renderHook(useAuth, { wrapper: AuthProvider });
+  await waitFor(() => expect(result.current.user?.id).toBe('existing'));
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ credentials: 'include', cache: 'no-store' });
+  visibility.mockReturnValue('hidden');
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  visibility.mockReturnValue('visible');
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  await act(async () => window.dispatchEvent(new Event('online')));
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  unmount();
+  document.dispatchEvent(new Event('visibilitychange'));
+  window.dispatchEvent(new Event('online'));
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});
