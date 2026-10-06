@@ -1,0 +1,69 @@
+{
+  "product": "WeChurch",
+  "releaseDate": "2026-10-06",
+  "sourceCommit": "0f300c92b5f3bc55f32d56291a3a7aabc069ed07",
+  "githubSourceBranch": "codex/mini-development-20261003",
+  "fingerprint": "824d538a7b3813dbf9d6670c3792e53dabbe0e2176d1389d0b681dbd82d339b4",
+  "runtimeFiles": 651,
+  "sites": {
+    "A": {
+      "origin": "https://www.wechurch.online",
+      "deploymentId": "8949c941-1415-4fa0-82e4-453d95642275",
+      "postVerifiedAt": "2026-10-06T05:37:41.890Z",
+      "postReceiptSha256": "f5bdf250448bea0128b86e507ac73bbd7d86fb044820c3c611911778279dc584",
+      "everyRuntimeByteVerified": true,
+      "migrationsExactly29": true
+    },
+    "B": {
+      "origin": "https://wechurch-staging-staging.up.railway.app",
+      "deploymentId": "98044b73-aab9-498d-abb4-5ddb7f0ce26e",
+      "postVerifiedAt": "2026-10-06T05:17:56.174Z",
+      "postReceiptSha256": "2279bdea4f2d161272ac94ad03d56ef5e1b10a141000c9e9844ea991e7ba71bf",
+      "everyRuntimeByteVerified": true,
+      "migrationsExactly29": true
+    }
+  },
+  "churches": [
+    "iM",
+    "桃園WeChurch",
+    "火樂"
+  ],
+  "mapping": "All prior church data remains iM; the two new churches start empty. Private notes remain owned by their existing owner.",
+  "membership": "One approved primary church per member; existing Sai system administrator manages all three.",
+  "includedPriorUpdates": [
+    "Inline encouragement below prayer cards",
+    "One devotional share submission can select group and church wall",
+    "Small group co-leaders",
+    "Existing feedback and onboarding help retained"
+  ],
+  "checks": {
+    "typecheck": "PASS",
+    "testFiles": 143,
+    "testsPassed": 864,
+    "integrityChecksPassed": 47,
+    "lint": "PASS with pre-existing warnings",
+    "productionBuild": "PASS",
+    "sameSourceReused": true
+  },
+  "verification": {
+    "fullSourceAndMigrationPreservation": "PASS",
+    "realGoogleAuthenticatedUI": "Verified on B and A, three church contexts and existing owner notes",
+    "responsive390And320": "Verified on B exact same release, not a physical phone",
+    "physicalPhone": "pending",
+    "bTenantAcceptanceSha256": "b7c51b7d0393c0ea38e0bce9871c58ff343fd417d9dd344cc6bb25a79b8a5aed",
+    "aUiAuthorEvidenceSha256": "f7094f57122be06cd43f491a09f36a1ce275a8c00edd2b2603bc8178aa903035",
+    "independentFinalReleaseReviewSha256": "e034d9d71d2a1576a1b99bc45229c25d64e974f47c3e0efd81a9f8d625152f45",
+    "independentAUiReviewSha256": "bd6499f780d547881cec1f6477a99460b3707c2882782a6ae5e8b4e58c21fa70"
+  },
+  "backup": {
+    "eachSiteEncryptedBackupAndIsolatedRestoreVerified": true,
+    "memberDataOrSecretsInGithub": false,
+    "githubBackupIsCodeOnly": true
+  },
+  "recovery": "Fix forward with church-scoped schema. After new church data exists, do not deploy earlier single-church readers or overwrite A with B data. Review any data restore separately.",
+  "remainingItems": [
+    "Physical mobile device verification",
+    "Wall visibility copy should say current church members",
+    "Legacy Firebase freeze is a separate handover task, not certified by this release"
+  ]
+}
