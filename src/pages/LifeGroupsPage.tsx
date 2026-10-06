@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { ScriptureSection } from '@/components/scripture/ChurchScriptureSection';
 import { fetchChurchReadingForToday, type ChurchReadingSummary } from '@/lib/churchReading';
 import { useState, useEffect } from 'react';

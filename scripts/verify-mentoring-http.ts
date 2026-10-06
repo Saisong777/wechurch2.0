@@ -17,7 +17,7 @@ export async function verifyMentoringHttp(pool:Pool,makeClient:()=>Client){
   const day=(await pool.query('SELECT id FROM journey_days WHERE template_id=$1 AND day_number=1',[template])).rows[0].id;
   const journeyId=(await pool.query("INSERT INTO person_journeys(person_id,template_id,owner_user_id,private_note) VALUES($1,$2,$3,'JOURNEY_SECRET') RETURNING id",[person,template,learnerId])).rows[0].id;
   const progressId=(await pool.query("INSERT INTO journey_progress(person_journey_id,journey_day_id,day_number,response_text,mentor_note) VALUES($1,$2,1,'SHARE_ONLY_BY_CHOICE','MENTOR_SECRET') RETURNING id",[journeyId,day])).rows[0].id;
-  const groupId=(await pool.query("INSERT INTO small_groups(name,church,leader_user_id,pastor_user_id) VALUES('Mentoring fixture','Fixture',$1,$2) RETURNING id",[mentorId,nextId])).rows[0].id;
+  const groupId=(await pool.query("INSERT INTO small_groups(name,church,leader_user_id,pastor_user_id) VALUES('Mentoring fixture','IM 行動教會',$1,$2) RETURNING id",[mentorId,nextId])).rows[0].id;
   await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2)',[groupId,learnerId]);
   const id=randomUUID(),input={journeyId,groupId,mentorId,cadenceDays:14,agreement:'Synthetic mutual agreement',consent:true};
   assert.equal((await learner(`/api/mentoring/contracts/${id}`,'PUT',{...input,consent:false})).status,400);

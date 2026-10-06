@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { StudyResponse, StudyResponseFormData, emptyFormData, parseCategories, parseNotes, serializeCategories, serializeNotes } from '@/types/spiritual-fitness';

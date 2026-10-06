@@ -46,7 +46,6 @@ function crmFunction(name: string, bindings: Record<string, unknown>) {
   return compile(node.getText(crmSource).replace(/^export /, ''), bindings);
 }
 const churchMatches = crmFunction('churchMatches', { getChurchAliases, normalizeChurch });
-const filterUsersForCrmAccess = crmFunction('filterUsersForCrmAccess', { churchMatches });
 const actorId = '00000000-0000-4000-8000-000000000001';
 const ownId = '00000000-0000-4000-8000-000000000002';
 const foreignId = '00000000-0000-4000-8000-000000000003';
@@ -59,11 +58,15 @@ const plain = (value: unknown) => JSON.parse(JSON.stringify(value));
 
 export async function runSecurityAccessRegressions() {
   let role = 'leader';
+  let selected = 'IM 行動教會';
+  const churchContext = () => ({actorId,actorChurch:normalizeChurch(actor.church),selectedChurch:selected,isSystemAdmin:role==='admin'});
+  const selectedChurch=()=>selected;
+  const filterUsersForCrmAccess = crmFunction('filterUsersForCrmAccess', { churchMatches, churchContext, normalizeChurch });
   const actor = { id: actorId, church: 'IM', email: 'actor@example.test' };
   const target = { id: otherId, church: 'IM', email: 'other@example.test', displayName: 'Other', password: 'TEST_HASH', birthday: '2000-01-01', userGender: 'other', address: 'PRIVATE' };
   const sessions = new Map([
-    [ownId, { ownerId: actorId, churchUnit: 'IM 行動教會' }],
-    [foreignId, { ownerId: actorId, churchUnit: '火樂' }],
+    [ownId, { ownerId: actorId, church: 'IM 行動教會', churchUnit: 'IM 行動教會' }],
+    [foreignId, { ownerId: actorId, church: '火樂', churchUnit: '火樂' }],
   ]);
   const deletes: string[] = [];
   const writes: any[] = [];
@@ -81,7 +84,7 @@ export async function runSecurityAccessRegressions() {
     getUsers: async () => [target],
     upsertPotentialMember: async (data: any) => { writes.push(data); return undefined; },
   };
-  const canManageSession = helper('canManageSession', { storage, getRequestRole: async () => role,
+  const canManageSession = helper('canManageSession', { churchContext, storage, getRequestRole: async () => role,
     resolveUserId: async () => actorId, sessionManagerRoles: ['admin', 'leader'],
     pool: { query: async () => ({ rows: [{ session_id: foreignId }] }) },
   });
@@ -96,11 +99,12 @@ export async function runSecurityAccessRegressions() {
   actor.church = '火樂';
   assert.equal(await canManageSession(req(ownId)), false, 'cross-church management denied');
   actor.church = church;
-  role = 'admin';
+  role = 'admin'; selected='火樂';
   assert.equal(await canManageSession(req(foreignId)), true);
+  selected='IM 行動教會';
   role = 'leader';
   assert.equal(route('delete', '/api/sessions/:id').arguments[1].getText(routes), 'requireSessionManager');
-  const common = { storage, canManageSession, sessionCache: { invalidate() {} } };
+  const common = { storage, canManageSession, churchContext, selectedChurch, resolveUserId:async()=>actorId, approveChurchAffiliation:async (_actor:string,_target:string,updates:any)=>{const {expectedChurch,...data}=updates;writes.push(data);return data;}, GroupError:Error, sessionCache: { invalidate() {} } };
   let res = response();
   await handler('delete', '/api/study-responses/:id', common)({ ...req(responseId), path: `/api/study-responses/${responseId}` }, res);
   assert.equal(res.statusCode, 403); assert.equal(deletes.length, 0);
@@ -111,7 +115,7 @@ export async function runSecurityAccessRegressions() {
 
   const baseAccess = { role: 'leader', canEnterCrm: true, canViewPersonal: false, canManageMembers: false, churchScopes: [], userIds: [otherId], memberEmails: [] };
   let access = { ...baseAccess };
-  const guard = helper('requireSelfOrRole', { storage, resolveUserId: async () => actorId,
+  const guard = helper('requireSelfOrRole', { hasPermission:async()=>false, storage, resolveUserId: async () => actorId,
     getCrmAccessForRequest: async (_req: unknown, capability: string) => { assert.ok(['personal', 'members'].includes(capability)); return access; }, filterUsersForCrmAccess,
   })('id', 'leader', 'admin');
   let allowed = 0;
@@ -138,10 +142,10 @@ export async function runSecurityAccessRegressions() {
   self.body = { displayName: ' Changed ' };
   res = response(); await handler('patch', '/api/users/:id/profile', common)(self, res);
   assert.deepEqual(plain(writes.pop()), { displayName: 'Changed' }, 'omitted fields stay omitted');
-  self.body = { church: '火樂' }; self.userRole = 'admin';
+  self.body = { church: '火樂', expectedChurch:'IM 行動教會' }; self.userRole = 'admin';
   await handler('patch', '/api/users/:id/profile', common)(self, response());
   assert.deepEqual(plain(writes.pop()), { church: '火樂' });
-  const list = handler('get', '/api/users', { ...common, getCrmChurchFilter: async () => null,
+  const list = handler('get', '/api/users', { ...common, getCrmChurchFilter: async () => selected,
     memberRoleNames: async () => new Map(),
     getCrmAccessForRequest: async () => ({ ...baseAccess, personalAccess: access }), filterUsersForCrmAccess,
     sanitizeUserRecord: helperSanitizer(),
@@ -156,10 +160,10 @@ export async function runSecurityAccessRegressions() {
   role = 'leader';
   const create = handler('post', '/api/sessions', common);
   const creator = { legacyUserId: actorId, userRole: role, body: { verseReference: 'Test', churchUnit: '火樂' } };
-  res = response(); await create(creator, res); assert.equal(res.statusCode, 403);
+  res = response(); await create(creator, res); assert.equal(res.statusCode, 201,'churchUnit is an internal unit, not tenant selector'); assert.equal(writes.pop().church,selected);
   creator.body = { verseReference: 'Test', churchUnit: 'IM' };
   await create(creator, response());
-  assert.equal(writes.at(-1).ownerId, actorId); assert.equal(writes.pop().churchUnit, 'IM 行動教會');
+  assert.equal(writes.at(-1).ownerId, actorId); assert.equal(writes.pop().churchUnit, 'IM');
   res = response(); await create({ ...creator, body: { verseReference: 'Test', ownerId: otherId } }, res); assert.equal(res.statusCode, 403);
   const patch = handler('patch', '/api/sessions/:id', common);
   for (const body of [{ ownerId: otherId }, { churchUnit: '火樂' }]) {
@@ -178,7 +182,7 @@ export async function runSecurityAccessRegressions() {
   let queued = Promise.resolve();
   const sql = (strings: TemplateStringsArray, ...values: unknown[]) => ({ text: strings.join('?'), values });
   const table = { id: 'id', email: 'email' };
-  const upsert = method('upsertPotentialMember', { potentialMembers: table, sql, db: {
+  const upsert = method('upsertPotentialMember', { normalizeChurch, potentialMembers: table, sql, db: {
     transaction: async (run: any) => {
       let release!: () => void;
       const previous = queued; queued = new Promise<void>(resolve => { release = resolve; });
@@ -201,11 +205,11 @@ export async function runSecurityAccessRegressions() {
   assert.deepEqual(statements, ['lock', 'select', 'lock', 'select', 'insert', 'lock', 'select']);
 
   let committed: string[] = []; let fail = true;
-  const deleteSession = method('deleteSession', { eq: (...args: any[]) => args, inArray: (...args: any[]) => args,
+  const deleteSession = method('deleteSession', {lockDrizzleChurchContext:async()=>{},selectedChurch:()=>selected,sql:(strings:TemplateStringsArray,...values:unknown[])=>({text:strings.join('?'),values}),and:(...args:any[])=>args,eq: (...args: any[]) => args, inArray: (...args: any[]) => args,
     ...Object.fromEntries(['sessions', 'participants', 'studyResponses', 'submissions', 'aiReports', 'icebreakerGames', 'icebreakerPlayers'].map(name => [name, { name }])),
     db: { transaction: async (run: any) => {
       const pending: string[] = [];
-      await run({ select: () => ({ from: () => ({ where: async () => [{ id: 'game' }] }) }),
+      await run({ execute:async()=>({rowCount:1}),select: () => ({ from: () => ({ where: async () => [{ id: 'game' }] }) }),
         delete: (table: any) => ({ where: async () => { pending.push(table.name); if (fail && table.name === 'sessions') throw new Error('FK failure'); } }),
       }); committed = pending;
     } },

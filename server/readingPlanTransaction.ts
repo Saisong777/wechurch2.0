@@ -1,4 +1,6 @@
-import { eq } from 'drizzle-orm';
+import { churchContext } from './churchContext';
+import { normalizeChurch } from '../shared/churches';
+import { eq, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { db } from './db';
 import { readingPlanTemplates, readingPlanTemplateItems, userReadingPlans, userReadingProgress } from '@shared/schema';
@@ -10,12 +12,16 @@ export class ReadingPlanError extends Error {
 
 export async function createReadingPlan(database: typeof db, userId: string, input: z.infer<typeof readingPlanBodySchema>) {
   return database.transaction(async tx => {
+    const context=churchContext();
+    if(!context||context.actorId!==userId)throw new ReadingPlanError('Reading plan owner context required',403);
+    const actual=(await tx.execute(sql`SELECT u.church,EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='admin') AS admin FROM users u WHERE u.id=${userId} FOR SHARE OF u`)).rows[0] as {church:string|null;admin:boolean}|undefined;
+    if(!actual||normalizeChurch(actual.church)!==context.actorChurch||actual.admin!==context.isSystemAdmin)throw new ReadingPlanError('Church context changed; please reload',409);
     let templateId = input.templateId;
     let totalDays: number;
     let items: { dayNumber: number; scriptureReference: string; bookName?: string; chapterStart?: number; chapterEnd?: number }[];
     if (templateId) {
       const [template] = await tx.select().from(readingPlanTemplates).where(eq(readingPlanTemplates.id, templateId)).for('share');
-      if (!template || (!template.isPublic && template.createdBy !== userId)) throw new ReadingPlanError('Reading plan template not found', 404);
+      if (!template || (template.isPublic ? !context.selectedChurch || template.church!==context.selectedChurch : template.createdBy!==userId)) throw new ReadingPlanError('Reading plan template not found', 404);
       totalDays = template.durationDays;
       const original = await tx.select().from(readingPlanTemplateItems).where(eq(readingPlanTemplateItems.templateId, templateId));
       items = original.map(item => ({ dayNumber: item.dayNumber, scriptureReference: readingItemReference(item) }));
@@ -29,7 +35,7 @@ export async function createReadingPlan(database: typeof db, userId: string, inp
       ));
       totalDays = Math.ceil(chapters.length / input.chaptersPerDay);
       const [template] = await tx.insert(readingPlanTemplates).values({ name: `${input.name} - Personal`, description: input.description || null,
-        category: 'personal', durationDays: totalDays, isPublic: false, createdBy: userId }).returning();
+        category: 'personal', durationDays: totalDays, isPublic: false, createdBy: userId,church:context.actorChurch }).returning();
       templateId = template.id;
       items = Array.from({ length: totalDays }, (_, day) => {
         const slice = chapters.slice(day * input.chaptersPerDay!, (day + 1) * input.chaptersPerDay!);

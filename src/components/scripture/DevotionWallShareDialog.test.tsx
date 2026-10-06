@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+const churchState=vi.hoisted(()=>({selected:'IM 行動教會'}));
+vi.mock('@/contexts/ChurchContext',()=>({useChurchScopeKey:()=>churchState.selected,useChurchContext:()=>({loading:false,error:'',data:{selectedChurch:churchState.selected}})}));
 import {afterEach,beforeEach,it,expect,vi} from 'vitest';
 import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
@@ -15,7 +17,7 @@ let groupWrites:Array<{path:string;body:Record<string,unknown>}>=[];
 const firstGroup='00000000-0000-4000-8000-000000000002';
 const secondGroup='00000000-0000-4000-8000-000000000003';
 beforeEach(()=>{vi.stubGlobal('ResizeObserver',class { observe=vi.fn();unobserve=vi.fn();disconnect=vi.fn(); });});
-beforeEach(()=>{auth.user={id:'actor'};payload=undefined;fail=false;groupFail=false;groupLoadFail=false;groupWrites=[];groupList=[{id:firstGroup,name:'同行小家'},{id:secondGroup,name:'盼望小家'}];vi.stubGlobal('fetch',vi.fn(async(_path:string,options?:RequestInit)=>{
+beforeEach(()=>{churchState.selected='IM 行動教會';auth.user={id:'actor'};payload=undefined;fail=false;groupFail=false;groupLoadFail=false;groupWrites=[];groupList=[{id:firstGroup,name:'同行小家'},{id:secondGroup,name:'盼望小家'}];vi.stubGlobal('fetch',vi.fn(async(_path:string,options?:RequestInit)=>{
   if(options?.method==='PUT'){
     const input=JSON.parse(options.body as string);
     if(input.group)groupWrites.push({path:_path,body:input});
@@ -117,7 +119,7 @@ it('resets consent when changing group or audience and publishes only to the sel
   fireEvent.change(screen.getByRole('combobox',{name:'選擇所屬小家'}),{target:{value:secondGroup}});
   expect(groupConsent()).not.toBeChecked();fireEvent.click(groupConsent());
   fireEvent.click(screen.getByRole('checkbox',{name:'所屬小家'}));
-  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'教會・靈修牆'}));
   expect(consent()).not.toBeChecked();
   await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
   fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));
@@ -128,9 +130,9 @@ it('resets consent when changing group or audience and publishes only to the sel
 
 it('does not claim anonymity for a group share after switching from the wall',async()=>{
   const close=show({},true);await chooseGroup();
-  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'教會・靈修牆'}));
   fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));
-  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'教會・靈修牆'}));
   expect(screen.queryByRole('checkbox',{name:'匿名分享'})).toBeNull();
   fireEvent.click(groupConsent());fireEvent.click(screen.getByRole('button',{name:'確認分享至小家'}));
   await waitFor(()=>expect(close).toHaveBeenCalledOnce());
@@ -169,7 +171,7 @@ it('applies the selected destination length limit without truncating the preview
   fireEvent.click(groupConsent());expect(screen.getByRole('button',{name:'確認分享至小家'})).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('超過字數上限');
   fireEvent.click(screen.getByRole('checkbox',{name:'所屬小家'}));
-  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'教會・靈修牆'}));
   await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
   expect(screen.getByRole('textbox',{name:'領受內容'})).toHaveValue(content);
   fireEvent.click(consent());expect(screen.getByRole('button',{name:'確認公開分享'})).toBeEnabled();
@@ -183,7 +185,7 @@ it('requires at least one audience and never silently publishes publicly',async(
 });
 it('publishes both audiences once and retries the exact operation after a failed response',async()=>{
   const close=show({sections},true);await chooseGroup();
-  fireEvent.click(groupConsent());fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+  fireEvent.click(groupConsent());fireEvent.click(screen.getByRole('checkbox',{name:'教會・靈修牆'}));
   const bothConsent=()=>screen.getByRole('checkbox',{name:/我同意將以上內容同時分享/});
   expect(bothConsent()).not.toBeChecked();await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
   expect(screen.getByText(/小家以你的姓名分享/)).toBeInTheDocument();
@@ -196,7 +198,7 @@ it('publishes both audiences once and retries the exact operation after a failed
 });
 
 it('locks the whole form while a dual destination request is pending',async()=>{
- const close=show({},true);await chooseGroup();fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+ const close=show({},true);await chooseGroup();fireEvent.click(screen.getByRole('checkbox',{name:'教會・靈修牆'}));
  await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
  let resolve!:()=>void;const pending=new Promise<void>(r=>{resolve=r;});
  const original=vi.mocked(fetch).getMockImplementation()!;
@@ -226,4 +228,11 @@ it('clears consent when the server day changes and reuses no old-date request',a
  vi.mocked(fetch).mockImplementation(async(path,options)=>String(path).includes('/window')?{ok:true,json:async()=>next} as Response:original(path,options));
  await clients[0].refetchQueries({queryKey:['devotion-wall']});
  await waitFor(()=>expect(consent()).not.toBeChecked());expect(screen.getByText(new RegExp(next.day))).toBeInTheDocument();expect(payload).toBeUndefined();
+});
+
+it('holds an uncertain share UUID to the original church and blocks a different church until switched back',async()=>{
+ fail=true;const client=new QueryClient({defaultOptions:{queries:{retry:false}}});clients.push(client);const draft={sourceId:'00000000-0000-4000-8000-000000000001',title:'心得',body:'教會原文',reference:'詩篇 23'};const close=vi.fn();
+ const tree=()=> <QueryClientProvider client={client}><MemoryRouter><DevotionWallShareDialog draft={draft} close={close}/></MemoryRouter></QueryClientProvider>;const view=render(tree());await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());fireEvent.click(consent());fireEvent.click(screen.getByRole('button',{name:'確認公開分享'}));await screen.findByRole('alert');const before=vi.mocked(fetch).mock.calls.filter(([,o])=>o?.method==='PUT');expect(before).toHaveLength(1);
+ churchState.selected='火樂';view.rerender(tree());expect(screen.getByRole('button',{name:'確認公開分享'})).toBeDisabled();expect(screen.getByText(/此預覽與重試編號保留/)).toBeVisible();expect(screen.getByRole('textbox',{name:'公開心得'})).toHaveValue('教會原文');
+ churchState.selected='IM 行動教會';fail=false;view.rerender(tree());await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());if(!(consent() as HTMLInputElement).checked)fireEvent.click(consent());await waitFor(()=>expect(screen.getByRole('button',{name:'確認公開分享'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'確認公開分享'}));await waitFor(()=>expect(close).toHaveBeenCalled());const after=vi.mocked(fetch).mock.calls.filter(([,o])=>o?.method==='PUT');expect(after).toHaveLength(2);expect(after[1][0]).toBe(after[0][0]);expect(after[1][1]?.body).toBe(after[0][1]?.body);
 });

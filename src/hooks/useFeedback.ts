@@ -1,3 +1,4 @@
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import type { FeedbackRecord } from '@shared/feedback';
@@ -10,7 +11,8 @@ export const categoryLabels = { bug: '操作問題', suggestion: '改善建議',
 export const statusLabels = { new: '已收到', reviewing: '處理中', planned: '已排入計畫', done: '已完成' };
 export const priorityLabels = { P0: 'P0・立即處理', P1: 'P1・優先處理', P2: 'P2・正常安排', P3: 'P3・後續評估' };
 export function useFeedbackItems(admin: boolean, userId?: string, filters = '') {
+  const scope = useChurchScopeKey();
   const url = admin ? `/api/admin/feedback${filters}` : `/api/feedback/me${filters}`;
-  return useQuery<{ items: FeedbackItem[]; hasMore?: boolean }>({ queryKey: [url, userId], enabled: !!userId,
+  return useQuery<{ items: FeedbackItem[]; hasMore?: boolean }>({ queryKey: [url, userId, scope], enabled: !!userId,
     queryFn: async () => (await apiRequest('GET', url)).json(), staleTime: 0 });
 }

@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -51,7 +52,7 @@ function GrantEditor({data,member,initial,close,done}:{data:Snapshot;member:Memb
  const [expiry,setExpiry]=useState(initial?.expiresAt?new Date(initial.expiresAt).toLocaleDateString('sv-SE'): '');
  const [reason,setReason]=useState(initial?.reason || '');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
  const [requestId]=useState(()=>crypto.randomUUID());
- const allowed=permissionKeys.filter(p=>scope==='site'?globalPermissions.includes(p):!globalPermissions.includes(p) && (p!=='visits.manage' || scope==='church') && (p!=='groups.manage'||scope!=='member'));
+ const allowed=permissionKeys.filter(p=>scope!=='site' && (!globalPermissions.includes(p) || scope==='church') && (p!=='visits.manage' || scope==='church') && (p!=='groups.manage'||scope!=='member'));
  return <form className="space-y-4 border-y py-5" aria-label="編輯成員授權" onSubmit={async e=>{e.preventDefault();if(busy)return;
    if(!window.confirm(`確認${initial?'更新':'授予'}「${member.name}」的${data.roles.find(r=>r.id===roleId)?.name}職分與 ${permissions.length} 項權限？`))return;
    setBusy(true);setError('');try{await api(initial?'/grants/'+initial.id:'/grants',initial?'PUT':'POST',{
@@ -61,8 +62,8 @@ function GrantEditor({data,member,initial,close,done}:{data:Snapshot;member:Memb
   <h3 className="font-semibold">{initial?'調整授權':'新增職分與授權'} · {member.name}</h3>
   <fieldset disabled={busy} className="min-w-0 space-y-4">
    <div className="grid gap-4 sm:grid-cols-2"><label className="space-y-2 text-sm">職分<select aria-label="職分" className={selectClass} required disabled={!!initial} value={roleId} onChange={e=>{setRole(e.target.value);setPermissions([]);}}>{data.roles.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
-   <label className="space-y-2 text-sm">管理範圍<select aria-label="管理範圍" className={selectClass} value={scope} onChange={e=>{setScope(e.target.value as AccessGrant['scope']);setTarget('');setPermissions([]);}}>{Object.entries(scopeLabels).filter(([k])=>k!=='site'||data.isSystemAdmin).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
-   {scope==='site' && <p className="text-sm text-amber-700 dark:text-amber-300">影響全站公共內容，不限單一教會。</p>}
+   <label className="space-y-2 text-sm">管理範圍<select aria-label="管理範圍" className={selectClass} value={scope} onChange={e=>{setScope(e.target.value as AccessGrant['scope']);setTarget('');setPermissions([]);}}>{Object.entries(scopeLabels).filter(([k])=>k!=='site').map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
+   {scope==='site' && <p className="text-sm text-amber-700 dark:text-amber-300">這是歷史授權，請改為所屬教會範圍後再儲存。</p>}
    {(scope==='group'||scope==='member') && <label className="block space-y-2 text-sm">指定對象<select aria-label="指定對象" required className={selectClass} value={target} onChange={e=>setTarget(e.target.value)}><option value="">請選擇</option>{(scope==='group'?data.groups:data.users).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}
    <Button type="button" variant="outline" size="sm" disabled={!roleId} onClick={()=>setPermissions(data.roles.find(r=>r.id===roleId)?.permissions.filter(p=>allowed.includes(p)) || [])}>套用職分預設權限</Button>
    <PermissionChecks value={permissions} onChange={setPermissions} allowed={allowed}/>

@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 

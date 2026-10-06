@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

@@ -77,6 +77,7 @@
     { "idx": 24, "version": "7", "when": 1790758800001, "tag": "0024_interaction_notifications", "breakpoints": true },
     { "idx": 25, "version": "7", "when": 1791072000000, "tag": "0025_member_feedback", "breakpoints": true },
     { "idx": 26, "version": "7", "when": 1791158400000, "tag": "0026_co_leaders", "breakpoints": true },
-    { "idx": 27, "version": "7", "when": 1791244800000, "tag": "0027_devotion_share_requests", "breakpoints": true }
+    { "idx": 27, "version": "7", "when": 1791244800000, "tag": "0027_devotion_share_requests", "breakpoints": true },
+    { "idx": 28, "version": "7", "when": 1791244800001, "tag": "0028_multichurch", "breakpoints": true }
   ]
 }

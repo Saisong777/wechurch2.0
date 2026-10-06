@@ -1,3 +1,4 @@
+import { selectedChurch, churchPredicate, churchContext, lockChurchContext } from './churchContext';
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import { z } from 'zod';
 import { pool } from './db';
@@ -37,7 +38,7 @@ export function devotionWallRoutes(resolveUserId:(req:Request)=>Promise<string|n
       p.created_at AS "createdAt",p.expires_at AS "expiresAt",
       to_char(p.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
       FROM devotion_wall_posts p JOIN users u ON u.id=p.user_id
-      WHERE p.published_day=$2::date AND p.expires_at>clock_timestamp() AND p.withdrawn_at IS NULL
+      WHERE ${churchPredicate('p')} AND p.published_day=$2::date AND p.expires_at>clock_timestamp() AND p.withdrawn_at IS NULL
       ${mine}${seek} ORDER BY p.created_at DESC,p.id ASC LIMIT $${values.length}`,values)).rows;
     const page=posts.slice(0,limit);const last=page.at(-1);
     // Keep PostgreSQL microseconds in the cursor; JS Dates truncate them.
@@ -52,26 +53,30 @@ export function devotionWallRoutes(resolveUserId:(req:Request)=>Promise<string|n
     const input=devotionWallShareInput.parse(req.body); const actor=res.locals.actor;
     const c=await pool.connect();
     try{
-      await c.query('BEGIN');
+      await c.query('BEGIN'); await lockChurchContext(c);
       if(!(await c.query('SELECT id FROM devotional_notes WHERE id=$1 AND user_id=$2 AND hidden=false FOR UPDATE',[input.sourceId,actor])).rowCount)throw new GroupError(404,'找不到本人已儲存的筆記，尚未分享。');
       const window=devotionDayWindow((await c.query('SELECT clock_timestamp() AS now')).rows[0].now);
       if(input.day!==window.day)throw new GroupError(409,'已經換日，請重新確認今天的分享日期。');
-      const existing=(await c.query('SELECT id,title,body,reference,is_anonymous FROM devotion_wall_posts WHERE source_note_id=$1 AND published_day=$2 AND withdrawn_at IS NULL',[input.sourceId,window.day])).rows[0];
+      const existing=(await c.query('SELECT id,title,body,reference,is_anonymous FROM devotion_wall_posts WHERE source_note_id=$1 AND published_day=$2 AND church=$3 AND withdrawn_at IS NULL',[input.sourceId,window.day,selectedChurch()])).rows[0];
       if(existing){
         if(existing.title!==input.title || existing.body!==input.body || existing.reference!==input.reference || existing.is_anonymous!==input.anonymous)throw new GroupError(409,'這篇筆記今天已分享；請先在靈修牆撤回，再分享修改後的內容。');
         await c.query('COMMIT');return void res.json({id:existing.id,created:false,...window});
       }
-      const post=(await c.query(`INSERT INTO devotion_wall_posts(source_note_id,user_id,published_day,title,body,reference,is_anonymous,expires_at)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[input.sourceId,actor,window.day,input.title,input.body,input.reference,input.anonymous,window.expiresAt])).rows[0];
+      const post=(await c.query(`INSERT INTO devotion_wall_posts(source_note_id,user_id,published_day,title,body,reference,is_anonymous,expires_at,church)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,[input.sourceId,actor,window.day,input.title,input.body,input.reference,input.anonymous,window.expiresAt,selectedChurch()])).rows[0];
       await c.query('COMMIT');res.status(201).json({id:post.id,created:true,...window});
     }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
   });
   router.delete('/:id',async(req,res)=>{
     const id=z.string().uuid().parse(req.params.id);
-    const moderator=await hasPermission(res.locals.actor,'wall.moderate','site') || (await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[res.locals.actor])).rowCount!>0;
-    const result=await pool.query('UPDATE devotion_wall_posts SET withdrawn_at=COALESCE(withdrawn_at,now()) WHERE id=$1 AND (user_id=$2 OR $3) RETURNING id',[id,res.locals.actor,moderator]);
-    if(!result.rowCount)throw new GroupError(404,'找不到本人的分享。');
-    res.json({ok:true});
+    const c=await pool.connect();
+    try{
+      await c.query('BEGIN');await lockChurchContext(c);
+      const moderator=await hasPermission(res.locals.actor,'wall.moderate','church') || (await c.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[res.locals.actor])).rowCount!>0;
+      const result=await c.query('UPDATE devotion_wall_posts SET withdrawn_at=COALESCE(withdrawn_at,now()) WHERE id=$1 AND ((user_id=$2) OR ($3 AND church=$4)) RETURNING id',[id,res.locals.actor,moderator,churchContext()?.selectedChurch??null]);
+      if(!result.rowCount)throw new GroupError(404,'找不到本人的分享。');
+      await c.query('COMMIT');res.json({ok:true});
+    }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
   });
   const errors:ErrorRequestHandler=(e,_req,res,_next)=>{
     if(e instanceof z.ZodError)return void res.status(400).json({error:'請確認分享內容並勾選公開同意。'});

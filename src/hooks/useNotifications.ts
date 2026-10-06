@@ -1,3 +1,5 @@
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import type { NotificationFeed } from '@shared/notifications';
@@ -11,7 +13,8 @@ export async function notificationRequest<T>(path = '',body?: unknown): Promise<
 }
 export function useNotifications(cursor: string | null = null) {
   const { user } = useAuth();
-  return useQuery<NotificationFeed>({queryKey:[notificationsKey,user?.id,cursor],enabled:!!user,
+  const scopeKey = useChurchScopeKey();
+  return useQuery<NotificationFeed>({queryKey:[notificationsKey,user?.id,cursor,scopeKey],enabled:!!user,
     queryFn:() => notificationRequest(cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''),staleTime:10000,retry:false,
     refetchInterval:30000,refetchIntervalInBackground:false});
 }

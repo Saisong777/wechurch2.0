@@ -5,7 +5,8 @@ export const churchCatalog = [{
   id: 'IM 行動教會',
   name: 'iM行動教會',
   aliases: ['IM行動教會', 'iM行動教會', 'iM 行動教會', "i'M church", 'i’M church', 'Im', 'IM'],
-}] as const;
+}, { id: '桃園WeChurch', name: '桃園WeChurch', aliases: ['桃園 WeChurch'] },
+{ id: '火樂', name: '火樂', aliases: ['火樂教會'] }] as const;
 
 const compact = (value: string) => value.trim().toLowerCase().replace(/[\s'’]/g, '');
 

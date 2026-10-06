@@ -1,3 +1,4 @@
+import { selectedChurch, churchPredicate, lockChurchContext } from './churchContext';
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
@@ -11,8 +12,8 @@ import { publicPrayerFeed } from './prayerSharingRepository';
 async function withPrayer<T>(id: string, work: (c: PoolClient) => Promise<T>, allowClosed = false) {
   const c = await pool.connect();
   try {
-    await c.query('BEGIN');
-    const prayer=(await c.query('SELECT id,closed_at,is_answered FROM prayers WHERE id=$1 FOR UPDATE', [id])).rows[0];
+    await c.query('BEGIN'); await lockChurchContext(c);
+    const prayer=(await c.query('SELECT id,closed_at,is_answered FROM prayers WHERE id=$1 AND church=$2 FOR UPDATE', [id,selectedChurch()])).rows[0];
     if (!prayer) throw new GroupError(404, '這則禱告已撤回或不存在。');
     if (!allowClosed && (prayer.closed_at || prayer.is_answered)) throw new GroupError(409,'這則代禱已結束。');
     const result = await work(c); await c.query('COMMIT'); return result;
@@ -20,12 +21,12 @@ async function withPrayer<T>(id: string, work: (c: PoolClient) => Promise<T>, al
   finally { c.release(); }
 }
 
-const commentProjection = `SELECT c.id,c.prayer_id AS "prayerId",c.content,c.kind,c.sticker,c.created_at AT TIME ZONE 'UTC' AS "createdAt",
+const commentProjection = () => `SELECT c.id,c.prayer_id AS "prayerId",c.content,c.kind,c.sticker,c.created_at AT TIME ZONE 'UTC' AS "createdAt",
   c.user_id=$2 AS "isOwner",(p.is_anonymous AND p.user_id=c.user_id) AS "isAnonymous",
   CASE WHEN p.is_anonymous AND p.user_id=c.user_id THEN NULL ELSE c.user_id END AS "userId",
   CASE WHEN p.is_anonymous AND p.user_id=c.user_id THEN '匿名發文者' ELSE COALESCE(NULLIF(u.display_name,''),'教會成員') END AS "authorName",
   CASE WHEN p.is_anonymous AND p.user_id=c.user_id THEN NULL ELSE u.avatar_url END AS "authorAvatar"
-  FROM prayer_comments c JOIN prayers p ON p.id=c.prayer_id JOIN users u ON u.id=c.user_id WHERE c.prayer_id=$1`;
+  FROM prayer_comments c JOIN prayers p ON p.id=c.prayer_id JOIN users u ON u.id=c.user_id WHERE c.prayer_id=$1 AND ${churchPredicate('p')}`;
 
 export function prayerInteractionRoutes(resolveUserId: (req: Request) => Promise<string | null>, getRole: (id: string) => Promise<string | null | undefined>) {
   const router = Router();
@@ -71,8 +72,8 @@ export function prayerInteractionRoutes(resolveUserId: (req: Request) => Promise
   });
   router.get('/:id/comments', async (req,res) => {
     const id = z.string().uuid().parse(req.params.id);
-    if (!(await pool.query('SELECT id FROM prayers WHERE id=$1 AND ((closed_at IS NULL AND NOT is_answered) OR user_id=$2)',[id,res.locals.actor])).rowCount) throw new GroupError(404,'這則禱告已結束、撤回或不存在。');
-    res.json((await pool.query(`${commentProjection} AND ((p.closed_at IS NULL AND NOT p.is_answered) OR p.user_id=$2) ORDER BY c.created_at,c.id`,[id,res.locals.actor])).rows);
+    if (!(await pool.query('SELECT id FROM prayers WHERE id=$1 AND church=$3 AND ((closed_at IS NULL AND NOT is_answered) OR user_id=$2)',[id,res.locals.actor,selectedChurch()])).rowCount) throw new GroupError(404,'這則禱告已結束、撤回或不存在。');
+    res.json((await pool.query(`${commentProjection()} AND ((p.closed_at IS NULL AND NOT p.is_answered) OR p.user_id=$2) ORDER BY c.created_at,c.id`,[id,res.locals.actor])).rows);
   });
   router.post('/:id/comments', async (req,res) => {
     const id = z.string().uuid().parse(req.params.id); const actor = res.locals.actor;
@@ -87,13 +88,13 @@ export function prayerInteractionRoutes(resolveUserId: (req: Request) => Promise
         commentId = previous.id;
       }
       if (inserted.rowCount) await recordCommentInteraction(c,actor,id,commentId);
-      return (await c.query(`${commentProjection} AND c.id=$3`,[id,actor,commentId])).rows[0];
+      return (await c.query(`${commentProjection()} AND c.id=$3`,[id,actor,commentId])).rows[0];
     });
     res.status(201).json(comment);
   });
   router.delete('/:id/comments/:commentId', async (req,res) => {
     const id = z.string().uuid().parse(req.params.id); const commentId = z.string().uuid().parse(req.params.commentId);
-    const actor = res.locals.actor; const admin = await getRole(actor) === 'admin' || await hasPermission(actor,'wall.moderate','site');
+    const actor = res.locals.actor; const admin = await getRole(actor) === 'admin' || await hasPermission(actor,'wall.moderate','church');
     await withPrayer(id, async c => {
       const comment = (await c.query('SELECT user_id FROM prayer_comments WHERE id=$1 AND prayer_id=$2',[commentId,id])).rows[0];
       if (!comment) throw new GroupError(404,'找不到這則回應。');

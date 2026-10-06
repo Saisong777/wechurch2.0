@@ -11,7 +11,7 @@ export async function verifyCareHttp(pool: Pool, makeClient: () => Client) {
   }
   const [owner, pastor, foreign, member] = clients;
   await pool.query("UPDATE users SET church='IM 行動教會' WHERE id=ANY($1::uuid[])", [ids]);
-  await pool.query("UPDATE users SET church='Other fixture church' WHERE id=$1", [ids[2]]);
+  await pool.query("UPDATE users SET church='火樂' WHERE id=$1", [ids[2]]);
   await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'pastor'),($2,'minister') ON CONFLICT DO NOTHING", [ids[1], ids[2]]);
   const guest = makeClient();
   assert.equal((await guest('/api/care/contacts')).status, 401);

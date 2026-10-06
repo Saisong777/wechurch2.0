@@ -1,3 +1,4 @@
+import { selectedChurch, assertSelectedChurch, lockChurchContext } from './churchContext';
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
@@ -12,12 +13,12 @@ const uuid = z.string().uuid();
 const missing = () => new GroupError(404, '找不到探訪申請，或你沒有存取權限。');
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (error) { await c.query('ROLLBACK'); throw error; } finally { c.release(); }
 }
 async function actorInfo(actor: string) {
   const row = (await pool.query(`SELECT church,EXISTS(SELECT 1 FROM user_roles WHERE user_id=$1 AND role::text=ANY($2)) AS staff FROM users WHERE id=$1`, [actor, roles])).rows[0];
-  return { church: normalizeChurch(row?.church), staff: !!row?.staff || await hasPermission(actor,'visits.manage','church') };
+  return { church: selectedChurch(), staff: !!row?.staff || await hasPermission(actor,'visits.manage','church') };
 }
 async function visitStaff(church:string) {
   return (await pool.query(`SELECT u.id,coalesce(u.display_name,'探訪同工') AS name FROM users u WHERE u.church=ANY($1) AND (
@@ -47,7 +48,7 @@ export function careVisitRoutes(resolveUserId: (req: Request) => Promise<string 
   router.get('/summary', async (_req, res) => {
     const { church, staff } = res.locals.info;
     const counts = staff && church ? (await pool.query(`SELECT count(*)::int AS pending,count(*) FILTER(WHERE urgency='urgent')::int AS urgent
-      FROM care_visit_requests WHERE church=$1 AND status='open'`, [church])).rows[0] : { pending: 0, urgent: 0 };
+      FROM care_visit_requests WHERE church=ANY($1::text[]) AND status='open'`, [getChurchAliases(church)])).rows[0] : { pending: 0, urgent: 0 };
     const available = church ? (await visitStaff(church)).length>0 : false;
     res.json({ canManage: staff && !!church, available, ...counts });
   });
@@ -63,9 +64,9 @@ export function careVisitRoutes(resolveUserId: (req: Request) => Promise<string 
     const { church, staff } = res.locals.info;
     if (mode === 'inbox' && (!staff || !church)) throw new GroupError(403, '需要同教會牧者權限。');
     const rows = (await pool.query(`SELECT ${projection} FROM care_visit_requests r JOIN users u ON u.id=r.sender_id LEFT JOIN users a ON a.id=r.assignee_id
-      WHERE ${mode === 'mine' ? 'r.sender_id=$1' : 'r.church=$1'} AND r.status=ANY($2)
+      WHERE ${mode === 'mine' ? 'r.sender_id=$1' : 'r.church=ANY($1::text[])'} AND r.status=ANY($2)
       ORDER BY CASE WHEN r.urgency='urgent' THEN 0 ELSE 1 END,r.created_at,r.id LIMIT 31 OFFSET $3`,
-    [mode === 'mine' ? res.locals.actor : church, filter === 'active' ? ['open', 'assigned'] : ['completed', 'cancelled'], offset])).rows;
+    [mode === 'mine' ? res.locals.actor : getChurchAliases(church), filter === 'active' ? ['open', 'assigned'] : ['completed', 'cancelled'], offset])).rows;
     res.json({ requests: rows.slice(0, 30), hasMore: rows.length > 30 });
   });
   router.put('/:id', async (req, res) => {
@@ -76,6 +77,7 @@ export function careVisitRoutes(resolveUserId: (req: Request) => Promise<string 
       await c.query("SELECT pg_advisory_xact_lock(hashtext('care-visit:' || $1))", [id]);
       const old = (await c.query('SELECT * FROM care_visit_requests WHERE id=$1', [id])).rows[0];
       if (old) {
+        assertSelectedChurch(old.church);
         if (old.sender_id !== actor) throw missing();
         if (old.name !== input.name || old.reason !== input.reason || old.contact_method !== input.contactMethod || old.urgency !== input.urgency || old.contact_id !== input.contactId) throw new GroupError(409, '申請已送出，請重新載入。');
         return { id, created: false };
@@ -89,7 +91,7 @@ export function careVisitRoutes(resolveUserId: (req: Request) => Promise<string 
   });
   async function access(c: PoolClient, id: string, actor: string, info: { church: string | null; staff: boolean }) {
     const r = (await c.query('SELECT *,due_date::text AS due_date FROM care_visit_requests WHERE id=$1 FOR UPDATE', [id])).rows[0];
-    if (!r || (r.sender_id !== actor && !(info.staff && info.church === r.church))) throw missing();
+    if (!r || (r.sender_id !== actor && !(info.staff && info.church === normalizeChurch(r.church)))) throw missing();
     return r;
   }
   router.get('/:id/events', async (req, res) => {
@@ -113,7 +115,7 @@ export function careVisitRoutes(resolveUserId: (req: Request) => Promise<string 
     const id = uuid.parse(req.params.id), input = visitUpdate.parse(req.body), actor = res.locals.actor;
     res.json(await transaction(async c => {
       const old = await access(c, id, actor, res.locals.info);
-      const manager = res.locals.info.staff && res.locals.info.church === old.church;
+      const manager = res.locals.info.staff && res.locals.info.church === normalizeChurch(old.church);
       if (old.version !== input.version) throw new GroupError(409, '其他同工已更新安排。請載入最新狀態，輸入會保留。');
       if (['cancelled', 'completed'].includes(old.status)) throw new GroupError(409, '這筆申請已結束。');
       if (!manager && (input.status !== 'cancelled' || input.assigneeId !== old.assignee_id || input.dueDate !== (old.due_date ? String(old.due_date).slice(0, 10) : null))) throw new GroupError(403, '只有牧者能安排探訪。');

@@ -1,3 +1,5 @@
+import { setChurchScope } from '@/lib/churchFetch';
+import { ChurchProvider } from '@/contexts/ChurchContext';
 import { lazy, Suspense, ComponentType } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -76,6 +78,7 @@ const HelpPage = lazyPage(() => import('./pages/HelpPage'));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 
 
+setChurchScope(null);
 const router = createBrowserRouter([{ path: '*', element: (
             <ErrorBoundary fallbackTitle="頁面載入失敗">
               <AppLayout>
@@ -142,11 +145,11 @@ const router = createBrowserRouter([{ path: '*', element: (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
+      <ChurchProvider><TooltipProvider>
         <Toaster />
         <Sonner />
         <RouterProvider router={router} />
-      </TooltipProvider>
+      </TooltipProvider></ChurchProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

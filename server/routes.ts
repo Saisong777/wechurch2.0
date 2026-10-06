@@ -1,3 +1,5 @@
+import { churchContextMiddleware, churchContext, churchContextResponse, selectedChurch, assertSelectedChurch, lockChurchContext, churchWrite } from './churchContext';
+import { approveChurchAffiliation, pendingChurchAffiliations } from './churchAffiliationRepository';
 import type { Express, RequestHandler } from "express";
 import express from "express";
 import { mergePersons, PersonMergeError } from './personMerge';
@@ -480,6 +482,7 @@ export async function registerRoutes(app: Express) {
       (req as any).legacyUserId = userId;
       (req as any).userRole = role;
       if (req.params[paramName] === userId) return next();
+      if(role==='admin'&&req.method==='PATCH'&&/^\/api\/users\/[^/]+\/profile$/.test(req.path)&&Object.hasOwn(req.body||{},'church')&&Object.keys(req.body).every(key=>['church','expectedChurch'].includes(key)))return next();
       if ((role && roles.includes(role as AppRole)) || (req.method === 'PATCH' && await hasPermission(userId, 'members.manage'))) {
         const capability = req.method === 'GET' ? 'personal' : 'members';
         const access = await getCrmAccessForRequest(req, capability);
@@ -558,30 +561,7 @@ export async function registerRoutes(app: Express) {
 
   const sessionManagerRoles: AppRole[] = crmLeaderRoles;
 
-  const getChurchScope = async (req: any): Promise<string | null> => {
-    const userId = req.legacyUserId || await resolveUserId(req);
-    if (!userId) return null;
-
-    const [role, currentUser] = await Promise.all([
-      storage.getUserRole(userId),
-      storage.getUser(userId),
-    ]);
-    const requestedChurch = normalizeChurch(typeof req.query?.church === "string" ? req.query.church : null);
-
-    if (role === "admin") {
-      if (requestedChurch && requestedChurch !== "all") return requestedChurch;
-      if (requestedChurch === "all") return null;
-      return normalizeChurch(currentUser?.church);
-    }
-
-    if (role === "senior_pastor") {
-      const ownChurch = normalizeChurch(currentUser?.church);
-      if (requestedChurch && requestedChurch !== "all" && requestedChurch === ownChurch) return requestedChurch;
-      return ownChurch || UNASSIGNED_CHURCH_ID;
-    }
-
-    return normalizeChurch(currentUser?.church) || UNASSIGNED_CHURCH_ID;
-  };
+  const getChurchScope = async (_req: any): Promise<string> => selectedChurch();
 
   const getRequestRole = async (req: any): Promise<AppRole | null> => {
     const userId = await resolveUserId(req);
@@ -606,14 +586,12 @@ export async function registerRoutes(app: Express) {
     const userId = await resolveUserId(req);
     if (!session || !userId) return false;
     const user = await storage.getUser(userId);
-    if (role !== 'admin' && normalizeChurch(user?.church) !== normalizeChurch(session.churchUnit)) return false;
+    if(normalizeChurch(session.church)!==churchContext()?.selectedChurch)return false;
+    if (role !== 'admin' && normalizeChurch(user?.church) !== normalizeChurch(session.church)) return false;
     return mayManageStudySession(role, user, session);
   };
 
-  const getCrmChurchFilter = async (req: any): Promise<string | null> => {
-    const selected = normalizeChurch(typeof req.query?.church === 'string' ? req.query.church : null);
-    return selected && selected !== 'all' ? selected : null;
-  };
+  const getCrmChurchFilter = async (_req: any): Promise<string> => selectedChurch();
   const getCrmAccessForRequest = async (req: any, capability?: import('./crmPermissions').CrmCapability) => {
     const userId = req.legacyUserId || await resolveUserId(req);
     if (!userId) return null;
@@ -707,6 +685,10 @@ export async function registerRoutes(app: Express) {
     console.error("[Routes] Auth setup failed:", error);
     throw error;
   }
+
+  app.use('/api', churchContextMiddleware(resolveUserId));
+  app.get('/api/church-context', (_req,res)=>{ const context=churchContext(); if(!context)return void res.status(401).json({error:'請先登入。'});res.json(churchContextResponse(context)); });
+  app.get('/api/admin/church-affiliations/pending', requireRole('admin'), async(_req,res)=>res.json({users:await pendingChurchAffiliations()}));
 
   const studyAccess = soulGymAccess({ pool, resolveUserId, canManageSession });
   app.use('/api', (req, res, next) => {
@@ -859,28 +841,11 @@ export async function registerRoutes(app: Express) {
       const director = directorUserId ? await storage.getUser(directorUserId) : undefined;
       const directorChurch = normalizeChurch(director?.church);
       if (directorRole === 'senior_pastor' && !directorChurch) return res.json([]);
-      const result = directorRole === "senior_pastor" && directorChurch
-        ? await pool.query(
-            `SELECT a.*, u.display_name AS assignee_name, u.email AS assignee_email
-               FROM crm_scope_assignments a
-               JOIN users u ON u.id = a.assignee_user_id
-              WHERE a.is_active = true
-                AND (
-                  a.church = $1
-                  OR a.group_id IN (SELECT id FROM small_groups WHERE church = $1)
-                  OR a.member_user_id IN (SELECT id FROM users WHERE church = $1)
-                  OR a.potential_member_id IN (SELECT id FROM potential_members WHERE church = $1)
-                )
-              ORDER BY a.created_at DESC`,
-            [directorChurch]
-          )
-        : await pool.query(
-            `SELECT a.*, u.display_name AS assignee_name, u.email AS assignee_email
-               FROM crm_scope_assignments a
-               JOIN users u ON u.id = a.assignee_user_id
-              WHERE a.is_active = true
-              ORDER BY a.created_at DESC`
-          );
+      const result=await pool.query(`SELECT a.*,u.display_name AS assignee_name,u.email AS assignee_email
+        FROM crm_scope_assignments a JOIN users u ON u.id=a.assignee_user_id
+        WHERE a.is_active AND u.church=$1 AND (a.church=$1 OR a.group_id IN(SELECT id FROM small_groups WHERE church=$1)
+          OR a.member_user_id IN(SELECT id FROM users WHERE church=$1) OR a.potential_member_id IN(SELECT id FROM potential_members WHERE church=$1))
+        ORDER BY a.created_at DESC`,[selectedChurch()]);
       res.json(result.rows);
     } catch (error) {
       console.error("Error fetching CRM assignments:", error);
@@ -900,6 +865,14 @@ export async function registerRoutes(app: Express) {
       const director = await storage.getUser(directorUserId);
       const directorChurch = normalizeChurch(director?.church);
       const normalizedChurch = normalizeChurch(input.church);
+      const scope=selectedChurch();
+      const assignee=await storage.getUser(input.assigneeUserId);
+      if(normalizeChurch(assignee?.church)!==scope)return res.status(403).json({error:'被授權者必須屬於所選教會。'});
+      if(input.scopeType==='church')assertSelectedChurch(normalizedChurch);
+      if(input.scopeType==='group'&&!(await pool.query('SELECT 1 FROM small_groups WHERE id=$1 AND church=$2',[input.groupId,scope])).rowCount)return res.status(403).json({error:'小家不在所選教會。'});
+      if(input.scopeType==='member'&&input.memberUserId&&normalizeChurch((await storage.getUser(input.memberUserId))?.church)!==scope)return res.status(403).json({error:'成員不在所選教會。'});
+      if(input.scopeType==='member'&&input.potentialMemberId&&!(await pool.query('SELECT 1 FROM potential_members WHERE id=$1 AND church=$2',[input.potentialMemberId,scope])).rowCount)return res.status(403).json({error:'成員不在所選教會。'});
+
 
       if (directorRole === "senior_pastor") {
         if (!directorChurch) return res.status(403).json({ error: '請先指定教會管理範圍' });
@@ -926,7 +899,14 @@ export async function registerRoutes(app: Express) {
         }
       }
 
-      const result = await pool.query(
+      const result = await churchWrite(async client=>{
+        // Lock target identities before assignment rows, matching affiliation move user->resource order.
+        const targets=[...new Set([input.assigneeUserId,input.memberUserId].filter(Boolean))].sort();
+        const current=await client.query('SELECT id,church FROM users WHERE id=ANY($1::uuid[]) ORDER BY id FOR SHARE',[targets]);
+        if(current.rows.length!==targets.length||current.rows.some(row=>normalizeChurch(row.church)!==selectedChurch()))throw new GroupError(403,'目標帳號教會已變更。');
+        if(input.groupId&&!(await client.query('SELECT id FROM small_groups WHERE id=$1 AND church=$2 FOR SHARE',[input.groupId,selectedChurch()])).rowCount)throw new GroupError(403,'小家已變更。');
+        if(input.potentialMemberId&&!(await client.query('SELECT id FROM potential_members WHERE id=$1 AND church=$2 FOR SHARE',[input.potentialMemberId,selectedChurch()])).rowCount)throw new GroupError(403,'目標線索已變更。');
+        return client.query(
         `INSERT INTO crm_scope_assignments (
           assignee_user_id, assigned_by_user_id, scope_type, church, group_id,
           member_user_id, potential_member_id, can_view_personal, can_manage_care,
@@ -948,10 +928,11 @@ export async function registerRoutes(app: Express) {
           input.note || null,
         ]
       );
+      });
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error("Error creating CRM assignment:", error);
-      res.status(400).json({ error: "Failed to create CRM assignment" });
+      res.status(error instanceof GroupError?error.status:400).json({ error: "Failed to create CRM assignment" });
     }
   });
 
@@ -962,27 +943,29 @@ export async function registerRoutes(app: Express) {
       if (!canAssignCrmScopes(directorRole)) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      if (directorRole === 'senior_pastor') {
-        const church = normalizeChurch((await storage.getUser(directorUserId!))?.church);
+      {
+        const church = selectedChurch();
         if (!church || !(await pool.query(`SELECT a.id FROM crm_scope_assignments a WHERE a.id=$1 AND (
           a.church=ANY($2::text[]) OR a.group_id IN(SELECT id FROM small_groups WHERE church=ANY($2::text[]))
           OR a.member_user_id IN(SELECT id FROM users WHERE church=ANY($2::text[]))
           OR a.potential_member_id IN(SELECT id FROM potential_members WHERE church=ANY($2::text[])))`, [req.params.id, getChurchAliases(church)])).rowCount) return res.status(403).json({ error: 'Forbidden' });
       }
-      await pool.query(
-        `WITH previous AS (SELECT * FROM crm_scope_assignments WHERE id=$1 AND is_active FOR UPDATE),
+      await churchWrite(client=>client.query(
+        `WITH previous AS (SELECT * FROM crm_scope_assignments a WHERE id=$1 AND is_active AND (
+          a.church=ANY($3::text[]) OR a.group_id IN(SELECT id FROM small_groups WHERE church=ANY($3::text[]))
+          OR a.member_user_id IN(SELECT id FROM users WHERE church=ANY($3::text[])) OR a.potential_member_id IN(SELECT id FROM potential_members WHERE church=ANY($3::text[]))) FOR UPDATE),
          revoked AS (UPDATE crm_scope_assignments SET is_active=false,updated_at=now() WHERE id IN(SELECT id FROM previous) RETURNING id)
          INSERT INTO access_audit(church,actor_id,target_id,action,before_value,after_value)
          SELECT coalesce(p.church,(SELECT church FROM small_groups WHERE id=p.group_id),
            (SELECT church FROM users WHERE id=p.member_user_id),(SELECT church FROM potential_members WHERE id=p.potential_member_id),''),
            $2,p.id,'撤回舊有授權',to_jsonb(p),'{"active":false}'::jsonb
          FROM previous p JOIN revoked r ON r.id=p.id`,
-        [req.params.id,directorUserId]
-      );
+        [req.params.id,directorUserId,getChurchAliases(selectedChurch())]
+      ));
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting CRM assignment:", error);
-      res.status(500).json({ error: "Failed to delete CRM assignment" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete CRM assignment" });
     }
   });
 
@@ -993,9 +976,9 @@ export async function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const requestedChurch = normalizeChurch(typeof req.query?.church === "string" ? req.query.church : null);
+      const requestedChurch = selectedChurch();
       const params: any[] = [];
-      const conditions = ["g.is_active = true"];
+      const conditions = ["g.is_active = true", `g.church = '${selectedChurch()}'`];
 
       if (access.role !== "admin") {
         if (access.role === "senior_pastor" && access.churchScopes.length > 0) {
@@ -1057,6 +1040,7 @@ export async function registerRoutes(app: Express) {
       const creatorRole = creatorUserId ? await storage.getUserRole(creatorUserId) : null;
       const creator = creatorUserId ? await storage.getUser(creatorUserId) : undefined;
       const church = normalizeChurch(input.church);
+      assertSelectedChurch(church);
 
       if (!church) {
         return res.status(400).json({ error: "Church is required" });
@@ -1067,8 +1051,8 @@ export async function registerRoutes(app: Express) {
 
       const c = await pool.connect();
       try {
-        await c.query('BEGIN');
-        for (const appointedId of [input.leaderUserId, input.coLeaderUserId].filter(Boolean)) {
+        await c.query('BEGIN'); await lockChurchContext(c);
+        for (const appointedId of [input.leaderUserId, input.coLeaderUserId, input.pastorUserId].filter(Boolean)) {
           const appointed = (await c.query('SELECT church FROM users WHERE id=$1 FOR SHARE', [appointedId])).rows[0];
           if (!appointed || normalizeChurch(appointed.church) !== church) throw new Error('請選擇同教會已核對帳號的小家長。');
         }
@@ -1282,30 +1266,29 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/sessions", requireSessionManager, async (req, res) => {
     try {
-      const parsed = insertSessionSchema.omit({ shortCode: true }).strict().safeParse(req.body);
+      const parsed = insertSessionSchema.omit({ shortCode: true,church:true }).strict().safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid session data", details: parsed.error.issues });
       }
       const actorId = (req as any).legacyUserId as string;
       const actor = await storage.getUser(actorId);
-      const church = normalizeChurch(parsed.data.churchUnit);
-      const ownChurch = normalizeChurch(actor?.church);
-      if ((req as any).userRole !== 'admin' && ((church && church !== ownChurch) || (parsed.data.ownerId && parsed.data.ownerId !== actorId))) {
+      if ((req as any).userRole !== 'admin' && parsed.data.ownerId && parsed.data.ownerId !== actorId) {
         return res.status(403).json({ error: 'Session ownership and church must match the creator' });
       }
       const session = await storage.createSession({ ...parsed.data,
         ownerId: (req as any).userRole === 'admin' ? parsed.data.ownerId || actorId : actorId,
-        churchUnit: (req as any).userRole === 'admin' ? church : ownChurch,
+        churchUnit: parsed.data.churchUnit,
+        church:selectedChurch(),
       });
       res.status(201).json(session);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create session" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to create session" });
     }
   });
 
   app.patch("/api/sessions/:id", requireSessionManager, async (req, res) => {
     try {
-      const parsed = insertSessionSchema.omit({ shortCode: true }).partial().strict().safeParse(req.body);
+      const parsed = insertSessionSchema.omit({ shortCode: true,church:true }).partial().strict().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: 'Invalid session fields' });
       const existing = await storage.getSession(req.params.id);
       if (!existing) return res.status(404).json({ error: 'Session not found' });
@@ -1314,7 +1297,7 @@ export async function registerRoutes(app: Express) {
         (parsed.data.churchUnit !== undefined && normalizeChurch(parsed.data.churchUnit) !== normalizeChurch(existing.churchUnit))
       )) return res.status(403).json({ error: 'Only administrators may transfer session ownership or church' });
       const updates = { ...parsed.data };
-      if (updates.churchUnit !== undefined) updates.churchUnit = normalizeChurch(updates.churchUnit);
+
       const session = await storage.updateSession(req.params.id, updates);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
@@ -1322,7 +1305,7 @@ export async function registerRoutes(app: Express) {
       sessionCache.invalidate(`poll:${req.params.id}`);
       res.json(session);
     } catch (error) {
-      res.status(500).json({ error: "Failed to update session" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to update session" });
     }
   });
 
@@ -1336,7 +1319,7 @@ export async function registerRoutes(app: Express) {
       sessionCache.invalidate(`poll:${req.params.id}`);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete session" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete session" });
     }
   });
 
@@ -1417,7 +1400,8 @@ export async function registerRoutes(app: Express) {
       }
 
       let updateData: Record<string, unknown> = {};
-      if (!(await canManageSession(req))) {
+      const management=await canManageSession(req);
+      if (!management) {
         if (!await studyAccess.canOwn(req, existing)) return res.status(403).json({ error: 'Participant identity required' });
         const selfUpdateSchema = z.object({
           sessionId: z.string().uuid(),
@@ -1449,7 +1433,7 @@ export async function registerRoutes(app: Express) {
         updateData = managed.data;
       }
 
-      const participant = await storage.updateParticipant(req.params.id, updateData);
+      const participant = await storage.updateParticipant(req.params.id, updateData, management);
       if (!participant) {
         return res.status(404).json({ error: "Participant not found" });
       }
@@ -1458,7 +1442,7 @@ export async function registerRoutes(app: Express) {
       }
       res.json(participant);
     } catch (error) {
-      res.status(500).json({ error: "Failed to update participant" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to update participant" });
     }
   });
 
@@ -1531,8 +1515,10 @@ export async function registerRoutes(app: Express) {
       if (updates.length !== allIds.length) return res.status(400).json({ error: '同一位成員不可重複分組' });
       const client = await pool.connect();
       try {
-        await client.query('BEGIN');
-        await client.query('SELECT id FROM sessions WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...new Set(targets.rows.map(row => row.session_id))]]);
+        await client.query('BEGIN');await lockChurchContext(client);
+        const parentIds=[...new Set(targets.rows.map(row=>row.session_id))];
+        const lockedParents=await client.query('SELECT id FROM sessions WHERE id=ANY($1::uuid[]) AND church=$2 ORDER BY id FOR UPDATE',[parentIds,selectedChurch()]);
+        if(lockedParents.rowCount!==parentIds.length)throw new GroupError(404,'Session not found');
         const result = await client.query(`UPDATE participants p SET group_number=a.group_number,ready_confirmed=false,updated_at=NOW()
           FROM jsonb_to_recordset($1::jsonb) AS a(id uuid,group_number integer) WHERE p.id=a.id RETURNING p.id`, [JSON.stringify(updates)]);
         if (result.rowCount !== allIds.length) throw new Error('Group assignment changed during update');
@@ -1544,7 +1530,7 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true });
     } catch (error) {
       console.error("[batch-assign-groups] Error:", error);
-      res.status(500).json({ error: "Failed to batch assign groups", success: false });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to batch assign groups", success: false });
     }
   });
 
@@ -1604,7 +1590,7 @@ export async function registerRoutes(app: Express) {
       await storage.deleteSubmissionsBySession(req.params.sessionId);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete submissions" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete submissions" });
     }
   });
 
@@ -1613,7 +1599,7 @@ export async function registerRoutes(app: Express) {
       await storage.deleteParticipantsBySession(req.params.sessionId);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete participants" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete participants" });
     }
   });
 
@@ -1624,7 +1610,7 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true, count });
     } catch (error) {
       console.error("[force-verify-all] Error:", error);
-      res.status(500).json({ error: "Failed to force verify participants", success: false });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to force verify participants", success: false });
     }
   });
 
@@ -1635,7 +1621,7 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true, count });
     } catch (error) {
       console.error("[reset-ready-status] Error:", error);
-      res.status(500).json({ error: "Failed to reset ready status", success: false });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to reset ready status", success: false });
     }
   });
 
@@ -1646,7 +1632,7 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true, count });
     } catch (error) {
       console.error("[clear-groups] Error:", error);
-      res.status(500).json({ error: "Failed to clear group assignments", success: false });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to clear group assignments", success: false });
     }
   });
 
@@ -1876,7 +1862,7 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting study response:", error);
-      res.status(500).json({ error: "Failed to delete study response" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete study response" });
     }
   });
 
@@ -1913,7 +1899,7 @@ export async function registerRoutes(app: Express) {
       res.status(201).json((await publicPrayerFeed(userId, true)).find(p => p.id === prayer.id));
     } catch (error) {
       console.error("[create-prayer] Error:", error);
-      res.status(500).json({ error: "Failed to create prayer" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to create prayer" });
     }
   });
 
@@ -1929,7 +1915,7 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const role = userId ? await storage.getUserRole(userId) : null;
-      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole) || await hasPermission(userId, 'wall.moderate', 'site');
+      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole) || await hasPermission(userId, 'wall.moderate', 'church');
       if (!canManage) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -1959,7 +1945,7 @@ export async function registerRoutes(app: Express) {
       res.json(publicPrayerReceipt(prayer));
     } catch (error) {
       console.error("[update-prayer] Error:", error);
-      res.status(500).json({ error: "Failed to update prayer" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to update prayer" });
     }
   });
 
@@ -1975,7 +1961,7 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       const role = userId ? await storage.getUserRole(userId) : null;
-      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole) || await hasPermission(userId, 'wall.moderate', 'site');
+      const canManage = userId === existingPrayer.userId || !!role && crmLeaderRoles.includes(role as AppRole) || await hasPermission(userId, 'wall.moderate', 'church');
       if (!canManage) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -1984,7 +1970,7 @@ export async function registerRoutes(app: Express) {
       prayerCache.invalidatePattern('prayers:');
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete prayer" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete prayer" });
     }
   });
 
@@ -2251,13 +2237,26 @@ export async function registerRoutes(app: Express) {
     try {
       const parsed = z.object({ email: z.string().trim().email().max(254), name: z.string().trim().min(1).max(160),
         gender: z.string().trim().max(30).optional(), church: z.string().trim().max(120).nullable().optional(),
+        shortCode:z.string().trim().min(1).max(100).optional(),consent:z.literal(true).optional(),
       }).strict().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: 'Invalid intake fields' });
-      await storage.upsertPotentialMember(parsed.data);
+      let intakeChurch:string;
+      if(parsed.data.shortCode){
+        if(parsed.data.consent!==true)return res.status(400).json({error:'請確認同意提供聯絡資料。'});
+        const card=await storage.getInvitedMessageCard(parsed.data.shortCode);
+        if(!card)return res.status(404).json({error:'邀請短碼不存在或已停用。'});
+        intakeChurch=card.church;
+        if(parsed.data.church!==undefined&&normalizeChurch(parsed.data.church)!==intakeChurch)return res.status(400).json({error:'邀請教會不一致。'});
+      }else{
+        if(!await resolveUserId(req))return res.status(401).json({error:'請以有效邀請短碼提供資料。'});
+        intakeChurch=selectedChurch();
+        if(parsed.data.church!==undefined&&normalizeChurch(parsed.data.church)!==intakeChurch)return res.status(403).json({error:'教會範圍不一致。'});
+      }
+      await storage.upsertPotentialMember({...parsed.data,church:intakeChurch},!parsed.data.shortCode);
       // Identical receipt whether the address is new or already known.
       res.status(201).json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to create potential member" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to create potential member" });
     }
   });
 
@@ -2348,6 +2347,7 @@ export async function registerRoutes(app: Express) {
       try {
         return await storage.createIcebreakerGame(gameData);
       } catch (createError: any) {
+        if(createError instanceof GroupError)throw createError;
         if (req.body.bibleStudySessionId && req.body.groupNumber) {
           const fallback = await storage.getSessionIcebreakerGame(
             req.body.bibleStudySessionId,
@@ -2390,6 +2390,7 @@ export async function registerRoutes(app: Express) {
       }
       res.status(200).json(game);
     } catch (error) {
+      if(error instanceof GroupError)return res.status(error.status).json({error:error.message});
       if (req.body.bibleStudySessionId && req.body.groupNumber) {
         try {
           const existingGame = await storage.getSessionIcebreakerGame(
@@ -2401,7 +2402,7 @@ export async function registerRoutes(app: Express) {
           }
         } catch { }
       }
-      res.status(500).json({ error: "Failed to create game" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to create game" });
     }
   });
 
@@ -2470,7 +2471,14 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/icebreaker/cards/:id", async (req, res) => {
     try {
-      const card = await storage.getCardQuestionById(req.params.id);
+      let card;
+      if(typeof req.query.gameId==='string'){
+        const gameId=z.string().uuid().safeParse(req.query.gameId);
+        if(!gameId.success)return res.sendStatus(400);
+        const game=await storage.getIcebreakerGame(gameId.data);
+        if(!game||(game.currentCardId!==req.params.id&&game.currentDrawerCardId!==req.params.id)||!await canAccessGame(req,game))return res.sendStatus(403);
+        card=await storage.getGameCardQuestion(req.params.id,game.church);
+      }else card=await storage.getCardQuestionById(req.params.id);
       if (!card) {
         return res.status(404).json({ error: "Card not found" });
       }
@@ -3503,7 +3511,7 @@ export async function registerRoutes(app: Express) {
       });
       res.json(question);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create card question" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to create card question" });
     }
   });
 
@@ -3515,7 +3523,7 @@ export async function registerRoutes(app: Express) {
       }
       res.json(question);
     } catch (error) {
-      res.status(500).json({ error: "Failed to update card question" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to update card question" });
     }
   });
 
@@ -3524,7 +3532,7 @@ export async function registerRoutes(app: Express) {
       await storage.deleteCardQuestion(req.params.id);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete card question" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete card question" });
     }
   });
 
@@ -3557,7 +3565,7 @@ export async function registerRoutes(app: Express) {
 
   app.get("/api/message-cards/:shortCode", async (req, res) => {
     try {
-      const card = await storage.getMessageCard(req.params.shortCode);
+      const card = await storage.getInvitedMessageCard(req.params.shortCode);
       if (!card) {
         return res.status(404).json({ error: "Card not found" });
       }
@@ -3608,16 +3616,16 @@ export async function registerRoutes(app: Express) {
 
   // Delete message card image
   app.delete("/api/message-cards/image/:filename", requireLeader, async (req, res) => {
+    const client=await pool.connect();
     try {
-      const filePath = path.join(messageCardRoot, path.basename(req.params.filename));
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Failed to delete image:", error);
-      res.status(500).json({ error: "Failed to delete image" });
-    }
+      await client.query('BEGIN');await lockChurchContext(client);
+      const filename=path.basename(req.params.filename),church=selectedChurch();
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`message-card-image:${filename}`]);
+      if(!(await client.query('SELECT 1 FROM message_cards WHERE image_path=$1 AND church=$2 AND NOT EXISTS(SELECT 1 FROM message_cards other WHERE other.image_path=$1 AND other.church<>$2)',[filename,church])).rowCount){await client.query('ROLLBACK');return res.status(404).json({error:'Image not found'});}
+      const filePath=path.join(messageCardRoot,filename);
+      if(fs.existsSync(filePath))fs.unlinkSync(filePath);
+      await client.query('COMMIT');res.json({success:true});
+    }catch(error){await client.query('ROLLBACK');res.status(error instanceof GroupError?error.status:500).json({error:'Failed to delete image'});}finally{client.release();}
   });
 
   app.post("/api/message-cards", requireLeader, async (req, res) => {
@@ -3631,7 +3639,7 @@ export async function registerRoutes(app: Express) {
       res.status(201).json(card);
     } catch (error) {
       console.error("Failed to create message card:", error);
-      res.status(500).json({ error: "Failed to create message card" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to create message card" });
     }
   });
 
@@ -3644,7 +3652,7 @@ export async function registerRoutes(app: Express) {
       res.json(card);
     } catch (error) {
       console.error("Failed to update message card:", error);
-      res.status(500).json({ error: "Failed to update message card" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to update message card" });
     }
   });
 
@@ -3654,7 +3662,7 @@ export async function registerRoutes(app: Express) {
       res.json({ success: true });
     } catch (error) {
       console.error("Failed to delete message card:", error);
-      res.status(500).json({ error: "Failed to delete message card" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete message card" });
     }
   });
 
@@ -3695,20 +3703,24 @@ export async function registerRoutes(app: Express) {
         userGender: z.enum(['male', 'female', 'other']).nullable().optional(),
         address: z.string().trim().max(1000).nullable().optional(),
         church: z.string().trim().max(120).nullable().optional(),
+        expectedChurch:z.string().trim().max(120).nullable().optional(),
       }).strict().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: 'Invalid profile fields' });
       if (parsed.data.church !== undefined && (req as any).userRole !== 'admin') {
         return res.status(403).json({ error: 'Only administrators may change church membership' });
       }
-      const updates = { ...parsed.data };
+      if(parsed.data.church!==undefined&&!Object.hasOwn(parsed.data,'expectedChurch'))return res.status(428).json({error:'請重新載入目前的教會核定資料。'});
+      const {expectedChurch,...updates}=parsed.data;
       if (updates.church !== undefined) updates.church = normalizeChurch(updates.church);
-      const updated = await storage.updateUser(req.params.id, updates);
+      const updated = updates.church !== undefined
+        ? await approveChurchAffiliation((req as any).legacyUserId || (await resolveUserId(req))!, req.params.id, {...updates,expectedChurch})
+        : await storage.updateUser(req.params.id, updates);
       if (!updated) {
         return res.status(404).json({ error: "User not found" });
       }
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to update user profile" });
+      res.status(error instanceof GroupError ? error.status : 500).json({ error: error instanceof GroupError ? error.message : "Failed to update user profile" });
     }
   });
 
@@ -3837,6 +3849,7 @@ export async function registerRoutes(app: Express) {
       const updates = z.object({ status: z.enum(['pending','member','declined']).optional(), subscribed: z.boolean().optional(), name: z.string().trim().min(1).max(160).optional(), gender: z.string().max(30).nullable().optional(), church: z.string().max(120).optional() }).strict().parse(req.body);
       if (typeof updates.church === "string") {
         updates.church = normalizeChurch(updates.church) || '';
+        assertSelectedChurch(updates.church);
         if (access.role !== 'admin' && !access.churchScopes.includes(updates.church || '')) return res.status(403).json({ error: '目的教會不在管理範圍內' });
       }
       const updated = await storage.updatePotentialMember(req.params.id, updates);
@@ -3846,7 +3859,7 @@ export async function registerRoutes(app: Express) {
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid member fields' });
-      res.status(500).json({ error: "Failed to update potential member" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to update potential member" });
     }
   });
 
@@ -3872,7 +3885,7 @@ export async function registerRoutes(app: Express) {
       await storage.deletePotentialMember(req.params.id);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete potential member" });
+      res.status(error instanceof GroupError?error.status:500).json({ error: "Failed to delete potential member" });
     }
   });
 
@@ -5506,7 +5519,7 @@ export async function registerRoutes(app: Express) {
       const diffTime = today.getTime() - startDate.getTime();
       const dayNumber = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      const items = plan.templateId ? await storage.getReadingPlanItems(plan.templateId) : [];
+      const items = plan.templateId ? await storage.getOwnedReadingItems(plan.templateId,userId) : [];
       const todayItem = items.find(i => i.dayNumber === dayNumber);
 
       const progress = await storage.getUserReadingProgress(plan.id);
@@ -5621,6 +5634,12 @@ export async function registerRoutes(app: Express) {
   });
 
   app.use('/api/user-reading-plans/:id', readingPlanAccess(resolveUserId, (id, userId) => storage.getUserReadingPlan(id, userId)));
+
+  app.get('/api/user-reading-plans/:id/items', async (req,res) => {
+    const plan=await storage.getUserReadingPlan(req.params.id,res.locals.readingOwnerId);
+    if(!plan)return void res.sendStatus(404);
+    res.json(plan.templateId?await storage.getOwnedReadingItems(plan.templateId,res.locals.readingOwnerId):[]);
+  });
 
   app.get("/api/user-reading-plans/:id", async (req, res) => {
     try {
@@ -5748,7 +5767,7 @@ export async function registerRoutes(app: Express) {
       const progress = await storage.getUserReadingProgress(plan.id);
       const todayProgress = progress.find(p => p.dayNumber === dayNumber);
 
-      const items = await storage.getReadingPlanItems(plan.templateId || '');
+      const items = await storage.getOwnedReadingItems(plan.templateId || '',res.locals.readingOwnerId);
       const todayItem = items.find(i => i.dayNumber === dayNumber);
 
       res.json({

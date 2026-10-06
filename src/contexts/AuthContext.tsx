@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import * as React from 'react';
 import { useState, useEffect, useRef, useCallback, createContext, useContext, ReactNode } from 'react';
 import { queryClient } from '@/lib/queryClient';
@@ -25,6 +26,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshAuth: () => Promise<AuthUser | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -189,7 +191,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const session = user ? { user } : null;
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user, loading, signUp, signIn, signOut, refreshAuth: () => fetchUser(false) }}>
       <React.Fragment key={user?.id || 'signed-out'}>{children}</React.Fragment>
     </AuthContext.Provider>
   );

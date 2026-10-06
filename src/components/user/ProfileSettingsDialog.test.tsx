@@ -40,7 +40,7 @@ it('allows an administrator to submit a church change', async () => {
   expect(church).toBeEnabled();
   expect(screen.getByRole('option', {name:'iM行動教會'})).toBeTruthy();
   expect(screen.getAllByRole('option').filter(option => (option as HTMLOptionElement).value === 'New church')).toHaveLength(0);
-  fireEvent.change(church, { target: { value: 'IM 行動教會' } });
+  fireEvent.change(church, { target: { value: '火樂' } });
   fireEvent.click(screen.getByTestId('button-save-profile'));
-  await waitFor(() => expect(saved?.church).toBe('IM 行動教會'));
+  await waitFor(() => expect(saved).toMatchObject({church:'火樂',expectedChurch:'IM'}));
 });

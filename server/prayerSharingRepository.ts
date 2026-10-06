@@ -1,23 +1,25 @@
+import { selectedChurch, churchPredicate, lockChurchContext } from './churchContext';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { pool } from './db';
 import { groupAccess, GroupError } from './lifeGroupRepository';
+import { getKnownChurchOptions } from '../shared/churches';
 import type { PrayerSharingInput } from '../shared/prayerSharing';
 
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (error) { await c.query('ROLLBACK'); throw error; }
   finally { c.release(); }
 }
 
 export async function listPrayerDeliveries(actor: string) {
-  return (await pool.query(`SELECT s.prayer_id AS "prayerId",s.destination,s.group_id AS "groupId",s.post_id AS "postId",s.is_anonymous AS anonymous,s.created_at AS "createdAt",
+  return (await pool.query(`SELECT s.church,s.prayer_id AS "prayerId",s.destination,s.group_id AS "groupId",s.post_id AS "postId",s.is_anonymous AS anonymous,s.created_at AS "createdAt",
     CASE WHEN s.group_id IS NULL THEN CASE WHEN EXISTS(SELECT 1 FROM prayers p WHERE p.id=s.post_id AND (p.closed_at IS NOT NULL OR p.is_answered)) THEN '已結束的代禱（本人紀錄）' ELSE '公共禱告牆' END ELSE COALESCE(g.name,'原小家') END AS name,
     CASE WHEN s.group_id IS NULL THEN (SELECT p.content FROM prayers p WHERE p.id=s.post_id)
       ELSE (SELECT p.title || E'\\n\\n' || p.body FROM life_group_shares p WHERE p.id=s.post_id AND p.withdrawn_at IS NULL) END AS content
     FROM personal_prayer_shares s LEFT JOIN small_groups g ON g.id=s.group_id
-    WHERE s.owner_id=$1 AND ((s.group_id IS NULL AND EXISTS(SELECT 1 FROM prayers p WHERE p.id=s.post_id)) OR
+    WHERE s.owner_id=$1 AND ${churchPredicate('s')} AND ((s.group_id IS NULL AND EXISTS(SELECT 1 FROM prayers p WHERE p.id=s.post_id)) OR
     (s.group_id IS NOT NULL AND EXISTS(SELECT 1 FROM life_group_shares p WHERE p.id=s.post_id AND p.withdrawn_at IS NULL)))
     ORDER BY s.created_at DESC`, [actor])).rows;
 }
@@ -32,7 +34,7 @@ export function sharePersonalPrayers(actor: string, input: PrayerSharingInput) {
     const destinations = [...(input.groupId ? [input.groupId] : []), ...(input.publicWall ? ['public'] : [])];
     for (const item of input.items) for (const destination of destinations) {
       const isPublic = destination === 'public';
-      const previous = (await c.query('SELECT post_id FROM personal_prayer_shares WHERE prayer_id=$1 AND destination=$2', [item.sourceId, destination])).rows[0];
+      const previous = (await c.query('SELECT post_id FROM personal_prayer_shares WHERE prayer_id=$1 AND destination=$2 AND church=$3', [item.sourceId, destination,selectedChurch()])).rows[0];
       if (previous) {
         const active = await c.query(isPublic ? 'SELECT id FROM prayers WHERE id=$1' : 'SELECT id FROM life_group_shares WHERE id=$1 AND withdrawn_at IS NULL', [previous.post_id]);
         if (active.rowCount) { skipped++; continue; }
@@ -40,10 +42,10 @@ export function sharePersonalPrayers(actor: string, input: PrayerSharingInput) {
       const postId = randomUUID();
       const source = owned.rows.find(row => row.id === item.sourceId);
       const gratitude = source.record_kind === 'grace' || source.status === 'answered' || (source.status !== 'waiting' && source.response_type === 'grace');
-      if (isPublic) await c.query("INSERT INTO prayers(id,user_id,content,category,is_anonymous,is_urgent) VALUES($1,$2,$3,$6,$4,$5)", [postId,actor,`${item.title}\n\n${item.body}`,input.anonymous,!gratitude && !!input.urgent,gratitude ? 'thanksgiving' : 'supplication']);
+      if (isPublic) await c.query("INSERT INTO prayers(id,user_id,content,category,is_anonymous,is_urgent,church) VALUES($1,$2,$3,$6,$4,$5,$7)", [postId,actor,`${item.title}\n\n${item.body}`,input.anonymous,!gratitude && !!input.urgent,gratitude ? 'thanksgiving' : 'supplication',selectedChurch()]);
       else await c.query("INSERT INTO life_group_shares(id,group_id,author_id,kind,title,body,reference,source_id,is_anonymous) VALUES($1,$2,$3,'prayer',$4,$5,'',$6,$7)", [postId,destination,actor,item.title,item.body,item.sourceId,input.anonymous]);
-      await c.query(`INSERT INTO personal_prayer_shares(prayer_id,destination,owner_id,group_id,post_id,is_anonymous) VALUES($1,$2,$3,$4,$5,$6)
-        ON CONFLICT(prayer_id,destination) DO UPDATE SET post_id=$5,is_anonymous=$6,created_at=now()`, [item.sourceId,destination,actor,isPublic ? null : destination,postId,input.anonymous]);
+      await c.query(`INSERT INTO personal_prayer_shares(prayer_id,destination,owner_id,group_id,post_id,is_anonymous,church) VALUES($1,$2,$3,$4,$5,$6,$7)
+        ON CONFLICT(prayer_id,destination,church) DO UPDATE SET post_id=$5,is_anonymous=$6,created_at=now()`, [item.sourceId,destination,actor,isPublic ? null : destination,postId,input.anonymous,selectedChurch()]);
       created++;
     }
     return { created, skipped };
@@ -57,15 +59,16 @@ export async function deletePublicPrayer(c: PoolClient, postId: string) {
   await c.query('DELETE FROM prayers WHERE id=$1', [postId]);
 }
 
-export function withdrawPrayerDelivery(actor: string, prayerId: string, destination: string) {
+export function withdrawPrayerDelivery(actor: string, prayerId: string, destination: string, deliveryChurch=selectedChurch()) {
+  if(!getKnownChurchOptions().some(c=>c.id===deliveryChurch))throw new GroupError(400,'分享教會格式不正確。');
   return transaction(async c => {
     if (!(await c.query('SELECT id FROM personal_prayers WHERE id=$1 AND user_id=$2 FOR UPDATE', [prayerId,actor])).rowCount) throw new GroupError(404, '找不到本人禱告。');
-    const s = (await c.query('SELECT * FROM personal_prayer_shares WHERE prayer_id=$1 AND destination=$2 AND owner_id=$3 FOR UPDATE', [prayerId,destination,actor])).rows[0];
+    const s = (await c.query('SELECT * FROM personal_prayer_shares WHERE prayer_id=$1 AND destination=$2 AND owner_id=$3 AND church=$4 FOR UPDATE', [prayerId,destination,actor,deliveryChurch])).rows[0];
     if (!s) return { ok: true };
     // Owners may withdraw their own previously shared copy even after leaving a group.
     if (s.group_id) await c.query('UPDATE life_group_shares SET withdrawn_at=now() WHERE id=$1 AND author_id=$2', [s.post_id,actor]);
     else { await c.query('SELECT id FROM prayers WHERE id=$1 FOR UPDATE', [s.post_id]); await deletePublicPrayer(c,s.post_id); }
-    await c.query('DELETE FROM personal_prayer_shares WHERE prayer_id=$1 AND destination=$2', [prayerId,destination]);
+    await c.query('DELETE FROM personal_prayer_shares WHERE prayer_id=$1 AND destination=$2 AND church=$3', [prayerId,destination,deliveryChurch]);
     return { ok: true };
   });
 }
@@ -81,7 +84,7 @@ export async function publicPrayerFeed(actor: string, mine = false, id: string |
     (SELECT count(*)::int FROM prayer_comments c WHERE c.prayer_id=p.id) AS "commentCount",
     COALESCE((SELECT jsonb_agg(r) FROM (SELECT kind,count(*)::int AS count,bool_or(user_id=$1) AS selected FROM prayer_reactions WHERE prayer_id=p.id GROUP BY kind) r),'[]'::jsonb) AS reactions
     FROM prayers p JOIN users u ON u.id=p.user_id
-    WHERE (CASE WHEN $2::boolean THEN p.user_id=$1 ELSE (p.closed_at IS NULL AND NOT p.is_answered) OR ($3::uuid IS NOT NULL AND p.user_id=$1) END)
+    WHERE ${churchPredicate('p')} AND (CASE WHEN $2::boolean THEN p.user_id=$1 ELSE (p.closed_at IS NULL AND NOT p.is_answered) OR ($3::uuid IS NOT NULL AND p.user_id=$1) END)
       AND ($3::uuid IS NULL OR p.id=$3)
     ORDER BY p.created_at DESC`, [actor,mine,id])).rows;
 }

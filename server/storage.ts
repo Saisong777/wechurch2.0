@@ -1,3 +1,5 @@
+import { GroupError } from './groupError';
+import { selectedChurch, assertSelectedChurch, churchContext, lockDrizzleChurchContext } from './churchContext';
 import { db } from "./db";
 import { eq, and, desc, sql, asc, like, or, isNull, inArray } from "drizzle-orm";
 import { bibleCache, timelineCache, cacheKeys } from "./cache";
@@ -45,7 +47,7 @@ export interface IStorage {
   getParticipant(id: string): Promise<Participant | undefined>;
   getParticipantBySessionEmail(sessionId: string, email: string): Promise<Participant | undefined>;
   createParticipant(participant: InsertParticipant, access?: { userId: string | null; browserHash: string }): Promise<Participant>;
-  updateParticipant(id: string, data: Partial<Participant>): Promise<Participant | undefined>;
+  updateParticipant(id: string, data: Partial<Participant>, management?:boolean): Promise<Participant | undefined>;
   deleteParticipantsBySession(sessionId: string): Promise<void>;
   forceVerifyAllParticipants(sessionId: string): Promise<number>;
   resetAllReadyStatus(sessionId: string): Promise<number>;
@@ -82,7 +84,7 @@ export interface IStorage {
   updateFeatureToggle(id: string, data: Partial<FeatureToggle>): Promise<FeatureToggle | undefined>;
 
   getPotentialMembers(church?: string | null): Promise<PotentialMember[]>;
-  upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<void>;
+  upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }, verifiedChurchWrite?:boolean): Promise<void>;
   updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined>;
   deletePotentialMember(id: string): Promise<void>;
 
@@ -98,6 +100,7 @@ export interface IStorage {
 
   getCardQuestions(level?: string): Promise<CardQuestion[]>;
   getAllCardQuestions(): Promise<CardQuestion[]>;
+  getGameCardQuestion(id:string,church:string):Promise<CardQuestion|undefined>;
   getCardQuestionById(id: string): Promise<CardQuestion | undefined>;
   createCardQuestion(question: { contentText: string; contentTextEn?: string; level: string; isActive: boolean; sortOrder: number }): Promise<CardQuestion>;
   updateCardQuestion(id: string, updates: Partial<CardQuestion>): Promise<CardQuestion | undefined>;
@@ -109,6 +112,7 @@ export interface IStorage {
 
   getMessageCards(): Promise<MessageCard[]>;
   getAllMessageCards(): Promise<MessageCard[]>;
+  getInvitedMessageCard(shortCode:string):Promise<MessageCard|undefined>;
   getMessageCard(shortCode: string): Promise<MessageCard | undefined>;
   getMessageCardById(id: string): Promise<MessageCard | undefined>;
   createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard>;
@@ -157,6 +161,8 @@ export interface IStorage {
   getJesus4SeasonsBySeason(season: string): Promise<Jesus4Season[]>;
   getJesusDailyContent(season?: string): Promise<JesusDailyContent[]>;
 
+  getOwnedReadingTemplate(templateId:string,userId:string): Promise<ReadingPlanTemplate | undefined>;
+  getOwnedReadingItems(templateId:string,userId:string): Promise<ReadingPlanTemplateItem[]>;
   getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]>;
   getReadingPlanTemplate(id: string): Promise<ReadingPlanTemplate | undefined>;
   getReadingPlanItems(templateId: string): Promise<ReadingPlanTemplateItem[]>;
@@ -197,6 +203,16 @@ export interface IStorage {
   markInboxEmailRead(id: number, isRead: boolean): Promise<InboxEmail | undefined>;
   archiveInboxEmail(id: number, isArchived: boolean): Promise<InboxEmail | undefined>;
   getInboxUnreadCount(): Promise<number>;
+}
+
+type ChurchTransaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
+async function sessionManagementWrite<T>(sessionId:string,work:(tx:ChurchTransaction)=>Promise<T>):Promise<T>{
+  return db.transaction(async tx=>{
+    await lockDrizzleChurchContext(tx);
+    const [parent]=await tx.select().from(sessions).where(and(eq(sessions.id,sessionId),eq(sessions.church,selectedChurch()))).for('share');
+    if(!parent)throw new GroupError(404,'Session not found');
+    return work(tx);
+  });
 }
 
 export class DatabaseStorage implements IStorage {
@@ -270,7 +286,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSessions(): Promise<Session[]> {
-    return db.select().from(sessions).orderBy(desc(sessions.createdAt));
+    return db.select().from(sessions).where(eq(sessions.church,selectedChurch())).orderBy(desc(sessions.createdAt));
   }
 
   async getSessionByShortCode(shortCode: string): Promise<Session | undefined> {
@@ -280,17 +296,26 @@ export class DatabaseStorage implements IStorage {
 
   async createSession(session: InsertSession): Promise<Session> {
     const shortCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const [newSession] = await db.insert(sessions).values({ ...session, shortCode }).returning();
-    return newSession;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [newSession]=await tx.insert(sessions).values({...session,shortCode,church:selectedChurch()}).returning();
+      return newSession;
+    });
   }
 
   async updateSession(id: string, data: Partial<Session>): Promise<Session | undefined> {
-    const [updated] = await db.update(sessions).set(data).where(eq(sessions.id, id)).returning();
-    return updated;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [updated]=await tx.update(sessions).set(data).where(and(eq(sessions.id,id),eq(sessions.church,selectedChurch()))).returning();
+      return updated;
+    });
   }
 
   async deleteSession(id: string): Promise<void> {
     await db.transaction(async tx => {
+      await lockDrizzleChurchContext(tx);
+      const parent=await tx.execute(sql`SELECT id FROM sessions WHERE id=${id} AND church=${selectedChurch()} FOR UPDATE`);
+      if(!parent.rowCount)return;
       const sessionGames = await tx.select({ id: icebreakerGames.id }).from(icebreakerGames).where(eq(icebreakerGames.bibleStudySessionId, id));
       if (sessionGames.length > 0) {
         const gameIds = sessionGames.map(g => g.id);
@@ -342,7 +367,7 @@ export class DatabaseStorage implements IStorage {
       return created;
     });
     const [session] = await db
-      .select({ churchUnit: sessions.churchUnit })
+      .select({ church: sessions.church })
       .from(sessions)
       .where(eq(sessions.id, participant.sessionId))
       .limit(1);
@@ -350,42 +375,53 @@ export class DatabaseStorage implements IStorage {
       email: participant.email,
       name: participant.name,
       gender: participant.gender,
-      church: normalizeChurch(session?.churchUnit),
+      church: normalizeChurch(session?.church),
     }).catch(error => console.error('[Participant] CRM follow-up failed; participation was saved', error));
     return newParticipant;
   }
 
-  async updateParticipant(id: string, data: Partial<Participant>): Promise<Participant | undefined> {
+  async updateParticipant(id: string, data: Partial<Participant>, management=false): Promise<Participant | undefined> {
+    if(management)return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [updated]=await tx.update(participants).set({...data,updatedAt:new Date()}).where(and(eq(participants.id,id),inArray(participants.sessionId,tx.select({id:sessions.id}).from(sessions).where(eq(sessions.church,selectedChurch()))))).returning();
+      return updated;
+    });
     const [updated] = await db.update(participants).set({ ...data, updatedAt: new Date() }).where(eq(participants.id, id)).returning();
     return updated;
   }
 
   async deleteParticipantsBySession(sessionId: string): Promise<void> {
-    await db.delete(participants).where(eq(participants.sessionId, sessionId));
+    await sessionManagementWrite(sessionId,async tx=>{await tx.delete(participants).where(eq(participants.sessionId,sessionId));});
   }
 
   async forceVerifyAllParticipants(sessionId: string): Promise<number> {
-    const result = await db.update(participants)
+    return sessionManagementWrite(sessionId,async tx=>{
+    const result = await tx.update(participants)
       .set({ readyConfirmed: true })
       .where(eq(participants.sessionId, sessionId))
       .returning({ id: participants.id });
     return result.length;
+    });
   }
 
   async resetAllReadyStatus(sessionId: string): Promise<number> {
-    const result = await db.update(participants)
+    return sessionManagementWrite(sessionId,async tx=>{
+    const result = await tx.update(participants)
       .set({ readyConfirmed: false })
       .where(eq(participants.sessionId, sessionId))
       .returning({ id: participants.id });
     return result.length;
+    });
   }
 
   async clearAllGroupAssignments(sessionId: string): Promise<number> {
-    const result = await db.update(participants)
+    return sessionManagementWrite(sessionId,async tx=>{
+    const result = await tx.update(participants)
       .set({ groupNumber: null, readyConfirmed: false })
       .where(eq(participants.sessionId, sessionId))
       .returning({ id: participants.id });
     return result.length;
+    });
   }
 
   async getSubmissions(sessionId: string): Promise<Submission[]> {
@@ -398,7 +434,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSubmissionsBySession(sessionId: string): Promise<void> {
-    await db.delete(submissions).where(eq(submissions.sessionId, sessionId));
+    await sessionManagementWrite(sessionId,async tx=>{await tx.delete(submissions).where(eq(submissions.sessionId,sessionId));});
   }
 
   async getAiReports(sessionId: string): Promise<AiReport[]> {
@@ -462,7 +498,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteStudyResponse(id: string): Promise<void> {
-    await db.delete(studyResponses).where(eq(studyResponses.id, id));
+    await db.transaction(async tx=>{await lockDrizzleChurchContext(tx);await tx.delete(studyResponses).where(and(eq(studyResponses.id,id),inArray(studyResponses.sessionId,tx.select({id:sessions.id}).from(sessions).where(eq(sessions.church,selectedChurch())))));});
   }
 
   async getNotebookEntries(userId: string, browserHash: string): Promise<any[]> {
@@ -588,26 +624,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPrayers(): Promise<Prayer[]> {
-    return db.select().from(prayers).orderBy(desc(prayers.createdAt));
+    return db.select().from(prayers).where(eq(prayers.church, selectedChurch())).orderBy(desc(prayers.createdAt));
   }
 
   async createPrayer(prayer: InsertPrayer): Promise<Prayer> {
-    const [newPrayer] = await db.insert(prayers).values(prayer).returning();
-    return newPrayer;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [newPrayer]=await tx.insert(prayers).values({...prayer,church:selectedChurch()}).returning();
+      return newPrayer;
+    });
   }
 
   async updatePrayer(id: string, data: Partial<Prayer>): Promise<Prayer | undefined> {
-    const [updated] = await db.update(prayers).set(data).where(eq(prayers.id, id)).returning();
-    return updated;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [updated]=await tx.update(prayers).set(data).where(and(eq(prayers.id,id),eq(prayers.church,selectedChurch()))).returning();
+      return updated;
+    });
   }
 
   async deletePrayer(id: string): Promise<void> {
     await db.transaction(async tx => {
-      await tx.execute(sql`SELECT id FROM prayers WHERE id=${id} FOR UPDATE`);
+      await lockDrizzleChurchContext(tx);
+      const locked=await tx.execute(sql`SELECT id FROM prayers WHERE id=${id} AND church=${selectedChurch()} FOR UPDATE`);
+      if(!locked.rowCount)return;
       await tx.delete(prayerNotifications).where(eq(prayerNotifications.prayerId,id));
       await tx.delete(prayerComments).where(eq(prayerComments.prayerId,id));
       await tx.delete(prayerAmens).where(eq(prayerAmens.prayerId,id));
-      await tx.delete(prayers).where(eq(prayers.id, id));
+      await tx.delete(prayers).where(and(eq(prayers.id, id),eq(prayers.church,selectedChurch())));
     });
   }
 
@@ -676,9 +720,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(potentialMembers);
   }
 
-  async upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }): Promise<void> {
+  async upsertPotentialMember(data: { email: string; name: string; gender?: string; church?: string | null }, verifiedChurchWrite=false): Promise<void> {
     const email = data.email.trim().toLowerCase();
     await db.transaction(async tx => {
+      if(verifiedChurchWrite)await lockDrizzleChurchContext(tx);
       // Public intake and guest participation must never update or disclose an existing CRM record.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`potential-member:${email}`},0))`);
       const existing = await tx.select({ id: potentialMembers.id }).from(potentialMembers)
@@ -691,15 +736,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePotentialMember(id: string, data: Partial<PotentialMember>): Promise<PotentialMember | undefined> {
-    const [updated] = await db.update(potentialMembers)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(potentialMembers.id, id))
-      .returning();
-    return updated;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [updated]=await tx.update(potentialMembers).set({...data,updatedAt:new Date()}).where(and(eq(potentialMembers.id,id),eq(potentialMembers.church,selectedChurch()))).returning();
+      return updated;
+    });
   }
 
   async deletePotentialMember(id: string): Promise<void> {
-    await db.delete(potentialMembers).where(eq(potentialMembers.id, id));
+    await db.transaction(async tx=>{await lockDrizzleChurchContext(tx);await tx.delete(potentialMembers).where(and(eq(potentialMembers.id,id),eq(potentialMembers.church,selectedChurch())));});
   }
 
   async getStudyResponses(sessionId: string): Promise<(StudyResponse & { participantName?: string; groupNumber?: number })[]> {
@@ -735,8 +780,18 @@ export class DatabaseStorage implements IStorage {
 
   async createIcebreakerGame(game: Partial<IcebreakerGame>): Promise<IcebreakerGame> {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const [newGame] = await db.insert(icebreakerGames).values({ ...game, roomCode } as any).returning();
-    return newGame;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      // Session-mode publication follows the verified invitation parent, never an unrelated selected church.
+      let church=selectedChurch();
+      if(game.bibleStudySessionId){
+        const [parent]=await tx.select().from(sessions).where(eq(sessions.id,game.bibleStudySessionId)).for('share');
+        if(!parent)throw new GroupError(404,'Session not found');
+        church=parent.church;
+      }
+      const [newGame]=await tx.insert(icebreakerGames).values({...game,roomCode,church} as any).returning();
+      return newGame;
+    });
   }
 
   async updateIcebreakerGame(id: string, data: Partial<IcebreakerGame>): Promise<IcebreakerGame | undefined> {
@@ -755,32 +810,44 @@ export class DatabaseStorage implements IStorage {
 
   async getCardQuestions(level?: string): Promise<CardQuestion[]> {
     if (level) {
-      return db.select().from(cardQuestions).where(and(eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
+      return db.select().from(cardQuestions).where(and(eq(cardQuestions.church,selectedChurch()),eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
     }
-    return db.select().from(cardQuestions).where(eq(cardQuestions.isActive, true));
+    return db.select().from(cardQuestions).where(and(eq(cardQuestions.church,selectedChurch()),eq(cardQuestions.isActive, true)));
   }
 
   async getAllCardQuestions(): Promise<CardQuestion[]> {
-    return db.select().from(cardQuestions).orderBy(cardQuestions.level, cardQuestions.sortOrder);
+    return db.select().from(cardQuestions).where(eq(cardQuestions.church,selectedChurch())).orderBy(cardQuestions.level, cardQuestions.sortOrder);
   }
 
   async createCardQuestion(question: { contentText: string; contentTextEn?: string; level: string; isActive: boolean; sortOrder: number }): Promise<CardQuestion> {
-    const [newQuestion] = await db.insert(cardQuestions).values(question).returning();
-    return newQuestion;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [newQuestion]=await tx.insert(cardQuestions).values({...question,church:selectedChurch()}).returning();
+      return newQuestion;
+    });
   }
 
   async updateCardQuestion(id: string, updates: Partial<CardQuestion>): Promise<CardQuestion | undefined> {
-    const [updated] = await db.update(cardQuestions).set(updates).where(eq(cardQuestions.id, id)).returning();
-    return updated;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [updated]=await tx.update(cardQuestions).set({...updates,church:selectedChurch()}).where(and(eq(cardQuestions.id,id),eq(cardQuestions.church,selectedChurch()))).returning();
+      return updated;
+    });
   }
 
   async deleteCardQuestion(id: string): Promise<boolean> {
-    const result = await db.delete(cardQuestions).where(eq(cardQuestions.id, id));
-    return true;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      await tx.delete(cardQuestions).where(and(eq(cardQuestions.id,id),eq(cardQuestions.church,selectedChurch())));
+      return true;
+    });
   }
 
+  async getGameCardQuestion(id:string,church:string):Promise<CardQuestion|undefined>{
+    return (await db.select().from(cardQuestions).where(and(eq(cardQuestions.id,id),eq(cardQuestions.church,church))).limit(1))[0];
+  }
   async getCardQuestionById(id: string): Promise<CardQuestion | undefined> {
-    const [card] = await db.select().from(cardQuestions).where(eq(cardQuestions.id, id)).limit(1);
+    const [card] = await db.select().from(cardQuestions).where(and(eq(cardQuestions.id, id),eq(cardQuestions.church,selectedChurch()))).limit(1);
     return card;
   }
 
@@ -799,14 +866,15 @@ export class DatabaseStorage implements IStorage {
   async drawIcebreakerCard(gameId: string, level: string): Promise<{ cardId: string | null; cardContent: string | null; cardLevel: string; cardsRemaining: number }> {
     // Get current game to check usedCardIds
     const [game] = await db.select().from(icebreakerGames).where(eq(icebreakerGames.id, gameId)).limit(1);
+    if(!game)throw new Error('GAME_NOT_FOUND');
     const usedCardIds = (game?.usedCardIds as string[]) || [];
 
     // Get all active cards for this level — cached for 1 hour (static content)
-    const cardCacheKey = `cards:${level}`;
+    const cardCacheKey = `cards:${game.church}:${level}`;
     let allCards = bibleCache.get<typeof cardQuestions.$inferSelect[]>(cardCacheKey);
     if (!allCards) {
       allCards = await db.select().from(cardQuestions)
-        .where(and(eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
+        .where(and(eq(cardQuestions.church,game.church),eq(cardQuestions.level, level), eq(cardQuestions.isActive, true)));
       bibleCache.set(cardCacheKey, allCards, 3600);
     }
 
@@ -846,42 +914,69 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMessageCards(): Promise<MessageCard[]> {
-    return db.select().from(messageCards).where(eq(messageCards.isActive, true));
+    return db.select().from(messageCards).where(and(eq(messageCards.church,selectedChurch()),eq(messageCards.isActive, true)));
   }
 
   async getAllMessageCards(): Promise<MessageCard[]> {
-    return db.select().from(messageCards).orderBy(desc(messageCards.createdAt));
+    return db.select().from(messageCards).where(eq(messageCards.church,selectedChurch())).orderBy(desc(messageCards.createdAt));
+  }
+
+  // An explicit short code retains the existing invitation capability; it cannot enumerate the church catalog.
+  async getInvitedMessageCard(shortCode:string):Promise<MessageCard|undefined>{
+    return (await db.select().from(messageCards).where(and(eq(messageCards.shortCode,shortCode),eq(messageCards.isActive,true))).limit(1))[0];
   }
 
   async getMessageCard(shortCode: string): Promise<MessageCard | undefined> {
-    const [card] = await db.select().from(messageCards).where(eq(messageCards.shortCode, shortCode)).limit(1);
+    const [card] = await db.select().from(messageCards).where(and(eq(messageCards.shortCode, shortCode),eq(messageCards.church,selectedChurch()))).limit(1);
     return card;
   }
 
   async createMessageCard(card: { title: string; shortCode: string; imagePath: string; createdBy?: string }): Promise<MessageCard> {
-    const [newCard] = await db.insert(messageCards).values(card).returning();
-    return newCard;
+    const church=selectedChurch();
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`message-card-image:${card.imagePath}`},0))`);
+      const foreign=await tx.execute(sql`SELECT 1 FROM message_cards WHERE image_path=${card.imagePath} AND church<>${church} LIMIT 1`);
+      if(foreign.rows.length)throw new GroupError(404,'找不到所選教會的圖片。');
+      const [newCard]=await tx.insert(messageCards).values({...card,church}).returning();
+      return newCard;
+    });
   }
 
   async getMessageCardById(id: string): Promise<MessageCard | undefined> {
-    const [card] = await db.select().from(messageCards).where(eq(messageCards.id, id)).limit(1);
+    const [card] = await db.select().from(messageCards).where(and(eq(messageCards.id, id),eq(messageCards.church,selectedChurch()))).limit(1);
     return card;
   }
 
   async updateMessageCard(id: string, data: Partial<{ title: string; imagePath: string; isActive: boolean }>): Promise<MessageCard | undefined> {
-    const [updated] = await db.update(messageCards).set(data).where(eq(messageCards.id, id)).returning();
-    return updated;
+    const church=selectedChurch();
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const [current]=await tx.select().from(messageCards).where(and(eq(messageCards.id,id),eq(messageCards.church,church))).for('update');
+      if(!current)return undefined;
+      if(data.imagePath!==undefined){
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`message-card-image:${data.imagePath}`},0))`);
+        const foreign=await tx.execute(sql`SELECT 1 FROM message_cards WHERE image_path=${data.imagePath} AND church<>${church} LIMIT 1`);
+        if(foreign.rows.length)throw new GroupError(404,'找不到所選教會的圖片。');
+      }
+      const [updated]=await tx.update(messageCards).set({...data,church}).where(and(eq(messageCards.id,id),eq(messageCards.church,church))).returning();
+      return updated;
+    });
   }
 
   async deleteMessageCard(id: string): Promise<void> {
-    await db.delete(messageCards).where(eq(messageCards.id, id));
+    await db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      await tx.delete(messageCards).where(and(eq(messageCards.id,id),eq(messageCards.church,selectedChurch())));
+    });
   }
 
   async getMessageCardDownloads(): Promise<MessageCardDownload[]> {
-    return db.select().from(messageCardDownloads).orderBy(desc(messageCardDownloads.downloadedAt));
+    return db.select().from(messageCardDownloads).where(inArray(messageCardDownloads.cardId,db.select({id:messageCards.id}).from(messageCards).where(eq(messageCards.church,selectedChurch())))).orderBy(desc(messageCardDownloads.downloadedAt));
   }
 
   async getMessageCardDownloadsByCardId(cardId: string): Promise<MessageCardDownload[]> {
+    if(!await this.getMessageCardById(cardId))return [];
     return db.select().from(messageCardDownloads).where(eq(messageCardDownloads.cardId, cardId)).orderBy(desc(messageCardDownloads.downloadedAt));
   }
 
@@ -1191,15 +1286,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]> {
-    return db.select().from(readingPlanTemplates).orderBy(asc(readingPlanTemplates.name));
+    return db.select().from(readingPlanTemplates).where(eq(readingPlanTemplates.church,selectedChurch())).orderBy(asc(readingPlanTemplates.name));
   }
 
   async getReadingPlanTemplate(id: string): Promise<ReadingPlanTemplate | undefined> {
-    const [template] = await db.select().from(readingPlanTemplates).where(eq(readingPlanTemplates.id, id)).limit(1);
+    const [template] = await db.select().from(readingPlanTemplates).where(and(eq(readingPlanTemplates.id, id),eq(readingPlanTemplates.church,selectedChurch()))).limit(1);
     return template;
   }
 
   async getReadingPlanItems(templateId: string): Promise<ReadingPlanTemplateItem[]> {
+    if(!await this.getReadingPlanTemplate(templateId))return [];
     return db.select().from(readingPlanTemplateItems).where(eq(readingPlanTemplateItems.templateId, templateId)).orderBy(asc(readingPlanTemplateItems.dayNumber));
   }
 
@@ -1228,6 +1324,15 @@ export class DatabaseStorage implements IStorage {
     await db.delete(savedVerses).where(and(eq(savedVerses.id, id), eq(savedVerses.userId, userId)));
   }
 
+  async getOwnedReadingTemplate(templateId:string,userId:string) {
+    const own=(await db.select().from(userReadingPlans).where(and(eq(userReadingPlans.templateId,templateId),eq(userReadingPlans.userId,userId))).limit(1))[0];
+    if(!own)return undefined;
+    return (await db.select().from(readingPlanTemplates).where(eq(readingPlanTemplates.id,templateId)).limit(1))[0];
+  }
+  async getOwnedReadingItems(templateId:string,userId:string) {
+    if(!await this.getOwnedReadingTemplate(templateId,userId))return [];
+    return db.select().from(readingPlanTemplateItems).where(eq(readingPlanTemplateItems.templateId,templateId)).orderBy(asc(readingPlanTemplateItems.dayNumber));
+  }
   async getUserReadingPlans(userId: string): Promise<UserReadingPlan[]> {
     return db.select().from(userReadingPlans).where(eq(userReadingPlans.userId, userId)).orderBy(desc(userReadingPlans.createdAt));
   }
@@ -1238,6 +1343,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUserReadingPlan(plan: InsertUserReadingPlan): Promise<UserReadingPlan> {
+    if(plan.templateId && !await this.getReadingPlanTemplate(plan.templateId))throw new Error('找不到所選教會的讀經計畫');
     const [created] = await db.insert(userReadingPlans).values(plan).returning();
     return created;
   }
@@ -1383,8 +1489,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate> {
-    const [created] = await db.insert(readingPlanTemplates).values(template).returning();
-    return created;
+    return db.transaction(async tx=>{
+      await lockDrizzleChurchContext(tx);
+      const context=churchContext()!;
+      if(template.createdBy&&template.createdBy!==context.actorId)throw new GroupError(403,'Forbidden');
+      const [created]=await tx.insert(readingPlanTemplates).values({...template,createdBy:context.actorId,church:template.isPublic?selectedChurch():context.actorChurch}).returning();
+      return created;
+    });
   }
 
   async createReadingPlanTemplateItems(items: Array<{ templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string }>): Promise<void> {

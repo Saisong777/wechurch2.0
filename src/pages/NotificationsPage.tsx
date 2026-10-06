@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, ChevronRight, HandHeart, HeartHandshake, MessageCircle, RefreshCw, Settings } from 'lucide-react';

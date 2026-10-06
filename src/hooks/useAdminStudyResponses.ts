@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useQuery } from '@tanstack/react-query';
 import { StudyResponsePublic, ProgressStatus } from '@/types/spiritual-fitness';
 import { getPollingInterval } from '@/lib/retry-utils';

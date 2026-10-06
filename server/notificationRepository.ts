@@ -1,3 +1,4 @@
+import { churchPredicate } from './churchContext';
 import type { PoolClient } from 'pg';
 import { pool } from './db';
 import { notificationLabels, type NotificationKind } from '../shared/notifications';
@@ -21,9 +22,9 @@ export async function recordCommentInteraction(c: PoolClient, actor: string, tar
 }
 
 // Recheck the source and current membership on every read, including unread counts and email.
-export const visibleNotification = `(EXISTS(SELECT 1 FROM prayers p WHERE p.id=n.prayer_id AND (p.user_id=n.user_id OR (p.closed_at IS NULL AND NOT p.is_answered)))
+export const visibleNotification = (requestScope=true) => `(EXISTS(SELECT 1 FROM prayers p WHERE p.id=n.prayer_id AND ${requestScope?churchPredicate('p'):'TRUE'} AND EXISTS(SELECT 1 FROM users ru WHERE ru.id=n.user_id AND ru.church=p.church) AND (p.user_id=n.user_id OR (p.closed_at IS NULL AND NOT p.is_answered)))
   OR EXISTS(SELECT 1 FROM life_group_shares s JOIN small_groups g ON g.id=s.group_id
-    WHERE s.id=n.share_id AND s.withdrawn_at IS NULL AND g.is_active
+    WHERE s.id=n.share_id AND ${requestScope?churchPredicate('g'):'TRUE'} AND EXISTS(SELECT 1 FROM users ru WHERE ru.id=n.user_id AND ru.church=g.church) AND s.withdrawn_at IS NULL AND g.is_active
     AND ((g.leader_user_id=n.user_id OR g.co_leader_user_id=n.user_id) OR g.pastor_user_id=n.user_id OR EXISTS(
       SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=n.user_id AND m.is_active AND m.history_from<=s.created_at))))
   AND (n.family_comment_id IS NULL OR EXISTS(SELECT 1 FROM life_group_comments c WHERE c.id=n.family_comment_id AND c.share_id=n.share_id AND c.withdrawn_at IS NULL))`;
@@ -33,10 +34,10 @@ export async function notificationFeed(actor: string, cursor?: { at: string; id:
   try {
     await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const snapshotAt = (await c.query(`SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at`)).rows[0].at;
-    const unreadCount = (await c.query(`SELECT count(*)::int AS count FROM interaction_notifications n WHERE n.user_id=$1 AND n.read_at IS NULL AND ${visibleNotification}`, [actor])).rows[0].count;
+    const unreadCount = (await c.query(`SELECT count(*)::int AS count FROM interaction_notifications n WHERE n.user_id=$1 AND n.read_at IS NULL AND ${visibleNotification()}`, [actor])).rows[0].count;
     const rows = (await c.query(`SELECT n.id,n.kind,n.created_at AS "createdAt",to_char(n.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorAt",n.read_at AS "readAt",n.prayer_id,n.share_id,n.prayer_comment_id,n.family_comment_id,s.group_id
       FROM interaction_notifications n LEFT JOIN life_group_shares s ON s.id=n.share_id
-      WHERE n.user_id=$1 AND ${visibleNotification} AND ($2::timestamptz IS NULL OR (n.created_at,n.id)<($2::timestamptz,$3::uuid))
+      WHERE n.user_id=$1 AND ${visibleNotification()} AND ($2::timestamptz IS NULL OR (n.created_at,n.id)<($2::timestamptz,$3::uuid))
       ORDER BY n.created_at DESC,n.id DESC LIMIT 31`, [actor,cursor?.at || null,cursor?.id || null])).rows;
     await c.query('COMMIT');
     const items = rows.slice(0,30).map(n => ({ id:n.id,kind:n.kind as NotificationKind,title:notificationLabels[n.kind as NotificationKind],createdAt:n.createdAt,readAt:n.readAt,
@@ -49,8 +50,8 @@ export async function notificationFeed(actor: string, cursor?: { at: string; id:
 }
 
 export async function markNotificationRead(actor: string, id: string) {
-  return !!(await pool.query(`UPDATE interaction_notifications n SET read_at=COALESCE(read_at,now()) WHERE n.id=$1 AND n.user_id=$2 AND ${visibleNotification} RETURNING id`,[id,actor])).rowCount;
+  return !!(await pool.query(`UPDATE interaction_notifications n SET read_at=COALESCE(read_at,now()) WHERE n.id=$1 AND n.user_id=$2 AND ${visibleNotification()} RETURNING id`,[id,actor])).rowCount;
 }
 export async function markNotificationsRead(actor: string, before: string) {
-  await pool.query(`UPDATE interaction_notifications n SET read_at=now() WHERE n.user_id=$1 AND read_at IS NULL AND created_at<=$2::timestamptz AND created_at<=now() AND ${visibleNotification}`,[actor,before]);
+  await pool.query(`UPDATE interaction_notifications n SET read_at=now() WHERE n.user_id=$1 AND read_at IS NULL AND created_at<=$2::timestamptz AND created_at<=now() AND ${visibleNotification()}`,[actor,before]);
 }

@@ -23,7 +23,7 @@ export async function runInteractionEmails(options: { dryRun?: boolean; userIds?
     AND ($1::uuid[] IS NULL OR p.user_id=ANY($1::uuid[]))
     AND NOT EXISTS(SELECT 1 FROM interaction_email_deliveries d WHERE d.user_id=p.user_id AND d.batch_hour=$2)
     AND EXISTS(SELECT 1 FROM interaction_notifications n WHERE n.user_id=p.user_id AND n.read_at IS NULL AND n.email_claimed_at IS NULL
-      AND n.created_at>=p.interaction_email_consent_at AND n.created_at<=$3::timestamptz-interval '5 minutes' AND ${visibleNotification})
+      AND n.created_at>=p.interaction_email_consent_at AND n.created_at<=$3::timestamptz-interval '5 minutes' AND ${visibleNotification(false)})
     ORDER BY p.user_id LIMIT 50`,[options.userIds || null,hour,now])).rows;
   const result = {eligible:users.length,accepted:0,unconfirmed:0,skipped:0,dryRun};
   if (dryRun) return result;
@@ -38,7 +38,7 @@ export async function runInteractionEmails(options: { dryRun?: boolean; userIds?
         WHERE p.user_id=$1 AND p.interaction_email_enabled AND p.interaction_email_consent_at IS NOT NULL FOR UPDATE OF p SKIP LOCKED`,[u.user_id])).rows[0];
       if (p) {
         const ids = (await c.query(`SELECT n.id FROM interaction_notifications n WHERE n.user_id=$1 AND n.read_at IS NULL AND n.email_claimed_at IS NULL
-          AND n.created_at>=$2::timestamptz AND n.created_at<=$3::timestamptz-interval '5 minutes' AND ${visibleNotification}
+          AND n.created_at>=$2::timestamptz AND n.created_at<=$3::timestamptz-interval '5 minutes' AND ${visibleNotification(false)}
           ORDER BY n.created_at LIMIT 500 FOR UPDATE OF n`,[u.user_id,p.consent,now])).rows.map(n => n.id);
         if (ids.length && (await c.query(`INSERT INTO interaction_email_deliveries(user_id,batch_hour,status) VALUES($1,$2,'claimed') ON CONFLICT DO NOTHING RETURNING user_id`,[u.user_id,hour])).rowCount) {
           await c.query('UPDATE interaction_notifications SET email_claimed_at=$2 WHERE id=ANY($1::uuid[])',[ids,now]);
@@ -52,7 +52,7 @@ export async function runInteractionEmails(options: { dryRun?: boolean; userIds?
     // Recheck consent and visibility immediately before handing off a generic unread digest.
     const current = (await pool.query(`SELECT 1 FROM user_email_preferences p JOIN users u ON u.id=p.user_id
       WHERE p.user_id=$1 AND p.interaction_email_enabled AND p.interaction_email_consent_at=$2::timestamptz AND u.email=$3
-      AND EXISTS(SELECT 1 FROM interaction_notifications n WHERE n.user_id=p.user_id AND n.id=ANY($4::uuid[]) AND n.read_at IS NULL AND ${visibleNotification})`,[u.user_id,claim.consent,claim.email,claim.ids])).rowCount;
+      AND EXISTS(SELECT 1 FROM interaction_notifications n WHERE n.user_id=p.user_id AND n.id=ANY($4::uuid[]) AND n.read_at IS NULL AND ${visibleNotification(false)})`,[u.user_id,claim.consent,claim.email,claim.ids])).rowCount;
     if (!current || options.stopped?.() || !emailProviderStatus().interactionNotificationsEnabled) {
       await pool.query("UPDATE interaction_email_deliveries SET status='skipped' WHERE user_id=$1 AND batch_hour=$2",[u.user_id,hour]); result.skipped++; continue;
     }

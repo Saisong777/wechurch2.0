@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { scrubTelemetryText, telemetryMetadata, telemetryPath } from '@shared/telemetryPrivacy';
 
 type TelemetryPayload = Record<string, unknown>;

@@ -1,3 +1,4 @@
+import { selectedChurch, assertSelectedChurch, churchContext, lockChurchContext } from './churchContext';
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
@@ -23,7 +24,7 @@ export async function activeGrants(userId: string): Promise<AccessGrant[]> {
       AND (g.scope<>'member' OR m.church=ANY($2::text[]))`, [userId, getChurchAliases(church)])).rows;
 }
 export async function hasPermission(userId: string, permission: Permission, scope?: 'site' | 'church') {
-  return (await activeGrants(userId)).some(g => (!scope || g.scope === scope) && g.permissions.includes(permission));
+  return (await activeGrants(userId)).some(g => (!churchContext() || normalizeChurch(g.church)===selectedChurch()) && (!scope || g.scope === scope) && g.permissions.includes(permission));
 }
 export async function memberRoleNames(ids:string[]) {
   if(!ids.length)return new Map<string,string[]>();
@@ -45,10 +46,11 @@ export async function accessActor(id: string, c: Pick<PoolClient, 'query'> = poo
 }
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
 async function director(id: string, church: string, c: Pick<PoolClient, 'query'> = pool) {
+  assertSelectedChurch(church);
   const a = await accessActor(id, c);
   if (a.role !== 'admin' && !(a.role === 'senior_pastor' && a.church === normalizeChurch(church))) throw new GroupError(403, '只有管理員或所屬教會主任牧師可以授權。');
   return a;
@@ -104,17 +106,17 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
   });
   router.get('/', async (req, res) => {
     const a = await accessActor(res.locals.actor);
-    const church = normalizeChurch(z.string().max(120).optional().parse(req.query.church) || a.church);
+    const church = selectedChurch();
     if (!church) throw new GroupError(400, '請先指定教會。');
     await director(a.id, church);
     const aliases = getChurchAliases(church);
     const users = (await pool.query(`SELECT u.id,coalesce(u.display_name,u.email) AS name,u.email,coalesce(r.role,'member') AS role
       FROM users u LEFT JOIN user_roles r ON r.user_id=u.id WHERE u.church=ANY($1::text[]) ORDER BY name,u.id`, [aliases])).rows;
-    const roles = (await pool.query('SELECT id,name,permissions,version,true AS editable FROM access_roles WHERE church=$1 ORDER BY created_at,id', [church])).rows;
+    const roles = (await pool.query('SELECT id,name,permissions,version,true AS editable FROM access_roles WHERE church=ANY($1::text[]) ORDER BY created_at,id', [aliases])).rows;
     const groups = (await pool.query('SELECT id,name FROM small_groups WHERE church=ANY($1::text[]) AND is_active ORDER BY name,id', [aliases])).rows;
-    const grants = (await pool.query(`SELECT ${projection} FROM ${joins} WHERE g.church=$1 ORDER BY g.created_at DESC LIMIT 2000`, [church])).rows;
+    const grants = (await pool.query(`SELECT ${projection} FROM ${joins} WHERE g.church=ANY($1::text[]) ORDER BY g.created_at DESC LIMIT 2000`, [aliases])).rows;
     const history = (await pool.query(`SELECT a.id,a.action,a.target_id AS "targetId",a.created_at AS "createdAt",u.display_name AS "actorName",a.before_value AS before,a.after_value AS after
-      FROM access_audit a JOIN users u ON u.id=a.actor_id WHERE a.church=$1 ORDER BY a.created_at DESC,a.id LIMIT 100`, [church])).rows;
+      FROM access_audit a JOIN users u ON u.id=a.actor_id WHERE a.church=ANY($1::text[]) ORDER BY a.created_at DESC,a.id LIMIT 100`, [aliases])).rows;
     const legacyScopes = (await pool.query(`SELECT a.id,a.assignee_user_id AS "userId",a.scope_type AS scope,a.can_view_personal AS "canViewPersonal",
       a.can_manage_care AS "canManageCare",a.can_manage_members AS "canManageMembers",a.ends_at AS "expiresAt",coalesce(s.name,m.display_name,a.church,'指定成員') AS "scopeName"
       FROM crm_scope_assignments a JOIN users u ON u.id=a.assignee_user_id LEFT JOIN small_groups s ON s.id=a.group_id LEFT JOIN users m ON m.id=a.member_user_id
@@ -139,7 +141,7 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
     const input = roleTemplateInput.parse(rest), church = normalizeChurch(raw)!;
     const role = await transaction(async c => {
       const a = await director(res.locals.actor, church, c);
-      if (a.role !== 'admin' && input.permissions.some(p => globalPermissions.includes(p))) throw new GroupError(403, '全站功能只能由系統管理員授權。');
+      if (a.role !== 'admin' && input.permissions.some(p => globalPermissions.includes(p))) throw new GroupError(403, '教會課表與分享管理只能由系統管理員授權。');
       const row = (await c.query('INSERT INTO access_roles(church,name,permissions) VALUES($1,$2,$3) RETURNING id', [church,input.name,JSON.stringify(input.permissions)])).rows[0];
       await audit(c, a.id, church, row.id, '新增職分', null, input); return row;
     });
@@ -151,7 +153,7 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
       const old = (await c.query('SELECT * FROM access_roles WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if (!old) throw new GroupError(404,'找不到職分。');
       const a = await director(res.locals.actor, old.church, c);
-      if (a.role !== 'admin' && [...old.permissions,...input.permissions].some(p => globalPermissions.includes(p))) throw new GroupError(403,'全站功能只能由系統管理員授權。');
+      if (a.role !== 'admin' && [...old.permissions,...input.permissions].some(p => globalPermissions.includes(p))) throw new GroupError(403,'教會課表與分享管理只能由系統管理員授權。');
       if (old.version !== input.version) throw new GroupError(409,'職分已更新，請重新載入。');
       await c.query('UPDATE access_roles SET name=$2,permissions=$3,version=version+1 WHERE id=$1', [id,input.name,JSON.stringify(input.permissions)]);
       await audit(c,a.id,old.church,id,'修改職分範本',old,input);
@@ -163,7 +165,7 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
     if (input.expiresAt && Date.parse(input.expiresAt) <= Date.now()) throw new GroupError(400,'到期時間必須在未來。');
     return transaction(async c => {
       const a = await director(actor, church, c);
-      if (input.scope === 'site' && a.role !== 'admin') throw new GroupError(403,'全站功能只能由系統管理員授權。');
+      if (input.permissions.some(p=>globalPermissions.includes(p)) && a.role !== 'admin') throw new GroupError(403,'教會課表與分享管理只能由系統管理員授權。');
       const createId=input.requestId || randomUUID();
       if(!id){
         await c.query("SELECT pg_advisory_xact_lock(hashtext('access-grant:' || $1))",[createId]);
@@ -179,13 +181,13 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
       }
       const target = await accessActor(input.userId,c);
       if (target.church !== church) throw new GroupError(403,'成員必須屬於指定教會。');
-      if (!(await c.query('SELECT id FROM access_roles WHERE id=$1 AND church=$2 FOR SHARE',[input.roleId,church])).rowCount) throw new GroupError(403,'職分不屬於此教會。');
+      if (!(await c.query('SELECT id FROM access_roles WHERE id=$1 AND church=ANY($2::text[]) FOR SHARE',[input.roleId,getChurchAliases(church)])).rowCount) throw new GroupError(403,'職分不屬於此教會。');
       if (input.groupId && !(await c.query('SELECT id FROM small_groups WHERE id=$1 AND church=ANY($2) AND is_active FOR SHARE',[input.groupId,getChurchAliases(church)])).rowCount) throw new GroupError(403,'小家不在此教會。');
       if (input.memberId && (await accessActor(input.memberId,c)).church !== church) throw new GroupError(403,'指定會員不在此教會。');
       const old = id ? (await c.query('SELECT * FROM access_grants WHERE id=$1 FOR UPDATE',[id])).rows[0] : null;
-      if (id && (!old || old.church !== church || old.user_id !== input.userId || old.role_id !== input.roleId)) throw new GroupError(404,'找不到相同成員的授權。');
+      if (id && (!old || normalizeChurch(old.church) !== church || old.user_id !== input.userId || old.role_id !== input.roleId)) throw new GroupError(404,'找不到相同成員的授權。');
       if (id && (!old.active || old.version !== input.version)) throw new GroupError(409,'授權已更新或撤回，請重新載入。');
-      if (old?.scope === 'site' && a.role !== 'admin') throw new GroupError(403,'全站授權限系統管理員調整。');
+      if (old?.permissions.some((p:Permission)=>globalPermissions.includes(p)) && a.role !== 'admin') throw new GroupError(403,'全站授權限系統管理員調整。');
       const values = [input.userId,input.roleId,church,input.scope,input.groupId,input.memberId,JSON.stringify(input.permissions),input.expiresAt,input.reason];
       const row = id
         ? (await c.query('UPDATE access_grants SET user_id=$1,role_id=$2,church=$3,scope=$4,group_id=$5,member_id=$6,permissions=$7,expires_at=$8,reason=$9,version=version+1,updated_at=now() WHERE id=$10 RETURNING id',[...values,id])).rows[0]
@@ -201,7 +203,7 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
       const old=(await c.query('SELECT * FROM access_grants WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new GroupError(404,'找不到授權。');
       const a=await director(res.locals.actor,old.church,c);
-      if(old.scope==='site' && a.role!=='admin')throw new GroupError(403,'全站授權限系統管理員調整。');
+      if(old.permissions.some((p:Permission)=>globalPermissions.includes(p)) && a.role!=='admin')throw new GroupError(403,'全站授權限系統管理員調整。');
       if(!old.active || old.version!==input.version)throw new GroupError(409,'授權已更新或撤回，請重新載入。');
       await c.query('UPDATE access_grants SET active=false,version=version+1,updated_at=now() WHERE id=$1',[id]);
       await audit(c,a.id,old.church,id,'撤回授權',old,input);

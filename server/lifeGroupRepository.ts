@@ -1,3 +1,5 @@
+import { normalizeChurch } from '../shared/churches';
+import { assertSelectedChurch, selectedChurch, churchPredicate, churchContext, lockChurchContext } from './churchContext';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { z } from 'zod';
@@ -12,12 +14,12 @@ const missing = () => new GroupError(404, '找不到內容，或你已不在這�
 const conflict = () => new GroupError(409, '內容已更新，請重新載入後再試；你的輸入尚未送出。');
 const activeMember = `((g.leader_user_id=$2 OR g.co_leader_user_id=$2) OR g.pastor_user_id=$2 OR EXISTS (SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$2 AND m.is_active))`;
 const nameSql = (alias: string) => `COALESCE(NULLIF(${alias}.display_name,''),'小家成員')`;
-export const visibleContent = (alias: string, actor = '$2') => `(EXISTS(SELECT 1 FROM small_groups vg WHERE vg.id=${alias}.group_id AND ((vg.leader_user_id=${actor} OR vg.co_leader_user_id=${actor}) OR vg.pastor_user_id=${actor}))
-  OR EXISTS(SELECT 1 FROM small_group_members vm WHERE vm.group_id=${alias}.group_id AND vm.user_id=${actor} AND vm.is_active AND vm.history_from<=${alias}.created_at))`;
+export const visibleContent = (alias: string, actor = '$2') => `(EXISTS(SELECT 1 FROM small_groups vg WHERE vg.id=${alias}.group_id AND ${churchPredicate('vg')} AND ((vg.leader_user_id=${actor} OR vg.co_leader_user_id=${actor}) OR vg.pastor_user_id=${actor}))
+  OR EXISTS(SELECT 1 FROM small_group_members vm WHERE vm.group_id=${alias}.group_id AND EXISTS(SELECT 1 FROM small_groups vg WHERE vg.id=vm.group_id AND ${churchPredicate('vg')}) AND vm.user_id=${actor} AND vm.is_active AND vm.history_from<=${alias}.created_at))`;
 
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (e) { await c.query('ROLLBACK'); throw e; }
   finally { c.release(); }
 }
@@ -25,6 +27,7 @@ export async function groupAccess(c: PoolClient, groupId: string, actor: string,
   // Locks protect against membership removal during a read or mutation, including CRM changes.
   const g = (await c.query('SELECT g.*,(SELECT display_name FROM users WHERE id=g.leader_user_id) AS leader_name,(SELECT display_name FROM users WHERE id=g.co_leader_user_id) AS co_leader_name FROM small_groups g WHERE g.id=$1 AND g.is_active FOR SHARE OF g', [groupId])).rows[0];
   if (!g) throw missing();
+  assertSelectedChurch(g.church);
   const manager = g.leader_user_id === actor || g.co_leader_user_id === actor || g.pastor_user_id === actor;
   const membership = await c.query('SELECT id FROM small_group_members WHERE group_id=$1 AND user_id=$2 AND is_active FOR SHARE', [groupId, actor]);
   if (!manager && (!membership.rowCount || managerOnly)) throw missing();
@@ -41,15 +44,13 @@ export async function myGroups(actor: string) {
   const groups = (await pool.query(`SELECT g.id,g.name,g.church,(SELECT display_name FROM users WHERE id=g.leader_user_id) AS "leaderName",(SELECT display_name FROM users WHERE id=g.co_leader_user_id) AS "coLeaderName",((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1) IS TRUE AS manager,
     CASE WHEN (g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 THEN (SELECT count(*)::int FROM life_group_requests r WHERE r.group_id=g.id AND r.status='pending') ELSE 0 END AS "pendingRequestCount",
     (SELECT count(DISTINCT uid)::int FROM (SELECT user_id AS uid FROM small_group_members WHERE group_id=g.id AND is_active UNION SELECT g.leader_user_id UNION SELECT g.co_leader_user_id UNION SELECT g.pastor_user_id) a WHERE uid IS NOT NULL) AS "memberCount"
-    FROM small_groups g WHERE g.is_active AND ${activeMember.replaceAll('$2', '$1')} ORDER BY g.name`, [actor])).rows;
-  const requests = (await pool.query("SELECT r.group_id AS id,g.name,r.status FROM life_group_requests r JOIN small_groups g ON g.id=r.group_id WHERE r.user_id=$1 AND g.is_active AND r.status!='approved' ORDER BY r.created_at DESC", [actor])).rows;
+    FROM small_groups g WHERE g.is_active AND ${churchPredicate('g')} AND ${activeMember.replaceAll('$2', '$1')} ORDER BY g.name`, [actor])).rows;
+  const requests = (await pool.query(`SELECT r.group_id AS id,g.name,r.status FROM life_group_requests r JOIN small_groups g ON g.id=r.group_id WHERE r.user_id=$1 AND g.is_active AND r.status!='approved' AND ${churchPredicate('g')} ORDER BY r.created_at DESC`, [actor])).rows;
   return { groups, requests, canCreate: await canCreateGroup(actor) };
 }
 export async function createGroup(actor: string, name: string) {
   if (!await canCreateGroup(actor)) throw new GroupError(403, '請由小家長或同工建立小家。');
-  const user = (await pool.query('SELECT church FROM users WHERE id=$1', [actor])).rows[0];
-  if (!user?.church) throw new GroupError(400, '請在牧養後台選擇小家所屬教會。');
-  return createFamily(actor, { name, church: user.church });
+  return createFamily(actor, { name, church: selectedChurch() });
 }
 async function members(c: PoolClient, id: string) {
   return (await c.query(`SELECT u.id,${nameSql('u')} AS name,(u.id=g.leader_user_id OR u.id=g.co_leader_user_id OR u.id=g.pastor_user_id) IS TRUE AS manager
@@ -71,8 +72,10 @@ export function rotateInvite(id: string, actor: string) {
 }
 export function requestJoin(actor: string, token: string) {
   return transaction(async c => {
-    const invitation = (await c.query("SELECT i.group_id,g.name FROM life_group_invites i JOIN small_groups g ON g.id=i.group_id WHERE (i.token_hash=$1 OR i.short_code_hash=$1) AND i.expires_at>now() AND g.is_active AND g.lifecycle='active' FOR SHARE OF i,g", [hashToken(token)])).rows[0];
+    const invitation = (await c.query("SELECT i.group_id,g.name,g.church FROM life_group_invites i JOIN small_groups g ON g.id=i.group_id WHERE (i.token_hash=$1 OR i.short_code_hash=$1) AND i.expires_at>now() AND g.is_active AND g.lifecycle='active' FOR SHARE OF i,g", [hashToken(token)])).rows[0];
     if (!invitation) throw new GroupError(404, '邀請碼無效或已過期，請向小家長索取。');
+    assertSelectedChurch(invitation.church);
+    if(churchContext()?.actorChurch!==normalizeChurch(invitation.church))throw missing();
     const already = (await c.query(`SELECT 1 FROM small_groups g WHERE g.id=$1 AND ${activeMember}`, [invitation.group_id, actor])).rowCount;
     if (already) return { status: 'approved', name: invitation.name };
     await c.query("INSERT INTO life_group_requests(group_id,user_id,status) VALUES($1,$2,'pending') ON CONFLICT(group_id,user_id) DO UPDATE SET status='pending',created_at=now()", [invitation.group_id, actor]);
@@ -83,6 +86,7 @@ export function decideJoin(id: string, actor: string, userId: string, approve: b
   return transaction(async c => {
     await c.query('SELECT id FROM small_groups WHERE id=$1 FOR UPDATE', [id]);
     const group = await groupAccess(c, id, actor, true);
+    if(approve && !(await c.query('SELECT 1 FROM users WHERE id=$1 AND church=$2 FOR SHARE',[userId,group.church])).rowCount)throw missing();
     if (approve && group.status !== 'active') throw new GroupError(409, '請先恢復小家運作，再確認新成員。');
     const r = await c.query("UPDATE life_group_requests SET status=$3 WHERE group_id=$1 AND user_id=$2 AND status='pending' RETURNING user_id", [id, userId, approve ? 'approved' : 'rejected']);
     if (!r.rowCount) throw conflict();
@@ -105,15 +109,15 @@ export function removeMember(id: string, actor: string, userId: string) {
   });
 }
 export function groupReading(id: string, actor: string, date: string) {
-  return withGroup(id, actor, async c => {
-    const entry = (await c.query(`SELECT id,date::text,version,plan_name AS "planName",scripture_reference AS reference,scripture_text AS "scriptureText",devotional_title AS title,devotional_text AS body,prayer,love_action AS "loveAction" FROM church_devotions WHERE date=$1 AND status='published'`, [date])).rows[0] || null;
+  return withGroup(id, actor, async (c,group) => {
+    const entry = (await c.query(`SELECT id,date::text,version,plan_name AS "planName",scripture_reference AS reference,scripture_text AS "scriptureText",devotional_title AS title,devotional_text AS body,prayer,love_action AS "loveAction" FROM church_devotions WHERE date=$1 AND status='published' AND church=$2`, [date,group.church])).rows[0] || null;
     const readers = entry ? (await c.query(`SELECT u.id,${nameSql('u')} AS name FROM life_group_reading r JOIN users u ON u.id=r.user_id JOIN small_groups g ON g.id=r.group_id WHERE r.group_id=$1 AND r.devotion_id=$2 AND r.devotion_version=$3 AND ((g.leader_user_id=u.id OR g.co_leader_user_id=u.id) OR g.pastor_user_id=u.id OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=u.id AND m.is_active)) ORDER BY r.created_at`, [id, entry.id, entry.version])).rows : [];
     return { entry, readers };
   });
 }
 export function markReading(id: string, actor: string, devotionId: string, version: number, done: boolean) {
-  return withGroup(id, actor, async c => {
-    if (!(await c.query("SELECT id FROM church_devotions WHERE id=$1 AND version=$2 AND status='published' FOR SHARE", [devotionId, version])).rowCount) throw conflict();
+  return withGroup(id, actor, async (c,group) => {
+    if (!(await c.query("SELECT id FROM church_devotions WHERE id=$1 AND version=$2 AND status='published' AND church=$3 FOR SHARE", [devotionId, version,group.church])).rowCount) throw conflict();
     if (done) await c.query('INSERT INTO life_group_reading(group_id,user_id,devotion_id,devotion_version) VALUES($1,$2,$3,$4) ON CONFLICT(group_id,user_id,devotion_id) DO UPDATE SET devotion_version=$4,created_at=now()', [id, actor, devotionId, version]);
     else await c.query('DELETE FROM life_group_reading WHERE group_id=$1 AND user_id=$2 AND devotion_id=$3', [id, actor, devotionId]);
     return { ok: true };
@@ -171,11 +175,14 @@ export function editShare(id: string, actor: string, shareId: string, input: z.i
   });
 }
 export function withdrawShare(id: string, actor: string, shareId: string) {
-  return withGroup(id, actor, async (c, g) => {
-    const s = await share(c, id, shareId, actor);
-    if (s.author_id !== actor && !g.manager) throw missing();
-    await c.query('UPDATE life_group_shares SET withdrawn_at=now() WHERE id=$1', [shareId]);
-    return { ok: true };
+  return transaction(async c => {
+    // Historical owners can withdraw just their own copy, without reading the former church/group body.
+    const own=await c.query('UPDATE life_group_shares SET withdrawn_at=COALESCE(withdrawn_at,now()) WHERE id=$1 AND group_id=$2 AND author_id=$3 RETURNING id',[shareId,id,actor]);
+    if(own.rowCount)return {ok:true};
+    const g=await groupAccess(c,id,actor,true);
+    if(!g.manager)throw missing();
+    if(!(await c.query('UPDATE life_group_shares SET withdrawn_at=COALESCE(withdrawn_at,now()) WHERE id=$1 AND group_id=$2 RETURNING id',[shareId,id])).rowCount)throw missing();
+    return {ok:true};
   });
 }
 export function shareComments(id: string, actor: string, shareId: string, offset: number) {

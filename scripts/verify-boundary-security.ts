@@ -8,6 +8,7 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
     assert.equal((await guest(`/api/prayer-meetings/${randomUUID()}/participants`, method)).status, 410);
   }
   const host = makeClient();
+  assert.equal((await host('/api/auth/register','POST',{email:`game-host-${randomUUID()}@example.test`,password:randomUUID(),displayName:'Synthetic game host'})).status,200);
   const create = await host('/api/icebreaker/games', 'POST', { mode: 'standalone', currentLevel: 'L1' });
   assert.equal(create.status, 200); const game = await create.json();
   assert.equal((await guest(`/api/icebreaker/games/${game.roomCode}`)).status, 200);
@@ -17,13 +18,13 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   assert.equal((await host(`/api/icebreaker/games/${game.id}`, 'PATCH', { timerRunning: true })).status, 200);
   assert.equal((await host(`/api/icebreaker/games/${game.id}`, 'PATCH', { bibleStudySessionId: randomUUID() })).status, 400);
   assert.equal((await host(`/api/icebreaker/games/${game.id}/reset`, 'POST')).status, 200);
-  assert.equal((await guest('/api/icebreaker/games', 'POST', { mode: 'session', bibleStudySessionId: randomUUID(), groupNumber: 1 })).status, 403);
+  assert.equal((await guest('/api/icebreaker/games', 'POST', { mode: 'session', bibleStudySessionId: randomUUID(), groupNumber: 1 })).status, 401);
 
   // Real HTTP access checks run before the existing administrator promotion.
   const actorBefore = (await pool.query('SELECT church, display_name FROM users WHERE id=$1', [ids[0]])).rows[0];
   assert.equal((await pool.query('SELECT role FROM user_roles WHERE user_id=$1', [ids[0]])).rows[0].role, 'leader');
-  const ownChurch = `Boundary own ${randomUUID()}`;
-  const otherChurch = `Boundary other ${randomUUID()}`;
+  const ownChurch = 'IM 行動教會';
+  const otherChurch = '火樂';
   await pool.query('UPDATE users SET church=$2 WHERE id=$1', [ids[0], ownChurch]);
   const privateUserId = randomUUID();
   await pool.query(`INSERT INTO users(id,email,display_name,church,birthday,user_gender,address)
@@ -40,11 +41,13 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   assert.equal((await a(`/api/users/${ids[0]}/profile`, 'PATCH', { displayName: 'Boundary self edit' })).status, 200);
   assert.deepEqual((await pool.query('SELECT church,birthday::text,user_gender,address FROM users WHERE id=$1', [ids[0]])).rows[0], personalBefore, 'omitted profile fields are preserved');
 
+  // Cross-church grants cannot bypass tenant isolation; same-church delegation retains its original boundaries.
+  await pool.query('UPDATE users SET church=$2 WHERE id=$1',[privateUserId,ownChurch]);
   // Visibility alone must not grant personal-field access or member editing.
   const assignmentId = randomUUID();
   await pool.query(`INSERT INTO crm_scope_assignments(id,assignee_user_id,scope_type,member_user_id)
     VALUES($1,$2,'member',$3)`, [assignmentId, ids[0], privateUserId]);
-  const listResponse = await a('/api/users?church=all'); assert.equal(listResponse.status, 200);
+  const listResponse = await a('/api/users'); assert.equal(listResponse.status, 200);
   const redacted = (await listResponse.json()).find((user: { id: string }) => user.id === privateUserId);
   assert.ok(redacted, 'assigned member remains visible in the directory');
   for (const key of ['password', 'email', 'birthday', 'userGender', 'address']) assert.equal(key in redacted, false, `${key} must be redacted`);
@@ -62,7 +65,8 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   const createdSession = await a('/api/sessions', 'POST', { verseReference: 'Boundary fixture', churchUnit: ownChurch });
   assert.equal(createdSession.status, 201); const ownSession = await createdSession.json();
   assert.equal(ownSession.ownerId, ids[0]); assert.equal(ownSession.churchUnit, ownChurch);
-  assert.equal((await a('/api/sessions', 'POST', { verseReference: 'Unauthorized church', churchUnit: otherChurch })).status, 403);
+  const internalUnit=await a('/api/sessions','POST',{verseReference:'Synthetic internal unit',churchUnit:'內部合成聚會單位'});assert.equal(internalUnit.status,201);assert.equal((await internalUnit.json()).church,ownChurch);
+  assert.equal((await a('/api/sessions','POST',{verseReference:'Forged snapshot',church:otherChurch})).status,400);
   assert.equal((await a('/api/sessions', 'POST', { verseReference: 'Unauthorized owner', ownerId: ids[1] })).status, 403);
   assert.equal((await a(`/api/sessions/${ownSession.id}`, 'PATCH', { status: 'studying' })).status, 200, 'legitimate owner can manage');
   for (const change of [{ churchUnit: otherChurch }, { ownerId: ids[1] }]) {
@@ -70,8 +74,8 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   }
   const foreignSessionId = randomUUID();
   // Even historical ownership cannot bypass a different church boundary.
-  await pool.query(`INSERT INTO sessions(id,owner_id,church_unit,verse_reference)
-    VALUES($1,$2,$3,'Foreign fixture')`, [foreignSessionId, ids[0], otherChurch]);
+  await pool.query(`INSERT INTO sessions(id,owner_id,church_unit,church,verse_reference)
+    VALUES($1,$2,$3,$3,'Foreign fixture')`, [foreignSessionId, ids[0], otherChurch]);
   const participantId = randomUUID(), responseId = randomUUID();
   await pool.query(`INSERT INTO participants(id,session_id,name,email,gender)
     VALUES($1,$2,'Boundary participant',$3,'male')`, [participantId, foreignSessionId, `boundary-participant-${randomUUID()}@example.test`]);
@@ -96,9 +100,10 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   await pool.query(`INSERT INTO potential_members(id,email,name,gender,church,status,subscribed,sessions_count)
     VALUES($1,$2,'Preserve name','female',$3,'member',false,7)`, [knownId, ` ${knownEmail.toUpperCase()} `, otherChurch]);
   const intakeBefore = (await pool.query('SELECT to_jsonb(p) AS row FROM potential_members p WHERE id=$1', [knownId])).rows[0].row;
-  const duplicate = await guest('/api/potential-members', 'POST', { email: knownEmail, name: 'Overwrite attempt', gender: 'male', church: ownChurch });
+  const intakeCode='intake-'+randomUUID();await pool.query("INSERT INTO message_cards(title,short_code,image_path,church) VALUES('Synthetic intake invitation',$1,'synthetic.png',$2)",[intakeCode,ownChurch]);
+  const duplicate = await guest('/api/potential-members', 'POST', { email: knownEmail, name: 'Overwrite attempt', gender: 'male',shortCode:intakeCode,consent:true });
   assert.equal(duplicate.status, 201); assert.deepEqual(await duplicate.json(), { success: true });
-  assert.equal((await guest('/api/potential-members', 'POST', { email: knownEmail, name: 'Mass assignment', userId: ids[0], status: 'pending' })).status, 400);
+  assert.equal((await guest('/api/potential-members', 'POST', { email: knownEmail, name: 'Mass assignment',shortCode:intakeCode,consent:true, userId: ids[0], status: 'pending' })).status, 400);
   const joinSessionId = randomUUID();
   await pool.query(`INSERT INTO sessions(id,owner_id,church_unit,verse_reference)
     VALUES($1,$2,$3,'Guest intake fixture')`, [joinSessionId, ids[0], ownChurch]);
@@ -106,7 +111,7 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   assert.deepEqual((await pool.query('SELECT to_jsonb(p) AS row FROM potential_members p WHERE id=$1', [knownId])).rows[0].row, intakeBefore, 'public intake and guest participation cannot modify existing CRM records');
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM potential_members WHERE lower(trim(email))=$1', [knownEmail])).rows[0].n, 1);
   const freshEmail = `boundary-new-${randomUUID()}@example.test`;
-  const receipts = await Promise.all([freshEmail, freshEmail.toUpperCase()].map(email => guest('/api/potential-members', 'POST', { email, name: 'New intake' })));
+  const receipts = await Promise.all([freshEmail, freshEmail.toUpperCase()].map(email => guest('/api/potential-members', 'POST', { email, name: 'New intake',shortCode:intakeCode,consent:true })));
   for (const receipt of receipts) { assert.equal(receipt.status, 201); assert.deepEqual(await receipt.json(), { success: true }); }
   const newRows = await pool.query('SELECT email,status FROM potential_members WHERE lower(trim(email))=$1', [freshEmail]);
   assert.deepEqual(newRows.rows, [{ email: freshEmail, status: 'pending' }], 'concurrent normalized intake inserts once');
@@ -116,13 +121,13 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   try {
     const adminProfile = await a(`/api/users/${privateUserId}/profile`); assert.equal(adminProfile.status, 200);
     assert.equal((await adminProfile.json()).address, 'Private fixture address');
-    assert.equal((await a(`/api/users/${privateUserId}/profile`, 'PATCH', { church: ownChurch })).status, 200);
+    assert.equal((await a(`/api/users/${privateUserId}/profile`, 'PATCH', { church: ownChurch,expectedChurch:ownChurch })).status, 200);
     assert.equal((await pool.query('SELECT church FROM users WHERE id=$1', [privateUserId])).rows[0].church, ownChurch);
-    assert.equal((await a(`/api/sessions/${foreignSessionId}`, 'PATCH', { verseReference: 'Authorized admin update' })).status, 200);
+    assert.equal((await a(`/api/sessions/${foreignSessionId}?church=${encodeURIComponent(otherChurch)}`, 'PATCH', { verseReference: 'Authorized admin update' })).status, 200);
     assert.equal((await pool.query('SELECT verse_reference FROM sessions WHERE id=$1', [foreignSessionId])).rows[0].verse_reference, 'Authorized admin update');
-    assert.equal((await a(`/api/study-responses/${responseId}`, 'DELETE')).status, 200);
+    assert.equal((await a(`/api/study-responses/${responseId}?church=${encodeURIComponent(otherChurch)}`, 'DELETE')).status, 200);
     assert.equal((await pool.query('SELECT id FROM study_responses WHERE id=$1', [responseId])).rowCount, 0);
-    assert.equal((await a(`/api/sessions/${foreignSessionId}`, 'DELETE')).status, 200);
+    assert.equal((await a(`/api/sessions/${foreignSessionId}?church=${encodeURIComponent(otherChurch)}`, 'DELETE')).status, 200);
     assert.equal((await pool.query('SELECT id FROM sessions WHERE id=$1', [foreignSessionId])).rowCount, 0);
     assert.equal((await pool.query('SELECT id FROM participants WHERE id=$1', [participantId])).rowCount, 0);
     console.log('PASS HTTP administrator profile/church and cross-church session management; persisted mutations verified');
@@ -135,12 +140,19 @@ export async function verifyBoundarySecurity(pool: Pool, a: Client, b: Client, g
   const valid = new FormData(); valid.set('image', new Blob([png], { type: 'image/png' }), 'misleading.html');
   const uploaded = await a('/api/message-cards/upload', 'POST', valid); assert.equal(uploaded.status, 200);
   const imagePath = (await uploaded.json()).imagePath; assert.match(imagePath, /^[a-f0-9]+\.png$/);
+  assert.equal((await a(`/api/message-cards/image/${imagePath}`, 'DELETE')).status,404,'unreferenced upload cannot be deleted via a fabricated card scope');
+  assert.equal((await guest(`/api/message-cards/image/${imagePath}`)).status,200,'orphan upload bytes retained');
+  const imageCardResponse = await a('/api/message-cards', 'POST', { title: 'Synthetic raster fixture', shortCode: randomUUID(), imagePath });
+  assert.equal(imageCardResponse.status, 201); const imageCard = await imageCardResponse.json();
   try {
     const media = await guest(`/api/message-cards/image/${imagePath}`);
     assert.equal(media.status, 200); assert.match(media.headers.get('content-security-policy') || '', /sandbox/);
     assert.equal((await guest('/api/message-cards/image/old.html')).status, 404);
     assert.equal((await guest('/uploads/avatars/old.svg')).status, 404);
-  } finally { assert.equal((await a(`/api/message-cards/image/${imagePath}`, 'DELETE')).status, 200); }
+  } finally {
+    assert.equal((await a(`/api/message-cards/image/${imagePath}`, 'DELETE')).status, 200);
+    assert.equal((await a(`/api/message-cards/${imageCard.id}`, 'DELETE')).status, 200);
+  }
   assert.equal((await guest('/api/webhooks/resend/inbound', 'POST', { from: 'fake@example.test', to: 'test@example.test' })).status, 503);
   console.log('PASS retired prayer boundary, host-bound games, immutable game scope, raster uploads, legacy active-file denial and fail-closed webhook');
 }

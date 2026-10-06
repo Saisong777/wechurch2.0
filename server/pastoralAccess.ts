@@ -1,3 +1,4 @@
+import { churchContext, selectedChurch } from './churchContext';
 import { getChurchAliases } from './churches';
 
 export interface PastoralAccessFilter {
@@ -16,6 +17,9 @@ export function appendPastoralAccessCondition(
   personAlias: string,
   access?: PastoralAccessFilter | null,
 ) {
+  const context=churchContext();
+  const ownerSelf=access?.accessLevel==='self'&&!!access.userId&&access.userId===context?.actorId;
+  if(context&&!ownerSelf){params.push(selectedChurch());conditions.push(`${personAlias}.church=$${params.length}`);}
   if (!access || access.accessLevel === "all") return;
 
   const clauses: string[] = [];

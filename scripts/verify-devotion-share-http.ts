@@ -10,7 +10,7 @@ export async function verifyDevotionShareHttp(pool:Pool,makeClient:()=>Client){
   if(client===owner){ownerCookie=registration.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');origin=new URL(registration.url).origin;}
   ids.push((await pool.query('SELECT id FROM users WHERE email=$1',[email])).rows[0].id);
  }
- const group=(await pool.query("INSERT INTO small_groups(name,church,leader_user_id) VALUES('Synthetic share group','Fixture',$1) RETURNING id",[ids[1]])).rows[0];
+ const group=(await pool.query("INSERT INTO small_groups(name,church,leader_user_id) VALUES('Synthetic share group','IM 行動教會',$1) RETURNING id",[ids[1]])).rows[0];
  await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2)',[group.id,ids[0]]);
  const makeNote=async()=>{const r=await owner('/api/devotional-notes','POST',{verseReference:'詩篇 23',verseText:'Synthetic scripture',observation:'PRIVATE fixture original',clientMutationId:randomUUID()});assert.equal(r.status,201);return (await r.json()).id as string;};
  const day=(await(await owner('/api/devotion-wall/window')).json()).day;
@@ -62,7 +62,7 @@ export async function verifyDevotionShareHttp(pool:Pool,makeClient:()=>Client){
  }finally{await removal.query('ROLLBACK');removal.release();}
  await pool.query('UPDATE small_group_members SET is_active=true WHERE group_id=$1 AND user_id=$2',[group.id,ids[0]]);
  // Existing co-manager and pastor access needs no ordinary membership row.
- const managerGroup=(await pool.query("INSERT INTO small_groups(name,church,co_leader_user_id) VALUES('Synthetic co manager','Fixture',$1) RETURNING id",[ids[0]])).rows[0];
+ const managerGroup=(await pool.query("INSERT INTO small_groups(name,church,co_leader_user_id) VALUES('Synthetic co manager','IM 行動教會',$1) RETURNING id",[ids[0]])).rows[0];
  assert.equal((await owner(endpoint(randomUUID()),'PUT',{...input,sourceId:await makeNote(),group:{groupId:managerGroup.id},wall:undefined})).status,201);
  await pool.query('UPDATE small_groups SET co_leader_user_id=NULL,pastor_user_id=$2 WHERE id=$1',[managerGroup.id,ids[0]]);
  assert.equal((await owner(endpoint(randomUUID()),'PUT',{...input,sourceId:await makeNote(),group:{groupId:managerGroup.id},wall:undefined})).status,201);

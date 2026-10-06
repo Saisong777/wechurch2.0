@@ -12,13 +12,13 @@ export async function verifyLeaderDashboardHttp(pool:Pool,makeClient:()=>Client)
   }
   const [a,b,senior,pastor,minister,admin,foreign]=clients;
   await pool.query("UPDATE users SET church='IM 行動教會' WHERE id=ANY($1::uuid[])",[ids]);
-  await pool.query("UPDATE users SET church='Other church' WHERE id=$1",[ids[6]]);
+  await pool.query("UPDATE users SET church='火樂' WHERE id=$1",[ids[6]]);
   for(const [n,role] of ['group_leader','group_leader','senior_pastor','pastor','minister','admin','senior_pastor'].entries()){
     await pool.query('DELETE FROM user_roles WHERE user_id=$1',[ids[n]]);
     await pool.query('INSERT INTO user_roles(user_id,role) VALUES($1,$2)',[ids[n],role]);
   }
   const g=randomUUID(),other=randomUUID();
-  await pool.query("INSERT INTO small_groups(id,name,church,leader_user_id) VALUES($1,'Dashboard family','IM 行動教會',$2),($3,'Foreign family','Other church',$4)",[g,ids[0],other,ids[6]]);
+  await pool.query("INSERT INTO small_groups(id,name,church,leader_user_id) VALUES($1,'Dashboard family','IM 行動教會',$2),($3,'Foreign family','火樂',$4)",[g,ids[0],other,ids[6]]);
   await pool.query("INSERT INTO small_group_members(group_id,user_id,history_from) VALUES($1,$2,now()),($1,$3,now())",[g,ids[1],ids[3]]);
   const prayers=[randomUUID(),randomUUID(),randomUUID()];
   await pool.query("INSERT INTO life_group_shares(id,group_id,author_id,kind,title,body,is_anonymous,created_at) VALUES($1,$2,$3,'prayer','ANON_SHARED','Shared only',true,now()-interval '10 days'),($4,$2,$3,'prayer','WITHDRAWN','Hidden',false,now()),($5,$6,$7,'prayer','FOREIGN_SHARED','Foreign',false,now())",[prayers[0],g,ids[0],prayers[1],prayers[2],other,ids[6]]);

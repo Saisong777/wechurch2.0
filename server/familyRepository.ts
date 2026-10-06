@@ -1,3 +1,4 @@
+import { assertSelectedChurch, selectedChurch, churchContext, churchPredicate, lockChurchContext } from './churchContext';
 import type { PoolClient } from 'pg';
 import type { z } from 'zod';
 import { pool } from './db';
@@ -9,7 +10,7 @@ import { familyCreateInput, familySettingsInput, matchingInput, matchingUpdateIn
 
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
 const denied = () => new GroupError(403, '不在你的小家管理範圍內。');
@@ -19,9 +20,11 @@ export async function familyAccess(actor: string) {
   return getCrmAccessContext(actor, await storage.getUserRole(actor), 'groups');
 }
 function churchAllowed(access: CrmAccessContext, church: string) {
+  if(normalizeChurch(church)!==selectedChurch())return false;
   return access.canEnterCrm && access.canManageMembers && (access.role === 'admin' || access.churchScopes.includes(normalizeChurch(church) || ''));
 }
 function groupAllowed(access: CrmAccessContext, g: { id: string; church: string; leader_user_id?: string; co_leader_user_id?: string; pastor_user_id?: string }) {
+  if(normalizeChurch(g.church)!==selectedChurch())return false;
   return churchAllowed(access, g.church) || g.leader_user_id === access.userId || g.co_leader_user_id === access.userId || g.pastor_user_id === access.userId || (access.canManageMembers && access.groupIds.includes(g.id));
 }
 function aliases(access: CrmAccessContext) { return [...new Set(access.churchScopes.flatMap(getChurchAliases))]; }
@@ -30,19 +33,22 @@ export async function familyDirectory(actor: string, church: string, search: str
   const own = (await pool.query('SELECT church FROM users WHERE id=$1', [actor])).rows[0];
   const churches = getKnownChurchOptions();
   const candidate = normalizeChurch(church || own?.church);
-  const selected = churches.some(c => c.id === candidate) ? candidate! : (!church && churches.length === 1 ? churches[0].id : '');
+  const selected = selectedChurch();
+  if(church && candidate!==selected)throw denied();
   const groups = selected ? (await pool.query(`SELECT g.id,g.name,g.church,g.description,g.meeting,g.audience,(SELECT display_name FROM users WHERE id=g.leader_user_id) AS "leaderName",(SELECT display_name FROM users WHERE id=g.co_leader_user_id) AS "coLeaderName",
     CASE WHEN (g.leader_user_id=$3 OR g.co_leader_user_id=$3) OR g.pastor_user_id=$3 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$3 AND m.is_active)
       THEN 'approved' ELSE (SELECT r.status FROM life_group_requests r WHERE r.group_id=g.id AND r.user_id=$3 AND r.status!='approved') END AS "membershipStatus"
     FROM small_groups g
     WHERE is_active AND lifecycle='active' AND is_listed AND church=ANY($1::text[]) AND strpos(lower(name),lower($2))>0
     ORDER BY name,id LIMIT 100`, [getChurchAliases(selected), search, actor])).rows : [];
-  return { churches, selectedChurch: selected, groups };
+  return { churches:churches.filter(c=>c.id===selected), selectedChurch: selected, groups };
 }
 export async function joinListedFamily(actor: string, id: string, message = '') {
   return transaction(async c => {
-    const g = (await c.query("SELECT id,name FROM small_groups WHERE id=$1 AND is_active AND lifecycle='active' AND is_listed FOR SHARE", [id])).rows[0];
+    const g = (await c.query("SELECT id,name,church FROM small_groups WHERE id=$1 AND is_active AND lifecycle='active' AND is_listed FOR SHARE", [id])).rows[0];
     if (!g) throw new GroupError(404, '這個小家目前不開放申請。');
+    assertSelectedChurch(g.church);
+    if(churchContext()?.actorChurch!==normalizeChurch(g.church))throw denied();
     const exists = (await c.query(`SELECT 1 FROM small_groups g WHERE g.id=$1 AND ((g.leader_user_id=$2 OR g.co_leader_user_id=$2) OR g.pastor_user_id=$2 OR EXISTS(SELECT 1 FROM small_group_members WHERE group_id=$1 AND user_id=$2 AND is_active))`, [id, actor])).rowCount;
     if (exists) return { status: 'approved' };
     await c.query("INSERT INTO life_group_requests(group_id,user_id,status,message) VALUES($1,$2,'pending',$3) ON CONFLICT(group_id,user_id) DO UPDATE SET status='pending',message=$3,created_at=now() WHERE life_group_requests.status!='pending'", [id, actor, message]);
@@ -58,14 +64,15 @@ export async function withdrawFamilyJoin(actor: string, id: string) {
 }
 export async function requestMatching(actor: string, input: z.infer<typeof matchingInput>) {
   const church = normalizeChurch(input.church)!;
+  assertSelectedChurch(church);
   if (!getKnownChurchOptions().some(c => c.id === church)) throw new GroupError(400, '請選擇教會。');
-  return (await pool.query(`INSERT INTO family_matching_requests(user_id,church,availability,region,contact) VALUES($1,$2,$3,$4,$5)
-    ON CONFLICT(user_id) WHERE status IN ('pending','contacting') DO NOTHING RETURNING id`, [actor, church, input.availability, input.region, input.contact])).rows[0] || { existing: true };
+  return transaction(async c=>(await c.query(`INSERT INTO family_matching_requests(user_id,church,availability,region,contact) VALUES($1,$2,$3,$4,$5)
+    ON CONFLICT(user_id) WHERE status IN ('pending','contacting') DO NOTHING RETURNING id`, [actor, church, input.availability, input.region, input.contact])).rows[0] || { existing: true });
 }
 export async function myMatching(actor: string) {
   return (await pool.query(`SELECT r.id,r.church,r.availability,r.region,r.contact,r.status,r.message,r.version,r.created_at AS "createdAt",g.name AS "groupName",u.display_name AS "ownerName"
     FROM family_matching_requests r LEFT JOIN small_groups g ON g.id=r.group_id LEFT JOIN users u ON u.id=r.owner_id
-    WHERE r.user_id=$1 ORDER BY r.created_at DESC LIMIT 20`, [actor])).rows;
+    WHERE r.user_id=$1 AND r.church=ANY($2::text[]) ORDER BY r.created_at DESC LIMIT 20`, [actor,getChurchAliases(selectedChurch())])).rows;
 }
 export async function cancelMatching(actor: string, id: string) {
   if (!(await pool.query("UPDATE family_matching_requests SET status='cancelled',version=version+1,updated_at=now() WHERE id=$1 AND user_id=$2 AND status IN ('pending','contacting') RETURNING id", [id, actor])).rowCount) throw conflict();
@@ -76,11 +83,11 @@ export async function familyManagement(actor: string) {
   const groups = (await pool.query(`SELECT ${fields},true AS "canManage",
     (SELECT count(*)::int FROM life_group_requests r WHERE r.group_id=g.id AND r.status='pending') AS "pendingRequestCount",
     (SELECT count(DISTINCT uid)::int FROM (SELECT user_id AS uid FROM small_group_members WHERE group_id=g.id AND is_active UNION SELECT g.leader_user_id UNION SELECT g.co_leader_user_id UNION SELECT g.pastor_user_id) m WHERE uid IS NOT NULL) AS "memberCount"
-    FROM small_groups g WHERE $1 OR ($2 AND (g.church=ANY($3::text[]) OR g.id=ANY($4::uuid[]))) OR (g.leader_user_id=$5 OR g.co_leader_user_id=$5) OR g.pastor_user_id=$5 ORDER BY g.name LIMIT 200`,
+    FROM small_groups g WHERE ${churchPredicate('g')} AND ($1 OR ($2 AND (g.church=ANY($3::text[]) OR g.id=ANY($4::uuid[]))) OR (g.leader_user_id=$5 OR g.co_leader_user_id=$5) OR g.pastor_user_id=$5) ORDER BY g.name LIMIT 200`,
   [a.role === 'admin', a.canManageMembers, aliases(a), a.groupIds, actor])).rows;
   const requests = a.canEnterCrm && a.canManageMembers ? (await pool.query(`SELECT r.id,r.user_id AS "userId",u.display_name AS name,r.church,r.availability,r.region,r.contact,r.status,r.message,r.version,r.created_at AS "createdAt",owner.display_name AS "ownerName",g.name AS "groupName"
     FROM family_matching_requests r JOIN users u ON u.id=r.user_id LEFT JOIN users owner ON owner.id=r.owner_id LEFT JOIN small_groups g ON g.id=r.group_id
-    WHERE ($1 OR r.church=ANY($2::text[])) AND r.status IN ('pending','contacting') ORDER BY r.created_at LIMIT 100`, [a.role === 'admin', aliases(a)])).rows : [];
+    WHERE r.church=ANY($3::text[]) AND ($1 OR r.church=ANY($2::text[])) AND r.status IN ('pending','contacting') ORDER BY r.created_at LIMIT 100`, [a.role === 'admin', aliases(a),getChurchAliases(selectedChurch())])).rows : [];
   return { groups, requests, churches: getKnownChurchOptions().filter(c => churchAllowed(a, c.id)) };
 }
 export async function updateMatching(actor: string, id: string, input: z.infer<typeof matchingUpdateInput>) {
@@ -103,6 +110,7 @@ export async function createFamily(actor: string, input: z.input<typeof familyCr
   const details = familyCreateInput.parse(input);
   const a = await familyAccess(actor), church = normalizeChurch(input.church)!;
   if (!getKnownChurchOptions().some(c => c.id === church)) throw new GroupError(400, '請選擇目前開放的教會。');
+  assertSelectedChurch(church);
   if (!churchAllowed(a, church)) throw denied();
   return transaction(async c => {
     if (details.coLeaderId) {
@@ -110,7 +118,7 @@ export async function createFamily(actor: string, input: z.input<typeof familyCr
       const co = (await c.query('SELECT church FROM users WHERE id=$1 FOR SHARE', [details.coLeaderId])).rows[0];
       if (!co || normalizeChurch(co.church) !== church) throw new GroupError(400, '請選擇同教會已核對帳號的小家長。');
     }
-    const g = (await c.query('INSERT INTO small_groups(name,church,leader_user_id,audience,description,meeting,is_listed,co_leader_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [details.name, church, actor, details.audience, details.description, details.meeting, details.listed, details.coLeaderId ?? null])).rows[0];
+    const g = (await c.query('INSERT INTO small_groups(name,church,leader_user_id,audience,description,meeting,is_listed,co_leader_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [details.name, church, churchContext()?.actorChurch===church ? actor : null, details.audience, details.description, details.meeting, details.listed, details.coLeaderId ?? null])).rows[0];
     await c.query("INSERT INTO family_membership_events(group_id,actor_id,action) VALUES($1,$2,'created')", [g.id, actor]);
     return g;
   });
@@ -134,6 +142,7 @@ export async function decideManagedJoin(actor: string, id: string, userId: strin
     const g = (await c.query('SELECT * FROM small_groups WHERE id=$1 FOR UPDATE', [id])).rows[0];
     if (!g || !groupAllowed(a, g)) throw denied();
     if (g.lifecycle !== 'active') throw new GroupError(409, '請先恢復小家運作。');
+    if(approve && !(await c.query('SELECT 1 FROM users WHERE id=$1 AND church=$2 FOR SHARE',[userId,g.church])).rowCount)throw denied();
     if (!(await c.query("UPDATE life_group_requests SET status=$3 WHERE group_id=$1 AND user_id=$2 AND status='pending' RETURNING user_id", [id, userId, approve ? 'approved' : 'rejected'])).rowCount) throw conflict();
     if (approve) await c.query('INSERT INTO small_group_members(group_id,user_id) SELECT $1,$2 WHERE NOT EXISTS(SELECT 1 FROM small_group_members WHERE group_id=$1 AND user_id=$2 AND is_active)', [id, userId]);
     await c.query('INSERT INTO family_membership_events(group_id,user_id,actor_id,action) VALUES($1,$2,$3,$4)', [id, userId, actor, approve ? 'joined' : 'declined']);

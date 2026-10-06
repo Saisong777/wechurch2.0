@@ -1,3 +1,6 @@
+import { useChurchContext,useChurchScopeKey } from '@/contexts/ChurchContext';
+import { churchDisplayName } from '@shared/churches';
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect,useRef,useState } from 'react';
 import { Link,useNavigate } from 'react-router-dom';
 import { useQuery,useQueryClient } from '@tanstack/react-query';
@@ -24,6 +27,11 @@ async function groupRequest<T>(path='',method='GET',body?:unknown):Promise<T> {
 
 export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:DevotionShareDraft;close:()=>void;allowGroup?:boolean}) {
   const {user}=useAuth();
+  const context=useChurchContext(),scope=useChurchScopeKey();
+  const scopeReady=!context || (!context.loading && !context.error && !!context.data?.selectedChurch);
+  const initialScope=useRef<string|null>(null),initialChurch=useRef<string|null>(null);
+  if(scopeReady && initialScope.current===null){initialScope.current=scope;initialChurch.current=context?.data?.selectedChurch || null;}
+  const scopeMatches=scopeReady && initialScope.current===scope;
   const [groupSelected,setGroupSelected]=useState(allowGroup);
   const [wallSelected,setWallSelected]=useState(!allowGroup);
   const initialSource=useRef(draft.sourceId);const initialActor=useRef(user?.id);const currentActor=useRef(user?.id);currentActor.current=user?.id;
@@ -40,23 +48,25 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
   const [reference,setReference]=useState(draft.reference);const [anonymous,setAnonymous]=useState(false);
   const [consent,setConsent]=useState(false);const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const window=useDevotionWall(true,false,isWall);const client=useQueryClient();const navigate=useNavigate();
-  const groups=useQuery<{groups:GroupSummary[]}>({queryKey:['/api/life-groups',user?.id,'note-sharing-picker'],queryFn:()=>groupRequest(),enabled:allowGroup && groupSelected && !!user,retry:false,staleTime:0});
+  const groups=useQuery<{groups:GroupSummary[]}>({queryKey:['/api/life-groups',user?.id,'note-sharing-picker',scope],queryFn:()=>groupRequest(),enabled:allowGroup && groupSelected && !!user && scopeReady,retry:false,staleTime:0});
   const selectedGroup=groups.data?.groups.find(group=>group.id===groupId);
   const destinationReady=(groupSelected || isWall) && (!isWall || (window.data && !window.expired && !window.isError)) && (!groupSelected || (selectedGroup && !groups.isError));
   useEffect(()=>{setConsent(false);},[window.data?.day,window.expired]);
   useEffect(()=>{setConsent(false);setError('');},[user?.id,draft.sourceId]);
-  const valid=draft.sourceId===initialSource.current && user?.id===initialActor.current && !!user && title.trim() && title.length<=160 && body.trim() && body.length<=maxLength && reference.trim() && reference.length<=200 && consent && destinationReady;
+  const valid=scopeMatches && draft.sourceId===initialSource.current && user?.id===initialActor.current && !!user && title.trim() && title.length<=160 && body.trim() && body.length<=maxLength && reference.trim() && reference.length<=200 && consent && destinationReady;
   return <Dialog open onOpenChange={open=>{if(!open && !busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl [overflow-wrap:anywhere] [&>button:last-child]:right-2 [&>button:last-child]:top-2 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center">
-    <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{groupSelected && isWall?'同時分享至所選小家及全站靈修牆。小家以你的姓名分享；牆上可選匿名，台灣時間午夜移出公開牆。私人筆記仍保留。':isWall?'全站登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小家成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
+    <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{groupSelected && isWall?'同時分享至所選小家及本教會靈修牆。小家以你的姓名分享；牆上可選匿名，台灣時間午夜移出公開牆。私人筆記仍保留。':isWall?'目前教會的登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小家成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
+    {context && <p className="text-sm leading-6">分享教會：{initialChurch.current ? churchDisplayName(initialChurch.current) : '等待確認'}</p>}
+    {!scopeMatches && <p role="alert" className="text-sm leading-6">教會範圍已切換或尚未核定。此預覽與重試編號保留，請切回原教會後確認，或關閉並重新選擇分享內容。</p>}
     <form onSubmit={async e=>{
       e.preventDefault();if(!valid || busyLock.current)return;busyLock.current=true;setBusy(true);setError('');
       try{
         const input={sourceId:draft.sourceId,title,body,reference,consent,
           ...(groupSelected?{group:{groupId}}:{}),...(isWall?{wall:{day:window.data!.day,anonymous}}:{})};
         // Retry the exact reviewed operation; changing content/destinations gets a new ID.
-        const key=JSON.stringify(input);const mutationId=mutationIds.current[key] ??= crypto.randomUUID();
+        const key=JSON.stringify([initialScope.current,input]);const mutationId=mutationIds.current[key] ??= crypto.randomUUID();
         await devotionWallApi(`/shares/${mutationId}`,'PUT',input);
-        if(currentActor.current!==initialActor.current)return;
+        if(currentActor.current!==initialActor.current || !scopeMatches)return;
         // A failed cache refresh is not a failed publication.
         void client.invalidateQueries({queryKey:['devotion-wall']});
         void client.invalidateQueries({queryKey:['/api/life-groups']});
@@ -66,7 +76,7 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
       catch(e){if(currentActor.current===initialActor.current){setError((e as Error).message);if(isWall)void window.refetch();if(groupSelected)void groups.refetch();}}finally{busyLock.current=false;setBusy(false);}
     }}><fieldset disabled={busy} className="min-w-0 space-y-4">
       {allowGroup && <fieldset className="space-y-2"><legend className="text-sm font-medium">分享對象</legend><div className="grid grid-cols-2 gap-2">
-        {([['group','所屬小家',Users],['wall','所有人・靈修牆',Globe]] as const).map(([value,label,Icon])=><label key={value} className={`flex min-h-12 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${(value==='group'?groupSelected:isWall)?'border-primary bg-primary/5':'border-border'}`}><input type="checkbox" checked={value==='group'?groupSelected:isWall} onChange={e=>{if(value==='group')setGroupSelected(e.target.checked);else setWallSelected(e.target.checked);setConsent(false);setError('');}} /><Icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /><span>{label}</span></label>)}
+        {([['group','所屬小家',Users],['wall','教會・靈修牆',Globe]] as const).map(([value,label,Icon])=><label key={value} className={`flex min-h-12 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${(value==='group'?groupSelected:isWall)?'border-primary bg-primary/5':'border-border'}`}><input type="checkbox" checked={value==='group'?groupSelected:isWall} onChange={e=>{if(value==='group')setGroupSelected(e.target.checked);else setWallSelected(e.target.checked);setConsent(false);setError('');}} /><Icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /><span>{label}</span></label>)}
       </div></fieldset>}
       {groupSelected && <div className="space-y-2">
         <label className="block space-y-1 text-sm"><span>選擇所屬小家</span><select className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base" value={groupId} onChange={e=>{setGroupId(e.target.value);setConsent(false);setError('');}} disabled={groups.isPending || groups.isError || busy}><option value="">請選擇小家</option>{groups.data?.groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</select></label>

@@ -1,3 +1,5 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
+import { ChurchPageBoundary } from '@/contexts/ChurchContext';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Archive, ChevronDown, ChevronUp, Heart, LockKeyhole, Pencil, Plus, RefreshCw, Search, Users, HandHeart, Undo2 } from 'lucide-react';
@@ -54,10 +56,10 @@ function CareWorkspace() {
       <Button variant={visits ? 'secondary' : 'ghost'} disabled={locked} aria-pressed={visits} onClick={() => setParams({ view: 'visits' })}>牧者探訪</Button>
       {!locked && <Button asChild variant="ghost" className="gap-2"><Link to="/groups?view=care"><Users className="h-4 w-4" />小家共同關懷</Link></Button>}
     </div>
-    {visits ? <CareVisits onEditing={setVisitEditing} /> : <>
+    {visits ? <ChurchPageBoundary><CareVisits onEditing={setVisitEditing} /></ChurchPageBoundary> : <>
       <div className="flex flex-wrap items-center justify-between gap-3"><p className="flex items-center gap-2 text-sm text-muted-foreground"><LockKeyhole className="h-4 w-4" />僅自己可見</p><Button onClick={() => edit()} disabled={locked} className="min-h-11 gap-2"><Plus className="h-4 w-4" />新增對象</Button></div>
       {editor && <ContactEditor key={editor.id || 'new'} initial={editor.initial} editing={!!editor.id} care={care} id={editor.id} close={() => setEditor(null)} />}
-      {visit && <VisitComposer contact={visit} close={() => setVisit(null)} />}
+      {visit && <ChurchPageBoundary><VisitComposer contact={visit} close={() => setVisit(null)} /></ChurchPageBoundary>}
       <div className="relative"><Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" /><Input type="search" aria-label="搜尋關懷對象" placeholder="搜尋名字、關係或需要" className="min-h-11 pl-10" disabled={locked} value={search} onChange={e => setSearch(e.target.value)} /></div>
       <div role="group" aria-label="關懷清單篩選" className="grid grid-cols-3 gap-1 border-b pb-3">{([['due', '待關心', due.length], ['all', '全部', active.length], ['archived', '已封存', archived.length]] as const).map(([key, label, count]) => <Button key={key} disabled={locked} variant={tab === key ? 'secondary' : 'ghost'} aria-pressed={tab === key} onClick={() => setTab(key)} className="min-h-11 min-w-0 px-1 text-sm">{label}{!care.isLoading && !care.isError && ` (${count})`}</Button>)}</div>
       {care.isLoading ? <p role="status" className="py-6">正在載入關懷清單...</p> : care.isError ? <div role="alert" className="space-y-3 py-6"><p>暫時無法載入關懷資料。</p><Button variant="outline" onClick={() => void care.refetch()}><RefreshCw className="mr-2 h-4 w-4" />重新載入</Button></div> : !list.length ? <div className="space-y-2 py-8 text-center"><HandHeart className="mx-auto h-8 w-8 text-primary" /><p>{search ? '沒有符合的對象。' : tab === 'due' ? '今天沒有待關心的對象。' : tab === 'archived' ? '沒有封存的對象。' : '從一位你想關心的人開始。'}</p></div> : <ul className="divide-y border-b">{list.map(c => <ContactRow key={c.id} contact={c} care={care} locked={locked && activeForm !== c.id} onRecord={open => setActiveForm(open ? c.id : null)} edit={() => edit(c)} archive={() => setArchive(c)} visit={() => setVisit(c)} />)}</ul>}

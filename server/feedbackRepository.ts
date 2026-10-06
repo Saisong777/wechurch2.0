@@ -1,3 +1,4 @@
+import { selectedChurch, churchPredicate, lockChurchContext } from './churchContext';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { pool } from './db';
@@ -8,7 +9,7 @@ const memberColumns=`id,category,title,body,location,urgency,status,priority,pub
 const adminColumns=`${memberColumns},analysis_status AS "analysisStatus",analysis,analysis_error AS "analysisError",analysis_model AS "analysisModel",analyzed_at AS "analyzedAt"`;
 async function transaction<T>(work:(c:PoolClient)=>Promise<T>) {
   const c=await pool.connect();
-  try { await c.query('BEGIN'); const result=await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result=await work(c); await c.query('COMMIT'); return result; }
   catch(e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
 export function feedbackContentHash(input:Pick<FeedbackCreate,'category'|'title'|'body'|'location'|'urgency'>) {
@@ -22,30 +23,30 @@ export async function createFeedback(actor:string,raw:unknown) {
   return transaction(async c => {
     // Per-account database lock also bounds submissions across app replicas.
     await c.query('SELECT pg_advisory_xact_lock(73624811,hashtext($1))',[actor]);
-    const existing=(await c.query(`SELECT ${memberColumns},content_hash AS "contentHash" FROM member_feedback WHERE user_id=$1 AND request_id=$2`,[actor,input.requestId])).rows[0];
+    const existing=(await c.query(`SELECT ${memberColumns},content_hash AS "contentHash",church FROM member_feedback WHERE user_id=$1 AND request_id=$2`,[actor,input.requestId])).rows[0];
     if (existing) {
-      if (existing.contentHash!==hash) throw new FeedbackError(409,'這次送出編號已有不同內容，請重新送出。');
+      if (existing.contentHash!==hash || existing.church!==selectedChurch()) throw new FeedbackError(409,'這次送出編號已有不同內容，請重新送出。');
       const {contentHash:_hash,...feedback}=existing; return {feedback:feedback as FeedbackRecord,created:false};
     }
     const recent=(await c.query(`SELECT count(*)::int AS count FROM member_feedback WHERE user_id=$1 AND created_at>now()-interval '1 hour'`,[actor])).rows[0].count;
     if (recent>=10) throw new FeedbackError(429,'每小時最多送出 10 則意見，請稍後再試。');
-    const feedback=(await c.query<FeedbackRecord>(`INSERT INTO member_feedback(user_id,request_id,category,title,body,location,urgency,content_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING ${memberColumns}`,[actor,input.requestId,input.category,input.title,input.body,input.location,input.urgency,hash])).rows[0];
+    const feedback=(await c.query<FeedbackRecord>(`INSERT INTO member_feedback(user_id,request_id,category,title,body,location,urgency,content_hash,church) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${memberColumns}`,[actor,input.requestId,input.category,input.title,input.body,input.location,input.urgency,hash,selectedChurch()])).rows[0];
     await audit(c,feedback.id,actor,'created',null,{status:feedback.status,priority:feedback.priority,version:feedback.version});
     return {feedback,created:true};
   });
 }
 export async function myFeedback(actor:string,limit=50,offset=0) {
-  const rows=(await pool.query<FeedbackRecord>(`SELECT ${memberColumns} FROM member_feedback WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3`,[actor,limit+1,offset])).rows;
+  const rows=(await pool.query<FeedbackRecord>(`SELECT ${memberColumns} FROM member_feedback WHERE user_id=$1 AND ${churchPredicate()} ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3`,[actor,limit+1,offset])).rows;
   return {items:rows.slice(0,limit),hasMore:rows.length>limit};
 }
 export async function adminFeedback(filters:{status?:string;category?:string;priority?:string;limit:number;offset:number;sort?:'ai'|'manual'}) {
-  const rows=(await pool.query<FeedbackRecord>(`SELECT ${adminColumns} FROM member_feedback WHERE ($1::text IS NULL OR status=$1) AND ($2::text IS NULL OR category=$2) AND ($3::text IS NULL OR priority=$3) ORDER BY CASE WHEN status='done' THEN 1 ELSE 0 END,CASE WHEN $6='ai' THEN CASE WHEN analysis_status='ready' THEN analysis->>'suggestedPriority' ELSE 'ZZ' END ELSE priority END,created_at,id LIMIT $4 OFFSET $5`,[filters.status??null,filters.category??null,filters.priority??null,filters.limit+1,filters.offset,filters.sort??'manual'])).rows;
+  const rows=(await pool.query<FeedbackRecord>(`SELECT ${adminColumns} FROM member_feedback WHERE ${churchPredicate()} AND ($1::text IS NULL OR status=$1) AND ($2::text IS NULL OR category=$2) AND ($3::text IS NULL OR priority=$3) ORDER BY CASE WHEN status='done' THEN 1 ELSE 0 END,CASE WHEN $6='ai' THEN CASE WHEN analysis_status='ready' THEN analysis->>'suggestedPriority' ELSE 'ZZ' END ELSE priority END,created_at,id LIMIT $4 OFFSET $5`,[filters.status??null,filters.category??null,filters.priority??null,filters.limit+1,filters.offset,filters.sort??'manual'])).rows;
   return {items:rows.slice(0,filters.limit),hasMore:rows.length>filters.limit};
 }
 export async function updateFeedback(actor:string,id:string,raw:unknown) {
   const input=feedbackUpdateInput.parse(raw);
   return transaction(async c => {
-    const before=(await c.query<FeedbackRecord>(`SELECT ${adminColumns} FROM member_feedback WHERE id=$1 FOR UPDATE`,[id])).rows[0];
+    const before=(await c.query<FeedbackRecord>(`SELECT ${adminColumns} FROM member_feedback WHERE id=$1 AND church=$2 FOR UPDATE`,[id,selectedChurch()])).rows[0];
     if (!before) throw new FeedbackError(404,'找不到這則意見。');
     if (before.version!==input.version) throw new FeedbackError(409,'這則意見已更新，請重新載入。');
     const after=(await c.query<FeedbackRecord>(`UPDATE member_feedback SET status=$2,priority=$3,public_reply=$4,version=version+1,updated_at=now() WHERE id=$1 RETURNING ${adminColumns}`,[id,input.status??before.status,input.priority??before.priority,input.publicReply??before.publicReply])).rows[0];
@@ -53,15 +54,15 @@ export async function updateFeedback(actor:string,id:string,raw:unknown) {
   });
 }
 export async function feedbackHistory(id:string) {
-  return {items:(await pool.query(`SELECT id,action,before_data AS before,after_data AS after,created_at AS "createdAt" FROM member_feedback_events WHERE feedback_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100`,[id])).rows};
+  return {items:(await pool.query(`SELECT id,action,before_data AS before,after_data AS after,created_at AS "createdAt" FROM member_feedback_events WHERE feedback_id=$1 AND EXISTS(SELECT 1 FROM member_feedback f WHERE f.id=feedback_id AND f.church=$2) ORDER BY created_at DESC,id DESC LIMIT 100`,[id,selectedChurch()])).rows};
 }
 export async function exportFeedback(limit=100,offset=0) {
-  const rows=(await pool.query(`SELECT ${adminColumns},source_version AS "sourceVersion",content_hash AS "contentHash" FROM member_feedback ORDER BY created_at,id LIMIT $1 OFFSET $2`,[limit+1,offset])).rows;
+  const rows=(await pool.query(`SELECT ${adminColumns},source_version AS "sourceVersion",content_hash AS "contentHash" FROM member_feedback WHERE ${churchPredicate()} ORDER BY created_at,id LIMIT $1 OFFSET $2`,[limit+1,offset])).rows;
   return {schemaVersion:1,items:rows.slice(0,limit),hasMore:rows.length>limit};
 }
 export async function reanalyzeFeedback(actor:string,id:string,version:number) {
   return transaction(async c => {
-    const before=(await c.query<FeedbackRecord>(`SELECT ${adminColumns} FROM member_feedback WHERE id=$1 FOR UPDATE`,[id])).rows[0];
+    const before=(await c.query<FeedbackRecord>(`SELECT ${adminColumns} FROM member_feedback WHERE id=$1 AND church=$2 FOR UPDATE`,[id,selectedChurch()])).rows[0];
     if (!before) throw new FeedbackError(404,'找不到這則意見。');
     if (before.version!==version) throw new FeedbackError(409,'這則意見已更新，請重新載入。');
     const after=(await c.query<FeedbackRecord>(`UPDATE member_feedback SET analysis_status='pending',analysis=NULL,analysis_error=NULL,analysis_model=NULL,analyzed_at=NULL,lease_token=NULL,lease_until=NULL,analysis_attempts=0,version=version+1,updated_at=now() WHERE id=$1 RETURNING ${adminColumns}`,[id])).rows[0];

@@ -1,3 +1,5 @@
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useState } from 'react';
 import { useInfiniteQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,8 +12,8 @@ export async function devotionWallApi<T>(path='',method='GET',body?:unknown,sign
 }
 type TimedFeed = DevotionWallFeed & { receivedAt:number;receivedTick:number };
 export function useDevotionWall(windowOnly=false,mineOnly=false,enabled=true) {
-  const {user}=useAuth();const [,tick]=useState(0);
-  const query=useInfiniteQuery({queryKey:['devotion-wall',user?.id,windowOnly?'window':mineOnly?'mine':'feed','pages'],enabled:!!user && enabled,retry:false,
+  const {user}=useAuth();const scope=useChurchScopeKey();const [,tick]=useState(0);
+  const query=useInfiniteQuery({queryKey:['devotion-wall',user?.id,windowOnly?'window':mineOnly?'mine':'feed','pages',scope],enabled:!!user && enabled,retry:false,
     initialPageParam:null as string|null,
     getNextPageParam:(last:TimedFeed)=>windowOnly?undefined:last.nextCursor || undefined,
     staleTime:30000,refetchInterval:45000,refetchIntervalInBackground:false,refetchOnWindowFocus:'always',

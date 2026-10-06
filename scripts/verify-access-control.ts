@@ -11,11 +11,11 @@ export async function verifyAccessControl(pool:Pool,makeClient:()=>Client){
   if(!result.rowCount)await pool.query('INSERT INTO user_roles(user_id,role) VALUES($1,$2)',[id,role]);
   return {id,client,email};
  };
- const admin=await fixture('admin'),senior=await fixture('senior_pastor'),worker=await fixture('member'),member=await fixture('member'),other=await fixture('member','Another Church');
+ const admin=await fixture('admin'),senior=await fixture('senior_pastor'),worker=await fixture('member'),member=await fixture('member'),other=await fixture('member','火樂');
  const guest=makeClient();
  assert.equal((await guest('/api/access-control')).status,401);
  assert.equal((await worker.client('/api/access-control')).status,403);
- assert.equal((await senior.client('/api/access-control?church=Another%20Church')).status,403);
+ assert.equal((await senior.client('/api/access-control?church=%E7%81%AB%E6%A8%82')).status,403);
  assert.equal((await worker.client('/api/access-control/presets','POST',{church:'IM 行動教會'})).status,403);
  const mixedAdmin=(await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'admin') RETURNING id",[worker.id])).rows[0].id;
  try{
@@ -28,7 +28,7 @@ export async function verifyAccessControl(pool:Pool,makeClient:()=>Client){
  const base={userId:worker.id,roleId,permissions:[],scope:'member',church:'IM 行動教會',groupId:null,memberId:member.id,expiresAt:null,reason:'驗收'};
  assert.equal((await senior.client('/api/access-control/grants','POST',{...base,userId:other.id})).status,403);
  assert.equal((await senior.client('/api/access-control/grants','POST',{...base,memberId:other.id})).status,403);
- assert.equal((await senior.client('/api/access-control/grants','POST',{...base,scope:'site',memberId:null,permissions:['devotions.manage']})).status,403);
+ assert.equal((await senior.client('/api/access-control/grants','POST',{...base,scope:'church',memberId:null,permissions:['devotions.manage']})).status,403);
  const firstRequest={...base,requestId:randomUUID()};
  const created=await admin.client('/api/access-control/grants','POST',firstRequest);assert.equal(created.status,201);const {id}=await created.json();
  const replay=await admin.client('/api/access-control/grants','POST',firstRequest);assert.equal(replay.status,201);assert.equal((await replay.json()).id,id);
@@ -65,11 +65,11 @@ export async function verifyAccessControl(pool:Pool,makeClient:()=>Client){
  await pool.query("UPDATE access_grants SET expires_at=now()-interval '1 second' WHERE id=$1",[expiredId]);
  assert.equal((await worker.client('/api/users')).status,403);
  const moved=await admin.client('/api/access-control/grants','POST',{...base,permissions:['members.read']});assert.equal(moved.status,201);
- await pool.query("UPDATE users SET church='Another Church' WHERE id=$1",[worker.id]);
+ await pool.query("UPDATE users SET church='火樂' WHERE id=$1",[worker.id]);
  assert.equal((await worker.client('/api/users')).status,403);
  await pool.query("UPDATE users SET church='IM 行動教會' WHERE id=$1",[worker.id]);
  // Public content authority cannot unlock personal notes or group-only posts.
- const global=await admin.client('/api/access-control/grants','POST',{...base,scope:'site',memberId:null,permissions:['devotions.manage','wall.moderate']});assert.equal(global.status,201);
+ const global=await admin.client('/api/access-control/grants','POST',{...base,scope:'church',memberId:null,permissions:['devotions.manage','wall.moderate']});assert.equal(global.status,201);
  assert.equal((await worker.client('/api/admin/church-devotions?from=2026-09-01&to=2026-09-30')).status,200);
  assert.equal((await worker.client('/api/admin/inbox')).status,403);
  assert.equal((await worker.client('/api/users/'+member.id+'/profile')).status,403);

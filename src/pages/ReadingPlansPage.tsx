@@ -1,3 +1,4 @@
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -72,6 +73,7 @@ interface ReadingPlanTemplate {
 type ViewMode = 'my-plans' | 'create' | 'browse';
 
 const ReadingPlansPage = () => {
+  const churchScope=useChurchScopeKey();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { requestPermission, startReminder, stopReminder, isSupported } = useReadingReminder();
@@ -124,7 +126,7 @@ const ReadingPlansPage = () => {
   });
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery<ReadingPlanTemplate[]>({
-    queryKey: ['/api/reading-plans'],
+    queryKey: ['/api/reading-plans',churchScope],
     enabled: viewMode === 'browse',
   });
 

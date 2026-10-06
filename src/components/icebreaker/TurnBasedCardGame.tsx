@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getPollingInterval } from '@/lib/retry-utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -95,9 +96,9 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
     }
   };
 
-  const fetchCardContent = async (cardId: string): Promise<{ content: string; contentEn: string | null } | null> => {
+  const fetchCardContent = async (cardId: string, gameId: string): Promise<{ content: string; contentEn: string | null } | null> => {
     try {
-      const response = await fetch(`/api/icebreaker/cards/${cardId}`);
+      const response = await fetch(`/api/icebreaker/cards/${cardId}?gameId=${encodeURIComponent(gameId)}`);
       if (!response.ok) return null;
       const data = await response.json();
       return { content: data.contentText, contentEn: data.contentTextEn };
@@ -188,7 +189,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
       let cardContent: string | null = null;
       let cardContentEn: string | null = null;
       if (existingGame.currentDrawerCardId) {
-        const cardData = await fetchCardContent(existingGame.currentDrawerCardId);
+        const cardData = await fetchCardContent(existingGame.currentDrawerCardId,existingGame.id);
         if (cardData) {
           cardContent = cardData.content;
           cardContentEn = cardData.contentEn;
@@ -232,7 +233,7 @@ export const TurnBasedCardGame: React.FC<TurnBasedCardGameProps> = ({
       
       if (newData.currentDrawerCardId && 
           newData.currentDrawerCardId !== gameState.currentDrawerCardId) {
-        const cardData = await fetchCardContent(newData.currentDrawerCardId);
+        const cardData = await fetchCardContent(newData.currentDrawerCardId,newData.id);
         if (cardData) {
           cardContent = cardData.content;
           cardContentEn = cardData.contentEn;

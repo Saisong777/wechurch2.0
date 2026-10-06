@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useChurchContext,useChurchScopeKey } from '@/contexts/ChurchContext';
+import { churchDisplayName } from '@shared/churches';
+import { churchFetch as fetch } from '@/lib/churchFetch';
+import { useRef,useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Undo2 } from 'lucide-react';
@@ -27,9 +30,9 @@ function useRefreshSharing() {
   };
 }
 export function usePrayerSharing() {
-  const { user } = useAuth();
+  const { user } = useAuth();const scope=useChurchScopeKey();
   const refresh = useRefreshSharing();
-  const query = useQuery<PrayerShareDelivery[]>({queryKey:['/api/prayer-sharing',user?.id],enabled:!!user,queryFn:() => api('/api/prayer-sharing'),refetchInterval:30000,refetchIntervalInBackground:false,retry:false});
+  const query = useQuery<PrayerShareDelivery[]>({queryKey:['/api/prayer-sharing',user?.id,scope],enabled:!!user,queryFn:() => api('/api/prayer-sharing'),refetchInterval:30000,refetchIntervalInBackground:false,retry:false});
   const withdraw = useMutation({
     mutationFn:(share:PrayerShareDelivery) => api(`/api/prayer-sharing/${share.prayerId}/${share.destination}`,'DELETE'),
     onSuccess:async () => { await refresh(); toast.success('已撤回分享，私人原稿仍保留'); },
@@ -44,16 +47,23 @@ export function PrayerDeliveries({items,busy,onWithdraw}:{items:PrayerShareDeliv
 export function PersonalPrayerShareDialog({records,close,done}:{records:PersonalPrayer[];close:()=>void;done:()=>void}) {
   const graceOnly = records.every(isGraceRecord);
   const {user}=useAuth();
+  const context=useChurchContext(),scope=useChurchScopeKey();
+  const scopeReady=!context || (!context.loading && !context.error && !!context.data?.selectedChurch);
+  const initialScope=useRef<string|null>(null),initialChurch=useRef<string|null>(null);
+  if(scopeReady && initialScope.current===null){initialScope.current=scope;initialChurch.current=context?.data?.selectedChurch || null;}
+  const scopeMatches=scopeReady && initialScope.current===scope;
   const refresh=useRefreshSharing();
   const [items,setItems]=useState(() => records.map(record => ({sourceId:record.id,title:record.title,body:record.prayer || record.title})));
   const [groupId,setGroupId]=useState(''); const [publicWall,setPublicWall]=useState(false); const [anonymous,setAnonymous]=useState(false);
   const [consent,setConsent]=useState(false); const [busy,setBusy]=useState(false); const [error,setError]=useState('');
   const [urgent,setUrgent]=useState(false);
-  const groups=useQuery<{groups:GroupSummary[]}>({queryKey:['/api/life-groups',user?.id,'sharing-picker'],queryFn:() => api('/api/life-groups'),enabled:!!user,retry:false});
+  const groups=useQuery<{groups:GroupSummary[]}>({queryKey:['/api/life-groups',user?.id,'sharing-picker',scope],queryFn:() => api('/api/life-groups'),enabled:!!user && scopeReady,retry:false});
   const groupName=groups.data?.groups.find(g=>g.id===groupId)?.name;
-  const valid=!!(groupId || publicWall) && consent && items.length>0 && items.every(i=>i.title.trim() && i.body.trim());
+  const valid=scopeMatches && !!(groupId || publicWall) && consent && items.length>0 && items.every(i=>i.title.trim() && i.body.trim());
   return <Dialog open onOpenChange={open=>{if(!open && !busy && window.confirm('關閉分享預覽？私人禱告不受影響。')) close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl [overflow-wrap:anywhere]">
     <DialogHeader><DialogTitle>分享選取的 {items.length} 筆{graceOnly ? '恩典' : '禱告'}</DialogTitle><DialogDescription>只分享以下預覽內容，私人歷程不會自動加入。已分享的副本不會被覆蓋。</DialogDescription></DialogHeader>
+    {context && <p className="text-sm leading-6">分享教會：{initialChurch.current ? churchDisplayName(initialChurch.current) : '等待確認'}</p>}
+    {!scopeMatches && <p role="alert" className="text-sm leading-6">教會範圍已切換或尚未核定。請切回原教會後確認，或關閉並重新預覽；私人原稿仍保留。</p>}
     <form onSubmit={async e=>{
       e.preventDefault(); if(!valid || busy) return; setBusy(true); setError('');
       try { const result=await api<{created:number;skipped:number}>('/api/prayer-sharing','POST',{items,groupId:groupId || null,publicWall,anonymous,urgent:publicWall && urgent,consent}); await refresh(); done(); toast.success(`新增 ${result.created} 份分享${result.skipped ? `，${result.skipped} 份已存在` : ''}`); }
@@ -62,7 +72,7 @@ export function PersonalPrayerShareDialog({records,close,done}:{records:Personal
       <label className="block space-y-2 text-sm"><span>分享至小家（選填）</span><select aria-label="分享至小家" className="h-11 w-full min-w-0 rounded-md border bg-background px-3" value={groupId} onChange={e=>{setGroupId(e.target.value);setConsent(false);}}><option value="">不分享到小家</option>{groups.data?.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
       {groups.isError && <p role="alert" className="text-sm text-destructive">小家載入失敗。<button type="button" className="ml-2 underline" onClick={()=>groups.refetch()}>重新載入</button></p>}
       {!groups.isPending && !groups.isError && !groups.data?.groups.length && <Link className="block text-sm text-primary underline" to="/groups">尚未加入小家</Link>}
-      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={publicWall} onChange={e=>{setPublicWall(e.target.checked);setConsent(false);}} />分享到公共禱告牆（全站登入成員可見）</label>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={publicWall} onChange={e=>{setPublicWall(e.target.checked);setConsent(false);}} />分享到公共禱告牆（目前教會的登入成員可見）</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={anonymous} onChange={e=>{setAnonymous(e.target.checked);setConsent(false);}} />匿名分享</label>
       {publicWall && !graceOnly && <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={urgent} onChange={e=>{setUrgent(e.target.checked);setConsent(false);}} />標記為緊急代禱</label>}
       {anonymous && <p className="text-sm text-muted-foreground">分享中不顯示姓名、頭像或帳號識別碼；系統仍保留作者供本人管理。請移除內文中可辨認身分的細節。</p>}

@@ -42,16 +42,21 @@ try {
   const address = server!.address(); assert(address && typeof address !== 'string');
   const origin = `http://127.0.0.1:${address.port}`;
   process.env.PUBLIC_BASE_URL = origin;
-  const makeClient = () => {
+  const makeClient = (approvedFixture=true) => {
     const cookies = new Map<string,string>();
     return async (path: string, method='GET', body?: unknown) => {
       const multipart = body instanceof FormData;
       const response = await fetch(origin+path,{method, headers:{...(!multipart ? {'Content-Type':'application/json'} : {}),origin,cookie:[...cookies].map(([key,value])=>`${key}=${value}`).join('; ')},body:body===undefined?undefined:multipart?body:JSON.stringify(body),redirect:'manual'});
       for(const cookie of response.headers.getSetCookie()) { const value=cookie.split(';')[0]; const split=value.indexOf('='); cookies.set(value.slice(0,split),value.slice(split+1)); }
+      if(approvedFixture&&path==='/api/auth/register'&&response.status===200&&body&&typeof body==='object'&&'email' in body)await pool.query("UPDATE users SET church='IM 行動教會' WHERE email=$1",[(body as {email:string}).email]);
       return response;
     };
   };
-  if (process.env.RUN_CHURCH_SIMULATION === '1') {
+  if(process.env.RUN_MULTICHURCH_ONLY==='1'){
+    const {verifyMultichurchHttp}=await import('./verify-multichurch-http');await verifyMultichurchHttp(pool,()=>makeClient(false));
+    const {verifyMultichurchExtraHttp}=await import('./verify-multichurch-extra-http');await verifyMultichurchExtraHttp(pool,()=>makeClient(false));
+    const {verifyMultichurchRacesHttp}=await import('./verify-multichurch-races-http');await verifyMultichurchRacesHttp(pool,()=>makeClient(false));
+  } else if (process.env.RUN_CHURCH_SIMULATION === '1') {
     const { simulateChurch } = await import('./simulate-church');
     await simulateChurch(pool, origin);
     if (process.env.RUN_CHURCH_HISTORY === '1') {
@@ -85,7 +90,8 @@ try {
   await verifyRetiredAiHttp(pool, a, b, guest, ids[0]);
   const { verifyAuditBoundaries } = await import('./verify-audit-boundaries');
   await verifyAuditBoundaries(pool, a, guest, ids[0], ids[1]);
-  const empty=await guest('/api/church-reading/today?date=2026-09-13'); assert.equal(empty.status,200);
+  assert.equal((await guest('/api/church-reading/today?date=2026-09-13')).status,401);
+  const empty=await a('/api/church-reading/today?date=2026-09-13'); assert.equal(empty.status,200);
   const brief=await empty.json();assert.equal(brief.sourceStatus,'unpublished');assert.equal(brief.scriptureReference,'');
   const { verifySupportHttp }=await import('./verify-support-http');
   await verifySupportHttp(pool,a,b,guest,makeClient,ids[0],ids[1]);
@@ -95,7 +101,9 @@ try {
   const { verifyMentoringHttp }=await import('./verify-mentoring-http'); await verifyMentoringHttp(pool,makeClient);
   const { verifyLineIdentity }=await import('./verify-line-identity'); await verifyLineIdentity(pool);
   const { verifyImImportHttp }=await import('./verify-im-import-http'); await verifyImImportHttp(pool,a,b,guest,ids);
-  const repo=await import('../server/churchDevotionRepository');
+  const nativeRepo=await import('../server/churchDevotionRepository');
+  const {runChurchContext}=await import('../server/churchContext');
+  const repo=new Proxy(nativeRepo,{get(target,key){const value=Reflect.get(target,key);if(typeof value!=='function'||key==='DevotionConflict')return value;return async(...args:unknown[])=>{const actor=(await pool.query("SELECT church,EXISTS(SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin') AS admin FROM users WHERE id=$1",[ids[0]])).rows[0];return runChurchContext({actorId:ids[0],actorChurch:actor.church,selectedChurch:actor.church,isSystemAdmin:actor.admin},()=>Reflect.apply(value,target,args));};}});
   const input={date:'2026-09-13',planName:'Fixture',dayNumber:1,scriptureReference:'以賽亞書 1',scriptureText:'',devotionalTitle:'Original',devotionalText:'Original body',prayer:'',loveAction:'',status:'published' as const};
   const original=await repo.saveChurchDevotion(ids[0],input);
   const history=await repo.churchDevotionHistory(original.id);
@@ -125,7 +133,7 @@ try {
   assert.equal((await b('/api/devotional-notes','POST',noteBody)).status,409);
   assert.equal((await a(`/api/devotional-notes/${note.id}`,'PATCH',{observation:'other account',version:2})).status,409);
   assert.equal((await pool.query('SELECT observation FROM devotional_notes WHERE id=$1',[note.id])).rows[0].observation,'updated');
-  const group=(await pool.query('INSERT INTO small_groups(name,church,leader_user_id) VALUES($1,$2,$3) RETURNING id',['Note sharing fixture','Fixture',ids[0]])).rows[0];
+  const group=(await pool.query('INSERT INTO small_groups(name,church,leader_user_id) VALUES($1,$2,$3) RETURNING id',['Note sharing fixture','IM 行動教會',ids[0]])).rows[0];
   const groupShareId=randomUUID();
   const groupSharePath=`/api/life-groups/${group.id}/shares/${groupShareId}`;
   const groupShareBody={kind:'note',sourceId:note.id,title:'Group excerpt',body:'Only selected note text',reference:'以賽亞書 43',anonymous:false,consent:true};
@@ -212,6 +220,10 @@ try {
   await verifyEmailPermissions(pool, makeClient);
   const { verifyAccessControl } = await import('./verify-access-control');
   await verifyAccessControl(pool, makeClient);
+  const {verifyMultichurchHttp}=await import('./verify-multichurch-http');await verifyMultichurchHttp(pool,()=>makeClient(false));
+    const {verifyMultichurchExtraHttp}=await import('./verify-multichurch-extra-http');await verifyMultichurchExtraHttp(pool,()=>makeClient(false));
+    const {verifyMultichurchRacesHttp}=await import('./verify-multichurch-races-http');await verifyMultichurchRacesHttp(pool,()=>makeClient(false));
+
   }
 } finally {
   if(server) await new Promise<void>(resolve=>server!.close(()=>resolve()));

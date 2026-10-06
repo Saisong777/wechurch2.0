@@ -22,6 +22,7 @@ try {
     env: { ...env, DATABASE_URL: url.href, NODE_ENV: 'test', LOCAL_INSECURE_COOKIES: '1',
       SESSION_SECRET: randomUUID()+randomUUID(), DISABLE_OUTBOUND_EMAIL: '1', DISABLE_MORNING_BRIEF: '1',
       UPLOAD_ROOT: uploadRoot, RUN_CAPACITY_BENCHMARK: process.env.RUN_CAPACITY_BENCHMARK === '1' ? '1' : '0',
+      RUN_MULTICHURCH_ONLY: process.env.RUN_MULTICHURCH_ONLY === '1' ? '1' : '0',
       RUN_CHURCH_SIMULATION: process.env.RUN_CHURCH_SIMULATION === '1' ? '1' : '0',
       RUN_CHURCH_HISTORY: process.env.RUN_CHURCH_HISTORY === '1' ? '1' : '0',
       RUN_SECURITY_BROWSER: process.env.RUN_SECURITY_BROWSER === '1' ? '1' : '0',

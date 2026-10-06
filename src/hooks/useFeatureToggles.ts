@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState, useEffect } from 'react';
 
 export interface FeatureToggle {

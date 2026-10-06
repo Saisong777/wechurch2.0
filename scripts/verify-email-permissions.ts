@@ -22,7 +22,7 @@ export async function verifyEmailPermissions(pool: Pool, makeClient: () => Clien
   };
   try {
     Object.assign(process.env, { RESEND_API_KEY: 'isolated-test-only', RESEND_FROM_EMAIL: 'Church <mail@example.test>', RESEND_REPLY_TO: 'reply@example.test', DISABLE_OUTBOUND_EMAIL: '0', DAILY_EMAIL_SCHEDULER_ENABLED: '1' });
-    const fixture = async (role: string, church = 'iM行動教會') => {
+    const fixture = async (role: string, church = 'IM 行動教會') => {
       const client = makeClient();
       const email = `email-${randomUUID()}@example.test`;
       assert.equal((await client('/api/auth/register', 'POST', { email, password: randomUUID(), displayName: 'Email fixture' })).status, 200);
@@ -34,7 +34,7 @@ export async function verifyEmailPermissions(pool: Pool, makeClient: () => Clien
     const admin = await fixture('admin');
     const pastor = await fixture('pastor');
     const member = await fixture('member');
-    const outside = await fixture('member', 'Other church');
+    const outside = await fixture('member', '火樂');
     const careOnly = await fixture('member');
     const senior = await fixture('senior_pastor');
     const guest = makeClient();

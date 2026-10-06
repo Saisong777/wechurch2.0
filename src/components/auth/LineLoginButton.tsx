@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SiLine } from 'react-icons/si';

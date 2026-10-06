@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { HandHeart, KeyRound, Search, Send } from 'lucide-react';

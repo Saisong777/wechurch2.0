@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
+import { runChurchContext, resolveChurchContext, churchContext } from './churchContext';
 import { devotionWallRoutes } from './devotionWallRoutes';
 import { devotionWallCursor, devotionWallPageInput } from '../shared/devotionWall';
 
@@ -12,10 +13,11 @@ const actor = '00000000-0000-4000-8000-000000000001';
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const instant = '2026-09-27T02:00:00.123456Z';
 const day = '2026-09-27';
-function handler(method = 'get', path = '/') {
+function handler(method = 'get', path = '/', selected='IM 行動教會', admin=false) {
   const router = devotionWallRoutes(async () => actor);
   const layer = (router as unknown as { stack: Layer[] }).stack.find(({ route }) => route?.methods[method] && [route.path].flat().includes(path));
-  return layer!.route!.stack[0].handle;
+  const routeHandler=layer!.route!.stack[0].handle;
+  return (req:Request,res:Response,next:NextFunction)=>runChurchContext(resolveChurchContext(actor,admin?'IM 行動教會':selected,admin,encodeURIComponent(selected)),()=>routeHandler(req,res,next));
 }
 function response() {
   const res = { locals: { actor }, json: vi.fn() };
@@ -23,6 +25,11 @@ function response() {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  db.connect.mockResolvedValue({query:async(text:string,values?:unknown[])=>{
+    if(['BEGIN','COMMIT','ROLLBACK'].includes(text))return {};
+    if(text.includes('FOR SHARE OF u'))return {rows:[{church:churchContext()!.actorChurch,admin:churchContext()!.isSystemAdmin}]};
+    return db.query(text,values);
+  },release:vi.fn()});
   db.query.mockResolvedValueOnce({ rows: [{ now: new Date('2026-09-27T03:00:00Z') }] });
 });
 it('validates page size and malformed cursors before touching the database', async () => {
@@ -40,6 +47,7 @@ it('fetches at most limit+1 rows and returns a microsecond-safe stable cursor', 
   const [sql, values] = db.query.mock.calls[1];
   expect(values).toEqual([actor, day, 31]);
   expect(sql).toContain('ORDER BY p.created_at DESC,p.id ASC LIMIT $3');
+  expect(sql).toContain("p.church='IM 行動教會'");
   expect(sql).toContain('p.withdrawn_at IS NULL'); expect(sql).toContain('p.expires_at>clock_timestamp()');
   expect(sql).toContain("WHEN p.is_anonymous THEN '匿名'");
   const result = res.json.mock.calls[0][0]; expect(result.posts).toHaveLength(30);
@@ -64,5 +72,23 @@ it('does not carry an old cursor into a new Taipei day', async () => {
 it('keeps withdrawal owner-scoped', async () => {
   db.query.mockReset().mockResolvedValueOnce({ rowCount: 0 }).mockResolvedValueOnce({ rowCount: 1 });
   await handler('delete', '/:id')({ params: { id: id(2) } } as unknown as Request, response(), vi.fn());
-  expect(db.query).toHaveBeenCalledWith(expect.stringContaining('WHERE id=$1 AND (user_id=$2 OR $3)'), [id(2), actor, false]);
+  expect(db.query).toHaveBeenCalledWith(expect.stringContaining('WHERE id=$1 AND ((user_id=$2) OR ($3 AND church=$4))'), [id(2), actor, false, 'IM 行動教會']);
+});
+
+it('fails closed without verified church context instead of reading any church feed',async()=>{
+  const router=devotionWallRoutes(async()=>actor);
+  const layer=(router as unknown as {stack:Layer[]}).stack.find(({route})=>route?.methods.get&&[route.path].flat().includes('/'))!;
+  await expect(layer.route!.stack[0].handle({query:{},path:'/'} as Request,response(),vi.fn())).rejects.toMatchObject({status:403,code:'CHURCH_APPROVAL_REQUIRED'});
+  expect(db.query).toHaveBeenCalledTimes(1);
+  expect(db.query.mock.calls[0][0]).toBe('SELECT clock_timestamp() AS now');
+});
+it('restricts administrator moderation to the verified selected snapshot church',async()=>{
+  db.query.mockReset().mockResolvedValueOnce({rowCount:1}).mockResolvedValueOnce({rowCount:1});
+  await handler('delete','/:id','火樂',true)({params:{id:id(2)}} as unknown as Request,response(),vi.fn());
+  expect(db.query).toHaveBeenLastCalledWith(expect.stringContaining('((user_id=$2) OR ($3 AND church=$4))'),[id(2),actor,true,'火樂']);
+});
+it('keeps an owner historical withdrawal separate from current church moderation',async()=>{
+  db.query.mockReset().mockResolvedValueOnce({rowCount:0}).mockResolvedValueOnce({rowCount:1});
+  await handler('delete','/:id','火樂',false)({params:{id:id(2)}} as unknown as Request,response(),vi.fn());
+  expect(db.query).toHaveBeenLastCalledWith(expect.stringContaining('((user_id=$2) OR ($3 AND church=$4))'),[id(2),actor,false,'火樂']);
 });

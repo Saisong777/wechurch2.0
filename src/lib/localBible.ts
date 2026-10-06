@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 export interface LocalBibleBook {
   bookName: string;
   bookNumber: number;

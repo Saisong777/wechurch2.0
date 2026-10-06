@@ -152,6 +152,7 @@ export const personIdentityLinks = pgTable("person_identity_links", {
 }));
 
 export const sessions = pgTable("sessions", {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   churchUnit: text("church_unit"),
   verseReference: text("verse_reference").notNull(),
@@ -355,6 +356,7 @@ export const personalPrayers = pgTable("personal_prayers", {
 }));
 
 export const prayers = pgTable("prayers", {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid("user_id").references(() => users.id).notNull(),
   content: text("content").notNull(),
@@ -455,6 +457,7 @@ export const careVisitEvents = pgTable('care_visit_events', {
 }, t => [index('care_visit_events_request_idx').on(t.requestId, t.createdAt.desc())]);
 
 export const cardQuestions = pgTable("card_questions", {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   contentText: text("content_text").notNull(),
   contentTextEn: text("content_text_en"),
@@ -465,6 +468,7 @@ export const cardQuestions = pgTable("card_questions", {
 });
 
 export const icebreakerGames = pgTable("icebreaker_games", {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   roomCode: text("room_code").notNull(),
   status: text("status").notNull().default("waiting"),
@@ -498,6 +502,7 @@ export const icebreakerPlayers = pgTable("icebreaker_players", {
 });
 
 export const messageCards = pgTable("message_cards", {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   shortCode: text("short_code").notNull().unique(),
@@ -726,6 +731,7 @@ export const devotionalNoteDeletions = pgTable('devotional_note_deletions', {
 });
 
 export const devotionWallPosts = pgTable('devotion_wall_posts', {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   sourceNoteId: uuid('source_note_id').references(() => devotionalNotes.id, { onDelete: 'set null' }),
   userId: uuid('user_id').notNull().references(() => users.id),
@@ -736,7 +742,7 @@ export const devotionWallPosts = pgTable('devotion_wall_posts', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
 }, t => [
-  uniqueIndex('devotion_wall_source_day_unique').on(t.sourceNoteId,t.publishedDay).where(sql`${t.withdrawnAt} IS NULL`),
+  uniqueIndex('devotion_wall_source_day_unique').on(t.church,t.sourceNoteId,t.publishedDay).where(sql`${t.withdrawnAt} IS NULL`),
   index('devotion_wall_active_idx').on(t.publishedDay,t.expiresAt).where(sql`${t.withdrawnAt} IS NULL`),
 ]);
 
@@ -756,6 +762,7 @@ export const savedVerses = pgTable("saved_verses", {
 
 // Reading Plan Templates
 export const readingPlanTemplates = pgTable("reading_plan_templates", {
+  church: text('church').default('IM 行動教會'),
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
@@ -765,7 +772,7 @@ export const readingPlanTemplates = pgTable("reading_plan_templates", {
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+},t=>[check('reading_plan_public_church_check',sql`NOT ${t.isPublic} OR ${t.church} IS NOT NULL`)]);
 
 // Reading Plan Template Items
 export const readingPlanTemplateItems = pgTable("reading_plan_template_items", {
@@ -1409,10 +1416,11 @@ export type InsertMentorAssignment = z.infer<typeof insertMentorAssignmentSchema
 
 export * from "./models/auth";
 
-// Use migration 0003 for the deferrable date uniqueness used by date swaps.
+// Migration 0028 keeps deferrable (church,date) uniqueness for scoped date swaps.
 export const churchDevotions = pgTable('church_devotions', {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid('id').primaryKey().defaultRandom(),
-  date: date('date').notNull().unique('church_devotions_date_unique'),
+  date: date('date').notNull(),
   planName: text('plan_name').notNull(),
   dayNumber: integer('day_number').notNull(),
   scriptureReference: text('scripture_reference').notNull(),
@@ -1426,8 +1434,9 @@ export const churchDevotions = pgTable('church_devotions', {
   updatedBy: uuid('updated_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, t => ({ churchDate: unique('church_devotions_date_unique').on(t.church,t.date) }));
 export const churchDevotionImports = pgTable('church_devotion_imports', {
+  church: text('church').notNull().default('IM 行動教會'),
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
   preview: jsonb('preview').notNull(),
@@ -1481,11 +1490,12 @@ export const lifeGroupComments = pgTable('life_group_comments', {
 }, t => ({ share: index('life_group_comments_share').on(t.shareId,t.createdAt) }));
 
 export const personalPrayerShares = pgTable('personal_prayer_shares', {
+  church: text('church').notNull().default('IM 行動教會'),
   prayerId: uuid('prayer_id').notNull().references(() => personalPrayers.id), destination: text('destination').notNull(),
   ownerId: uuid('owner_id').notNull().references(() => users.id), groupId: uuid('group_id').references(() => smallGroups.id),
   postId: uuid('post_id').notNull(), isAnonymous: boolean('is_anonymous').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => ({ pk: primaryKey({ columns: [t.prayerId,t.destination] }), owner: index('personal_prayer_shares_owner_idx').on(t.ownerId), destination: check('personal_prayer_shares_check', sql`(${t.groupId} IS NULL AND ${t.destination}='public') OR (${t.groupId} IS NOT NULL AND ${t.destination}=${t.groupId}::text)`) }));
+}, t => ({ pk: primaryKey({ columns: [t.prayerId,t.destination,t.church] }), owner: index('personal_prayer_shares_owner_idx').on(t.ownerId), destination: check('personal_prayer_shares_check', sql`(${t.groupId} IS NULL AND ${t.destination}='public') OR (${t.groupId} IS NOT NULL AND ${t.destination}=${t.groupId}::text)`) }));
 export const lifeGroupPrayed = pgTable('life_group_prayed', {
   shareId: uuid('share_id').notNull().references(() => lifeGroupShares.id), userId: uuid('user_id').notNull().references(() => users.id), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => ({ pk: primaryKey({ columns: [t.shareId,t.userId] }) }));
@@ -1553,6 +1563,7 @@ export const interactionEmailDeliveries = pgTable('interaction_email_deliveries'
 
 // Product feedback is private to its submitter and platform managers.
 export const memberFeedback = pgTable('member_feedback', {
+  church: text('church').notNull().default('IM 行動教會'),
   id:uuid('id').primaryKey().defaultRandom(),userId:uuid('user_id').notNull().references(()=>users.id),requestId:uuid('request_id').notNull(),
   category:text('category').notNull(),title:text('title').notNull(),body:text('body').notNull(),location:text('location').notNull().default('/'),
   urgency:text('urgency').notNull().default('normal'),consentAt:timestamp('consent_at',{withTimezone:true}).notNull().defaultNow(),
@@ -1575,9 +1586,18 @@ export const memberFeedbackEvents=pgTable('member_feedback_events',{
 },t=>({history:index('member_feedback_events_history').on(t.feedbackId,t.createdAt.desc(),t.id.desc()),action:check('member_feedback_events_action_check',sql`${t.action} IN ('created','updated','reanalyze','analysis_ready','analysis_failed')`)}));
 
 export const devotionShareRequests = pgTable('devotion_share_requests', {
+  church: text('church').notNull().default('IM 行動教會'),
   userId:uuid('user_id').notNull().references(()=>users.id),
   requestId:uuid('request_id').notNull(),
   requestHash:text('request_hash').notNull(),
   result:jsonb('result').notNull(),
   createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
 },t=>({pk:primaryKey({columns:[t.userId,t.requestId]}),hash:check('devotion_share_requests_request_hash_check',sql`${t.requestHash} ~ '^[a-f0-9]{64}$'`)}));
+
+export const churchCatalogTable=pgTable('church_catalog',{
+ id:text('id').primaryKey(),displayName:text('display_name').notNull(),
+});
+export const churchAffiliationEvents=pgTable('church_affiliation_events',{
+ id:uuid('id').primaryKey().defaultRandom(),actorId:uuid('actor_id').notNull().references(()=>users.id),userId:uuid('user_id').notNull().references(()=>users.id),
+ previousChurch:text('previous_church'),nextChurch:text('next_church'),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+});

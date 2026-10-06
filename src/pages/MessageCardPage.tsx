@@ -1,3 +1,5 @@
+import { churchDisplayName } from '@shared/churches';
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
@@ -20,6 +22,7 @@ interface MessageCard {
   id: string;
   title: string;
   shortCode: string;
+  church?: string | null;
   imagePath: string;
   createdAt: string;
 }
@@ -45,6 +48,7 @@ export const MessageCardPage: React.FC = () => {
   // Guest auth state
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
+  const [guestConsent,setGuestConsent]=useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
 
@@ -201,14 +205,13 @@ export const MessageCardPage: React.FC = () => {
 
   const handleGuestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guestName.trim() || !guestEmail.trim()) {
+    if (!card || !guestConsent || !guestName.trim() || !guestEmail.trim()) {
       toast.error('請填寫姓名和電子郵件');
       return;
     }
 
     // Save to localStorage
-    localStorage.setItem('bible_study_guest_name', guestName);
-    localStorage.setItem('bible_study_guest_email', guestEmail);
+    try{localStorage.setItem('bible_study_guest_name', guestName);localStorage.setItem('bible_study_guest_email', guestEmail);}catch{/* Continue in memory when browser storage is disabled. */}
 
     // Sync to potential_members table (non-blocking)
     // First try to insert, if conflict then we don't need to update since they already exist
@@ -221,9 +224,8 @@ export const MessageCardPage: React.FC = () => {
           body: JSON.stringify({
             email: normalizedEmail,
             name: guestName.trim(),
-            firstJoinedAt: new Date().toISOString(),
-            lastSessionAt: new Date().toISOString(),
-            sessionsCount: 1,
+            shortCode: card.shortCode,
+            consent: true,
           }),
         });
         // Ignore 409 conflict errors - user already exists which is fine
@@ -468,7 +470,9 @@ export const MessageCardPage: React.FC = () => {
               />
             </div>
 
-            <Button type="submit" variant="gold" size="lg" className="w-full">
+            <p className="text-sm leading-6 text-muted-foreground">這份圖片由 {card?.church ? churchDisplayName(card.church) : '發送圖片的教會'} 提供。以下資料只作自願聯絡，不會建立會員帳號或核定教會歸屬。</p>
+            <label className="flex min-h-11 items-start gap-2 text-sm leading-6"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={guestConsent} onChange={e=>setGuestConsent(e.target.checked)}/><span>我同意提供姓名與信箱給發送這份圖片的教會，供同工聯絡。</span></label>
+            <Button type="submit" variant="gold" size="lg" className="w-full" disabled={!guestConsent}>
               繼續下載 Continue
             </Button>
           </form>

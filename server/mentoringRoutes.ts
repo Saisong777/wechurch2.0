@@ -1,3 +1,4 @@
+import { churchPredicate, lockChurchContext } from './churchContext';
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
@@ -14,7 +15,7 @@ const projection=`c.id,c.journey_id AS "journeyId",c.learner_id AS "learnerId",c
   c.accepted_at AS "acceptedAt",c.ended_at AS "endedAt",c.created_at AS "createdAt",c.learner_id=$1 AS "isLearner",
   COALESCE(l.display_name,'學員') AS "learnerName",COALESCE(m.display_name,'陪伴者') AS "mentorName"`;
 async function transaction<T>(work:(c:PoolClient)=>Promise<T>){
-  const c=await pool.connect();try{await c.query('BEGIN');const result=await work(c);await c.query('COMMIT');return result;}
+  const c=await pool.connect();try{await c.query('BEGIN');await lockChurchContext(c);const result=await work(c);await c.query('COMMIT');return result;}
   catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }
 async function access(db:PoolClient,id:string,actor:string,ending=false){
@@ -40,7 +41,7 @@ export function mentoringRoutes(resolveUserId:(req:Request)=>Promise<string|null
   router.get('/targets',async(_req,res)=>{
     res.json((await pool.query(`SELECT g.id AS "groupId",g.name AS "groupName",u.id AS "mentorId",COALESCE(u.display_name,'陪伴者') AS "mentorName"
       FROM small_groups g JOIN users u ON u.id=g.leader_user_id OR u.id=g.co_leader_user_id OR u.id=g.pastor_user_id
-      WHERE g.is_active AND u.id<>$1 AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active))
+      WHERE ${churchPredicate('g')} AND g.is_active AND u.id<>$1 AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active))
       ORDER BY g.name,u.id`,[res.locals.actor])).rows);
   });
   router.get('/contracts',async(req,res)=>{
@@ -71,7 +72,7 @@ export function mentoringRoutes(resolveUserId:(req:Request)=>Promise<string|null
       const journey=(await db.query(`SELECT j.id,t.name FROM person_journeys j JOIN journey_templates t ON t.id=j.template_id
         WHERE j.id=$1 AND j.owner_user_id=$2 AND j.status IN ('active','paused') FOR UPDATE OF j`,[input.journeyId,actor])).rows[0];
       if(!journey||actor===input.mentorId)throw missing();
-      const group=(await db.query(`SELECT id FROM small_groups g WHERE g.id=$1 AND g.is_active AND ((g.leader_user_id=$2 OR g.co_leader_user_id=$2) OR g.pastor_user_id=$2)
+      const group=(await db.query(`SELECT id FROM small_groups g WHERE ${churchPredicate('g')} AND g.id=$1 AND g.is_active AND ((g.leader_user_id=$2 OR g.co_leader_user_id=$2) OR g.pastor_user_id=$2)
         AND ((g.leader_user_id=$3 OR g.co_leader_user_id=$3) OR g.pastor_user_id=$3 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$3 AND m.is_active)) FOR SHARE`,[input.groupId,input.mentorId,actor])).rows[0];
       if(!group)throw missing();
       if((await db.query("SELECT id FROM mentoring_contracts WHERE journey_id=$1 AND status IN ('pending','active')",[journey.id])).rowCount)throw new GroupError(409,'請先結束目前的邀請或陪伴關係，再邀請另一位。');

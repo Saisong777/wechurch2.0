@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useCallback, useRef } from "react";
 import { User, Session, StudySubmission } from "@/types/bible-study";
 import { HIGH_CONCURRENCY_CONFIG, getPollingInterval } from "@/lib/retry-utils";

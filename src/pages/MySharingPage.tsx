@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { Link } from 'react-router-dom';
 import { Undo2,ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';

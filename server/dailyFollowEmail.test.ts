@@ -18,7 +18,7 @@ afterEach(() => vi.unstubAllEnvs());
 function emptyReading() {
   mocks.select.mockImplementation(() => ({ from: () => ({ where: () => ({ orderBy: () => ({ limit: async () => [] }) }) }) }));
 }
-const reader = { id: 'test-user', displayName: '<Reader>', email: 'reader@example.test' } as User;
+const reader = { id: 'test-user',church:'IM 行動教會', displayName: '<Reader>', email: 'reader@example.test' } as User;
 
 it('keeps all preview links on B including subscription management', async () => {
   emptyReading();
@@ -66,14 +66,14 @@ it('selects only open unanswered prayers, pinned first and newest first, with a 
     if (table === careContacts) return [];
     expect(table).toBe(prayers);
     const query = dialect.sqlToQuery(condition);
-    expect(query.sql).toBe('("prayers"."closed_at" is null and "prayers"."is_answered" = $1)');
-    expect(query.params).toEqual([false]);
+    expect(query.sql).toBe('("prayers"."church" = $1 and "prayers"."closed_at" is null and "prayers"."is_answered" = $2)');
+    expect(query.params).toEqual(['IM 行動教會',false]);
     expect(order.map(value => dialect.sqlToQuery(value).sql)).toEqual(['"prayers"."is_pinned" desc', '"prayers"."created_at" desc']);
     expect(limit).toBe(3);
     return rows.filter(row => row.closedAt === null && !row.isAnswered)
       .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
   } }) }) }) }));
-  const email = await buildDailyFollowEmail({ id: 'test-user', displayName: 'Reader', email: 'reader@example.test' } as User, new Date('2026-01-01'));
+  const email = await buildDailyFollowEmail({ id: 'test-user',church:'IM 行動教會', displayName: 'Reader', email: 'reader@example.test' } as User, new Date('2026-01-01'));
   for (const output of [email.html, email.text]) {
     expect(output).not.toMatch(/CLOSED_PRIVATE|ANSWERED_PRIVATE|OPEN_2|OPEN_1/);
     expect(output.indexOf('OPEN_PINNED')).toBeLessThan(output.indexOf('OPEN_4'));

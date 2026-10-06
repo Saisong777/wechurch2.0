@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2 } from 'lucide-react';

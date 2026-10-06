@@ -23,8 +23,7 @@ export async function verifyCoLeadersHttp(pool:Pool,makeClient:()=>Client){
  await assert.rejects(pool.query('UPDATE small_groups SET co_leader_user_id=leader_user_id WHERE id=$1',[id]),(error:{code?:string})=>error.code==='23514');
  await assert.rejects(pool.query('UPDATE small_groups SET co_leader_user_id=$2 WHERE id=$1',[id,randomUUID()]),(error:{code?:string})=>error.code==='23503');
  const appointments=await (await director.client('/api/access-control')).json();assert.equal(appointments.appointments.find((g:{id:string})=>g.id===id).coLeaderId,second.id);
- const devotionRepo=await import('../server/churchDevotionRepository');
- const devotion=await devotionRepo.saveChurchDevotion(director.id,{date:'2026-10-05',planName:'雙人合成讀經',dayNumber:1,scriptureReference:'詩篇 1',scriptureText:'',devotionalTitle:'合成驗收',devotionalText:'只用於隔離測試',prayer:'',loveAction:'',status:'published'});
+ const devotionResponse=await director.client('/api/admin/church-devotions','POST',{date:'2026-10-05',planName:'雙人合成讀經',dayNumber:1,scriptureReference:'詩篇 1',scriptureText:'',devotionalTitle:'合成驗收',devotionalText:'只用於隔離測試',prayer:'',loveAction:'',status:'published'});assert.equal(devotionResponse.status,201);const devotion=await devotionResponse.json();
  const membershipBefore=(await pool.query('SELECT count(*)::int AS count FROM small_group_members WHERE group_id=$1',[id])).rows[0].count;assert.equal(membershipBefore,0);
  const info=async(client:Client,g=id)=>{const r=await client(`${root}/${g}`);assert.equal(r.status,200);return r.json();};
  for(const actor of [first,second]){
@@ -63,7 +62,7 @@ export async function verifyCoLeadersHttp(pool:Pool,makeClient:()=>Client){
  const concurrent=await settings({announcement:'互斥版本合成'});
  const race=await Promise.all([director.client(`${root}/management/${id}`,'PATCH',concurrent),director.client(`${root}/management/${id}`,'PATCH',concurrent)]);assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
  await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2)',[id,last.id]);
- await pool.query('UPDATE users SET church=$2 WHERE id=$1',[last.id,'跨教會合成']);
+ await pool.query('UPDATE users SET church=$2 WHERE id=$1',[last.id,'火樂']);
  assert.equal((await patch({coLeaderId:last.id})).status,400);
  await pool.query('DELETE FROM small_group_members WHERE group_id=$1 AND user_id=$2',[id,last.id]);await pool.query('UPDATE users SET church=$2 WHERE id=$1',[last.id,'IM 行動教會']);
  assert.equal((await patch({coLeaderId:other.id})).status,400);assert.equal((await patch({coLeaderId:randomUUID()})).status,400);

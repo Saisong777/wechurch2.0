@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { withRetry, staggeredStart, getPollingInterval } from '@/lib/retry-utils';
@@ -60,9 +61,9 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchCardContent = async (cardId: string): Promise<{ content: string; contentEn: string | null } | null> => {
+  const fetchCardContent = async (cardId: string, gameId: string): Promise<{ content: string; contentEn: string | null } | null> => {
     try {
-      const response = await fetch(`/api/icebreaker/cards/${cardId}`);
+      const response = await fetch(`/api/icebreaker/cards/${cardId}?gameId=${encodeURIComponent(gameId)}`);
       if (!response.ok) return null;
       const data = await response.json();
       return { content: data.contentText, contentEn: data.contentTextEn };
@@ -88,7 +89,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
       }));
       
       if (updated.currentCardId && updated.currentCardId !== state.currentCard?.id) {
-        const cardData = await fetchCardContent(updated.currentCardId);
+        const cardData = await fetchCardContent(updated.currentCardId,updated.id || state.gameId);
         if (cardData) {
           setState(prev => ({
             ...prev,
@@ -174,7 +175,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
 
       let currentCard: GameState['currentCard'] = null;
       if (data.currentCardId) {
-        const cardData = await fetchCardContent(data.currentCardId);
+        const cardData = await fetchCardContent(data.currentCardId,data.id);
         if (cardData) {
           currentCard = {
             id: data.currentCardId,
@@ -230,7 +231,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
       if (data) {
         let currentCard: GameState['currentCard'] = null;
         if (data.currentCardId) {
-          const cardData = await fetchCardContent(data.currentCardId);
+          const cardData = await fetchCardContent(data.currentCardId,data.id);
           if (cardData) {
             currentCard = {
               id: data.currentCardId,
@@ -288,7 +289,7 @@ export function useIcebreakerGame(options: UseIcebreakerGameOptions = {}) {
         return;
       }
 
-      const cardData = await fetchCardContent(result.cardId);
+      const cardData = await fetchCardContent(result.cardId,state.gameId!);
 
       setTimeout(() => {
         setState(prev => ({

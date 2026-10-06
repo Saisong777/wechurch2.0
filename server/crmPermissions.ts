@@ -1,3 +1,4 @@
+import { churchContext, selectedChurch } from './churchContext';
 import { pool } from "./db";
 import { getChurchAliases, normalizeChurch } from "./churches";
 import { activeGrants } from './accessControl';
@@ -81,6 +82,8 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   );
   const currentUser = currentUserResult.rows[0];
   const ownChurch = normalizeChurch(currentUser?.church);
+  const requestScope=churchContext()?.selectedChurch;
+  if(churchContext()&&!requestScope)selectedChurch();
 
   const churchScopes = new Set<string>();
   const groupIds = new Set<string>();
@@ -101,7 +104,7 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
       role,
       canEnterCrm,
       accessLevel: "all",
-      churchScopes: [],
+      churchScopes: requestScope ? [requestScope] : ownChurch ? [ownChurch] : [],
       groupIds: [],
       userIds: [],
       potentialMemberIds: [],
@@ -133,14 +136,15 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
   }
 
   const assignmentsResult = await pool.query(
-    `SELECT scope_type, church, group_id, member_user_id, potential_member_id,
+    `SELECT scope_type, a.church, group_id, member_user_id, potential_member_id,
             can_view_personal, can_manage_care, can_manage_members
-       FROM crm_scope_assignments
-      WHERE assignee_user_id = $1
+       FROM crm_scope_assignments a
+      WHERE (a.church=ANY($2::text[]) OR EXISTS(SELECT 1 FROM small_groups g WHERE g.id=a.group_id AND g.church=ANY($2::text[])) OR EXISTS(SELECT 1 FROM users u WHERE u.id=a.member_user_id AND u.church=ANY($2::text[])) OR EXISTS(SELECT 1 FROM potential_members p WHERE p.id=a.potential_member_id AND p.church=ANY($2::text[])))
+        AND assignee_user_id = $1
         AND is_active = true
         AND starts_at <= NOW()
         AND (ends_at IS NULL OR ends_at > NOW())`,
-    [userId]
+    [userId,getChurchAliases(ownChurch)]
   );
 
   let canViewPersonal = role === "pastor" || role === "minister";
@@ -260,6 +264,8 @@ export function filterUsersForCrmAccess<T extends { id: string; email?: string |
   records: T[],
   access: CrmAccessContext
 ) {
+  const requestScope=churchContext()?.selectedChurch;
+  if(churchContext())records=records.filter(record=>normalizeChurch(record.church)===requestScope);
   if (access.role === "admin") return records;
   if (access.role === "senior_pastor") {
     return records.filter((record) => churchMatches(access.churchScopes, record.church));
@@ -277,6 +283,8 @@ export function filterPotentialMembersForCrmAccess<T extends { id: string; email
   records: T[],
   access: CrmAccessContext
 ) {
+  const requestScope=churchContext()?.selectedChurch;
+  if(churchContext())records=records.filter(record=>normalizeChurch(record.church)===requestScope);
   if (access.role === "admin") return records;
   if (access.role === "senior_pastor") {
     return records.filter((record) => churchMatches(access.churchScopes, record.church));

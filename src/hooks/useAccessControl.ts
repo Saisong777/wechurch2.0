@@ -1,11 +1,14 @@
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import type { MyAccess } from '@shared/accessControl';
 
 export function useAccessControl() {
   const { user } = useAuth();
+  const scopeKey = useChurchScopeKey();
   return useQuery<MyAccess>({
-    queryKey: ['access-control-me',user?.id], enabled: !!user, staleTime: 0, gcTime: 0,
+    queryKey: ['access-control-me',user?.id,scopeKey], enabled: !!user, staleTime: 0, gcTime: 0,
     refetchInterval: 30_000, refetchOnWindowFocus: true, retry: false,
     queryFn: async ({signal}) => {
       const res=await fetch('/api/access-control/me',{signal,cache:'no-store'});

@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 export interface LineLoginConfig {

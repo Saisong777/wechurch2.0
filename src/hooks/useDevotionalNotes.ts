@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '@/lib/queryClient';

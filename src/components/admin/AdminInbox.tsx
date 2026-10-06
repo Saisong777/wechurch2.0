@@ -1,5 +1,6 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,7 @@ import {
   Inbox, Mail, MailOpen, Archive, ArchiveRestore,
   ChevronLeft, Search, Loader2, RefreshCw, Eye, EyeOff
 } from 'lucide-react';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest } from '@/lib/queryClient';
 import DOMPurify from 'dompurify';
 
 interface InboxEmail {
@@ -33,6 +34,7 @@ interface AdminInboxProps {
 }
 
 export function AdminInbox({ onBack }: AdminInboxProps) {
+  const queryClient=useQueryClient();
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmail, setSelectedEmail] = useState<InboxEmail | null>(null);

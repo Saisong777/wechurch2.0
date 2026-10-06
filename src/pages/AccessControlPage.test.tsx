@@ -45,13 +45,13 @@ afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.restoreAl
 it('starts with a title only and applies preset permissions only on explicit action', async () => {
   fireEvent.click(await screen.findByRole('button', { name: '新增職分' }));
   expect(screen.getByRole('checkbox', { name: '寄送教會通知' })).not.toBeChecked();
-  expect(screen.getByRole('checkbox', { name: '管理全站靈修課表' })).toBeDisabled();
+  expect(screen.getByRole('checkbox', { name: '管理本教會靈修課表' })).toBeEnabled();
   fireEvent.click(screen.getByRole('button', { name: '套用職分預設權限' }));
   expect(screen.getByRole('checkbox', { name: '寄送教會通知' })).toBeChecked();
-  fireEvent.change(screen.getByLabelText('管理範圍'), { target: { value: 'site' } });
+  fireEvent.change(screen.getByLabelText('管理範圍'), { target: { value: 'group' } });
   expect(screen.getByRole('checkbox', { name: '寄送教會通知' })).not.toBeChecked();
-  expect(screen.getByRole('checkbox', { name: '寄送教會通知' })).toBeDisabled();
-  expect(screen.getByRole('checkbox', { name: '管理全站靈修課表' })).not.toBeDisabled();
+  expect(screen.getByRole('checkbox', { name: '寄送教會通知' })).toBeEnabled();
+  expect(screen.getByRole('checkbox', { name: '管理本教會靈修課表' })).toBeDisabled();
   expect(sent).toHaveLength(0);
 });
 

@@ -12,13 +12,13 @@ export async function verifySupportHttp(pool: Pool, a: Client, b: Client, guest:
     ids.push((await pool.query('SELECT id FROM users WHERE email=$1',[email])).rows[0].id);
   }
   const [idC,idD] = ids;
-  await pool.query("UPDATE users SET church='HTTP church' WHERE id=ANY($1::uuid[])", [[idA,idB,idC,idD]]);
+  await pool.query("UPDATE users SET church='IM 行動教會' WHERE id=ANY($1::uuid[])", [[idA,idB,idC,idD]]);
   const roleUpdate = await pool.query("UPDATE user_roles SET role='future_leader' WHERE user_id=$1",[idC]);
   if (!roleUpdate.rowCount) await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'future_leader')",[idC]);
-  const group = async (leader: string) => (await pool.query("INSERT INTO small_groups(name,church,leader_user_id) VALUES('Scope group','HTTP church',$1) RETURNING id",[leader])).rows[0].id;
+  const group = async (leader: string) => (await pool.query("INSERT INTO small_groups(name,church,leader_user_id) VALUES('Scope group','IM 行動教會',$1) RETURNING id",[leader])).rows[0].id;
   const gA=await group(idA),gC=await group(idC);
   await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2)',[gA,idB]);
-  const users = await a('/api/users?church=all'); assert.equal(users.status,200);
+  const users = await a('/api/users'); assert.equal(users.status,200);
   const visible = (await users.json()).map((r: {id:string})=>r.id);
   assert(visible.includes(idB)); assert(!visible.includes(idD)); assert(!visible.includes(idC));
   const groups = await a('/api/crm/groups'); assert.equal(groups.status,200); assert.deepEqual((await groups.json()).map((g:{id:string})=>g.id),[gA]);
@@ -61,7 +61,7 @@ export async function verifySupportHttp(pool: Pool, a: Client, b: Client, guest:
   assert.equal((await d(`/api/support/requests/${requestId}`)).status,404);
 
   const person = async (userId:string) => {
-    const id=(await pool.query("INSERT INTO persons(display_name,church,notes) VALUES('Fixture person','HTTP church','PERSON_PRIVATE') RETURNING id")).rows[0].id;
+    const id=(await pool.query("INSERT INTO persons(display_name,church,notes) VALUES('Fixture person','IM 行動教會','PERSON_PRIVATE') RETURNING id")).rows[0].id;
     await pool.query("INSERT INTO person_identity_links(person_id,user_id,source_type) VALUES($1,$2,'user')",[id,userId]);return id;
   };
   const pB=await person(idB),pD=await person(idD);
@@ -86,12 +86,12 @@ export async function verifySupportHttp(pool: Pool, a: Client, b: Client, guest:
   const taskFiltered=await c('/api/pastoral/persons?filter=tasks');assert.equal(taskFiltered.status,200);
   assert(!(await taskFiltered.json()).persons.some((p:{id:string})=>p.id===pB));
 
-  const potential=(await pool.query("INSERT INTO potential_members(email,name,church) VALUES($1,'Care fixture','HTTP church') RETURNING id",[`care-${randomUUID()}@example.test`])).rows[0].id;
+  const potential=(await pool.query("INSERT INTO potential_members(email,name,church) VALUES($1,'Care fixture','IM 行動教會') RETURNING id",[`care-${randomUUID()}@example.test`])).rows[0].id;
   await pool.query(`INSERT INTO crm_scope_assignments(assignee_user_id,assigned_by_user_id,scope_type,potential_member_id,can_manage_care,can_manage_members) VALUES($1,$2,'member',$3,true,false)`,[idC,idA,potential]);
   assert.equal((await c(`/api/potential-members/${potential}`,'PATCH',{status:'member'})).status,200);
   assert.equal((await c(`/api/potential-members/${potential}`,'PATCH',{name:'Forbidden rename'})).status,403);
 
-  const oldPerson=(await pool.query("INSERT INTO persons(display_name,church,merged_into_person_id) VALUES('Merged fixture','HTTP church',$1) RETURNING id",[pB])).rows[0].id;
+  const oldPerson=(await pool.query("INSERT INTO persons(display_name,church,merged_into_person_id) VALUES('Merged fixture','IM 行動教會',$1) RETURNING id",[pB])).rows[0].id;
   await pool.query("INSERT INTO pastoral_framework_stages(slug,code,name,display_name) VALUES('follow','F3','Fixture','Fixture') ON CONFLICT(slug) DO NOTHING");
   const stage=await c(`/api/pastoral/persons/${oldPerson}/stage`,'PATCH',{stageSlug:'follow'});assert.equal(stage.status,200);assert.equal((await stage.json()).personId,pB);
   assert.equal((await pool.query('SELECT pastoral_stage FROM persons WHERE id=$1',[pB])).rows[0].pastoral_stage,'follow');
@@ -109,7 +109,7 @@ export async function verifySupportHttp(pool: Pool, a: Client, b: Client, guest:
   const visit=await e('/api/me/love-journey');assert.equal(visit.status,200);const visitData=await visit.json();assert.notEqual(visitData.person.id,unclaimed);
   const repeatedVisit=await e('/api/me/love-journey');assert.equal((await repeatedVisit.json()).person.id,visitData.person.id);
   const idE=(await pool.query('SELECT id FROM users WHERE email=$1',[email])).rows[0].id;
-  await pool.query("UPDATE persons SET church='HTTP church' WHERE id=$1",[visitData.person.id]);
+  await pool.query("UPDATE persons SET church='IM 行動教會' WHERE id=$1",[visitData.person.id]);
   await pool.query(`INSERT INTO crm_scope_assignments(assignee_user_id,assigned_by_user_id,scope_type,member_user_id,can_manage_care) VALUES($1,$2,'member',$3,true)`,[idC,idA,idE]);
   const staffStart=await c(`/api/pastoral/persons/${visitData.person.id}/love-journey/start`,'POST',{});assert.equal(staffStart.status,201);
   const started=(await staffStart.json()).journeyId;

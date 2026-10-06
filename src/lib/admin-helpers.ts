@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 /**
  * Force all participants in a session to be marked as ready.
  * This is useful for testing when mock users cannot click checkboxes.

@@ -21,7 +21,7 @@ export function prayerSharingRoutes(resolveUserId: (req: Request) => Promise<str
   router.get('/', async (_req,res) => { res.json(await listPrayerDeliveries(res.locals.actor)); });
   router.post('/', async (req,res) => { res.json(await sharePersonalPrayers(res.locals.actor,prayerSharingInput.parse(req.body))); });
   router.delete('/:prayerId/:destination', async (req,res) => {
-    res.json(await withdrawPrayerDelivery(res.locals.actor,z.string().uuid().parse(req.params.prayerId),z.union([z.literal('public'),z.string().uuid()]).parse(req.params.destination)));
+    res.json(await withdrawPrayerDelivery(res.locals.actor,z.string().uuid().parse(req.params.prayerId),z.union([z.literal('public'),z.string().uuid()]).parse(req.params.destination),z.string().max(120).optional().parse(req.query.deliveryChurch)));
   });
   const errors: ErrorRequestHandler = (error,_req,res,_next) => {
     if (error instanceof z.ZodError) return void res.status(400).json({ error: error.issues.map(i => i.message).join('；') });

@@ -1,3 +1,4 @@
+import { selectedChurch, assertSelectedChurch, churchPredicate, lockChurchContext } from './churchContext';
 import { Router, type Request, type ErrorRequestHandler } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -12,7 +13,7 @@ const missing = () => new GroupError(404, '找不到事項，或你沒有存取�
 const conflict = () => new GroupError(409, '事項已更新，請重新載入；你的輸入仍保留。');
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (error) { await c.query('ROLLBACK'); throw error; } finally { c.release(); }
 }
 const receiverActiveSql = `(EXISTS(SELECT 1 FROM small_groups g WHERE g.id=r.group_id AND g.is_active AND ((g.leader_user_id=r.receiver_id OR g.co_leader_user_id=r.receiver_id) OR g.pastor_user_id=r.receiver_id))
@@ -26,12 +27,13 @@ async function validTarget(c: PoolClient, actor: string, target: z.infer<typeof 
   if (target.kind === 'group') {
     await groupAccess(c, target.id, actor);
     if (!(await c.query('SELECT id FROM small_groups WHERE id=$1 AND is_active AND ((leader_user_id=$2 OR co_leader_user_id=$2) OR pastor_user_id=$2) FOR SHARE', [target.id, target.receiverId])).rowCount) throw missing();
-  } else if (!(await c.query('SELECT id FROM support_destinations WHERE id=$1 AND owner_id=$2 AND is_active FOR SHARE', [target.id, target.receiverId])).rowCount) throw missing();
+  } else if (!(await c.query('SELECT id FROM support_destinations WHERE id=$1 AND owner_id=$2 AND is_active AND church=$3 FOR SHARE', [target.id, target.receiverId,selectedChurch()])).rowCount) throw missing();
 }
 async function requestAccess(c: PoolClient, id: string, actor: string) {
   const r = (await c.query('SELECT * FROM support_requests WHERE id=$1 FOR UPDATE', [id])).rows[0];
   if (!r) throw missing();
   if (r.sender_id === actor) return r;
+  assertSelectedChurch(r.church);
   if (r.receiver_id !== actor || r.status === 'cancelled') throw missing();
   if (r.group_id) {
     const g = await groupAccess(c, r.group_id, actor, true);
@@ -62,9 +64,9 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
     const actor = res.locals.actor;
     const groups = (await pool.query(`SELECT 'group' AS kind,g.id,g.name,u.id AS "receiverId",COALESCE(u.display_name,'小家同工') AS "receiverName"
       FROM small_groups g JOIN users u ON u.id=g.leader_user_id OR u.id=g.co_leader_user_id OR u.id=g.pastor_user_id
-      WHERE g.is_active AND u.id<>$1 AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active)) ORDER BY g.name,u.id`, [actor])).rows;
+      WHERE ${churchPredicate('g')} AND g.is_active AND u.id<>$1 AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active)) ORDER BY g.name,u.id`, [actor])).rows;
     const destinations = (await pool.query(`SELECT 'destination' AS kind,d.id,d.name,d.owner_id AS "receiverId",COALESCE(u.display_name,'關懷同工') AS "receiverName"
-      FROM support_destinations d JOIN users u ON u.id=d.owner_id WHERE d.is_active AND u.id<>$1 ORDER BY d.church,d.name`, [actor])).rows;
+      FROM support_destinations d JOIN users u ON u.id=d.owner_id WHERE ${churchPredicate('d')} AND d.is_active AND u.id<>$1 ORDER BY d.church,d.name`, [actor])).rows;
     res.json([...groups, ...destinations]);
   });
   router.get('/access', async (_req, res) => {
@@ -78,7 +80,7 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
   });
   router.get('/config', async (_req, res) => res.json(await transaction(async c => {
     const user = await director(c, res.locals.actor);
-    const scope = user.admin ? null : getChurchAliases(normalizeChurch(user.church) || '__unassigned');
+    const scope = getChurchAliases(selectedChurch());
     const destinations = (await c.query('SELECT id,name,church,owner_id AS "ownerId",is_active AS "isActive" FROM support_destinations WHERE ($1::text[] IS NULL OR church=ANY($1)) ORDER BY name', [scope])).rows;
     const receivers = (await c.query(`SELECT u.id,COALESCE(u.display_name,'同工') AS name,u.church FROM users u WHERE ($1::text[] IS NULL OR u.church=ANY($1))
       AND EXISTS(SELECT 1 FROM user_roles WHERE user_id=u.id AND role IN ('pastor','minister','senior_pastor','group_leader','leader')) ORDER BY name`, [scope])).rows;
@@ -90,6 +92,7 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
       const user = await director(c, res.locals.actor);
       const receiver = (await c.query(`SELECT u.church FROM users u WHERE u.id=$1 AND EXISTS(SELECT 1 FROM user_roles WHERE user_id=u.id AND role IN ('pastor','minister','senior_pastor','group_leader','leader')) FOR SHARE`, [input.ownerId])).rows[0];
       if (!receiver?.church || (!user.admin && normalizeChurch(receiver.church) !== normalizeChurch(user.church))) throw missing();
+      assertSelectedChurch(receiver.church);
       const destination = (await c.query('INSERT INTO support_destinations(name,church,owner_id,created_by) VALUES($1,$2,$3,$4) RETURNING id', [input.name, receiver.church, input.ownerId, res.locals.actor])).rows[0];
       await c.query("INSERT INTO support_destination_audit(destination_id,actor_id,action) VALUES($1,$2,'created')", [destination.id,res.locals.actor]);
       return destination;
@@ -100,6 +103,7 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
     res.json(await transaction(async c => {
       const user = await director(c, res.locals.actor), destination = (await c.query('SELECT * FROM support_destinations WHERE id=$1 FOR UPDATE', [id])).rows[0];
       if (!destination || (!user.admin && normalizeChurch(destination.church) !== normalizeChurch(user.church))) throw missing();
+      assertSelectedChurch(destination.church);
       await c.query('UPDATE support_destinations SET is_active=$2 WHERE id=$1', [id, input.isActive]);
       await c.query('INSERT INTO support_destination_audit(destination_id,actor_id,action) VALUES($1,$2,$3)', [id,res.locals.actor,input.isActive?'enabled':'disabled']);
       return { ok: true };
@@ -111,7 +115,7 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
     const filter = z.enum(['all','open','active','waiting','closed']).default('all').parse(req.query.filter);
     const statuses = { all: null, open: ['open'], active: ['open','accepted','waiting_requester','waiting_support'], waiting: ['waiting_requester','waiting_support'], closed: ['completed','declined','cancelled'] }[filter];
     const rows = (await pool.query(`SELECT ${projection} FROM support_requests r JOIN users s ON s.id=r.sender_id JOIN users u ON u.id=r.receiver_id
-      WHERE ${mode === 'personal' ? 'r.sender_id=$1' : `r.receiver_id=$1 AND r.status<>'cancelled' AND ${receiverActiveSql}`}
+      WHERE ${mode === 'personal' ? 'r.sender_id=$1' : `r.receiver_id=$1 AND ${churchPredicate('r')} AND r.status<>'cancelled' AND ${receiverActiveSql}`}
       AND ($3::text[] IS NULL OR r.status=ANY($3))
       ORDER BY CASE WHEN r.status IN ('open','accepted','waiting_requester','waiting_support') THEN 0 ELSE 1 END,
         r.due_date ASC NULLS LAST,r.updated_at DESC,r.id LIMIT 31 OFFSET $2`, [res.locals.actor,offset,statuses])).rows;
@@ -123,12 +127,13 @@ export function supportRoutes(resolveUserId: (req: Request) => Promise<string | 
       await c.query("SELECT pg_advisory_xact_lock(hashtext('support-create:' || $1))", [id]);
       const old = (await c.query('SELECT * FROM support_requests WHERE id=$1', [id])).rows[0];
       if (old) {
+        assertSelectedChurch(old.church);
         if (old.sender_id!==actor) throw missing();
         if (old.title!==input.title || old.body!==input.body || old.receiver_id!==input.target.receiverId || (old.group_id || old.destination_id)!==input.target.id) throw conflict();
         return { id, created: false };
       }
       await validTarget(c, actor, input.target);
-      await c.query('INSERT INTO support_requests(id,sender_id,receiver_id,group_id,destination_id,title,body) VALUES($1,$2,$3,$4,$5,$6,$7)', [id,actor,input.target.receiverId,input.target.kind==='group'?input.target.id:null,input.target.kind==='destination'?input.target.id:null,input.title,input.body]);
+      await c.query('INSERT INTO support_requests(id,sender_id,receiver_id,group_id,destination_id,title,body,church) VALUES($1,$2,$3,$4,$5,$6,$7,$8)', [id,actor,input.target.receiverId,input.target.kind==='group'?input.target.id:null,input.target.kind==='destination'?input.target.id:null,input.title,input.body,selectedChurch()]);
       return { id, created: true };
     }));
   });

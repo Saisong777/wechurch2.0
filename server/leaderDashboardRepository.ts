@@ -1,3 +1,4 @@
+import { churchPredicate, lockChurchContext } from './churchContext';
 import type { PoolClient } from 'pg';
 import type { z } from 'zod';
 import { pool } from './db';
@@ -11,7 +12,7 @@ const denied = () => new GroupError(404, '找不到內容，或已不在你的�
 const conflict = () => new GroupError(409, '記錄已更新，請重新載入後再修改；本次輸入尚未儲存。');
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
-  try { await c.query('BEGIN'); const result = await work(c); await c.query('COMMIT'); return result; }
+  try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
 
@@ -27,7 +28,7 @@ async function scopes(c: PoolClient, actor: string, scope = 'all') {
   const ids = grants.filter(g => g.scope_type === 'group').map(g => g.group_id);
   const groups = (await c.query(`SELECT g.id,g.name,g.church,((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR EXISTS(
       SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=$1 AND m.is_active)) IS TRUE AS "sharedReadable"
-    FROM small_groups g WHERE g.is_active AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR g.church=ANY($2::text[]) OR g.id=ANY($3::uuid[]))
+    FROM small_groups g WHERE ${churchPredicate('g')} AND g.is_active AND ((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 OR g.church=ANY($2::text[]) OR g.id=ANY($3::uuid[]))
     ORDER BY g.name,g.id FOR SHARE OF g`, [actor, [...churches], ids])).rows as DashboardGroup[];
   const selected = scope === 'all' ? groups : groups.filter(g => g.id === scope);
   if (scope !== 'all' && !selected.length) throw denied();
@@ -35,8 +36,8 @@ async function scopes(c: PoolClient, actor: string, scope = 'all') {
   await c.query('SELECT id FROM small_group_members WHERE group_id=ANY($1::uuid[]) AND user_id=$2 AND is_active FOR SHARE', [selected.map(g => g.id), actor]);
   return { groups, selected, ids: selected.map(g => g.id) };
 }
-const careWhere = `a.group_id=ANY($1::uuid[]) AND a.withdrawn_at IS NULL AND a.status IN ('new','following') AND ${visibleContent('a')}`;
-const prayerWhere = `s.group_id=ANY($1::uuid[]) AND s.withdrawn_at IS NULL AND s.kind='prayer' AND ${visibleContent('s')}
+const careWhere = () => `a.group_id=ANY($1::uuid[]) AND a.withdrawn_at IS NULL AND a.status IN ('new','following') AND ${visibleContent('a')}`;
+const prayerWhere = () => `s.group_id=ANY($1::uuid[]) AND s.withdrawn_at IS NULL AND s.kind='prayer' AND ${visibleContent('s')}
   AND s.updated_at >= ($3::date::timestamp AT TIME ZONE 'Asia/Taipei') AND s.updated_at<=now()`;
 const careFields = `a.id,a.group_id AS "groupId",g.name AS "groupName",a.name,a.status,a.due_date::text AS "dueDate",
   CASE WHEN a.responsible_id IS NULL THEN NULL ELSE COALESCE(NULLIF(u.display_name,''),'小家成員') END AS "responsibleName",a.responsible_id AS "responsibleId",a.next_action AS "nextAction",a.updated_at AS "updatedAt"`;
@@ -57,10 +58,10 @@ export function dashboard(actor: string, scope: string) {
   return transaction(async c => {
     const a = await scopes(c, actor, scope); const { today, since } = dates();
     const care = (await c.query(`SELECT count(*)::int AS active,count(*) FILTER(WHERE a.due_date<=$3::date)::int AS due,
-      count(*) FILTER(WHERE a.responsible_id IS NULL)::int AS unassigned FROM life_group_care a WHERE ${careWhere}`, [a.ids, actor, today])).rows[0];
-    const items = (await c.query(`SELECT ${careFields} ${careJoin} WHERE ${careWhere} AND (a.due_date<=$3::date OR a.responsible_id IS NULL)
+      count(*) FILTER(WHERE a.responsible_id IS NULL)::int AS unassigned FROM life_group_care a WHERE ${careWhere()}`, [a.ids, actor, today])).rows[0];
+    const items = (await c.query(`SELECT ${careFields} ${careJoin} WHERE ${careWhere()} AND (a.due_date<=$3::date OR a.responsible_id IS NULL)
       ORDER BY a.due_date ASC NULLS LAST,a.updated_at,a.id LIMIT 5`, [a.ids, actor, today])).rows;
-    const recent = (await c.query(`SELECT count(*)::int AS count FROM life_group_shares s WHERE ${prayerWhere}`, [a.ids, actor, since])).rows[0].count;
+    const recent = (await c.query(`SELECT count(*)::int AS count FROM life_group_shares s WHERE ${prayerWhere()}`, [a.ids, actor, since])).rows[0].count;
     const prayers = await prayerRows(c, a.ids, actor, since, 0, 5);
     const gatherings = (await c.query(`SELECT ${meetingFields},${meetingCounts} FROM group_gatherings m JOIN small_groups g ON g.id=m.group_id
       WHERE m.group_id=ANY($1::uuid[]) AND NOT m.cancelled AND m.gathering_date<=$2::date
@@ -73,7 +74,7 @@ export function dashboard(actor: string, scope: string) {
 export function carePage(actor: string, scope: string, filter: string, offset: number) {
   return transaction(async c => {
     const a = await scopes(c, actor, scope);
-    const where = `${careWhere} AND ($3='active' OR ($3='due' AND a.due_date<=$4::date) OR ($3='unassigned' AND a.responsible_id IS NULL))`;
+    const where = `${careWhere()} AND ($3='active' OR ($3='due' AND a.due_date<=$4::date) OR ($3='unassigned' AND a.responsible_id IS NULL))`;
     const args = [a.ids, actor, filter, taipeiToday()];
     const total = (await c.query(`SELECT count(*)::int AS total FROM life_group_care a WHERE ${where}`, args)).rows[0].total;
     const items = (await c.query(`SELECT ${careFields} ${careJoin} WHERE ${where} ORDER BY a.due_date ASC NULLS LAST,a.updated_at,a.id LIMIT 30 OFFSET $5`, [...args, offset])).rows;
@@ -83,13 +84,13 @@ export function carePage(actor: string, scope: string, filter: string, offset: n
 async function prayerRows(c: PoolClient, ids: string[], actor: string, since: string, offset: number, limit: number) {
   return (await c.query(`SELECT s.id,s.group_id AS "groupId",g.name AS "groupName",s.title,s.answered,s.updated_at AS "updatedAt",
     CASE WHEN s.is_anonymous THEN '匿名' ELSE COALESCE(NULLIF(u.display_name,''),'小家成員') END AS "authorName"
-    FROM life_group_shares s JOIN small_groups g ON g.id=s.group_id JOIN users u ON u.id=s.author_id WHERE ${prayerWhere}
+    FROM life_group_shares s JOIN small_groups g ON g.id=s.group_id JOIN users u ON u.id=s.author_id WHERE ${prayerWhere()}
     ORDER BY s.updated_at DESC,s.id DESC LIMIT $4 OFFSET $5`, [ids, actor, since, limit, offset])).rows;
 }
 export function prayerPage(actor: string, scope: string, offset: number) {
   return transaction(async c => {
     const a = await scopes(c, actor, scope); const { since } = dates();
-    const total = (await c.query(`SELECT count(*)::int AS total FROM life_group_shares s WHERE ${prayerWhere}`, [a.ids, actor, since])).rows[0].total;
+    const total = (await c.query(`SELECT count(*)::int AS total FROM life_group_shares s WHERE ${prayerWhere()}`, [a.ids, actor, since])).rows[0].total;
     return { total, items: await prayerRows(c, a.ids, actor, since, offset, 30) };
   });
 }

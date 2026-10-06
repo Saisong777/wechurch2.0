@@ -1,3 +1,4 @@
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
 import { usePastoralAccess } from '@/hooks/usePastoralAccess';
 import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
@@ -231,9 +232,10 @@ const Index = () => {
 
   const { data: devotionalNotes, isLoading: devotionalNotesLoading, isError: notesError, isFetching: notesFetching, refetch: retryNotes } = useDevotionalNotes<DevotionalNoteSummary>(user?.id);
 
+  const churchScope=useChurchScopeKey();
   const fallbackChurchReading = useMemo(() => getChurchReadingForToday(), []);
   const { data: syncedChurchReading, isLoading: churchReadingLoading, isError: churchReadingError } = useQuery({
-    queryKey: ['/api/church-reading/today'],
+    queryKey: ['/api/church-reading/today',churchScope],
     queryFn: () => fetchChurchReadingForToday(),
     refetchOnWindowFocus: true,
     refetchInterval: 60000,

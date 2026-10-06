@@ -14,4 +14,4 @@ export const prayerSharingInput = z.object({
 }).refine(value => value.groupId || value.publicWall, '請選擇分享對象');
 
 export type PrayerSharingInput = z.infer<typeof prayerSharingInput>;
-export type PrayerShareDelivery = { prayerId: string; destination: string; groupId: string | null; postId: string; name: string; anonymous: boolean; createdAt: string; content?: string };
+export type PrayerShareDelivery = { church?:string; prayerId: string; destination: string; groupId: string | null; postId: string; name: string; anonymous: boolean; createdAt: string; content?: string };

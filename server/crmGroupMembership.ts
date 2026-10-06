@@ -1,3 +1,4 @@
+import { assertSelectedChurch, lockChurchContext } from './churchContext';
 import { pool } from './db';
 import { normalizeChurch } from './churches';
 import { filterUsersForCrmAccess, filterPotentialMembersForCrmAccess, type CrmAccessContext } from './crmPermissions';
@@ -6,20 +7,21 @@ import { GroupError } from './lifeGroupRepository';
 export async function assignCrmGroupMember(groupId: string, input: { userId?: string | null; potentialMemberId?: string | null; memberEmail?: string | null }, access: CrmAccessContext) {
   const c = await pool.connect();
   try {
-    await c.query('BEGIN');
+    await c.query('BEGIN'); await lockChurchContext(c);
     await c.query("SELECT pg_advisory_xact_lock(hashtext('crm-membership:' || $1))", [groupId]);
     const group = (await c.query("SELECT id,church FROM small_groups WHERE id=$1 AND is_active AND lifecycle='active' FOR UPDATE", [groupId])).rows[0];
     if (!group || (access.role !== 'admin' && !access.groupIds.includes(groupId) && !access.churchScopes.includes(normalizeChurch(group.church) || ''))) throw new GroupError(403, '小家不在管理範圍內');
+    assertSelectedChurch(group.church);
     const normalizeEmail = (value: string) => value.trim().toLowerCase();
     const emails = new Set<string>();
     if (input.userId) {
       const rows = (await c.query('SELECT id,email,church FROM users WHERE id=$1 FOR SHARE', [input.userId])).rows;
-      if (!filterUsersForCrmAccess(rows, access).length) throw new GroupError(403, '成員不在管理範圍內');
+      if (!filterUsersForCrmAccess(rows, access).length || normalizeChurch(rows[0]?.church)!==normalizeChurch(group.church)) throw new GroupError(403, '成員不在管理範圍內');
       emails.add(normalizeEmail(rows[0].email));
     }
     if (input.potentialMemberId) {
       const rows = (await c.query('SELECT id,email,church FROM potential_members WHERE id=$1 FOR SHARE', [input.potentialMemberId])).rows;
-      if (!filterPotentialMembersForCrmAccess(rows, access).length) throw new GroupError(403, '成員不在管理範圍內');
+      if (!filterPotentialMembersForCrmAccess(rows, access).length || normalizeChurch(rows[0]?.church)!==normalizeChurch(group.church)) throw new GroupError(403, '成員不在管理範圍內');
       emails.add(normalizeEmail(rows[0].email));
     }
     if (input.memberEmail) {
@@ -27,6 +29,7 @@ export async function assignCrmGroupMember(groupId: string, input: { userId?: st
       const users = (await c.query('SELECT id,email,church FROM users WHERE lower(trim(email))=$1 FOR SHARE', [email])).rows;
       const potentials = (await c.query('SELECT id,email,church FROM potential_members WHERE lower(trim(email))=$1 FOR SHARE', [email])).rows;
       if ((!users.length && !potentials.length) || filterUsersForCrmAccess(users, access).length !== users.length || filterPotentialMembersForCrmAccess(potentials, access).length !== potentials.length) throw new GroupError(403, '成員不在管理範圍內');
+      if([...users,...potentials].some(row=>normalizeChurch(row.church)!==normalizeChurch(group.church)))throw new GroupError(403,'成員與小家必須屬於同一教會');
       emails.add(email);
     }
     if (emails.size !== 1) throw new GroupError(400, '成員識別資料不一致');

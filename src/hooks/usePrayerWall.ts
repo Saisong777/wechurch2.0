@@ -1,3 +1,5 @@
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -19,12 +21,12 @@ async function request<T>(path: string, method='GET', body?: unknown): Promise<T
   return response.json();
 }
 export const usePrayerWall = (mine = false) => {
-  const { user } = useAuth();
-  return useQuery<Prayer[]>({ queryKey:['prayer-wall',user?.id,mine?'mine':'active'], enabled:!!user, queryFn:() => request(mine?'?view=my':''), refetchInterval:30000, refetchIntervalInBackground:false, retry:false });
+  const { user } = useAuth();const scope=useChurchScopeKey();
+  return useQuery<Prayer[]>({ queryKey:['prayer-wall',user?.id,mine?'mine':'active',scope], enabled:!!user, queryFn:() => request(mine?'?view=my':''), refetchInterval:30000, refetchIntervalInBackground:false, retry:false });
 };
 export function usePrayerTarget(id: string) {
-  const {user} = useAuth();
-  return useQuery<Prayer>({queryKey:['prayer-wall',user?.id,'target',id],enabled:!!user && !!id,queryFn:() => request(`/${id}`),retry:false,staleTime:10000});
+  const {user} = useAuth();const scope=useChurchScopeKey();
+  return useQuery<Prayer>({queryKey:['prayer-wall',user?.id,'target',id,scope],enabled:!!user && !!id,queryFn:() => request(`/${id}`),retry:false,staleTime:10000});
 }
 function useRefreshWall() {
   const client = useQueryClient();

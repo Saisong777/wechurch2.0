@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import React, { useState, useEffect, useRef } from 'react';
 import { getKnownChurchOptions, normalizeChurch, churchDisplayName } from '@shared/churches';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,13 +33,15 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { user } = useAuth();
+  const { user, refreshAuth } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [birthday, setBirthday] = useState('');
   const [userGender, setUserGender] = useState('');
   const [address, setAddress] = useState('');
   const [church, setChurch] = useState('');
+  const [expectedChurch,setExpectedChurch]=useState<string|null>(null);
+  const [profileReady,setProfileReady]=useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,7 +59,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
       setBirthday('');
       setUserGender('');
       setAddress('');
-      setChurch('');
+      setChurch('');setProfileReady(false);
       fetchProfile();
     }
   }, [user, open]);
@@ -73,7 +76,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
         if (data.birthday) setBirthday(data.birthday);
         if (data.userGender) setUserGender(data.userGender);
         if (data.address) setAddress(data.address);
-        if (data.church) setChurch(data.church);
+        setChurch(data.church || '');setExpectedChurch(data.church ?? null);setProfileReady(true);
       }
     } catch (error) {
       console.error('Failed to fetch profile:', error);
@@ -158,7 +161,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !profileReady) return;
     
     if (!displayName.trim()) {
       toast.error('顯示名稱不能為空');
@@ -186,12 +189,16 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
           birthday: birthday || null,
           userGender: userGender || null,
           address: address.trim() || null,
-          ...(user.role === 'admin' ? { church: church.trim() || null } : {}),
+          ...(user.role === 'admin' && (church.trim() || null) !== expectedChurch ? { church: church.trim() || null,expectedChurch } : {}),
         }),
       });
 
-      if (!res.ok) throw new Error('Update failed');
+      if (!res.ok) {
+        if(res.status===409){const latest=await fetch(`/api/users/${user.id}/profile`);if(latest.ok)setExpectedChurch((await latest.json()).church ?? null);toast.error('教會歸屬已被更新，內容已保留；請重新確認後再儲存。');return;}
+        throw new Error('Update failed');
+      }
 
+      await refreshAuth?.();
       toast.success('個人設定已更新');
       onOpenChange(false);
     } catch (error: any) {
@@ -323,7 +330,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
 
             <div className="space-y-2">
               <Label htmlFor="church">
-                所屬教會 <span className="text-xs text-muted-foreground">(選填)</span>
+                所屬教會 <span className="text-xs text-muted-foreground">（管理者核定）</span>
               </Label>
               <select
                 id="church"
@@ -333,7 +340,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
                 className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
                 data-testid="input-church"
               >
-                <option value="">尚未設定</option>
+                <option value="">等待管理者核定</option>
                 {getKnownChurchOptions().map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 {church && !getKnownChurchOptions().some(c => c.id === normalizeChurch(church)) && <option value={church} disabled>{churchDisplayName(church)}（已停用）</option>}
               </select>
@@ -363,7 +370,7 @@ export const ProfileSettingsDialog: React.FC<ProfileSettingsDialogProps> = ({
             </Button>
             <Button
               onClick={handleSave}
-              disabled={isLoading}
+              disabled={isLoading || !profileReady}
               data-testid="button-save-profile"
             >
               {isLoading ? (

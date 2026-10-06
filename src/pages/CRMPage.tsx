@@ -1,3 +1,6 @@
+import { useChurchContext } from '@/contexts/ChurchContext';
+import { PendingChurchAffiliations } from '@/components/admin/PendingChurchAffiliations';
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { CrmOperationalPanel } from '@/components/admin/CrmOperationalPanel';
 import { VisitReminder } from '@/components/care/CareVisits';
 import { churchDisplayName } from '@shared/churches';
@@ -160,7 +163,7 @@ const StatTile = ({
 
 const CRMPage = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshAuth } = useAuth();
   const { role: currentRole, isLeader: legacyLeader, isAdmin, isSystemAdmin, loading: roleLoading } = useUserRole();
   const access = useAccessControl();
   const isLeader = legacyLeader || !!access.data?.canEnterCrm;
@@ -177,7 +180,10 @@ const CRMPage = () => {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [role, setRole] = useState<AppRole | 'all'>('all');
   const [ministryRole,setMinistryRole] = useState('');
-  const [selectedChurch, setSelectedChurch] = useState<string>('all');
+  const churchContext=useChurchContext();
+  const [legacyChurch, setLegacyChurch] = useState<string>('all');
+  const selectedChurch=churchContext?.data?.selectedChurch || legacyChurch;
+  const setSelectedChurch=(id:string)=>{if(churchContext)void churchContext.selectChurch(id);else setLegacyChurch(id);};
   const [churches, setChurches] = useState<ChurchOption[]>([]);
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -214,6 +220,7 @@ const CRMPage = () => {
 
   useEffect(() => {
     if (authLoading || roleLoading || churchScopeInitialized || !user || !currentRole) return;
+    if(churchContext?.data){setChurchScopeInitialized(true);return;}
     if (currentRole === 'admin') {
       setSelectedChurch('all');
       setChurchScopeInitialized(true);
@@ -223,7 +230,7 @@ const CRMPage = () => {
       setSelectedChurch(user.church);
     }
     setChurchScopeInitialized(true);
-  }, [authLoading, churchScopeInitialized, currentRole, roleLoading, user]);
+  }, [authLoading, churchScopeInitialized, currentRole, roleLoading, user, churchContext?.data]);
 
   useEffect(() => {
     if (!isLeader || !churchScopeInitialized) return;
@@ -374,15 +381,18 @@ const CRMPage = () => {
   const handleUpdateChurch = async (member: UnifiedMember, church: string) => {
     try {
       if (member.type === 'registered' && member.userId) {
+        const profileResponse = await fetch(`/api/users/${member.userId}/profile`);
+        if(!profileResponse.ok) throw new Error('無法確認最新教會歸屬');
+        const profile = await profileResponse.json();
         const response = await fetch(`/api/users/${member.userId}/profile`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            displayName: member.name || member.email,
-            church,
+            church, expectedChurch: profile.church ?? null,
           }),
         });
-        if (!response.ok) throw new Error('Failed to update church');
+        if (!response.ok) { if(response.status===409) forceRefetch(); throw new Error(response.status===409?'會員歸屬已更新，請重新確認':'Failed to update church'); }
+        if(member.userId===user?.id) await refreshAuth?.();
         toast.success('所屬教會已更新');
         forceRefetch();
         return;
@@ -554,7 +564,7 @@ const CRMPage = () => {
                 <SelectValue placeholder="選擇教會" />
               </SelectTrigger>
               <SelectContent>
-                {isSystemAdmin && <SelectItem value="all">全部教會</SelectItem>}
+                {isSystemAdmin && !churchContext && <SelectItem value="all">全部教會</SelectItem>}
                 {churches.map((church) => (
                   <SelectItem key={church.id} value={church.id}>
                     {church.name}
@@ -574,13 +584,14 @@ const CRMPage = () => {
       </header>
 
       <main className="container mx-auto space-y-4 px-4 py-4">
+        {churchContext?.data?.isSystemAdmin && <PendingChurchAffiliations />}
         <section className="sm:hidden">
           <Select value={selectedChurch} onValueChange={setSelectedChurch} disabled={writesPending}>
             <SelectTrigger aria-label="選擇教會">
               <SelectValue placeholder="選擇教會" />
             </SelectTrigger>
             <SelectContent>
-              {isSystemAdmin && <SelectItem value="all">全部教會</SelectItem>}
+              {isSystemAdmin && !churchContext && <SelectItem value="all">全部教會</SelectItem>}
               {churches.map((church) => (
                 <SelectItem key={church.id} value={church.id}>
                   {church.name}

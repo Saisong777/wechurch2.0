@@ -68,9 +68,9 @@ async function getCareContactsForEmail(userId: string): Promise<CareContact[]> {
     .limit(3);
 }
 
-async function getPrayerWallItems(): Promise<Prayer[]> {
+async function getPrayerWallItems(church:string): Promise<Prayer[]> {
   return db.select().from(prayers)
-    .where(and(isNull(prayers.closedAt), eq(prayers.isAnswered, false)))
+    .where(and(eq(prayers.church,church),isNull(prayers.closedAt), eq(prayers.isAnswered, false)))
     .orderBy(desc(prayers.isPinned), desc(prayers.createdAt))
     .limit(3);
 }
@@ -90,11 +90,12 @@ export interface DailyFollowEmail {
 
 export async function buildDailyFollowEmail(user: User, date = new Date()): Promise<DailyFollowEmail> {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-  const schedule = await getManagedChurchDevotion(day);
+  if(!user.church)throw new Error('CHURCH_APPROVAL_REQUIRED');
+  const schedule = await getManagedChurchDevotion(day,user.church);
   const reading = await withDevotionScripture(managedDevotionBrief(day, schedule.entry), (book, chapter) => storage.getBibleVerses(book, chapter));
   const [devotionalNote, prayers, contacts] = await Promise.all([
     storage.getDevotionalNoteByVerseReference(user.id, reading.scriptureReference),
-    getPrayerWallItems(),
+    getPrayerWallItems(user.church),
     getCareContactsForEmail(user.id),
   ]);
   const noteSteps = noteSnippet(devotionalNote);

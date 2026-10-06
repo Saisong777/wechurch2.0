@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 export class ApiError extends Error {
@@ -49,9 +50,10 @@ export const getQueryFn: <T>(options: {
       return await res.json();
     };
 
-export const queryClient = new QueryClient({
+export const createQueryClient = (namespace?: string) => new QueryClient({
   defaultOptions: {
     queries: {
+      ...(namespace ? { meta: { churchScope: namespace } } : {}),
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
@@ -72,3 +74,5 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export const queryClient = createQueryClient();

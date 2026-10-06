@@ -1,3 +1,4 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { formatScriptureText } from './scriptureDisplay';
 
 export interface ChurchReadingSummary {

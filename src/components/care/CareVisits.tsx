@@ -1,7 +1,9 @@
+import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, HandHeart, Send } from 'lucide-react';
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
@@ -21,8 +23,8 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
   return data as T;
 }
 function useVisitQuery<T>(path: string, enabled = true) {
-  const { user } = useAuth();
-  return useQuery({ queryKey: [base, user?.id, path], enabled: !!user && enabled, queryFn: () => request<T>(path), refetchInterval: 30000, retry: false });
+  const { user } = useAuth();const scope=useChurchScopeKey();
+  return useQuery({ queryKey: [base, user?.id, path,scope], enabled: !!user && enabled, queryFn: () => request<T>(path), refetchInterval: 30000, retry: false });
 }
 export function VisitReminder({ always = false }: { always?: boolean }) {
   const q = useVisitQuery<{ canManage: boolean; pending: number; urgent: number }>('/summary');

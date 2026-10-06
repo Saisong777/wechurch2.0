@@ -8,10 +8,10 @@ describe('explicit role grants',()=>{
   expect(grantInput.safeParse({...base,permissions:['admin']}).success).toBe(false);
   expect(grantInput.safeParse({...base,isAdmin:true}).success).toBe(false);
  });
- it('keeps shared-site permissions apart from membership scope',()=>{
-  expect(grantInput.safeParse({...base,permissions:['wall.moderate']}).success).toBe(false);
+ it('scopes moderation to the approved church, never the shared site',()=>{
+  expect(grantInput.safeParse({...base,permissions:['wall.moderate']}).success).toBe(true);
   expect(grantInput.safeParse({...base,scope:'site'}).success).toBe(false);
-  expect(grantInput.safeParse({...base,scope:'site',permissions:['wall.moderate']}).success).toBe(true);
+  expect(grantInput.safeParse({...base,scope:'site',permissions:['wall.moderate']}).success).toBe(false);
  });
  it('rejects mismatched targets, duplicates and a group-scoped visit inbox',()=>{
   expect(grantInput.safeParse({...base,scope:'group'}).success).toBe(false);
