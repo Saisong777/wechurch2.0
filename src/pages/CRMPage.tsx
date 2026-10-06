@@ -7,6 +7,8 @@ import { churchDisplayName } from '@shared/churches';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
 import { useReadingPreferences } from '@/components/theme/ReadingPreferences';
 import { useQuery } from '@tanstack/react-query';
+import { useAccessControlAdmin } from '@/hooks/useAccessControlAdmin';
+import { useMinistryRoleFilter } from '@/hooks/useMinistryRoleFilter';
 import { format } from 'date-fns';
 import {
 Activity,
@@ -179,7 +181,6 @@ const CRMPage = () => {
 
   const [status, setStatus] = useState<StatusFilter>('all');
   const [role, setRole] = useState<AppRole | 'all'>('all');
-  const [ministryRole,setMinistryRole] = useState('');
   const churchContext=useChurchContext();
   const [legacyChurch, setLegacyChurch] = useState<string>('all');
   const selectedChurch=churchContext?.data?.selectedChurch || legacyChurch;
@@ -217,6 +218,13 @@ const CRMPage = () => {
     bulkAction,
     forceRefetch,
   } = useUnifiedMembers({ tab: memberTab, status, role, church: selectedChurch, enabled: isLeader && churchScopeInitialized });
+
+  const roleCatalog = useAccessControlAdmin(isAdmin && churchScopeInitialized);
+  const { ministryRole, setMinistryRole, options: ministryOptions } = useMinistryRoleFilter(
+    roleCatalog.data?.roles || [], allMembers,
+    !isLoading && !isRefetching && !isError && (!isAdmin || (roleCatalog.isSuccess && !roleCatalog.isFetching)),
+  );
+  const refreshMembers = () => Promise.all([forceRefetch(), ...(isAdmin ? [roleCatalog.refetch()] : [])]);
 
   useEffect(() => {
     if (authLoading || roleLoading || churchScopeInitialized || !user || !currentRole) return;
@@ -576,7 +584,7 @@ const CRMPage = () => {
               <Copy className="h-4 w-4" />
               <span className="hidden sm:inline">複製名單</span>
             </Button>
-            <Button variant="outline" size="icon" className="crm-header-icon" title="重新整理會員" aria-label="重新整理會員" onClick={() => void forceRefetch()} disabled={isRefetching || writesPending}>
+            <Button variant="outline" size="icon" className="crm-header-icon" title="重新整理會員" aria-label="重新整理會員" onClick={() => void refreshMembers()} disabled={isRefetching || roleCatalog.isFetching || writesPending}>
               <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
             </Button>
           </div>
@@ -642,7 +650,7 @@ const CRMPage = () => {
           <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
             <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
             <p className="min-w-0 flex-1">{error?.message}{dataUpdatedAt ? '。目前顯示上次載入的資料。' : ''}</p>
-            <Button variant="outline" size="sm" onClick={() => void forceRefetch()} disabled={isRefetching}>重試</Button>
+            <Button variant="outline" size="sm" onClick={() => void refreshMembers()} disabled={isRefetching}>重試</Button>
           </div>
         )}
 
@@ -772,7 +780,8 @@ const CRMPage = () => {
                     {search && <Button variant="ghost" size="icon" className="absolute right-0 top-0" title="清除搜尋" aria-label="清除搜尋" onClick={() => setSearch('')}><X className="h-4 w-4" /></Button>}
                   </div>
                   <div className="crm-member-filters flex flex-wrap gap-2">
-                    {(memberTab==='all'||memberTab==='registered') && <Select value={ministryRole||'all'} onValueChange={v=>setMinistryRole(v==='all'?'':v)}><SelectTrigger aria-label="篩選職分" className="w-[140px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">全部職分</SelectItem>{[...new Set(['同工',...allMembers.flatMap(m=>m.ministryRoles || [])])].map(name=><SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>}
+                    {(memberTab==='all'||memberTab==='registered') && <Select value={ministryRole||'all'} onValueChange={v=>setMinistryRole(v==='all'?'':v)}><SelectTrigger aria-label="篩選職分" className="w-[140px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">全部職分</SelectItem>{ministryOptions.map(name=><SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>}
+                    {isAdmin && roleCatalog.isError && <span role="alert" className="text-sm text-destructive">職分清單未同步。<Button variant="link" size="sm" onClick={()=>void roleCatalog.refetch()}>重新載入職分</Button></span>}
                     {(memberTab === 'all' || memberTab === 'registered') && isAdmin && (
                       <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
                         <SelectTrigger aria-label="篩選角色" className="w-[140px]">
