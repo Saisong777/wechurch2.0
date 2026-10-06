@@ -1573,3 +1573,11 @@ export const memberFeedback = pgTable('member_feedback', {
 export const memberFeedbackEvents=pgTable('member_feedback_events',{
   id:uuid('id').primaryKey().defaultRandom(),feedbackId:uuid('feedback_id').notNull().references(()=>memberFeedback.id),actorId:uuid('actor_id').references(()=>users.id),action:text('action').notNull(),beforeData:jsonb('before_data'),afterData:jsonb('after_data'),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
 },t=>({history:index('member_feedback_events_history').on(t.feedbackId,t.createdAt.desc(),t.id.desc()),action:check('member_feedback_events_action_check',sql`${t.action} IN ('created','updated','reanalyze','analysis_ready','analysis_failed')`)}));
+
+export const devotionShareRequests = pgTable('devotion_share_requests', {
+  userId:uuid('user_id').notNull().references(()=>users.id),
+  requestId:uuid('request_id').notNull(),
+  requestHash:text('request_hash').notNull(),
+  result:jsonb('result').notNull(),
+  createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({pk:primaryKey({columns:[t.userId,t.requestId]}),hash:check('devotion_share_requests_request_hash_check',sql`${t.requestHash} ~ '^[a-f0-9]{64}$'`)}));

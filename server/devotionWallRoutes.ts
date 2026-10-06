@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { pool } from './db';
 import { hasPermission } from './accessControl';
 import { GroupError } from './lifeGroupRepository';
-import { devotionDayWindow, devotionWallShareInput, devotionWallPageInput, devotionWallCursor } from '../shared/devotionWall';
+import { devotionDayWindow, devotionWallShareInput, devotionWallPageInput, devotionWallCursor, devotionMultiShareInput } from '../shared/devotionWall';
+
+import { publishDevotionShare } from './devotionShareRepository';
 
 async function windowNow() {
   return devotionDayWindow((await pool.query('SELECT clock_timestamp() AS now')).rows[0].now);
@@ -41,6 +43,10 @@ export function devotionWallRoutes(resolveUserId:(req:Request)=>Promise<string|n
     // Keep PostgreSQL microseconds in the cursor; JS Dates truncate them.
     const nextCursor=posts.length>limit && last?devotionWallCursor(window.day,last.cursorCreatedAt,last.id):null;
     res.json({...window,posts:page.map(({cursorCreatedAt:_cursor,...post})=>post),nextCursor});
+  });
+  router.put('/shares/:requestId',async(req,res)=>{
+    const result=await publishDevotionShare(res.locals.actor,z.string().uuid().parse(req.params.requestId),devotionMultiShareInput.parse(req.body));
+    res.status(result.created?201:200).json(result);
   });
   router.post('/',async(req,res)=>{
     const input=devotionWallShareInput.parse(req.body); const actor=res.locals.actor;

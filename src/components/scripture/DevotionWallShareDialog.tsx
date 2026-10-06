@@ -24,11 +24,14 @@ async function groupRequest<T>(path='',method='GET',body?:unknown):Promise<T> {
 
 export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:DevotionShareDraft;close:()=>void;allowGroup?:boolean}) {
   const {user}=useAuth();
-  const [audience,setAudience]=useState<'group'|'wall'>(allowGroup?'group':'wall');
+  const [groupSelected,setGroupSelected]=useState(allowGroup);
+  const [wallSelected,setWallSelected]=useState(!allowGroup);
+  const initialSource=useRef(draft.sourceId);const initialActor=useRef(user?.id);const currentActor=useRef(user?.id);currentActor.current=user?.id;
+  const busyLock=useRef(false);
   const [groupId,setGroupId]=useState('');
-  const groupMutationIds=useRef<Record<string,string>>({});
-  const isWall=audience==='wall';
-  const maxLength=isWall?DEVOTION_SHARE_MAX_LENGTH:GROUP_SHARE_MAX_LENGTH;
+  const mutationIds=useRef<Record<string,string>>({});
+  const isWall=wallSelected;
+  const maxLength=groupSelected?GROUP_SHARE_MAX_LENGTH:DEVOTION_SHARE_MAX_LENGTH;
   const [title,setTitle]=useState(draft.title || '今日靈修心得');const [legacyBody,setLegacyBody]=useState(draft.body);
   const [sections] = useState(draft.sections || []);
   const [selected,setSelected] = useState(sections.filter(section=>section.key.startsWith('insight:')).map(section=>section.key));
@@ -37,32 +40,35 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
   const [reference,setReference]=useState(draft.reference);const [anonymous,setAnonymous]=useState(false);
   const [consent,setConsent]=useState(false);const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const window=useDevotionWall(true,false,isWall);const client=useQueryClient();const navigate=useNavigate();
-  const groups=useQuery<{groups:GroupSummary[]}>({queryKey:['/api/life-groups',user?.id,'note-sharing-picker'],queryFn:()=>groupRequest(),enabled:allowGroup && !isWall && !!user,retry:false,staleTime:0});
+  const groups=useQuery<{groups:GroupSummary[]}>({queryKey:['/api/life-groups',user?.id,'note-sharing-picker'],queryFn:()=>groupRequest(),enabled:allowGroup && groupSelected && !!user,retry:false,staleTime:0});
   const selectedGroup=groups.data?.groups.find(group=>group.id===groupId);
-  const destinationReady=isWall ? window.data && !window.expired && !window.isError : selectedGroup && !groups.isError;
+  const destinationReady=(groupSelected || isWall) && (!isWall || (window.data && !window.expired && !window.isError)) && (!groupSelected || (selectedGroup && !groups.isError));
   useEffect(()=>{setConsent(false);},[window.data?.day,window.expired]);
-  const valid=title.trim() && title.length<=160 && body.trim() && body.length<=maxLength && reference.trim() && reference.length<=200 && consent && destinationReady;
+  useEffect(()=>{setConsent(false);setError('');},[user?.id,draft.sourceId]);
+  const valid=draft.sourceId===initialSource.current && user?.id===initialActor.current && !!user && title.trim() && title.length<=160 && body.trim() && body.length<=maxLength && reference.trim() && reference.length<=200 && consent && destinationReady;
   return <Dialog open onOpenChange={open=>{if(!open && !busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl [overflow-wrap:anywhere] [&>button:last-child]:right-2 [&>button:last-child]:top-2 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center">
-    <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{isWall?'全站登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小家成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
+    <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{groupSelected && isWall?'同時分享至所選小家及全站靈修牆。小家以你的姓名分享；牆上可選匿名，台灣時間午夜移出公開牆。私人筆記仍保留。':isWall?'全站登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小家成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
     <form onSubmit={async e=>{
-      e.preventDefault();if(!valid || busy)return;setBusy(true);setError('');
+      e.preventDefault();if(!valid || busyLock.current)return;busyLock.current=true;setBusy(true);setError('');
       try{
-        if(isWall){
-          await devotionWallApi('','POST',{sourceId:draft.sourceId,title,body,reference,anonymous,day:window.data!.day,consent});
-          await client.invalidateQueries({queryKey:['devotion-wall']});toast.success('已分享到今日靈修牆');close();navigate('/devotion-wall');
-        }else{
-          // Keep the same operation ID when retrying an uncertain group delivery.
-          const mutationId=groupMutationIds.current[groupId] ??= crypto.randomUUID();
-          await groupRequest(`/${groupId}/shares/${mutationId}`,'PUT',{kind:'note',sourceId:draft.sourceId,title,body,reference,anonymous:false,consent});
-          await client.invalidateQueries({queryKey:['/api/life-groups']});toast.success(`已分享到${selectedGroup!.name}`);close();navigate(`/groups/${groupId}?view=note`);
-        }
+        const input={sourceId:draft.sourceId,title,body,reference,consent,
+          ...(groupSelected?{group:{groupId}}:{}),...(isWall?{wall:{day:window.data!.day,anonymous}}:{})};
+        // Retry the exact reviewed operation; changing content/destinations gets a new ID.
+        const key=JSON.stringify(input);const mutationId=mutationIds.current[key] ??= crypto.randomUUID();
+        await devotionWallApi(`/shares/${mutationId}`,'PUT',input);
+        if(currentActor.current!==initialActor.current)return;
+        // A failed cache refresh is not a failed publication.
+        void client.invalidateQueries({queryKey:['devotion-wall']});
+        void client.invalidateQueries({queryKey:['/api/life-groups']});
+        toast.success(groupSelected && isWall?`已分享到${selectedGroup!.name}及今日靈修牆`:isWall?'已分享到今日靈修牆':`已分享到${selectedGroup!.name}`);
+        close();navigate(isWall?'/devotion-wall':`/groups/${groupId}?view=note`);
       }
-      catch(e){setError((e as Error).message);if(isWall)void window.refetch();else void groups.refetch();}finally{setBusy(false);}
+      catch(e){if(currentActor.current===initialActor.current){setError((e as Error).message);if(isWall)void window.refetch();if(groupSelected)void groups.refetch();}}finally{busyLock.current=false;setBusy(false);}
     }}><fieldset disabled={busy} className="min-w-0 space-y-4">
       {allowGroup && <fieldset className="space-y-2"><legend className="text-sm font-medium">分享對象</legend><div className="grid grid-cols-2 gap-2">
-        {([['group','所屬小家',Users],['wall','所有人・靈修牆',Globe]] as const).map(([value,label,Icon])=><label key={value} className={`flex min-h-12 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${audience===value?'border-primary bg-primary/5':'border-border'}`}><input type="radio" name="devotion-audience" value={value} checked={audience===value} onChange={()=>{setAudience(value);setConsent(false);setError('');}} /><Icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /><span>{label}</span></label>)}
+        {([['group','所屬小家',Users],['wall','所有人・靈修牆',Globe]] as const).map(([value,label,Icon])=><label key={value} className={`flex min-h-12 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${(value==='group'?groupSelected:isWall)?'border-primary bg-primary/5':'border-border'}`}><input type="checkbox" checked={value==='group'?groupSelected:isWall} onChange={e=>{if(value==='group')setGroupSelected(e.target.checked);else setWallSelected(e.target.checked);setConsent(false);setError('');}} /><Icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /><span>{label}</span></label>)}
       </div></fieldset>}
-      {!isWall && <div className="space-y-2">
+      {groupSelected && <div className="space-y-2">
         <label className="block space-y-1 text-sm"><span>選擇所屬小家</span><select className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base" value={groupId} onChange={e=>{setGroupId(e.target.value);setConsent(false);setError('');}} disabled={groups.isPending || groups.isError || busy}><option value="">請選擇小家</option>{groups.data?.groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
         {groups.isPending && <p role="status" className="text-sm text-muted-foreground">載入小家中…</p>}
         {groups.isError && <p role="alert" className="text-sm text-destructive">小家載入失敗。<button type="button" className="ml-2 min-h-11 underline" onClick={()=>groups.refetch()}>重新載入</button></p>}
@@ -87,10 +93,13 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
       {body.length>maxLength && <p role="alert" className="text-sm text-destructive">內容超過字數上限，請減少段落或縮短內容。尚未送出，原始筆記不受影響。</p>}
       {isWall && <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={anonymous} onChange={e=>{setAnonymous(e.target.checked);setConsent(false);}} />匿名分享</label>}
       {isWall && anonymous && <p className="text-sm text-muted-foreground">牆上不顯示姓名；系統仍保留作者供本人管理。請移除內文中可辨識自己或他人的細節。</p>}
-      {!isWall && selectedGroup && <p className="text-sm font-medium">分享對象：{selectedGroup.name} 全體成員</p>}
-      <label className="flex min-h-11 items-start gap-2 text-sm leading-6"><input type="checkbox" className="mt-1.5" checked={consent} onChange={e=>setConsent(e.target.checked)} />{isWall?'我同意公開以上內容，已移除不想公開的私人資訊。':'我同意將以上內容分享給所選小家，已移除不想分享的私人資訊。'}</label>
+      {groupSelected && selectedGroup && <p className="text-sm font-medium">分享對象：{selectedGroup.name} 全體成員</p>}
+      <label className="flex min-h-11 items-start gap-2 text-sm leading-6"><input type="checkbox" className="mt-1.5" checked={consent} onChange={e=>setConsent(e.target.checked)} />{groupSelected && isWall?'我同意將以上內容同時分享給所選小家及公開靈修牆，已移除不想分享的私人資訊。':isWall?'我同意公開以上內容，已移除不想公開的私人資訊。':'我同意將以上內容分享給所選小家，已移除不想分享的私人資訊。'}</label>
+      {!groupSelected && !isWall && <p role="status" className="text-sm text-muted-foreground">請至少勾選一個分享對象。</p>}
+      {user?.id!==initialActor.current && <p role="alert" className="text-sm text-destructive">登入帳號已變更，請關閉後從本人的筆記重新分享。</p>}
+      {draft.sourceId!==initialSource.current && <p role="alert" className="text-sm text-destructive">筆記已變更，請關閉後重新確認分享內容。</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={close}>取消</Button><Button type="submit" disabled={!valid || busy} className="gap-2">{busy?<Loader2 className="h-4 w-4 animate-spin" />:<Share2 className="h-4 w-4" />}{isWall?'確認公開分享':'確認分享至小家'}</Button></div>
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={close}>取消</Button><Button type="submit" disabled={!valid || busy} className="gap-2">{busy?<Loader2 className="h-4 w-4 animate-spin" />:<Share2 className="h-4 w-4" />}{groupSelected && isWall?'確認同時分享':isWall?'確認公開分享':'確認分享至小家'}</Button></div>
     </fieldset></form>
   </DialogContent></Dialog>;
 }

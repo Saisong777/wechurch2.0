@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { DEVOTION_SHARE_MAX_LENGTH,devotionDayWindow,devotionWallShareInput,wallTimeRemaining } from '../shared/devotionWall';
+import { DEVOTION_SHARE_MAX_LENGTH,devotionDayWindow,devotionWallShareInput,devotionMultiShareInput,wallTimeRemaining } from '../shared/devotionWall';
 import { isClosedPrayer,isUrgentPrayer } from '../shared/prayerInteraction';
 
 describe('daily wall visibility boundaries',()=>{
@@ -26,4 +26,13 @@ describe('daily wall visibility boundaries',()=>{
     expect(isClosedPrayer({isAnswered:true})).toBe(true);
     expect(isClosedPrayer({isAnswered:false,closedAt:null})).toBe(false);
   });
+});
+
+it('requires an explicit destination and limits dual sharing to the smaller group bound',()=>{
+ const input={sourceId:'00000000-0000-4000-8000-000000000001',title:'心得',body:'內容',reference:'詩篇 23',consent:true};
+ expect(devotionMultiShareInput.safeParse(input).success).toBe(false);
+ expect(devotionMultiShareInput.safeParse({...input,group:{groupId:input.sourceId}}).success).toBe(true);
+ expect(devotionMultiShareInput.safeParse({...input,wall:{day:'2026-10-06',anonymous:true}}).success).toBe(true);
+ expect(devotionMultiShareInput.safeParse({...input,group:{groupId:input.sourceId},wall:{day:'2026-10-06',anonymous:true},body:'x'.repeat(12001)}).success).toBe(false);
+ expect(devotionMultiShareInput.safeParse({...input,group:{groupId:input.sourceId},userId:'forged'}).success).toBe(false);
 });

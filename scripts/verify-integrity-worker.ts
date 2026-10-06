@@ -62,6 +62,8 @@ try {
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
   const { verifyCareHttp } = await import('./verify-care-http');
   await verifyCareHttp(pool, makeClient);
+  const { verifyDevotionShareHttp } = await import('./verify-devotion-share-http');
+  await verifyDevotionShareHttp(pool,makeClient);
   const { verifyFeedbackHttp } = await import('./verify-feedback-http');
   await verifyFeedbackHttp(pool, makeClient);
   const { verifyFamilyHttp } = await import('./verify-family-http');

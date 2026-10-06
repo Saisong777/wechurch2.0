@@ -6,7 +6,8 @@ import {MemoryRouter} from 'react-router-dom';
 import {DevotionWallShareDialog} from './DevotionWallShareDialog';
 import {DEVOTION_SHARE_MAX_LENGTH,devotionDayWindow,type DevotionShareDraft} from '@shared/devotionWall';
 import {GROUP_SHARE_MAX_LENGTH} from '@shared/lifeGroup';
-vi.mock('@/contexts/AuthContext',()=>({useAuth:()=>({user:{id:'actor'}})}));
+const auth=vi.hoisted(()=>({user:{id:'actor'} as {id:string}|null}));
+vi.mock('@/contexts/AuthContext',()=>({useAuth:()=>({user:auth.user})}));
 const clients:QueryClient[]=[];let payload:any;let fail=false;
 let groupFail=false;let groupLoadFail=false;
 let groupList:Array<{id:string;name:string}>=[];
@@ -14,9 +15,14 @@ let groupWrites:Array<{path:string;body:Record<string,unknown>}>=[];
 const firstGroup='00000000-0000-4000-8000-000000000002';
 const secondGroup='00000000-0000-4000-8000-000000000003';
 beforeEach(()=>{vi.stubGlobal('ResizeObserver',class { observe=vi.fn();unobserve=vi.fn();disconnect=vi.fn(); });});
-beforeEach(()=>{payload=undefined;fail=false;groupFail=false;groupLoadFail=false;groupWrites=[];groupList=[{id:firstGroup,name:'同行小家'},{id:secondGroup,name:'盼望小家'}];vi.stubGlobal('fetch',vi.fn(async(_path:string,options?:RequestInit)=>{
-  if(options?.method==='PUT'){groupWrites.push({path:_path,body:JSON.parse(options.body as string)});return {ok:!groupFail,json:async()=>groupFail?{error:'小家分享暫時失敗'}:{id:'group-share'}};}
-  if(options?.method==='POST'){payload=JSON.parse(options.body as string);return {ok:!fail,json:async()=>fail?{error:'尚未分享'}:{id:'posted'}};}
+beforeEach(()=>{auth.user={id:'actor'};payload=undefined;fail=false;groupFail=false;groupLoadFail=false;groupWrites=[];groupList=[{id:firstGroup,name:'同行小家'},{id:secondGroup,name:'盼望小家'}];vi.stubGlobal('fetch',vi.fn(async(_path:string,options?:RequestInit)=>{
+  if(options?.method==='PUT'){
+    const input=JSON.parse(options.body as string);
+    if(input.group)groupWrites.push({path:_path,body:input});
+    if(input.wall)payload={...input,anonymous:input.wall.anonymous};
+    const failed=(input.group && groupFail)||(input.wall && fail);
+    return {ok:!failed,json:async()=>failed?{error:'分享暫時失敗'}:{requestId:'posted'}};
+  }
   if(_path==='/api/life-groups')return {ok:!groupLoadFail,json:async()=>groupLoadFail?{error:'讀取失敗'}:{groups:groupList}};
   return {ok:true,json:async()=>devotionDayWindow(new Date())};
 }));});
@@ -93,7 +99,7 @@ const chooseGroup=async(id=firstGroup)=>{
 it('defaults to own groups and sends only selected text without publishing to the wall',async()=>{
   const close=show({sections},true);
   await chooseGroup();
-  expect(screen.getByRole('radio',{name:'所屬小家'})).toBeChecked();
+  expect(screen.getByRole('checkbox',{name:'所屬小家'})).toBeChecked();
   expect(screen.queryByRole('checkbox',{name:'匿名分享'})).toBeNull();
   expect(screen.getByRole('button',{name:'確認分享至小家'})).toBeDisabled();
   expect(vi.mocked(fetch).mock.calls.some(([path])=>String(path).includes('/api/devotion-wall'))).toBe(false);
@@ -101,8 +107,8 @@ it('defaults to own groups and sends only selected text without publishing to th
   fireEvent.click(groupConsent());fireEvent.click(screen.getByRole('button',{name:'確認分享至小家'}));
   await waitFor(()=>expect(close).toHaveBeenCalledOnce());
   expect(groupWrites).toHaveLength(1);
-  expect(groupWrites[0].path).toMatch(new RegExp(`^/api/life-groups/${firstGroup}/shares/[a-f0-9-]{36}$`));
-  expect(groupWrites[0].body).toEqual({kind:'note',sourceId:'00000000-0000-4000-8000-000000000001',title:'心得',body:'領受\n只分享這段领受',reference:'詩篇 23',anonymous:false,consent:true});
+  expect(groupWrites[0].path).toMatch(/^\/api\/devotion-wall\/shares\/[a-f0-9-]{36}$/);
+  expect(groupWrites[0].body).toEqual({group:{groupId:firstGroup},sourceId:'00000000-0000-4000-8000-000000000001',title:'心得',body:'領受\n只分享這段领受',reference:'詩篇 23',consent:true});
   expect(payload).toBeUndefined();
 });
 
@@ -110,7 +116,8 @@ it('resets consent when changing group or audience and publishes only to the sel
   const close=show({sections},true);await chooseGroup();fireEvent.click(groupConsent());
   fireEvent.change(screen.getByRole('combobox',{name:'選擇所屬小家'}),{target:{value:secondGroup}});
   expect(groupConsent()).not.toBeChecked();fireEvent.click(groupConsent());
-  fireEvent.click(screen.getByRole('radio',{name:'所有人・靈修牆'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'所屬小家'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
   expect(consent()).not.toBeChecked();
   await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
   fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));
@@ -121,19 +128,19 @@ it('resets consent when changing group or audience and publishes only to the sel
 
 it('does not claim anonymity for a group share after switching from the wall',async()=>{
   const close=show({},true);await chooseGroup();
-  fireEvent.click(screen.getByRole('radio',{name:'所有人・靈修牆'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
   fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));
-  fireEvent.click(screen.getByRole('radio',{name:'所屬小家'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
   expect(screen.queryByRole('checkbox',{name:'匿名分享'})).toBeNull();
   fireEvent.click(groupConsent());fireEvent.click(screen.getByRole('button',{name:'確認分享至小家'}));
   await waitFor(()=>expect(close).toHaveBeenCalledOnce());
-  expect(groupWrites[0].body.anonymous).toBe(false);expect(payload).toBeUndefined();
+  expect(groupWrites[0].body).not.toHaveProperty('anonymous');expect(payload).toBeUndefined();
 });
 
 it('keeps an empty membership list private and never falls back to the wall',async()=>{
   groupList=[];show({},true);await screen.findByText('尚未加入小家。');
   fireEvent.click(groupConsent());expect(screen.getByRole('button',{name:'確認分享至小家'})).toBeDisabled();
-  expect(screen.getByRole('radio',{name:'所屬小家'})).toBeChecked();expect(payload).toBeUndefined();
+  expect(screen.getByRole('checkbox',{name:'所屬小家'})).toBeChecked();expect(payload).toBeUndefined();
 });
 
 it('blocks group sharing on load failure and allows an explicit retry',async()=>{
@@ -161,9 +168,62 @@ it('applies the selected destination length limit without truncating the preview
   fireEvent.change(screen.getByRole('textbox',{name:'領受內容'}),{target:{value:content}});
   fireEvent.click(groupConsent());expect(screen.getByRole('button',{name:'確認分享至小家'})).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('超過字數上限');
-  fireEvent.click(screen.getByRole('radio',{name:'所有人・靈修牆'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'所屬小家'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
   await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
   expect(screen.getByRole('textbox',{name:'領受內容'})).toHaveValue(content);
   fireEvent.click(consent());expect(screen.getByRole('button',{name:'確認公開分享'})).toBeEnabled();
   expect(payload).toBeUndefined();expect(groupWrites).toHaveLength(0);
+});
+
+it('requires at least one audience and never silently publishes publicly',async()=>{
+  show({},true);await chooseGroup();fireEvent.click(screen.getByRole('checkbox',{name:'所屬小家'}));
+  fireEvent.click(groupConsent());expect(screen.getByRole('button',{name:'確認分享至小家'})).toBeDisabled();
+  expect(payload).toBeUndefined();expect(groupWrites).toHaveLength(0);
+});
+it('publishes both audiences once and retries the exact operation after a failed response',async()=>{
+  const close=show({sections},true);await chooseGroup();
+  fireEvent.click(groupConsent());fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+  const bothConsent=()=>screen.getByRole('checkbox',{name:/我同意將以上內容同時分享/});
+  expect(bothConsent()).not.toBeChecked();await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
+  expect(screen.getByText(/小家以你的姓名分享/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('checkbox',{name:'匿名分享'}));fireEvent.click(bothConsent());
+  fail=true;fireEvent.click(screen.getByRole('button',{name:'確認同時分享'}));await screen.findByRole('alert');
+  expect(close).not.toHaveBeenCalled();fail=false;fireEvent.click(screen.getByRole('button',{name:'確認同時分享'}));
+  await waitFor(()=>expect(close).toHaveBeenCalledOnce());expect(groupWrites).toHaveLength(2);
+  expect(groupWrites[0]).toEqual(groupWrites[1]);expect(groupWrites[0].body).toMatchObject({group:{groupId:firstGroup},wall:{anonymous:true}});
+  expect(vi.mocked(fetch).mock.calls.filter(([,o])=>o?.method==='PUT')).toHaveLength(2);
+});
+
+it('locks the whole form while a dual destination request is pending',async()=>{
+ const close=show({},true);await chooseGroup();fireEvent.click(screen.getByRole('checkbox',{name:'所有人・靈修牆'}));
+ await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());
+ let resolve!:()=>void;const pending=new Promise<void>(r=>{resolve=r;});
+ const original=vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementation(async(path,options)=>{if(options?.method==='PUT')await pending;return original(path,options);});
+ fireEvent.click(screen.getByRole('checkbox',{name:/我同意將以上內容同時分享/}));
+ const button=screen.getByRole('button',{name:'確認同時分享'});fireEvent.click(button);fireEvent.click(button);
+ expect(screen.getByRole('checkbox',{name:'所屬小家'})).toBeDisabled();expect(screen.getByRole('button',{name:'取消'})).toBeDisabled();
+ expect(screen.getByRole('textbox',{name:'分享標題'})).toBeDisabled();expect(close).not.toHaveBeenCalled();
+ resolve();await waitFor(()=>expect(close).toHaveBeenCalledOnce());
+ expect(vi.mocked(fetch).mock.calls.filter(([,o])=>o?.method==='PUT')).toHaveLength(1);
+});
+it('clears consent and blocks a changed authenticated user or changed note in an open dialog',async()=>{
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});clients.push(client);const close=vi.fn();
+ const draft={sourceId:'00000000-0000-4000-8000-000000000001',title:'心得',body:'原稿',reference:'詩篇 23'};
+ const view=(source=draft)=><QueryClientProvider client={client}><MemoryRouter><DevotionWallShareDialog draft={source} close={close}/></MemoryRouter></QueryClientProvider>;
+ const rendered=render(view());await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());fireEvent.click(consent());
+ auth.user={id:'different'};rendered.rerender(view());expect(consent()).not.toBeChecked();expect(screen.getByRole('button',{name:'確認公開分享'})).toBeDisabled();
+ expect(screen.getByRole('alert')).toHaveTextContent('登入帳號已變更');
+ auth.user={id:'actor'};rendered.rerender(view({...draft,sourceId:'00000000-0000-4000-8000-000000000007'}));
+ fireEvent.click(consent());expect(screen.getByRole('button',{name:'確認公開分享'})).toBeDisabled();expect(screen.getByRole('alert')).toHaveTextContent('筆記已變更');
+ expect(payload).toBeUndefined();
+});
+it('clears consent when the server day changes and reuses no old-date request',async()=>{
+ show();await waitFor(()=>expect(screen.queryByText(/確認中/)).toBeNull());fireEvent.click(consent());
+ const next=devotionDayWindow(new Date(Date.now()+86400000));
+ const original=vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementation(async(path,options)=>String(path).includes('/window')?{ok:true,json:async()=>next} as Response:original(path,options));
+ await clients[0].refetchQueries({queryKey:['devotion-wall']});
+ await waitFor(()=>expect(consent()).not.toBeChecked());expect(screen.getByText(new RegExp(next.day))).toBeInTheDocument();expect(payload).toBeUndefined();
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { GROUP_SHARE_MAX_LENGTH } from './lifeGroup';
 
 export function devotionDayWindow(now: Date) {
   const day = new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0,10);
@@ -36,3 +37,17 @@ export type DevotionWallFeed = ReturnType<typeof devotionDayWindow> & { posts:De
 export function wallTimeRemaining(feed:Pick<DevotionWallFeed,'serverNow'|'expiresAt'>,elapsedMs:number) {
   return Math.max(0,Date.parse(feed.expiresAt)-Date.parse(feed.serverNow)-Math.max(0,elapsedMs));
 }
+
+// One explicit operation can publish the same reviewed excerpt to both destinations.
+export const devotionMultiShareInput = z.object({
+  sourceId:z.string().uuid(), title:z.string().trim().min(1).max(160),
+  body:z.string().trim().min(1).max(DEVOTION_SHARE_MAX_LENGTH),
+  reference:z.string().trim().min(1).max(200), consent:z.literal(true),
+  group:z.object({groupId:z.string().uuid()}).strict().optional(),
+  wall:z.object({day:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),anonymous:z.boolean()}).strict().optional(),
+}).strict().superRefine((input,ctx)=>{
+  if(!input.group && !input.wall)ctx.addIssue({code:'custom',message:'請選擇分享對象。'});
+  if(input.group && input.body.length>GROUP_SHARE_MAX_LENGTH)ctx.addIssue({code:'custom',path:['body'],message:'內容超過小家分享上限。'});
+});
+export type DevotionMultiShareInput = z.infer<typeof devotionMultiShareInput>;
+export type DevotionMultiShareResult = { requestId:string;created:boolean;group:{id:string;groupId:string}|null;wall:{id:string;day:string}|null };
