@@ -12,7 +12,7 @@ export function setChurchScope(next: VerifiedChurchScope | null, active = true) 
 }
 // Explicit same-origin tenant routes only. Auth/OAuth, Bible and private notebook requests stay unchanged.
 export function isChurchApi(path: string, method = 'GET') {
-  return /^\/api\/(?:prayers|prayer-sharing|devotion-wall|life-groups|families|church-reading|admin\/church-devotions|admin\/church-affiliations|crm|access-control|care-visits|feedback|admin\/feedback|notifications|reading-plans|user-reading-plans|user-reading-progress|support|mentoring)(?:\/|$)/.test(path)
+  return /^\/api\/(?:me\/church-onboarding|me\/church-login-summary|admin\/church-login-inbox|prayers|prayer-sharing|devotion-wall|life-groups|families|church-reading|admin\/church-devotions|admin\/church-affiliations|crm|access-control|care-visits|feedback|admin\/feedback|notifications|reading-plans|user-reading-plans|user-reading-progress|support|mentoring)(?:\/|$)/.test(path)
     || /^\/api\/(?:message-cards|message-card-downloads|card-questions|icebreaker\/cards)(?:\/|$)/.test(path)
     || path === '/api/sessions' || (path === '/api/icebreaker/games' && method === 'POST')
     || /^\/api\/(?:users|user-roles|potential-members|churches)(?:\/|$)/.test(path);
@@ -38,7 +38,7 @@ export async function churchFetch(input: RequestInfo | URL, init?: RequestInit):
   if(capabilityPath && !scope?.selectedChurch)return globalThis.fetch(input,init);
   const current = scope;
   if (!current) return denied(503,'CHURCH_CONTEXT_PENDING','正在確認教會歸屬，請稍後重試。');
-  const personalOwnerRoute = /^\/api\/(?:support|mentoring|user-reading-plans|user-reading-progress)(?:\/|$)/.test(url.pathname) || /^\/api\/users\/[^/]+\/(?:profile|avatar)$/.test(url.pathname);
+  const personalOwnerRoute = /^\/api\/(?:me\/church-onboarding|me\/church-login-summary|admin\/church-login-inbox|support|mentoring|user-reading-plans|user-reading-progress)(?:\/|$)/.test(url.pathname) || /^\/api\/users\/[^/]+\/(?:profile|avatar)$/.test(url.pathname);
   if (!current.selectedChurch && !personalOwnerRoute) return denied(403,'CHURCH_APPROVAL_REQUIRED','教會歸屬等待管理者核定；個人筆記與聖經仍可使用。');
   const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
   let requestedHeader: string|null = null;

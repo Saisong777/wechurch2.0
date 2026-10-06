@@ -9,8 +9,9 @@ import { GoogleIdentityError, resolveGoogleIdentity } from '../../googleIdentity
 import { googleLoginConfig, googleOnlyRegistration } from '../../googleLoginPolicy';
 import { authStorage } from './storage';
 import { createSessionVersionGuard } from '../../authSessionVersion';
-import { authErrorMetadata } from '../../authLogging';
 import { SESSION_TTL_SECONDS, SESSION_TTL_MS, sessionDeadline, sessionCookieOptions, persistAuthenticatedSession, destroyAuthenticatedSession } from '../../authSessionPersistence';
+import { authErrorMetadata } from '../../authLogging';
+import { prepareLoginReceipt,recordPersistedLogin } from '../../churchLoginRepository';
 
 export function getSession() {
   const pgStore = connectPg(session);
@@ -90,9 +91,13 @@ export async function setupAuth(app: Express) {
           const code = info?.message === 'GOOGLE_ACCOUNT_LINK_REQUIRED' ? 'google_link_required' : 'google_login_failed';
           return res.redirect(`/login?error=${code}`);
         }
-        req.login(user, err => {
-          if (err) return next(err);
-          req.session.save(saveError => saveError ? next(saveError) : res.redirect('/login'));
+        req.login(prepareLoginReceipt(user as any), err => {
+          if (err) {console.error('[Auth] Google session failed',authErrorMetadata(err));return res.status(503).send('登入狀態暫時無法完整儲存，請重新登入。');}
+          req.session.save(async saveError => {
+            if(saveError){console.error('[Auth] Google session save failed',authErrorMetadata(saveError));return res.status(503).send('登入狀態暫時無法完整儲存，請重新登入。');}
+            try { await recordPersistedLogin(req);res.redirect('/login'); }
+            catch { res.status(503).send('登入紀錄尚未完整保存，請重新確認登入。'); }
+          });
         });
       })(req, res, next);
     });

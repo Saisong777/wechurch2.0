@@ -10,7 +10,7 @@ export function sessionCookieOptions() {
 }
 
 type PersistentIdentity = SessionIdentity & { expires_at?: number };
-export const persistAuthenticatedSession: RequestHandler = (req, res, next) => {
+export const persistAuthenticatedSession: RequestHandler = async (req, res, next) => {
   const user = req.user as PersistentIdentity | undefined;
   const saved = (req.session as typeof req.session & { passport?: { user?: PersistentIdentity } })?.passport?.user;
   const now = Math.floor(Date.now() / 1000);
@@ -25,6 +25,8 @@ export const persistAuthenticatedSession: RequestHandler = (req, res, next) => {
   user.expires_at = deadline;
   req.session.cookie.maxAge = SESSION_TTL_MS;
   req.session.touch();
+  try { if(user.loginReceiptId){const {recordSuccessfulLogin}=await import('./churchLoginRepository');await recordSuccessfulLogin(user);} }
+  catch { return void res.status(503).json({message:'登入紀錄尚未完整保存，請重新確認登入。'}); }
   next();
 };
 

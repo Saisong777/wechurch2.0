@@ -38,6 +38,8 @@ export const users = pgTable("users", {
   userGender: userGenderEnum("user_gender"),
   address: text("address"),
   church: text("church"),
+  churchChoiceLocked: boolean('church_choice_locked').notNull().default(false),
+  churchLoginSeen: boolean('church_login_seen').notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1600,4 +1602,28 @@ export const churchCatalogTable=pgTable('church_catalog',{
 export const churchAffiliationEvents=pgTable('church_affiliation_events',{
  id:uuid('id').primaryKey().defaultRandom(),actorId:uuid('actor_id').notNull().references(()=>users.id),userId:uuid('user_id').notNull().references(()=>users.id),
  previousChurch:text('previous_church'),nextChurch:text('next_church'),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
-});
+ source:text('source').notNull().default('admin'),requestId:uuid('request_id'),
+},t=>({request:uniqueIndex('church_affiliation_request').on(t.userId,t.requestId).where(sql`${t.requestId} IS NOT NULL`)}));
+
+export const churchLoginReceipts=pgTable('church_login_receipts',{
+ receiptId:uuid('receipt_id').primaryKey(),userId:uuid('user_id').notNull().references(()=>users.id),church:text('church'),
+ createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({user:index('church_login_receipts_user').on(t.userId,t.createdAt)}));
+export const churchLoginDaily=pgTable('church_login_daily',{
+ church:text('church').notNull(),userId:uuid('user_id').notNull().references(()=>users.id),day:date('day').notNull(),
+ firstLoginAt:timestamp('first_login_at',{withTimezone:true}).notNull(),lastLoginAt:timestamp('last_login_at',{withTimezone:true}).notNull(),
+ loginCount:integer('login_count').notNull().default(1),
+},t=>({pk:primaryKey({columns:[t.church,t.userId,t.day]}),count:check('church_login_daily_positive',sql`${t.loginCount}>0`)}));
+export const churchMemberArrivals=pgTable('church_member_arrivals',{
+ id:uuid('id').primaryKey().defaultRandom(),userId:uuid('user_id').notNull().references(()=>users.id),church:text('church'),
+ reason:text('reason').notNull(),status:text('status').notNull().default('pending'),version:integer('version').notNull().default(1),
+ handledBy:uuid('handled_by').references(()=>users.id),handledAt:timestamp('handled_at',{withTimezone:true}),
+ createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp('updated_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({scope:uniqueIndex('church_arrivals_user_scope').on(t.userId,sql`coalesce(${t.church},'')`),
+ pending:index('church_arrivals_pending').on(t.church,t.createdAt,t.id).where(sql`${t.status}='pending'`),
+ status:check('church_arrivals_status',sql`${t.status} IN ('pending','handled')`),
+ reason:check('church_arrivals_reason',sql`${t.reason} IN ('first_login','initial_choice','church_changed','needs_affiliation')`)}));
+export const churchLoginDigestReads=pgTable('church_login_digest_reads',{
+ userId:uuid('user_id').notNull().references(()=>users.id),church:text('church').notNull(),day:date('day').notNull(),
+ readAt:timestamp('read_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({pk:primaryKey({columns:[t.userId,t.church,t.day]})}));

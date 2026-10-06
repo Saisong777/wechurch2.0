@@ -20,6 +20,9 @@ import { db } from "./db";
 import { careActions, careContacts, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants, userEmailPreferences } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sessionDeadline } from './authSessionPersistence';
+import { churchOnboardingRoutes } from './churchOnboardingRoutes';
+import { authErrorMetadata } from './authLogging';
+import { prepareLoginReceipt, recordPersistedLogin } from './churchLoginRepository';
 import { readingPlanBodySchema } from './readingPlanInput';
 import { createReadingPlan, ReadingPlanError } from './readingPlanTransaction';
 import { soulGymAccess, visibleSubmissions, browserIdentity } from './soulGymAccess';
@@ -691,6 +694,7 @@ export async function registerRoutes(app: Express) {
   app.use('/api', churchContextMiddleware(resolveUserId));
   app.get('/api/church-context', (_req,res)=>{ const context=churchContext(); if(!context)return void res.status(401).json({error:'請先登入。'});res.json(churchContextResponse(context)); });
   app.get('/api/admin/church-affiliations/pending', requireRole('admin'), async(_req,res)=>res.json({users:await pendingChurchAffiliations()}));
+  app.use('/api',churchOnboardingRoutes(resolveUserId));
 
   const studyAccess = soulGymAccess({ pool, resolveUserId, canManageSession });
   app.use('/api', (req, res, next) => {
@@ -4649,16 +4653,17 @@ export async function registerRoutes(app: Express) {
       };
 
       delete req.session.lineLogin;
-      req.login(sessionUser, (loginError: unknown) => {
+      req.login(prepareLoginReceipt(sessionUser), (loginError: unknown) => {
         if (loginError) {
-          console.error("[LINE Login] Session error:", loginError);
-          return res.status(500).send("LINE Login succeeded but session creation failed.");
+          console.error("[LINE Login] Session error:", authErrorMetadata(loginError));
+          return res.status(503).send('登入狀態暫時無法完整儲存，請重新登入。');
         }
-        req.session.save((saveError: unknown) => {
+        req.session.save(async (saveError: unknown) => {
           if (saveError) {
-            console.error("[LINE Login] Session save error:", saveError);
+            console.error("[LINE Login] Session save error:", authErrorMetadata(saveError));
             return res.status(503).send('登入狀態暫時無法儲存，請重新登入。');
           }
+          try { await recordPersistedLogin(req); } catch { return res.status(503).send('登入紀錄尚未完整保存，請重新確認登入。'); }
           res.redirect(savedState.redirectPath || "/");
         });
       });

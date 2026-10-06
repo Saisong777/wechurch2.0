@@ -16,6 +16,7 @@ beforeEach(() => {
   user={id:'owner'};unread=1;fail=false;
   vi.stubGlobal('fetch',vi.fn(async(_url:string,init:RequestInit) => {
     if (fail) return {ok:false,status:503};
+    if(_url==='/api/me/church-login-summary') return {ok:true,json:async()=>({canManage:false,scopeChurch:null,unhandledArrivals:0,unassignedArrivals:0,unreadDigestDays:0,total:0})};
     if (init.method==='POST') {unread=0;return {ok:true,json:async() => ({ok:true})};}
     return {ok:true,json:async() => ({items:[{id,kind:'prayer_comment',title:'你參與的代禱有新的回應',createdAt:'2026-09-30T10:00:00.123Z',readAt:unread ? null : '2026-09-30T10:01:00Z',href}],unreadCount:unread,nextCursor:null,snapshotAt:'2026-09-30T10:01:00.123456Z'})};
   }));
@@ -27,7 +28,7 @@ function show() {
 }
 it('shares one unread query between the bell and page, with an accessible badge',async() => {
   show();await screen.findByRole('link',{name:'通知，1 則未讀'});
-  expect(screen.getByText('1 則未讀')).toBeTruthy();expect(fetch).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('1 則未讀')).toBeTruthy();expect(vi.mocked(fetch).mock.calls.filter(([url])=>url==='/api/notifications')).toHaveLength(1);
 });
 it('marks a notification read and opens the exact source comment without a dialog',async() => {
   show();const link=await screen.findByRole('link',{name:'你參與的代禱有新的回應，未讀'});expect(link).toHaveAttribute('href',href);

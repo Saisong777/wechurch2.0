@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 vi.mock('@/components/onboarding/IntroductionTour', () => ({ IntroductionTour: () => null }));
+vi.mock('@/components/onboarding/FirstChurchChoice', () => ({ FirstChurchChoice: () => null }));
+vi.mock('@/hooks/useChurchOnboarding', () => ({ useChurchOnboarding: () => ({isPending:false,isError:false,data:undefined}) }));
 vi.mock('@/hooks/usePastoralAccess', () => ({ usePastoralAccess: () => ({ data: { available: false } }) }));
 vi.mock('@/hooks/useAccessControl', () => ({ useAccessControl: () => ({ data: undefined }) }));
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';

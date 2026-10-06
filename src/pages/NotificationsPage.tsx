@@ -7,10 +7,14 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications, useReadNotification } from '@/hooks/useNotifications';
 import { NotificationEmailSettings } from '@/components/notifications/NotificationEmailSettings';
+import { ChurchLoginInbox } from '@/components/notifications/ChurchLoginInbox';
+import { useChurchContext } from '@/contexts/ChurchContext';
 import { toast } from 'sonner';
 
 export default function NotificationsPage() {
   const { user,loading } = useAuth(); const navigate = useNavigate();
+  const church = useChurchContext();
+  const churchReady = !church || !!church.data?.selectedChurch;
   const [cursors,setCursors] = useState<Array<string | null>>([null]);
   const query = useNotifications(cursors[cursors.length-1]); const read = useReadNotification();
   return <div className="min-h-screen bg-background"><Header title="通知" backTo="/" />
@@ -19,8 +23,10 @@ export default function NotificationsPage() {
         <div className="flex items-center gap-1"><Button size="icon" variant="ghost" title="更新通知" aria-label="更新通知" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw className="h-5 w-5" /></Button><a href="#email-settings" className="flex h-11 w-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:ring-ring" title="通知設定" aria-label="通知設定"><Settings className="h-5 w-5" /></a></div>
       </div>
       {loading ? <p role="status" className="py-8">正在載入…</p> : !user ? <div className="py-8"><p>登入後即可查看你的通知。</p><Button asChild className="mt-4"><Link to="/login?returnTo=/notifications">登入</Link></Button></div> : <>
+        <ChurchLoginInbox key={user.id} />
         {!!query.data?.unreadCount && !query.isError && <div className="flex justify-end py-2"><Button variant="ghost" disabled={read.isPending} onClick={async() => { try { await read.mutateAsync({before:query.data!.snapshotAt}); toast.success('已全部標為已讀'); } catch { toast.error('尚未更新，請重試'); } }}><CheckCheck className="mr-2 h-4 w-4" />全部標為已讀</Button></div>}
-        {query.isPending && <p role="status" className="py-8">正在載入通知…</p>}
+        {!churchReady && <p role="status" className="py-6">確認教會歸屬後，即可查看代禱與小家互動通知。</p>}
+        {query.isPending && churchReady && <p role="status" className="py-8">正在載入通知…</p>}
         {query.isError && <div role="alert" className="py-8"><p>通知暫時無法載入。</p><Button className="mt-3" variant="outline" onClick={() => void query.refetch()}>重新載入通知</Button></div>}
         {!query.isPending && !query.isError && !query.data?.items.length && <div className="py-12 text-center"><Bell className="mx-auto h-8 w-8 text-muted-foreground" /><p className="mt-4 font-medium">目前沒有新通知</p><Button asChild variant="outline" className="mt-4"><Link to="/walls">看看分享牆</Link></Button></div>}
         {!query.isError && <ol className="divide-y">{query.data?.items.map(item => {

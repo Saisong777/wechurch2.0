@@ -11,6 +11,7 @@ import { consumePasswordResetToken, issuePasswordResetToken } from '../../authPa
 import { createPasswordWorkLimiter, PasswordWorkBusyError } from '../../authPasswordWork';
 import { authErrorMetadata } from '../../authLogging';
 import { sessionDeadline } from '../../authSessionPersistence';
+import { prepareLoginReceipt, recordPersistedLogin } from '../../churchLoginRepository';
 
 export function registerAuthRoutes(app: Express): void {
   const passwordWork = createPasswordWorkLimiter();
@@ -86,16 +87,17 @@ export function registerAuthRoutes(app: Express): void {
         expires_at: sessionDeadline(),
       };
 
-      req.login(sessionUser, (err: any) => {
+      req.login(prepareLoginReceipt(sessionUser), (err: any) => {
         if (err) {
           console.error("[Auth] Register session error", authErrorMetadata(err));
-          return res.status(500).json({ message: "註冊成功但登入失敗，請手動登入" });
+          return res.status(err?.code ? 503 : 500).json({ message: "註冊成功但登入狀態尚未完整保存，請手動登入" });
         }
-        req.session.save((saveErr: any) => {
+        req.session.save(async (saveErr: any) => {
           if (saveErr) {
             console.error("[Auth] Register session save error", authErrorMetadata(saveErr));
             return res.status(503).json({ message: '登入狀態暫時無法儲存，請稍後再試' });
           }
+          try { await recordPersistedLogin(req); } catch { return res.status(503).json({message:'登入紀錄尚未完整保存，請重新確認登入。'}); }
           console.log("[Auth] Registration successful");
           res.json({ message: "註冊成功", user: { id: authUserId, email: normalizedEmail, displayName: displayName || null } });
         });
@@ -174,16 +176,17 @@ export function registerAuthRoutes(app: Express): void {
         expires_at: sessionDeadline(),
       };
 
-      req.login(sessionUser, (err: any) => {
+      req.login(prepareLoginReceipt(sessionUser), (err: any) => {
         if (err) {
           console.error("[Auth] Login session error", authErrorMetadata(err));
-          return res.status(500).json({ message: "登入失敗，請稍後重試" });
+          return res.status(err?.code ? 503 : 500).json({ message: "登入失敗，請稍後重試" });
         }
-        req.session.save((saveErr: any) => {
+        req.session.save(async (saveErr: any) => {
           if (saveErr) {
             console.error("[Auth] Login session save error", authErrorMetadata(saveErr));
             return res.status(503).json({ message: '登入狀態暫時無法儲存，請稍後再試' });
           }
+          try { await recordPersistedLogin(req); } catch { return res.status(503).json({message:'登入紀錄尚未完整保存，請重新確認登入。'}); }
           console.log("[Auth] Email login successful");
           res.json({ message: "登入成功", user: { id: authUserId, email: normalizedEmail, displayName: dbUser.display_name } });
         });

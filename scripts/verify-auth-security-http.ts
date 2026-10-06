@@ -63,7 +63,12 @@ export async function verifyAuthSecurityHttp(pool: Pool, origin: string, makeCli
   for (const [index, snapshot] of snapshots.entries()) {
     const passport = snapshot.sess.passport as { user: Record<string, unknown> & { claims: { sub: string } } };
     passport.user.claims.sub = index === 1 ? googleId : lineId;
-    if (index === 0) { delete passport.user.sessionVersion; delete passport.user.sessionUserId; }
+    if (index === 0) {
+      // A pre-receipt legacy session has neither canonical binding nor new login metadata.
+      // New bound receipts remain protected by the atomic session-save trigger.
+      delete passport.user.sessionVersion; delete passport.user.sessionUserId;
+      delete passport.user.loginReceiptId; delete passport.user.loginReceiptAt;
+    }
     await pool.query('UPDATE auth_sessions SET sess = $1 WHERE sid = $2', [JSON.stringify(snapshot.sess), snapshot.sid]);
     assert.equal((await clients[index]('/api/auth/user')).status, 200);
   }

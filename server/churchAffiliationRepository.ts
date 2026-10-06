@@ -1,6 +1,7 @@
 import { pool } from './db';
 import { churchContext, ChurchScopeError } from './churchContext';
 import { getKnownChurchOptions, normalizeChurch } from '../shared/churches';
+import { arrivalChurchChanged } from './churchLoginRepository';
 export async function pendingChurchAffiliations() {
   if(!churchContext()?.isSystemAdmin)throw new ChurchScopeError(403,'CHURCH_SCOPE_FORBIDDEN','需要系統管理權限。');
   return (await pool.query('SELECT id,display_name AS "displayName",email,church FROM users WHERE church IS NULL ORDER BY created_at,id LIMIT 500')).rows;
@@ -31,9 +32,10 @@ export async function approveChurchAffiliation(actor:string,target:string,update
       await c.query('UPDATE access_grants SET active=false,version=version+1,updated_at=now() WHERE (user_id=$1 OR member_id=$1) AND active AND church IS DISTINCT FROM $2',[target,next]);
       await c.query('UPDATE crm_scope_assignments SET is_active=false,updated_at=now() WHERE (assignee_user_id=$1 OR member_user_id=$1) AND is_active',[target]);
       await c.query('INSERT INTO church_affiliation_events(actor_id,user_id,previous_church,next_church) VALUES($1,$2,$3,$4)',[actor,target,before.church,next]);
+      await arrivalChurchChanged(c,actor,target,next);
     }
     const fields:{[key:string]:string}={displayName:'display_name',avatarUrl:'avatar_url',birthday:'birthday',userGender:'user_gender',address:'address'};
-    const values:unknown[]=[target,next];const sets=['church=$2'];
+    const values:unknown[]=[target,next];const sets=['church=$2','church_choice_locked=true'];
     for(const [key,col] of Object.entries(fields))if(Object.hasOwn(updates,key)){values.push(updates[key as keyof typeof updates]);sets.push(`${col}=$${values.length}`);}
     const after=(await c.query(`UPDATE users SET ${sets.join(',')},updated_at=now() WHERE id=$1 RETURNING id`,values)).rows[0];
     await c.query('COMMIT');return after;

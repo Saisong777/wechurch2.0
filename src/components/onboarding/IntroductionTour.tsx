@@ -7,20 +7,21 @@ import { Button } from '@/components/ui/button';
 
 const dismissedInMemory = new Set<string>();
 function hasDismissed(key: string) { try { return dismissedInMemory.has(key) || localStorage.getItem(key) === 'done'; } catch { return dismissedInMemory.has(key); } }
-export function IntroductionTour() {
+export function IntroductionTour({ paused = false }: { paused?: boolean }) {
   const { loading, user } = useAuth();
   const { pathname, search, hash } = useLocation();
   const completionKey = `${TOUR_KEY}:${user?.id || 'guest'}`;
   const [open, setOpen] = useState(false); const [step, setStep] = useState(0);
   const finish = () => { dismissedInMemory.add(completionKey); try { localStorage.setItem(completionKey, 'done'); } catch { /* Still dismiss for this app session. */ } setOpen(false); };
   useEffect(() => {
+    if (paused) { setOpen(false); return; }
     // Never interrupt an editing, login, invitation, or deep-link flow.
     if (pathname !== '/' || search || hash) { setOpen(false); return; }
     const active = document.activeElement;
     const editing = active instanceof HTMLElement && (active.matches('input, textarea, select') || active.isContentEditable);
     if (!loading && !editing && !document.querySelector('[role="dialog"]') && !hasDismissed(completionKey)) { setStep(0); setOpen(true); }
-  }, [loading, pathname, search, hash, completionKey]);
-  useEffect(() => { const reopen = () => { setStep(0); setOpen(true); }; window.addEventListener(introductionEvent, reopen); return () => window.removeEventListener(introductionEvent, reopen); }, []);
+  }, [loading, pathname, search, hash, completionKey, paused]);
+  useEffect(() => { const reopen = () => { if (!paused) { setStep(0); setOpen(true); } }; window.addEventListener(introductionEvent, reopen); return () => window.removeEventListener(introductionEvent, reopen); }, [paused]);
   const current = guideSteps[step]; const Icon = current.icon;
   return <Dialog open={open} onOpenChange={next => { if (!next) finish(); }}><DialogContent className="w-[calc(100%-2rem)] max-h-[85dvh] overflow-y-auto rounded-xl p-5 sm:p-6 motion-reduce:animate-none" onEscapeKeyDown={finish}>
     <DialogHeader><p className="text-sm text-primary">WeChurch 快速導覽 · {step + 1} / {guideSteps.length}</p><Icon className="h-9 w-9 text-primary" aria-hidden="true" /><DialogTitle className="text-xl leading-8">{step === 0 && user ? '歡迎回來，一起看看 WeChurch' : current.title}</DialogTitle><DialogDescription className="pt-2 text-base leading-7">{step === 0 && user ? '你已登入。讀經記錄、私人筆記與小家會跟隨你的帳號保存。接下來快速認識日常功能，也可以略過，之後從「使用說明」重新開始。' : current.text}</DialogDescription></DialogHeader>

@@ -13,7 +13,12 @@ let server: ReturnType<ReturnType<typeof express>['listen']> | undefined;
 try {
   await pool.query('CREATE SCHEMA drizzle; CREATE TABLE drizzle.__drizzle_migrations(id serial PRIMARY KEY, hash text NOT NULL, created_at bigint)');
   const journal = JSON.parse(fs.readFileSync('migrations/meta/_journal.json','utf8')).entries;
+  const legacyIds:string[]=[];
   for (const entry of journal) {
+    if(entry.tag==='0029_church_onboarding_logins'&&process.env.RUN_CHURCH_ONBOARDING_ONLY==='1'){
+      for(const church of ['IM 行動教會',null,null]){const id=randomUUID();legacyIds.push(id);await pool.query('INSERT INTO users(id,email,church) VALUES($1,$2,$3)',[id,`legacy-${id}@example.test`,church]);}
+      await pool.query("INSERT INTO church_affiliation_events(actor_id,user_id,previous_church,next_church) VALUES($1,$1,'火樂',NULL)",[legacyIds[2]]);
+    }
     const sql = fs.readFileSync(`migrations/${entry.tag}.sql`, 'utf8');
     const migrationClient=await pool.connect();
     await migrationClient.query('BEGIN');
@@ -23,6 +28,12 @@ try {
       await migrationClient.query('COMMIT');
     } catch(error) { await migrationClient.query('ROLLBACK'); throw error; }
     finally { migrationClient.release(); }
+  }
+  if(legacyIds.length){
+    const rows=(await pool.query('SELECT id,church_choice_locked,church_login_seen FROM users WHERE id=ANY($1::uuid[])',[legacyIds])).rows;
+    for(const row of rows){assert.equal(row.church_login_seen,true);assert.equal(row.church_choice_locked,row.id!==legacyIds[1]);}
+    assert.equal((await pool.query('SELECT count(*)::int n FROM church_member_arrivals WHERE user_id=ANY($1::uuid[])',[legacyIds])).rows[0].n,0);
+    console.log('PASS onboarding migration: assigned/cleared-history locked, never-assigned eligible, historical accounts not falsely announced');
   }
   const app = express(); app.use(express.json());
   app.use((_req, res, next) => { res.setHeader('Content-Security-Policy', contentSecurityPolicy()); next(); });
@@ -52,7 +63,9 @@ try {
       return response;
     };
   };
-  if(process.env.RUN_MULTICHURCH_ONLY==='1'){
+  if(process.env.RUN_CHURCH_ONBOARDING_ONLY==='1'){
+    const {verifyChurchOnboardingHttp}=await import('./verify-church-onboarding-http');await verifyChurchOnboardingHttp(pool,()=>makeClient(false));
+  } else if(process.env.RUN_MULTICHURCH_ONLY==='1'){
     const {verifyMultichurchHttp}=await import('./verify-multichurch-http');await verifyMultichurchHttp(pool,()=>makeClient(false));
     const {verifyMultichurchExtraHttp}=await import('./verify-multichurch-extra-http');await verifyMultichurchExtraHttp(pool,()=>makeClient(false));
     const {verifyMultichurchRacesHttp}=await import('./verify-multichurch-races-http');await verifyMultichurchRacesHttp(pool,()=>makeClient(false));

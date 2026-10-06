@@ -28,7 +28,7 @@ it('switches verified namespaces, resets only tenant drafts and preserves person
 });
 it('makes ordinary church membership readonly and null membership pending while keeping personal editing',async()=>{
  auth.user={id:'actor',church:null,role:'member'};render(<App/>);
- expect(await screen.findByText('等待教會核定')).toBeVisible();expect(screen.queryByRole('combobox',{name:'目前教會'})).toBeNull();
+ expect(await screen.findByText('先確認教會歸屬')).toBeVisible();expect(screen.queryByRole('combobox',{name:'目前教會'})).toBeNull();
  expect(screen.getByRole('textbox',{name:'私人筆記稿'})).toBeVisible();expect(screen.queryByRole('textbox',{name:'教會分享稿'})).toBeNull();
 });
 it('shows clear auth/context failures and keeps personal pages accessible',async()=>{
@@ -43,7 +43,7 @@ it('re-verifies a same-user approved church change and preserves the private not
  auth.user={id:'actor',church:'IM 行動教會',role:'member'};const view=render(<App/>);await waitFor(()=>expect(screen.getByTestId('tenant')).toHaveTextContent('IM 行動教會'));fireEvent.change(screen.getByRole('textbox',{name:'私人筆記稿'}),{target:{value:'同帳號未存筆記'}});auth.user={...auth.user!,church:'桃園WeChurch'};view.rerender(<App/>);await waitFor(()=>expect(screen.getByTestId('tenant')).toHaveTextContent('桃園WeChurch'));expect(screen.getByRole('textbox',{name:'私人筆記稿'})).toHaveValue('同帳號未存筆記');expect(screen.getByText('所屬教會：桃園WeChurch')).toBeVisible();
 });
 it('keeps null-affiliation owner support accessible and blocks the tenant wall',async()=>{
- auth.user={id:'actor',church:null,role:'member'};render(<ChurchProvider><ChurchPageBoundary allowPendingOwner><p>本人的陪伴申請</p></ChurchPageBoundary><ChurchPageBoundary><Tenant/></ChurchPageBoundary></ChurchProvider>);expect(await screen.findByText('等待教會核定')).toBeVisible();expect(screen.getByText('本人的陪伴申請')).toBeVisible();expect(screen.queryByTestId('tenant')).toBeNull();
+ auth.user={id:'actor',church:null,role:'member'};render(<ChurchProvider><ChurchPageBoundary allowPendingOwner><p>本人的陪伴申請</p></ChurchPageBoundary><ChurchPageBoundary><Tenant/></ChurchPageBoundary></ChurchProvider>);expect(await screen.findByText('先確認教會歸屬')).toBeVisible();expect(screen.getByText('本人的陪伴申請')).toBeVisible();expect(screen.queryByTestId('tenant')).toBeNull();
 });
 it('shows a clear 403 context failure instead of mounting tenant content',async()=>{contextFail=403;render(<App/>);expect(await screen.findByText('無法使用此教會，請聯繫管理者核定。')).toBeVisible();expect(screen.queryByTestId('tenant')).toBeNull();});
 

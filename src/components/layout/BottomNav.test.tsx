@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 vi.mock('@/components/onboarding/IntroductionTour', () => ({ IntroductionTour: () => null }));
+vi.mock('@/components/onboarding/FirstChurchChoice', () => ({ FirstChurchChoice: () => null }));
+vi.mock('@/hooks/useChurchOnboarding', () => ({ useChurchOnboarding: () => ({isPending:false,isError:false,data:undefined}) }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({user:null,loading:false}) }));
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
