@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, Trash2, User, Pin, Check, BookOpen, HandHeart, HeartHandshake, Sprout, AlertCircle, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Heart, Trash2, User, Pin, Check, BookOpen, AlertCircle, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { REACTION_LABELS, isUrgentPrayer, isClosedPrayer, type PrayerReaction } from '@shared/prayerInteraction';
 import { usePrayerReaction, useUrgentPrayer, useClosePrayer, type Prayer, useDeletePrayer, useToggleAmen, useTogglePinPrayer, useMarkPrayerAnswered, CATEGORY_LABELS } from '@/hooks/usePrayerWall';
 import { formatDistanceToNow } from 'date-fns';
@@ -116,16 +116,19 @@ export const PrayerCard: React.FC<{ prayer: Prayer; focusFromNotification?: bool
       <p className="whitespace-pre-wrap text-sm leading-7 [overflow-wrap:anywhere]">{prayer.content}</p>
       {prayer.scriptureReference && <p className="flex items-start gap-2 text-sm text-primary"><BookOpen className="mt-0.5 h-4 w-4 shrink-0" /><span className="[overflow-wrap:anywhere]">{prayer.scriptureReference}</span></p>}
     </div>
-    <div className={cn('space-y-2 px-3 sm:px-4 md:border-t md:py-3', mobileExpanded ? 'border-t py-3' : 'pb-1')}>
-      {!closed && <div className="grid grid-cols-3 gap-1" role="group" aria-label="關懷回應">{(Object.keys(REACTION_LABELS) as PrayerReaction[]).map(kind => {
+    <div className={cn('space-y-2 px-3 sm:px-4 md:border-t md:py-2', mobileExpanded ? 'border-t py-2' : 'pb-1')}>
+      {!closed && <div className="flex flex-wrap items-center gap-1" role="group" aria-label="關懷回應">{(Object.keys(REACTION_LABELS) as PrayerReaction[]).map(kind => {
         const reaction = prayer.reactions?.find(r => r.kind === kind);
-        const Icon = { heart: Heart, support: HeartHandshake, strength: Sprout }[kind];
-        return <Button key={kind} variant="outline" size="sm" className={cn('min-h-11 h-auto min-w-0 flex-wrap gap-x-1 gap-y-0.5 border-border bg-transparent px-1 py-2 text-xs hover:bg-muted/50 sm:text-sm', reaction?.selected && 'border-primary/40 bg-primary/5 text-primary')} aria-pressed={!!reaction?.selected} title={`${reaction?.selected ? '撤回' : '送出'}${REACTION_LABELS[kind]}`} disabled={reactionMutation.isPending} onClick={() => reactionMutation.mutate({ prayerId: prayer.id, kind, selected: !reaction?.selected })}><Icon className={cn('h-4 w-4', kind === 'heart' ? 'text-rose-600 dark:text-rose-300' : kind === 'support' ? 'text-teal-700 dark:text-teal-300' : 'text-green-700 dark:text-green-300', reaction?.selected && kind === 'heart' && 'fill-current')} />{REACTION_LABELS[kind]}<span className="tabular-nums">{reaction?.count || 0}</span></Button>;
-      })}</div>}
+        return <Button key={kind} variant="ghost" size="sm" className={cn('min-h-[44px] min-w-[44px] shrink-0 gap-1.5 rounded-full px-2.5 py-1 text-xs text-muted-foreground md:min-h-[36px]', reaction?.selected && 'bg-primary/5 text-primary')} aria-label={`${REACTION_LABELS[kind]} ${reaction?.count || 0}`} aria-pressed={!!reaction?.selected} title={`${reaction?.selected ? '撤回' : '送出'}${REACTION_LABELS[kind]}`} disabled={reactionMutation.isPending} onClick={() => reactionMutation.mutate({ prayerId: prayer.id, kind, selected: !reaction?.selected })}>
+          {kind === 'heart' ? <Heart aria-hidden="true" className={cn('h-[18px] w-[18px] text-rose-600 dark:text-rose-300', reaction?.selected && 'fill-current')} /> : <span aria-hidden="true" className="text-[18px] leading-none">{kind === 'support' ? '🫂' : '💪'}</span>}
+          <span className="sr-only">{REACTION_LABELS[kind]}</span><span className="tabular-nums">{reaction?.count || 0}</span>
+        </Button>;
+      })}
+        <Button variant="ghost" size="sm" className={cn('min-h-[44px] min-w-[44px] shrink-0 gap-1.5 rounded-full px-2.5 py-1 text-xs text-muted-foreground md:min-h-[36px]', prayer.hasAmened && 'bg-primary/5 text-primary disabled:opacity-100')} aria-label={`${prayer.hasAmened ? '已為你禱告' : '為你禱告'}${prayer.amenCount > 0 ? ` ${prayer.amenCount}` : ''}`} aria-pressed={prayer.hasAmened} title={prayer.hasAmened ? '已為你禱告' : '為你禱告'} disabled={toggleAmenMutation.isPending || prayer.hasAmened} onClick={() => { vibrate(50); toggleAmenMutation.mutate({ prayerId: prayer.id, hasAmened: prayer.hasAmened }); }}>
+          <span aria-hidden="true" className="text-[18px] leading-none">🙏</span><span className="sr-only">{prayer.hasAmened ? '已為你禱告' : '為你禱告'}</span>{prayer.amenCount > 0 && <span className="tabular-nums">{prayer.amenCount}</span>}
+        </Button>
+      </div>}
       <div id={actionsId} className={cn('flex-wrap gap-2 md:flex', mobileExpanded ? 'flex' : 'hidden')}>
-        {!closed && <Button variant="outline" className={cn('min-h-11 min-w-0 flex-1 gap-1.5 px-2', 'h-auto flex-wrap border-border bg-transparent py-2 hover:bg-muted/50', prayer.hasAmened && 'border-primary/40 bg-primary/5 text-primary disabled:opacity-100')} aria-pressed={prayer.hasAmened} disabled={toggleAmenMutation.isPending || prayer.hasAmened} onClick={() => { vibrate(50); toggleAmenMutation.mutate({ prayerId: prayer.id, hasAmened: prayer.hasAmened }); }}>
-          {prayer.hasAmened ? <Check className="h-4 w-4" /> : <HandHeart className="h-4 w-4" />}{prayer.hasAmened ? '已為你禱告' : '為你禱告'}{prayer.amenCount > 0 && <span className="text-xs tabular-nums">{prayer.amenCount}</span>}
-        </Button>}
         <PrayerComments prayerId={prayer.id} count={prayer.commentCount} anonymousOwner={prayer.isOwner && prayer.isAnonymous} readOnly={closed} enabled={commentsEnabled} targetCommentId={targetCommentId} />
       </div>
     </div>
