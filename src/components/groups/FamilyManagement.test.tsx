@@ -23,8 +23,8 @@ it('surfaces pending applications and submits explicit approval', async () => {
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/life-groups/management/family/requests/member',expect.objectContaining({method:'POST',body:JSON.stringify({approve:true})})));
 });
 
-function showDeletion({ status = 'active', canDelete = true, ordinaryMemberCount = 0, fail = false, deferred = false } = {}) {
-  let group = {id:'family',name:'可恢復小家',church:'IM 行動教會',audience:'unspecified',listed:status !== 'archived',status,version:7,description:'',meeting:'',announcement:'',leaderId:null,coLeaderId:null,memberCount:ordinaryMemberCount,pendingRequestCount:0,canManage:true,canDelete,ordinaryMemberCount};
+function showDeletion({ status = 'active', canDelete = true, ordinaryMemberCount = 0, unlinkedActiveMemberCount = 0, fail = false, deferred = false } = {}) {
+  let group = {id:'family',name:'可恢復小家',church:'IM 行動教會',audience:'unspecified',listed:status !== 'archived',status,version:7,description:'',meeting:'',announcement:'',leaderId:null,coLeaderId:null,memberCount:ordinaryMemberCount,pendingRequestCount:0,canManage:true,canDelete,ordinaryMemberCount,unlinkedActiveMemberCount};
   let resolveMutation: (() => void) | undefined;
   const fetch = vi.fn(async (input: string, options?: RequestInit) => {
     if (options?.method === 'DELETE' || (options?.method === 'POST' && input.endsWith('/restore'))) {
@@ -94,6 +94,15 @@ it('hides deletion from assigned leaders without church management',async()=>{
   showDeletion({canDelete:false});
   await screen.findByRole('button',{name:'設定與成員異動'});
   expect(screen.queryByRole('button',{name:'刪除 可恢復小家'})).toBeNull();
+});
+it('explains unlinked membership separately without claiming the user-only transfer menu can handle it',async()=>{
+  showDeletion({ordinaryMemberCount:1,unlinkedActiveMemberCount:1});
+  fireEvent.click(await screen.findByRole('button',{name:'刪除 可恢復小家'}));
+  const dialog=screen.getByRole('alertdialog');
+  expect(within(dialog).getByRole('status')).toHaveTextContent('另有 1 筆尚未綁定帳號的成員名錄');
+  expect(within(dialog).getByRole('status')).toHaveTextContent('無法在此處的「轉家或退出」選單操作');
+  expect(within(dialog).getByRole('status')).not.toHaveTextContent('請先到「設定與成員異動」完成轉家');
+  expect(within(dialog).getByRole('button',{name:'確認刪除'})).toBeDisabled();
 });
 it('requires explicit named restoration for existing archived families and explains invitation behavior',async()=>{
   const {fetch}=showDeletion({status:'archived'});

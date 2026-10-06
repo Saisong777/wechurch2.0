@@ -86,7 +86,8 @@ export async function familyManagement(actor: string) {
   const groups = (await pool.query(`SELECT ${fields},true AS "canManage",
     (SELECT count(*)::int FROM life_group_requests r WHERE r.group_id=g.id AND r.status='pending') AS "pendingRequestCount",
     ${registeredGroupCount()} AS "memberCount",
-    (SELECT count(*)::int FROM small_group_members m WHERE m.group_id=g.id AND ${ordinaryMembership}) AS "ordinaryMemberCount"
+    (SELECT count(*)::int FROM small_group_members m WHERE m.group_id=g.id AND ${ordinaryMembership}) AS "ordinaryMemberCount",
+    (SELECT count(*)::int FROM small_group_members m WHERE m.group_id=g.id AND m.is_active AND m.user_id IS NULL) AS "unlinkedActiveMemberCount"
     FROM small_groups g WHERE ${churchPredicate('g')} AND ($1 OR ($2 AND (g.church=ANY($3::text[]) OR g.id=ANY($4::uuid[]))) OR (g.leader_user_id=$5 OR g.co_leader_user_id=$5) OR g.pastor_user_id=$5) ORDER BY g.name LIMIT 200`,
   [a.role === 'admin', a.canManageMembers, aliases(a), a.groupIds, actor])).rows;
   const requests = a.canEnterCrm && a.canManageMembers ? (await pool.query(`SELECT r.id,r.user_id AS "userId",u.display_name AS name,r.church,r.availability,r.region,r.contact,r.status,r.message,r.version,r.created_at AS "createdAt",owner.display_name AS "ownerName",g.name AS "groupName"
@@ -159,8 +160,8 @@ export async function updateFamily(actor: string, id: string, input: z.infer<typ
     const g = (await c.query('SELECT * FROM small_groups WHERE id=$1 FOR UPDATE', [id])).rows[0];
     if (!g || !groupAllowed(a, g)) throw denied();
     if (g.version !== input.version) throw conflict();
-    if ((g.lifecycle === 'archived') !== (input.status === 'archived')) throw new GroupError(400, '請使用刪除或恢復小家的專用操作。');
     if (g.lifecycle === 'archived' && !churchAllowed(a, g.church)) throw denied();
+    if ((g.lifecycle === 'archived') !== (input.status === 'archived')) throw new GroupError(400, '請使用刪除或恢復小家的專用操作。');
     // Omitted second slot from legacy clients preserves its appointment.
     const coLeaderId = input.coLeaderId === undefined ? g.co_leader_user_id ?? null : input.coLeaderId;
     if (input.leaderId && coLeaderId === input.leaderId) throw new GroupError(400, '請選擇兩位不同的小家長。');

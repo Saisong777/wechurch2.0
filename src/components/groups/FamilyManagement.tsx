@@ -33,6 +33,8 @@ export function FamilyManagement({ initialGroup = null }: { initialGroup?: strin
   const selected = data.groups.find(g => g.id === editing && g.status !== 'archived');
   const restoring = lifecycleGroup?.status === 'archived';
   const blocked = !restoring && (lifecycleGroup?.ordinaryMemberCount ?? 0) > 0;
+  const unlinked = lifecycleGroup?.unlinkedActiveMemberCount ?? 0;
+  const linkedOrdinary = Math.max(0, (lifecycleGroup?.ordinaryMemberCount ?? 0) - unlinked);
   const openLifecycle = (g: ManagedFamily) => { setError(''); setConfirmName(''); setLifecycleGroup(g); };
   const changeLifecycle = async () => {
     if (!lifecycleGroup || busy || blocked || confirmName !== lifecycleGroup.name) return;
@@ -52,7 +54,7 @@ export function FamilyManagement({ initialGroup = null }: { initialGroup?: strin
     <AlertDialog open={!!lifecycleGroup} onOpenChange={open => { if (!open && !busy) { setLifecycleGroup(null); setConfirmName(''); setError(''); } }}>
       <AlertDialogContent className="max-h-[85dvh] max-w-[calc(100vw-2rem)] overflow-y-auto [overflow-wrap:anywhere] sm:max-w-lg">
         <AlertDialogHeader><AlertDialogTitle>{restoring ? '恢復小家' : '刪除小家'}：{lifecycleGroup?.name}</AlertDialogTitle><AlertDialogDescription>{restoring ? '恢復小家運作，保留原有成員及小家長；不會重新公開，也不會啟用舊邀請。' : '刪除後，小家將從一般名單移除並停止加入；帳號、筆記、讀經進度與小家歷史資料會保留，可在已刪除的小家恢復。'}</AlertDialogDescription></AlertDialogHeader>
-        {blocked && <p role="status" className="text-sm text-destructive">還有 {lifecycleGroup?.ordinaryMemberCount} 筆一般成員資料，請先到「設定與成員異動」完成轉家或退出，再刪除小家。</p>}
+        {blocked && <div role="status" className="space-y-2 text-sm text-destructive">{linkedOrdinary > 0 && <p>還有 {linkedOrdinary} 筆一般成員資料，請先到「設定與成員異動」完成轉家或退出，再刪除小家。</p>}{unlinked > 0 && <p>另有 {unlinked} 筆尚未綁定帳號的成員名錄，請管理者先核對並完成連結或名錄異動，再刪除。這些名錄無法在此處的「轉家或退出」選單操作。</p>}</div>}
         <form className="space-y-4" onSubmit={e => { e.preventDefault(); void changeLifecycle(); }}>
           <label className="block space-y-2 text-sm">請輸入小家完整名稱確認<Input autoComplete="off" disabled={busy || blocked} value={confirmName} onChange={e => setConfirmName(e.target.value)} maxLength={160} /></label>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

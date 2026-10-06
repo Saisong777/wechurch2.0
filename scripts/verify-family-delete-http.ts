@@ -41,6 +41,7 @@ export async function verifyFamilyDeleteHttp(pool: Pool, makeClient: () => Clien
   const assignment = (await pool.query("INSERT INTO crm_scope_assignments(assignee_user_id,assigned_by_user_id,scope_type,church,group_id,can_manage_members) VALUES($1,$2,'group',$3,$4,true) RETURNING id",[member.id,director.id,'IM 行動教會',id])).rows[0].id;
   assert.equal((await (await member.client(root+'/management')).json()).groups.find((g:{id:string}) => g.id === id).canDelete,false);
   assert.equal((await mutate(member.client)).status,403);
+  assert.equal((await mutate(member.client,true)).status,403);
   await pool.query('DELETE FROM crm_scope_assignments WHERE id=$1',[assignment]);
   assert.equal((await makeClient()(`${root}/management/${id}`,'DELETE',await input())).status,401);
   const unchanged = await groupDigest();
@@ -52,11 +53,13 @@ export async function verifyFamilyDeleteHttp(pool: Pool, makeClient: () => Clien
   assert.deepEqual(await groupDigest(),unchanged);
   await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2)',[id,member.id]);
   assert.equal((await listed()).ordinaryMemberCount,1);
+  assert.equal((await listed()).unlinkedActiveMemberCount,0);
   assert.equal((await mutate(director.client)).status,409);
   assert.deepEqual(await groupDigest(),unchanged);
   await pool.query('UPDATE small_group_members SET is_active=false WHERE group_id=$1 AND user_id=$2',[id,member.id]);
   const unlinked = (await pool.query('INSERT INTO small_group_members(group_id,member_email) VALUES($1,$2) RETURNING id',[id,'unlinked-fixture@example.test'])).rows[0].id;
   assert.equal((await listed()).ordinaryMemberCount,1);
+  assert.equal((await listed()).unlinkedActiveMemberCount,1);
   assert.equal((await mutate(director.client)).status,409);
   await pool.query('UPDATE small_group_members SET is_active=false WHERE id=$1',[unlinked]);
   await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2),($1,$3)',[id,appointed.id,co.id]);
