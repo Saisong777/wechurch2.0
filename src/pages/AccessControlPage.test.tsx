@@ -21,7 +21,7 @@ let revoked: {url:string;body:Record<string,unknown>}[]=[];
 let deleteError='';
 let client: QueryClient;
 beforeEach(() => {
-  sent = []; fail = false;revoked=[];deleteError='';data.appointments=[];
+  sent = []; fail = false;revoked=[];deleteError='';data.appointments=[];data.roles=[{id:'coworker',name:'同工',permissions:['email.send'],version:1}];data.users=[{id:'member',name:'測試成員',email:'fixture@example.test',role:'member'}];
   data.grants=['同工','全職同工'].map((roleName,i)=>({id:'grant-'+i,userId:'member',roleId:'coworker',roleName,permissions:['members.read'],scope:'church',church:'IM 行動教會',groupId:null,memberId:null,expiresAt:null,active:true,version:1,reason:'初始授權'}));
   vi.spyOn(window, 'confirm').mockReturnValue(true);
   vi.spyOn(window,'prompt').mockReturnValue(null);
@@ -125,3 +125,29 @@ it.each(['連線失敗，請重試','授權已更新或撤回，請重新載入�
 });
 
 it('includes the equal second leader appointment without disguising it as a pastor appointment',async()=>{data.appointments=[{id:'shared-group',name:'共同負責小家',leaderId:'other',coLeaderId:'member',pastorId:null}];await client.invalidateQueries({queryKey:['access-control-admin']});expect(await screen.findByText('小家長職務 · 共同負責小家')).toBeVisible();expect(screen.queryByText('牧者職務 · 共同負責小家')).toBeNull();});
+
+it('lists an appointed second leader in the leader filter and updates after a handover',async()=>{
+  data.appointments=[{id:'shared-group',name:'共同負責小家',leaderId:'other',coLeaderId:'member',pastorId:null}];
+  await client.invalidateQueries({queryKey:['access-control-admin']});
+  fireEvent.change(await screen.findByRole('combobox',{name:'篩選職分'}),{target:{value:'derived:小家長'}});
+  expect(await screen.findByText('1 位成員')).toBeVisible();
+  expect(screen.getByRole('button',{name:/測試成員/})).toHaveTextContent('小家長');
+  expect(screen.getByRole('link',{name:'前往小家管理'})).toHaveAttribute('href','/groups?manage=1&family=shared-group');
+  data.appointments=[];
+  await client.invalidateQueries({queryKey:['access-control-admin']});
+  expect(await screen.findByText('0 位成員')).toBeVisible();
+  expect(screen.getByRole('combobox',{name:'篩選職分'})).toHaveValue('derived:小家長');
+  expect(screen.queryByRole('button',{name:/測試成員/})).toBeNull();
+});
+it('includes account leaders and live title grants once while retaining text search',async()=>{
+  data.users=[{id:'member',name:'測試成員',email:'fixture@example.test',role:'leader'},{id:'appointed',name:'另一成員',email:'second@example.test',role:'member'}];
+  data.roles=[{id:'leader-role',name:'小家長',permissions:[],version:1}];
+  data.grants=[{...data.grants[0],roleId:'leader-role',roleName:'小家長'}];
+  data.appointments=[{id:'group',name:'測試小家',leaderId:'member',coLeaderId:'appointed',pastorId:null}];
+  await client.invalidateQueries({queryKey:['access-control-admin']});
+  fireEvent.change(await screen.findByRole('combobox',{name:'篩選職分'}),{target:{value:'leader-role'}});
+  expect(await screen.findByText('2 位成員')).toBeVisible();
+  fireEvent.change(screen.getByRole('textbox',{name:'搜尋成員'}),{target:{value:'second@example.test'}});
+  expect(screen.getByText('1 位成員')).toBeVisible();
+  expect(screen.queryByRole('button',{name:/測試成員/})).toBeNull();
+});

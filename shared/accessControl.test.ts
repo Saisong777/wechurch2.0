@@ -1,6 +1,6 @@
 import { describe,it,expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { grantInput } from './accessControl';
+import { grantInput, summarizeAppointments } from './accessControl';
 const base={userId:randomUUID(),roleId:randomUUID(),permissions:['members.read'],scope:'church',church:'IM 行動教會',groupId:null,memberId:null,expiresAt:null,reason:'驗收'};
 describe('explicit role grants',()=>{
  it('permits a title without management permissions',()=>expect(grantInput.safeParse({...base,permissions:[]}).success).toBe(true));
@@ -18,5 +18,13 @@ describe('explicit role grants',()=>{
   expect(grantInput.safeParse({...base,groupId:randomUUID()}).success).toBe(false);
   expect(grantInput.safeParse({...base,permissions:['members.read','members.read']}).success).toBe(false);
   expect(grantInput.safeParse({...base,scope:'group',groupId:randomUUID(),permissions:['visits.manage']}).success).toBe(false);
+ });
+});
+describe('account-linked group appointment counts',()=>{
+ it('deduplicates equal leaders across groups and reports groups with no valid account',()=>{
+  expect(summarizeAppointments([{leaderId:'a',coLeaderId:'b'},{leaderId:'a',coLeaderId:null},{leaderId:'foreign',coLeaderId:null},{leaderId:null,coLeaderId:null}],['a','b'])).toEqual({activeGroupCount:4,assignedLeaderCount:2,assignedGroupCount:2,unassignedGroupCount:2,invalidLeaderSlotCount:1});
+ });
+ it('reports duplicate slots as invalid without doubling the people count',()=>{
+  expect(summarizeAppointments([{leaderId:'a',coLeaderId:'a'}],['a'])).toEqual({activeGroupCount:1,assignedLeaderCount:1,assignedGroupCount:1,unassignedGroupCount:0,invalidLeaderSlotCount:1});
  });
 });

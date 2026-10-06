@@ -68,7 +68,7 @@ export function filterCrmMembers(members: UnifiedMember[], filters: {
     if (filters.status && filters.status !== 'all' && member.status !== filters.status) return false;
     if (filters.role && filters.role !== 'all') {
       const matchingRole = filters.role === 'group_leader'
-        ? member.role === 'group_leader' || member.role === 'leader'
+        ? member.role === 'group_leader' || member.role === 'leader' || member.ministryRoles?.includes('小家長') === true
         : member.role === filters.role;
       if (!matchingRole) return false;
     }
@@ -89,7 +89,7 @@ export function getCrmStats(snapshot: CrmSnapshot, members: UnifiedMember[], now
   return {
     totalCount: members.length, registeredCount: users.length,
     adminCount: registered.filter(m => m.role === 'admin' || m.role === 'senior_pastor').length,
-    leaderCount: registered.filter(m => m.role && ['pastor', 'minister', 'group_leader', 'leader', 'future_leader'].includes(m.role)).length,
+    leaderCount: registered.filter(m => (m.role && ['pastor', 'minister', 'group_leader', 'leader', 'future_leader'].includes(m.role)) || m.ministryRoles?.some(name => ['小家長','牧者'].includes(name))).length,
     potentialTotal: contacts.length,
     unlinkedCount: potential.length,
     linkedCount: contacts.filter(contact => !!contact.userId).length,

@@ -31,6 +31,24 @@ export type AccessGrant = {
   scope: 'church' | 'group' | 'member' | 'site'; church: string; groupId: string | null; memberId: string | null;
   expiresAt: string | null; active: boolean; version: number; reason: string;
   scopeName?: string;
+  effective?: boolean;
 };
 export type AccessTemplate = { id: string; name: string; permissions: Permission[]; version: number; editable: boolean };
-export type MyAccess = { permissions: Permission[]; grants: AccessGrant[]; canManageAccess: boolean; canEnterCrm: boolean; canEnterAdmin: boolean };
+export type GroupAppointment = { groupId: string; groupName: string; role: 'group_leader' | 'pastor' };
+export type AppointmentSummary = { activeGroupCount: number; assignedLeaderCount: number; assignedGroupCount: number; unassignedGroupCount: number; invalidLeaderSlotCount: number };
+export function summarizeAppointments(appointments: { leaderId: string | null; coLeaderId: string | null }[], memberIds: string[]): AppointmentSummary {
+  const available = new Set(memberIds), assigned = new Set<string>();
+  let assignedGroupCount = 0, invalidLeaderSlotCount = 0;
+  for (const group of appointments) {
+    const slots = [group.leaderId, group.coLeaderId].filter((id): id is string => !!id);
+    const valid = slots.filter(id => available.has(id));
+    valid.forEach(id => assigned.add(id));
+    if (valid.length) assignedGroupCount++;
+    invalidLeaderSlotCount += slots.length - valid.length;
+    // A repeated person is one leader, and the second slot needs correction.
+    if (group.leaderId && group.leaderId === group.coLeaderId) invalidLeaderSlotCount++;
+  }
+  return { activeGroupCount: appointments.length, assignedLeaderCount: assigned.size, assignedGroupCount,
+    unassignedGroupCount: appointments.length - assignedGroupCount, invalidLeaderSlotCount };
+}
+export type MyAccess = { permissions: Permission[]; grants: AccessGrant[]; canManageAccess: boolean; canEnterCrm: boolean; canEnterAdmin: boolean; appointments?: GroupAppointment[]; canManageGroups?: boolean };

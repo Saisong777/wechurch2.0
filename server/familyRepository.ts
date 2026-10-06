@@ -6,6 +6,7 @@ import { storage } from './storage';
 import { getCrmAccessContext, type CrmAccessContext } from './crmPermissions';
 import { getChurchAliases, getKnownChurchOptions, normalizeChurch } from './churches';
 import { GroupError } from './groupError';
+import { registeredGroupCount } from './groupRoster';
 import { familyCreateInput, familySettingsInput, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
 
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
@@ -82,7 +83,7 @@ export async function familyManagement(actor: string) {
   const a = await familyAccess(actor);
   const groups = (await pool.query(`SELECT ${fields},true AS "canManage",
     (SELECT count(*)::int FROM life_group_requests r WHERE r.group_id=g.id AND r.status='pending') AS "pendingRequestCount",
-    (SELECT count(DISTINCT uid)::int FROM (SELECT user_id AS uid FROM small_group_members WHERE group_id=g.id AND is_active UNION SELECT g.leader_user_id UNION SELECT g.co_leader_user_id UNION SELECT g.pastor_user_id) m WHERE uid IS NOT NULL) AS "memberCount"
+    ${registeredGroupCount()} AS "memberCount"
     FROM small_groups g WHERE ${churchPredicate('g')} AND ($1 OR ($2 AND (g.church=ANY($3::text[]) OR g.id=ANY($4::uuid[]))) OR (g.leader_user_id=$5 OR g.co_leader_user_id=$5) OR g.pastor_user_id=$5) ORDER BY g.name LIMIT 200`,
   [a.role === 'admin', a.canManageMembers, aliases(a), a.groupIds, actor])).rows;
   const requests = a.canEnterCrm && a.canManageMembers ? (await pool.query(`SELECT r.id,r.user_id AS "userId",u.display_name AS name,r.church,r.availability,r.region,r.contact,r.status,r.message,r.version,r.created_at AS "createdAt",owner.display_name AS "ownerName",g.name AS "groupName"

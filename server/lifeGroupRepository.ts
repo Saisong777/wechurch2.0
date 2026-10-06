@@ -6,6 +6,7 @@ import type { z } from 'zod';
 import { pool } from './db';
 import { careInput, careUpdateInput, shareInput, shareEditInput } from '../shared/lifeGroup';
 import { createFamily, familyAccess } from './familyRepository';
+import { registeredGroupCount } from './groupRoster';
 import { recordInteraction, recordCommentInteraction } from './notificationRepository';
 
 import { GroupError } from './groupError';
@@ -43,7 +44,7 @@ export async function canCreateGroup(actor: string) {
 export async function myGroups(actor: string) {
   const groups = (await pool.query(`SELECT g.id,g.name,g.church,(SELECT display_name FROM users WHERE id=g.leader_user_id) AS "leaderName",(SELECT display_name FROM users WHERE id=g.co_leader_user_id) AS "coLeaderName",((g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1) IS TRUE AS manager,
     CASE WHEN (g.leader_user_id=$1 OR g.co_leader_user_id=$1) OR g.pastor_user_id=$1 THEN (SELECT count(*)::int FROM life_group_requests r WHERE r.group_id=g.id AND r.status='pending') ELSE 0 END AS "pendingRequestCount",
-    (SELECT count(DISTINCT uid)::int FROM (SELECT user_id AS uid FROM small_group_members WHERE group_id=g.id AND is_active UNION SELECT g.leader_user_id UNION SELECT g.co_leader_user_id UNION SELECT g.pastor_user_id) a WHERE uid IS NOT NULL) AS "memberCount"
+    ${registeredGroupCount()} AS "memberCount"
     FROM small_groups g WHERE g.is_active AND ${churchPredicate('g')} AND ${activeMember.replaceAll('$2', '$1')} ORDER BY g.name`, [actor])).rows;
   const requests = (await pool.query(`SELECT r.group_id AS id,g.name,r.status FROM life_group_requests r JOIN small_groups g ON g.id=r.group_id WHERE r.user_id=$1 AND g.is_active AND r.status!='approved' AND ${churchPredicate('g')} ORDER BY r.created_at DESC`, [actor])).rows;
   return { groups, requests, canCreate: await canCreateGroup(actor) };

@@ -66,3 +66,14 @@ describe('CRM batch outcomes', () => {
     expect(request).toHaveBeenCalledWith('/api/potential-members/selected', { method: 'DELETE' });
   });
 });
+
+it('includes appointed leaders in CRM filters and scope totals without changing their account role or double counting',()=>{
+  const appointedSnapshot:CrmSnapshot={
+    users:[{id:'a',email:'a@example.invalid',displayName:'小家長甲',church:'iM',createdAt:'2026-09-10',ministryRoles:['小家長']},{id:'b',email:'b@example.invalid',displayName:'小家長乙',church:'iM',createdAt:'2026-09-10',ministryRoles:['小家長']}],
+    roles:[{userId:'a',role:'member'},{userId:'b',role:'leader'}],potentialMembers:[],
+  };
+  const members=mergeCrmMembers(appointedSnapshot);
+  expect(filterCrmMembers(members,{tab:'registered',role:'group_leader'}).map(m=>m.id).sort()).toEqual(['a','b']);
+  expect(getCrmStats(appointedSnapshot,members,now).leaderCount).toBe(2);
+  expect(members.find(m=>m.id==='a')?.role).toBe('member');
+});

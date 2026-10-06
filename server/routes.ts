@@ -105,6 +105,7 @@ import { prayerSharingRoutes } from './prayerSharingRoutes';
 import { prayerInteractionRoutes } from './prayerInteractionRoutes';
 import { notificationRoutes } from './notificationRoutes';
 import { accessControlRoutes, changeAccountRole, hasPermission, myAccess, memberRoleNames } from './accessControl';
+import { registeredGroupCount } from './groupRoster';
 import type { Permission } from '../shared/accessControl';
 import { GroupError } from './groupError';
 import { devotionWallRoutes } from './devotionWallRoutes';
@@ -1016,14 +1017,14 @@ export async function registerRoutes(app: Express) {
           leader.display_name AS "leaderName",
           co_leader.display_name AS "coLeaderName",
           pastor.display_name AS "pastorName",
-          COUNT(m.id)::int AS "memberCount"
+          ${registeredGroupCount()} AS "memberCount",
+          (SELECT count(*)::int FROM small_group_members unlinked WHERE unlinked.group_id=g.id
+            AND unlinked.is_active AND unlinked.user_id IS NULL) AS "unlinkedMemberCount"
         FROM small_groups g
         LEFT JOIN users leader ON leader.id = g.leader_user_id
         LEFT JOIN users co_leader ON co_leader.id = g.co_leader_user_id
         LEFT JOIN users pastor ON pastor.id = g.pastor_user_id
-        LEFT JOIN small_group_members m ON m.group_id = g.id AND m.is_active = true
         WHERE ${conditions.join(" AND ")}
-        GROUP BY g.id, leader.display_name, co_leader.display_name, pastor.display_name
         ORDER BY g.church, g.name`,
         params
       );

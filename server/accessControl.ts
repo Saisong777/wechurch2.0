@@ -6,12 +6,18 @@ import { z } from 'zod';
 import { pool } from './db';
 import { normalizeChurch, getChurchAliases } from './churches';
 import { GroupError } from './groupError';
-import { grantInput, roleTemplateInput, rolePresets, globalPermissions, type AccessGrant, type Permission } from '../shared/accessControl';
+import { grantInput, roleTemplateInput, rolePresets, globalPermissions, summarizeAppointments, type AccessGrant, type Permission } from '../shared/accessControl';
+import { activeGroupAppointments } from './groupAppointments';
 
 const projection = `g.id,g.user_id AS "userId",g.role_id AS "roleId",r.name AS "roleName",g.church,g.scope,
  g.group_id AS "groupId",g.member_id AS "memberId",g.permissions,g.expires_at AS "expiresAt",g.active,g.version,g.reason,
  coalesce(s.name,m.display_name,g.church) AS "scopeName"`;
 const joins = 'access_grants g JOIN access_roles r ON r.id=g.role_id LEFT JOIN small_groups s ON s.id=g.group_id LEFT JOIN users m ON m.id=g.member_id';
+const effectiveGrantSql = (churchParam: '$1' | '$2') => `(g.active AND (g.expires_at IS NULL OR g.expires_at>now())
+  AND g.church=ANY(${churchParam}::text[])
+  AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=g.user_id AND owner.church=ANY(${churchParam}::text[]))
+  AND (g.scope<>'group' OR (s.is_active AND s.lifecycle IN ('active','paused') AND s.church=ANY(${churchParam}::text[])))
+  AND (g.scope<>'member' OR m.church=ANY(${churchParam}::text[]))) IS TRUE`;
 
 // No cache: revocation, expiry and church moves are enforced on the next request.
 export async function activeGrants(userId: string): Promise<AccessGrant[]> {
@@ -19,16 +25,14 @@ export async function activeGrants(userId: string): Promise<AccessGrant[]> {
   const church = normalizeChurch(own?.church);
   if (!church) return [];
   return (await pool.query(`SELECT ${projection} FROM ${joins}
-    WHERE g.user_id=$1 AND g.active AND (g.expires_at IS NULL OR g.expires_at>now()) AND g.church=ANY($2::text[])
-      AND (g.scope<>'group' OR (s.is_active AND s.church=ANY($2::text[])))
-      AND (g.scope<>'member' OR m.church=ANY($2::text[]))`, [userId, getChurchAliases(church)])).rows;
+    WHERE g.user_id=$1 AND ${effectiveGrantSql('$2')}`, [userId, getChurchAliases(church)])).rows;
 }
 export async function hasPermission(userId: string, permission: Permission, scope?: 'site' | 'church') {
   return (await activeGrants(userId)).some(g => (!churchContext() || normalizeChurch(g.church)===selectedChurch()) && (!scope || g.scope === scope) && g.permissions.includes(permission));
 }
 export async function memberRoleNames(ids:string[]) {
   if(!ids.length)return new Map<string,string[]>();
-  const rows=(await pool.query(`SELECT g.user_id,g.church,u.church AS user_church,r.name,g.scope,s.church AS group_church,s.is_active AS group_active,m.church AS member_church FROM access_grants g
+  const rows=(await pool.query(`SELECT g.user_id,g.church,u.church AS user_church,r.name,g.scope,s.church AS group_church,(s.is_active AND s.lifecycle IN ('active','paused')) AS group_active,m.church AS member_church FROM access_grants g
     JOIN access_roles r ON r.id=g.role_id JOIN users u ON u.id=g.user_id
     LEFT JOIN small_groups s ON s.id=g.group_id LEFT JOIN users m ON m.id=g.member_id
     WHERE g.user_id=ANY($1::uuid[]) AND g.active AND (g.expires_at IS NULL OR g.expires_at>now())`,[ids])).rows;
@@ -37,6 +41,14 @@ export async function memberRoleNames(ids:string[]) {
     if(row.scope==='group'&&(!row.group_active||normalizeChurch(row.group_church)!==normalizeChurch(row.church)))continue;
     if(row.scope==='member'&&normalizeChurch(row.member_church)!==normalizeChurch(row.church))continue;
     result.set(row.user_id,[...new Set([...(result.get(row.user_id)||[]),row.name])]);}
+  const appointed = (await pool.query(`SELECT u.id AS user_id,u.church AS user_church,g.church,
+      CASE WHEN u.id=g.leader_user_id OR u.id=g.co_leader_user_id THEN '小家長' ELSE '牧者' END AS name
+    FROM users u JOIN small_groups g ON u.id=g.leader_user_id OR u.id=g.co_leader_user_id OR u.id=g.pastor_user_id
+    WHERE u.id=ANY($1::uuid[]) AND g.is_active AND g.lifecycle IN ('active','paused')`, [ids])).rows;
+  for (const row of appointed) {
+    if (!normalizeChurch(row.user_church) || normalizeChurch(row.user_church) !== normalizeChurch(row.church)) continue;
+    result.set(row.user_id,[...new Set([...(result.get(row.user_id)||[]),row.name])]);
+  }
   return result;
 }
 export async function accessActor(id: string, c: Pick<PoolClient, 'query'> = pool) {
@@ -47,6 +59,11 @@ export async function accessActor(id: string, c: Pick<PoolClient, 'query'> = poo
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
   try { await c.query('BEGIN'); await lockChurchContext(c); const result = await work(c); await c.query('COMMIT'); return result; }
+  catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+}
+async function readSnapshot<T>(work: (c: PoolClient) => Promise<T>) {
+  const c = await pool.connect();
+  try { await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'); const result = await work(c); await c.query('COMMIT'); return result; }
   catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
 async function director(id: string, church: string, c: Pick<PoolClient, 'query'> = pool) {
@@ -60,12 +77,13 @@ async function audit(c: PoolClient, actor: string, church: string, target: strin
 }
 
 export async function myAccess(id: string) {
-  const a = await accessActor(id), grants = await activeGrants(id);
+  const a = await accessActor(id), grants = await activeGrants(id), appointments = await activeGroupAppointments(id);
   const permissions = [...new Set(grants.flatMap(g => g.permissions))];
   const legacyLeader = ['admin','senior_pastor','pastor','minister','group_leader','leader','future_leader'].includes(a.role);
-  return { grants, permissions, canManageAccess: ['admin','senior_pastor'].includes(a.role),
-    canEnterCrm: legacyLeader || permissions.some(p => ['members.read','members.manage','groups.manage','care.manage'].includes(p)),
-    canEnterAdmin: legacyLeader || permissions.length > 0 };
+  return { grants, permissions, appointments, canManageAccess: ['admin','senior_pastor'].includes(a.role),
+    canManageGroups: ['admin','senior_pastor'].includes(a.role) || appointments.length > 0 || permissions.includes('groups.manage'),
+    canEnterCrm: legacyLeader || appointments.length > 0 || permissions.some(p => ['members.read','members.manage','groups.manage','care.manage'].includes(p)),
+    canEnterAdmin: legacyLeader || appointments.length > 0 || permissions.length > 0 };
 }
 
 export async function changeAccountRole(actor: string, targetId: string, role: string) {
@@ -105,26 +123,37 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
     res.json(await changeAccountRole(res.locals.actor,req.params.id,input.role));
   });
   router.get('/', async (req, res) => {
-    const a = await accessActor(res.locals.actor);
+    const snapshot = await readSnapshot(async c => {
+    const a = await accessActor(res.locals.actor, c);
     const church = selectedChurch();
     if (!church) throw new GroupError(400, '請先指定教會。');
-    await director(a.id, church);
+    await director(a.id, church, c);
     const aliases = getChurchAliases(church);
-    const users = (await pool.query(`SELECT u.id,coalesce(u.display_name,u.email) AS name,u.email,coalesce(r.role,'member') AS role
+    const users = (await c.query(`SELECT u.id,coalesce(u.display_name,u.email) AS name,u.email,coalesce(r.role,'member') AS role
       FROM users u LEFT JOIN user_roles r ON r.user_id=u.id WHERE u.church=ANY($1::text[]) ORDER BY name,u.id`, [aliases])).rows;
-    const roles = (await pool.query('SELECT id,name,permissions,version,true AS editable FROM access_roles WHERE church=ANY($1::text[]) ORDER BY created_at,id', [aliases])).rows;
-    const groups = (await pool.query('SELECT id,name FROM small_groups WHERE church=ANY($1::text[]) AND is_active ORDER BY name,id', [aliases])).rows;
-    const grants = (await pool.query(`SELECT ${projection} FROM ${joins} WHERE g.church=ANY($1::text[]) ORDER BY g.created_at DESC LIMIT 2000`, [aliases])).rows;
-    const history = (await pool.query(`SELECT a.id,a.action,a.target_id AS "targetId",a.created_at AS "createdAt",u.display_name AS "actorName",a.before_value AS before,a.after_value AS after
+    const roles = (await c.query('SELECT id,name,permissions,version,true AS editable FROM access_roles WHERE church=ANY($1::text[]) ORDER BY created_at,id', [aliases])).rows;
+    const groups = (await c.query("SELECT id,name FROM small_groups WHERE church=ANY($1::text[]) AND is_active AND lifecycle IN ('active','paused') ORDER BY name,id", [aliases])).rows;
+    const grants = (await c.query(`SELECT ${projection},${effectiveGrantSql('$1')} AS effective
+      FROM ${joins} WHERE g.church=ANY($1::text[]) ORDER BY g.created_at DESC,g.id`, [aliases])).rows;
+    const history = (await c.query(`SELECT a.id,a.action,a.target_id AS "targetId",a.created_at AS "createdAt",u.display_name AS "actorName",a.before_value AS before,a.after_value AS after
       FROM access_audit a JOIN users u ON u.id=a.actor_id WHERE a.church=ANY($1::text[]) ORDER BY a.created_at DESC,a.id LIMIT 100`, [aliases])).rows;
-    const legacyScopes = (await pool.query(`SELECT a.id,a.assignee_user_id AS "userId",a.scope_type AS scope,a.can_view_personal AS "canViewPersonal",
+    const legacyScopes = (await c.query(`SELECT a.id,a.assignee_user_id AS "userId",a.scope_type AS scope,a.can_view_personal AS "canViewPersonal",
       a.can_manage_care AS "canManageCare",a.can_manage_members AS "canManageMembers",a.ends_at AS "expiresAt",coalesce(s.name,m.display_name,a.church,'指定成員') AS "scopeName"
       FROM crm_scope_assignments a JOIN users u ON u.id=a.assignee_user_id LEFT JOIN small_groups s ON s.id=a.group_id LEFT JOIN users m ON m.id=a.member_user_id
       LEFT JOIN potential_members p ON p.id=a.potential_member_id
       WHERE a.is_active AND a.starts_at<=now() AND (a.ends_at IS NULL OR a.ends_at>now())
         AND u.church=ANY($1::text[]) AND (a.church=ANY($1::text[]) OR s.church=ANY($1::text[]) OR m.church=ANY($1::text[]) OR p.church=ANY($1::text[]))`, [aliases])).rows;
-    const appointments = (await pool.query(`SELECT id,name,leader_user_id AS "leaderId",co_leader_user_id AS "coLeaderId",pastor_user_id AS "pastorId" FROM small_groups WHERE is_active AND church=ANY($1::text[])`, [aliases])).rows;
-    res.json({ church, isSystemAdmin: a.role === 'admin', users, roles, groups, grants, history, legacyScopes, appointments });
+    const rawAppointments = (await c.query(`SELECT id,name,leader_user_id AS "leaderId",co_leader_user_id AS "coLeaderId",pastor_user_id AS "pastorId" FROM small_groups WHERE is_active AND lifecycle IN ('active','paused') AND church=ANY($1::text[])`, [aliases])).rows;
+    const memberIds = new Set(users.map(u => u.id));
+    const appointments = rawAppointments.map(g => ({ ...g,
+      leaderId: memberIds.has(g.leaderId) ? g.leaderId : null,
+      coLeaderId: memberIds.has(g.coLeaderId) && g.coLeaderId !== g.leaderId ? g.coLeaderId : null,
+      pastorId: memberIds.has(g.pastorId) ? g.pastorId : null,
+    }));
+    const appointmentSummary = summarizeAppointments(rawAppointments, [...memberIds]);
+    return { church, isSystemAdmin: a.role === 'admin', users, roles, groups, grants, history, legacyScopes, appointments, appointmentSummary };
+    });
+    res.json(snapshot);
   });
   router.post('/presets', async (req, res) => {
     const { church: raw } = z.object({ church: z.string().min(1).max(120) }).strict().parse(req.body);

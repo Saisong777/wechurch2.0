@@ -4,6 +4,7 @@ import { getChurchAliases, normalizeChurch } from "./churches";
 import { activeGrants } from './accessControl';
 import { canComposeEmail } from '../shared/email';
 import type { Permission } from '../shared/accessControl';
+import { activeGroupAppointments } from './groupAppointments';
 
 export type CrmRole =
   | "admin"
@@ -167,16 +168,19 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
     canManageMembers = canManageMembers || assignment.can_manage_members;
   }
 
-  const ownedGroupsResult = await pool.query(
-    `SELECT id, church
-       FROM small_groups
-      WHERE is_active = true
-        AND ((leader_user_id=$1 OR co_leader_user_id=$1) OR pastor_user_id = $1)`,
-    [userId]
-  );
-  for (const group of ownedGroupsResult.rows) {
-    if (capability && !roleGrant && !((capability === 'care' || capability === 'careOrMembers') && (role === 'group_leader' || role === 'leader'))) continue;
-    groupIds.add(group.id);
+  const appointments = await activeGroupAppointments(userId);
+  for (const appointment of appointments) {
+    // An appointment supplies management of its group and shared care. It does
+    // not supply profile edits, private devotional access or outbound email.
+    const appointedCapability = !capability || ['groups','care','careOrMembers'].includes(capability);
+    if (!appointedCapability && !roleGrant) continue;
+    if (capability === 'email' && !canComposeEmail(role)) continue;
+    groupIds.add(appointment.groupId);
+    canEnterCrm = true;
+    if (appointedCapability) {
+      if (capability === 'groups') canManageMembers = true;
+      else canManageCare = true;
+    }
   }
   const delegated = await activeGrants(userId);
   const required: Permission[] = capability === 'personal' ? [] : capability === 'members' ? ['members.manage']
@@ -198,11 +202,18 @@ export async function getCrmAccessContext(userId: string, roleInput?: string | n
 
   if (groupIds.size > 0) {
     const membersResult = await pool.query(
-      `SELECT user_id, potential_member_id, member_email
-         FROM small_group_members
-        WHERE is_active = true
-          AND group_id = ANY($1::uuid[])`,
-      [[...groupIds]]
+      `SELECT m.user_id,m.potential_member_id,m.member_email FROM small_group_members m
+          JOIN small_groups g ON g.id=m.group_id LEFT JOIN users u ON u.id=m.user_id
+          LEFT JOIN potential_members p ON p.id=m.potential_member_id
+        WHERE m.is_active AND g.is_active AND g.lifecycle IN ('active','paused') AND m.group_id=ANY($1::uuid[])
+          AND g.church=ANY($2::text[]) AND (m.user_id IS NULL OR u.church=ANY($2::text[]))
+          AND (m.potential_member_id IS NULL OR p.church=ANY($2::text[]))
+        UNION SELECT manager.user_id,NULL::uuid,NULL::text FROM small_groups g
+          CROSS JOIN LATERAL (VALUES(g.leader_user_id),(g.co_leader_user_id),(g.pastor_user_id)) manager(user_id)
+          JOIN users u ON u.id=manager.user_id
+          WHERE g.id=ANY($1::uuid[]) AND g.is_active AND g.lifecycle IN ('active','paused')
+            AND g.church=ANY($2::text[]) AND u.church=ANY($2::text[])`,
+      [[...groupIds],getChurchAliases(ownChurch)]
     );
     for (const member of membersResult.rows) {
       if (member.user_id) userIds.add(member.user_id);

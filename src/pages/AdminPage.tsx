@@ -52,6 +52,7 @@ export const AdminPage: React.FC = () => {
   const roleLabel = [...new Set([
     ...(role && role !== 'member' ? [crmRoleLabels[role]] : []),
     ...(access.data?.grants?.map(grant => grant.roleName) || []),
+    ...(access.data?.appointments?.map(appointment => appointment.role === 'group_leader' ? '小家長' : '牧者') || []),
   ])].join('、') || '會友';
   const canEnterAdmin = canCreateSession || !!access.data?.canEnterAdmin;
   const canMail = canComposeEmail(role) || !!access.data?.permissions?.includes('email.send');
@@ -100,7 +101,7 @@ export const AdminPage: React.FC = () => {
   const actionGroups: Array<{ title: string; actions: AdminAction[] }> = [
     { title: '會友與牧養', actions: [
       ...(canCreateSession || access.data?.canEnterCrm ? [{ icon: Users, label: '會員與牧養', action: () => navigate('/admin/crm'), testId: 'button-crm' }] : []),
-      ...(access.data?.permissions?.includes('groups.manage') ? [{ icon: Users, label: '小家管理', action: () => navigate('/groups?manage=1'), testId: 'button-family-access' }] : []),
+      ...(isAdmin || access.data?.canManageGroups || access.data?.permissions?.includes('groups.manage') ? [{ icon: Users, label: '小家管理', action: () => navigate('/groups?manage=1'), testId: 'button-family-access' }] : []),
       ...(access.data?.permissions?.includes('visits.manage') ? [{ icon: Users, label: '探訪安排', action: () => navigate('/care?view=visits'), testId: 'button-visits-access' }] : []),
       { icon: Crown, label: '禱告牆', action: () => navigate('/prayer-wall'), testId: 'button-prayer-meeting-admin' },
     ] },

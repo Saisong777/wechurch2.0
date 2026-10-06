@@ -114,6 +114,7 @@ interface CrmGroupOption {
   coLeaderUserId?: string | null;
   coLeaderName?: string | null;
   memberCount: number;
+  unlinkedMemberCount?: number;
 }
 
 const roleLabels: Record<AppRole, string> = {

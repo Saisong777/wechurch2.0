@@ -5,16 +5,16 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AdminPage } from './AdminPage';
 
-const fixture = vi.hoisted(() => ({ admin: false, user: { id: 'fixture', email: 'fixture@example.test' } }));
+const fixture = vi.hoisted(() => ({ admin: false, appointed: false, user: { id: 'fixture', email: 'fixture@example.test' } }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: fixture.user, loading: false, signOut: vi.fn() }) }));
 vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => ({ role: fixture.admin ? 'admin' : 'member', loading: false, isAdmin: fixture.admin, canCreateSession: fixture.admin }) }));
-vi.mock('@/hooks/useAccessControl', () => ({ useAccessControl: () => ({ isPending: false, data: { grants: [{ roleName: '同工' }], permissions: ['members.read'], canEnterAdmin: true, canEnterCrm: true } }) }));
+vi.mock('@/hooks/useAccessControl', () => ({ useAccessControl: () => ({ isPending: false, data: { grants: fixture.appointed ? [] : [{ roleName: '同工' }], permissions: fixture.appointed ? [] : ['members.read'], appointments: fixture.appointed ? [{groupId:'group',groupName:'測試小家',role:'group_leader'}] : [], canManageGroups: fixture.appointed, canEnterAdmin: true, canEnterCrm: true } }) }));
 vi.mock('@/components/theme/AppearanceControl', () => ({ AppearanceControl: () => null }));
 vi.mock('@/components/auth/AuthForm', () => ({ AuthForm: () => null }));
 vi.mock('@/components/admin/CardQuestionManager', () => ({ CardQuestionManager: () => <h1>測試題庫</h1> }));
 vi.mock('@/lib/queryClient', () => ({ apiRequest: vi.fn(async () => ({ json: async () => ({ count: 0 }) })) }));
 
-afterEach(() => { cleanup(); fixture.admin = false; });
+afterEach(() => { cleanup(); fixture.admin = false; fixture.appointed = false; });
 it('shows the delegated ministry title without mislabeling a member as a future leader', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<MemoryRouter><QueryClientProvider client={client}><AdminPage /></QueryClientProvider></MemoryRouter>);
@@ -40,5 +40,19 @@ it('groups admin work without losing role-protected entries and clearly returns 
   expect(await screen.findByRole('heading', { name: '測試題庫' })).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: '返回管理後台' }));
   expect(await screen.findByTestId('button-crm')).toBeVisible();
+  client.clear();
+});
+
+it('gives an appointed member the real small-group entry without global admin tools', async () => {
+  fixture.appointed=true;
+  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  render(<MemoryRouter><QueryClientProvider client={client}><AdminPage /></QueryClientProvider></MemoryRouter>);
+  expect(await screen.findByTestId('button-family-access')).toHaveTextContent('小家管理');
+  expect(screen.getByTestId('admin-role-label')).toHaveTextContent('小家長');
+  expect(screen.getByTestId('button-crm')).toBeVisible();
+  expect(screen.queryByTestId('button-access-control')).toBeNull();
+  expect(screen.queryByTestId('button-church-devotions')).toBeNull();
+  expect(screen.queryByTestId('button-mail-system')).toBeNull();
+  expect(screen.queryByTestId('button-cards')).toBeNull();
   client.clear();
 });
