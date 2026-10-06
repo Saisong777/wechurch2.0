@@ -110,14 +110,30 @@ it('enables inline comments on desktop and expands a targeted mobile notificatio
   expect(screen.getByRole('button',{name:'收合代禱：匿名，為家人禱告'})).toHaveAttribute('aria-expanded','true');
   expect(screen.getByTestId('comments')).toHaveAttribute('data-enabled','true');
 });
-it('preserves the three reversible caring responses in restrained outlined controls', () => {
+it('keeps all four compact caring actions named and preserves reaction withdrawal', () => {
   render(<PrayerCard prayer={{...prayer,reactions:[{kind:'heart',selected:true,count:3}]}}/>);
   const reactions=screen.getByRole('group',{name:'關懷回應'});
-  expect(reactions.querySelectorAll('button')).toHaveLength(3);
-  const selected=reactions.querySelector('button[aria-pressed="true"]')!;
-  expect(selected).toHaveClass('min-h-11','border-primary/40','bg-primary/5');
+  expect(reactions.querySelectorAll('button')).toHaveLength(4);
+  for (const name of ['愛心 3','陪伴 0','加油 0','為你禱告 1']) expect(screen.getByRole('button',{name})).toBeVisible();
+  const selected=screen.getByRole('button',{name:'愛心 3'});
+  expect(selected).toHaveAttribute('aria-pressed','true');
   fireEvent.click(selected);
   expect(state.mutate).toHaveBeenCalledWith({prayerId:'prayer',kind:'heart',selected:false});
+});
+
+it('preserves support, strength and prayer payloads, and keeps an already-prayed control disabled', () => {
+  const view=render(<PrayerCard prayer={prayer}/>);
+  fireEvent.click(screen.getByRole('button',{name:'陪伴 0'}));
+  expect(state.mutate).toHaveBeenLastCalledWith({prayerId:'prayer',kind:'support',selected:true});
+  fireEvent.click(screen.getByRole('button',{name:'加油 0'}));
+  expect(state.mutate).toHaveBeenLastCalledWith({prayerId:'prayer',kind:'strength',selected:true});
+  fireEvent.click(screen.getByRole('button',{name:'為你禱告 1'}));
+  expect(state.mutate).toHaveBeenLastCalledWith({prayerId:'prayer',hasAmened:false});
+  view.rerender(<PrayerCard prayer={{...prayer,hasAmened:true}}/>);
+  const already=screen.getByRole('button',{name:'已為你禱告 1'});
+  expect(already).toHaveAttribute('aria-pressed','true');
+  expect(already).toBeDisabled();
+  state.mutate.mockClear();fireEvent.click(already);expect(state.mutate).not.toHaveBeenCalled();
 });
 
 it('opens an already-mounted mobile card when a new notification targets its reply', () => {

@@ -61,15 +61,15 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
           {comment.kind === 'sticker' && comment.sticker && comment.sticker in STICKER_LABELS ? <Sticker value={comment.sticker} /> : <p className="whitespace-pre-wrap text-sm leading-6">{comment.content}</p>}
         </article>)}</div>}
       </div>
-      {!readOnly && <form className="border-t pt-4" onSubmit={e=>{e.preventDefault();void send();}}><fieldset disabled={create.isPending} className="min-w-0 space-y-3">
-        <div role="radiogroup" aria-label="回應類型" className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">{(Object.keys(responseLabels) as (keyof typeof responseLabels)[]).map(value => <label key={value} className="min-w-0 cursor-pointer">
+      {!readOnly && <form className="border-t pt-3" onSubmit={e=>{e.preventDefault();void send();}}><fieldset disabled={create.isPending} className="min-w-0 space-y-2">
+        <div role="radiogroup" aria-label="回應類型" className="flex max-w-full flex-wrap gap-1">{(Object.keys(responseLabels) as (keyof typeof responseLabels)[]).map(value => <label key={value} className="min-w-0 cursor-pointer">
           <input type="radio" name={formId+'-kind'} aria-label={responseLabels[value]} value={value} checked={kind===value} onChange={()=>setKind(value)} className="peer sr-only" />
-          <span className="flex min-h-11 items-center justify-center rounded-md px-1 text-sm text-muted-foreground peer-checked:bg-background peer-checked:font-semibold peer-checked:text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring">{responseLabels[value]}</span>
+          <span className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md px-2 text-xs text-muted-foreground peer-checked:bg-primary/5 peer-checked:font-semibold peer-checked:text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring md:min-h-[32px]">{responseLabels[value]}</span>
         </label>)}</div>
         {kind === 'sticker' ? <div role="radiogroup" aria-label="禱告貼圖" className="grid grid-cols-3 gap-2">{(Object.keys(STICKER_LABELS) as PrayerSticker[]).map(value=><label key={value} className="min-w-0 cursor-pointer">
           <input type="radio" name={formId+'-sticker'} aria-label={STICKER_LABELS[value]} value={value} checked={sticker===value} onChange={()=>setSticker(value)} className="peer sr-only" />
           <span className="relative block rounded-lg border-2 border-transparent p-1 peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring"><Sticker value={value} compact />{sticker===value && <Check aria-hidden="true" className="absolute right-1 top-1 h-4 w-4 text-primary" />}</span>
-        </label>)}</div> : <Textarea aria-label="回應內容" placeholder={kind==='scripture'?'分享一句經文，並寫下出處…':kind==='prayer'?'寫下你為對方的禱告…':'寫一句鼓勵，讓對方知道你在關心…'} rows={3} maxLength={1000} value={content} onChange={e=>setContent(e.target.value)} />}
+        </label>)}</div> : <Textarea className="min-h-[64px]" aria-label="回應內容" placeholder={kind==='scripture'?'分享一句經文，並寫下出處…':kind==='prayer'?'寫下你為對方的禱告…':'寫一句鼓勵，讓對方知道你在關心…'} rows={2} maxLength={1000} value={content} onChange={e=>setContent(e.target.value)} />}
         <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{anonymousOwner ? '以匿名發文者回應' : '以你的名字回應'}</span>{kind!=='sticker' && <span>{content.length} / 1000</span>}</div>
         {create.isError && <p role="alert" className="text-sm text-destructive">尚未送出，你的內容仍保留在這裡。</p>}
         <Button type="submit" disabled={create.isPending || (kind!=='sticker' && !content.trim())} variant="outline" className="min-h-11 h-auto min-w-32 gap-2 border-primary/40 bg-primary/5 py-2 text-primary hover:bg-primary/10">{create.isPending?<Loader2 className="h-4 w-4 animate-spin" />:<Send className="h-4 w-4" />}送出回應</Button>
