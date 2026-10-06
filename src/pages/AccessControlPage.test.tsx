@@ -11,7 +11,7 @@ vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => ({ isAdmin: true, loa
 vi.mock('@/components/theme/AppearanceControl', () => ({ AppearanceControl: () => null }));
 const data = {
   church: 'IM 行動教會', isSystemAdmin: true,
-  users: [{ id: 'member', name: '測試成員', email: 'fixture@example.test', role: 'member' }],
+  users: [{ id: 'member', name: '測試成員', email: 'fixture@example.test', role: 'member' }] as Array<{id:string;name:string;email:string;role:string;accountRoleRecordCount?:number}>,
   roles: [{ id: 'coworker', name: '同工', permissions: ['email.send'], version: 1 }],
   groups: [{ id: 'family', name: '測試小家' }], grants: [] as AccessGrant[], history: [], legacyScopes: [], appointments: [] as Array<{id:string;name:string;leaderId:string|null;coLeaderId?:string|null;pastorId:string|null}>,
 };
@@ -150,4 +150,15 @@ it('includes account leaders and live title grants once while retaining text sea
   fireEvent.change(screen.getByRole('textbox',{name:'搜尋成員'}),{target:{value:'second@example.test'}});
   expect(screen.getByText('1 位成員')).toBeVisible();
   expect(screen.queryByRole('button',{name:/測試成員/})).toBeNull();
+});
+
+it('warns about multiple legacy role records while keeping one account in the appointment filter',async()=>{
+  data.users[0].accountRoleRecordCount=2;
+  data.appointments=[{id:'shared-group',name:'共同負責小家',leaderId:null,coLeaderId:'member',pastorId:null}];
+  await client.invalidateQueries({queryKey:['access-control-admin']});
+  fireEvent.change(await screen.findByRole('combobox',{name:'篩選職分'}),{target:{value:'derived:小家長'}});
+  expect(await screen.findByText('1 位成員')).toBeVisible();
+  expect(screen.getAllByRole('button',{name:/測試成員/})).toHaveLength(1);
+  expect(screen.getByRole('alert')).toHaveTextContent('此帳號有 2 筆既有角色紀錄');
+  expect(screen.getByRole('combobox',{name:'既有帳號角色'})).toHaveValue('member');
 });

@@ -24,6 +24,18 @@ export async function verifyCoLeadersHttp(pool:Pool,makeClient:()=>Client){
  await assert.rejects(pool.query('UPDATE small_groups SET co_leader_user_id=$2 WHERE id=$1',[id,randomUUID()]),(error:{code?:string})=>error.code==='23503');
  const appointments=await (await director.client('/api/access-control')).json();assert.equal(appointments.appointments.find((g:{id:string})=>g.id===id).coLeaderId,second.id);
  assert.equal(appointments.appointmentSummary.activeGroupCount,appointments.appointments.length);
+ const firstAccessBefore=await (await first.client('/api/access-control/me')).json();
+ const duplicateRole=(await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'member') RETURNING id",[first.id])).rows[0].id;
+ try {
+  const duplicateSnapshot=await (await director.client('/api/access-control')).json();
+  const firstRows=duplicateSnapshot.users.filter((u:{id:string})=>u.id===first.id);
+  assert.equal(firstRows.length,1);assert.equal(firstRows[0].accountRoleRecordCount,2);assert.equal(firstRows[0].role,'member');
+  assert.deepEqual(duplicateSnapshot.appointmentSummary,appointments.appointmentSummary);
+  assert.deepEqual(duplicateSnapshot.appointments,appointments.appointments);
+  assert.deepEqual(await (await first.client('/api/access-control/me')).json(),firstAccessBefore);
+  assert.equal((await first.client(`${root}/${id}/invite`,'POST')).status,200);
+  assert.equal((await first.client('/api/access-control')).status,403);
+ } finally { await pool.query('DELETE FROM user_roles WHERE id=$1',[duplicateRole]); }
  await pool.query('UPDATE users SET church=$2 WHERE id=$1',[other.id,'火樂']);
  const invalidAppointment=await (await director.client('/api/access-control')).json();
  assert.equal(invalidAppointment.appointments.find((g:{id:string})=>g.id===foreign).leaderId,null);

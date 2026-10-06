@@ -129,8 +129,10 @@ export function accessControlRoutes(resolveId: (req: Request) => Promise<string 
     if (!church) throw new GroupError(400, '請先指定教會。');
     await director(a.id, church, c);
     const aliases = getChurchAliases(church);
-    const users = (await c.query(`SELECT u.id,coalesce(u.display_name,u.email) AS name,u.email,coalesce(r.role,'member') AS role
-      FROM users u LEFT JOIN user_roles r ON r.user_id=u.id WHERE u.church=ANY($1::text[]) ORDER BY name,u.id`, [aliases])).rows;
+    const users = (await c.query(`SELECT u.id,coalesce(u.display_name,u.email) AS name,u.email,
+      coalesce((SELECT role FROM user_roles WHERE user_id=u.id LIMIT 1),'member') AS role,
+      (SELECT count(*)::int FROM user_roles WHERE user_id=u.id) AS "accountRoleRecordCount"
+      FROM users u WHERE u.church=ANY($1::text[]) ORDER BY name,u.id`, [aliases])).rows;
     const roles = (await c.query('SELECT id,name,permissions,version,true AS editable FROM access_roles WHERE church=ANY($1::text[]) ORDER BY created_at,id', [aliases])).rows;
     const groups = (await c.query("SELECT id,name FROM small_groups WHERE church=ANY($1::text[]) AND is_active AND lifecycle IN ('active','paused') ORDER BY name,id", [aliases])).rows;
     const grants = (await c.query(`SELECT ${projection},${effectiveGrantSql('$1')} AS effective
