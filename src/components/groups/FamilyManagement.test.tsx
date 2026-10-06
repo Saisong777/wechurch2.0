@@ -4,9 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { FamilyManagement } from './FamilyManagement';
+import { toast } from 'sonner';
+vi.mock('sonner', () => ({ toast: { success: vi.fn() } }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'leader' } }) }));
 const clients: QueryClient[] = [];
-afterEach(() => { cleanup(); clients.forEach(c => c.clear()); clients.length = 0; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); clients.forEach(c => c.clear()); clients.length = 0; vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 function show() {
   const group = {id:'family',name:'同行小家',church:'IM 行動教會',audience:'couples',listed:true,status:'active',version:1,description:'',meeting:'',announcement:'',leaderId:null,memberCount:1,pendingRequestCount:1};
   vi.stubGlobal('fetch', vi.fn(async (input: string) => ({ok:true,json:async () => input.endsWith('/management') ? {groups:[group],requests:[],churches:[{id:'IM 行動教會',name:'iM行動教會'}]} : {members:[],requests:[{id:'member',name:'申請人',message:'希望週五參加'}],history:[],canChangeLeader:true}})));
@@ -19,6 +21,106 @@ it('surfaces pending applications and submits explicit approval', async () => {
   await screen.findByText('希望週五參加');
   fireEvent.click(screen.getByRole('button',{name:'同意加入'}));
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/life-groups/management/family/requests/member',expect.objectContaining({method:'POST',body:JSON.stringify({approve:true})})));
+});
+
+function showDeletion({ status = 'active', canDelete = true, ordinaryMemberCount = 0, fail = false, deferred = false } = {}) {
+  let group = {id:'family',name:'可恢復小家',church:'IM 行動教會',audience:'unspecified',listed:status !== 'archived',status,version:7,description:'',meeting:'',announcement:'',leaderId:null,coLeaderId:null,memberCount:ordinaryMemberCount,pendingRequestCount:0,canManage:true,canDelete,ordinaryMemberCount};
+  let resolveMutation: (() => void) | undefined;
+  const fetch = vi.fn(async (input: string, options?: RequestInit) => {
+    if (options?.method === 'DELETE' || (options?.method === 'POST' && input.endsWith('/restore'))) {
+      if (deferred) await new Promise<void>(resolve => { resolveMutation = resolve; });
+      if (fail) return { ok:false,json:async () => ({error:'資料已更新，請重新載入後再試。'}) };
+      group = {...group,status:input.endsWith('/restore')?'active':'archived',listed:false,version:group.version+1};
+      return {ok:true,json:async()=>({ok:true})};
+    }
+    return {ok:true,json:async()=>input.endsWith('/management')?{groups:[group],requests:[],churches:[]}:{members:[],requests:[],history:[],canChangeLeader:true}};
+  });
+  vi.stubGlobal('fetch',fetch);
+  const client = new QueryClient({defaultOptions:{queries:{retry:false}}});clients.push(client);
+  const invalidate = vi.spyOn(client,'invalidateQueries');
+  render(<MemoryRouter><QueryClientProvider client={client}><FamilyManagement initialGroup={status === 'active' ? 'family' : null}/></QueryClientProvider></MemoryRouter>);
+  return {fetch,invalidate,release:()=>resolveMutation?.()};
+}
+it('requires the exact current group name, allows cancellation and removes archived status from ordinary settings',async()=>{
+  const {fetch}=showDeletion();
+  fireEvent.click(await screen.findByRole('button',{name:'刪除 可恢復小家'}));
+  const dialog=screen.getByRole('alertdialog');
+  expect(within(dialog).getByRole('button',{name:'確認刪除'})).toBeDisabled();
+  fireEvent.change(within(dialog).getByRole('textbox',{name:'請輸入小家完整名稱確認'}),{target:{value:'別的小家'}});
+  expect(within(dialog).getByRole('button',{name:'確認刪除'})).toBeDisabled();
+  fireEvent.click(within(dialog).getByRole('button',{name:'取消'}));
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+  expect(fetch.mock.calls.some(([,opts])=>opts?.method==='DELETE')).toBe(false);
+  expect(within(screen.getByRole('combobox',{name:'狀態'})).queryByRole('option',{name:'已封存'})).toBeNull();
+});
+it('submits only a named versioned deletion, closes the editor and moves the family into the recovery list',async()=>{
+  const {fetch,invalidate}=showDeletion();
+  fireEvent.click(await screen.findByRole('button',{name:'刪除 可恢復小家'}));
+  const dialog=screen.getByRole('alertdialog');
+  fireEvent.change(within(dialog).getByRole('textbox',{name:'請輸入小家完整名稱確認'}),{target:{value:'可恢復小家'}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'確認刪除'}));
+  await waitFor(()=>expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(fetch).toHaveBeenCalledWith('/api/life-groups/management/family',expect.objectContaining({method:'DELETE',body:JSON.stringify({version:7,confirmName:'可恢復小家'})}));
+  expect(screen.queryByRole('button',{name:'儲存小家設定'})).toBeNull();
+  expect(within(screen.getByRole('region',{name:'目前的小家'})).queryByText('可恢復小家')).toBeNull();
+  expect(screen.getByText('已刪除的小家 · 1')).toBeInTheDocument();
+  expect(toast.success).toHaveBeenCalledWith('小家已刪除，歷史資料已保留');
+  expect(invalidate).toHaveBeenCalledWith({queryKey:['/api/life-groups']});
+  expect(invalidate).toHaveBeenCalledWith({queryKey:['access-control-me']});
+});
+it('keeps failed deletion visible without success or an automatic retry',async()=>{
+  const {fetch}=showDeletion({fail:true});
+  fireEvent.click(await screen.findByRole('button',{name:'刪除 可恢復小家'}));
+  const dialog=screen.getByRole('alertdialog');
+  fireEvent.change(within(dialog).getByRole('textbox',{name:'請輸入小家完整名稱確認'}),{target:{value:'可恢復小家'}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'確認刪除'}));
+  await within(dialog).findByRole('alert');
+  expect(screen.getByRole('alertdialog')).toBeVisible();
+  expect(fetch.mock.calls.filter(([,opts])=>opts?.method==='DELETE')).toHaveLength(1);
+  expect(toast.success).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button',{name:'取消'}));
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+});
+it('blocks a populated family and gives the existing move or exit route',async()=>{
+  const {fetch}=showDeletion({ordinaryMemberCount:2});
+  fireEvent.click(await screen.findByRole('button',{name:'刪除 可恢復小家'}));
+  const dialog=screen.getByRole('alertdialog');
+  expect(within(dialog).getByRole('status')).toHaveTextContent('還有 2 筆一般成員資料');
+  expect(within(dialog).getByRole('textbox')).toBeDisabled();
+  expect(within(dialog).getByRole('button',{name:'確認刪除'})).toBeDisabled();
+  expect(fetch.mock.calls.some(([,opts])=>opts?.method==='DELETE')).toBe(false);
+});
+it('hides deletion from assigned leaders without church management',async()=>{
+  showDeletion({canDelete:false});
+  await screen.findByRole('button',{name:'設定與成員異動'});
+  expect(screen.queryByRole('button',{name:'刪除 可恢復小家'})).toBeNull();
+});
+it('requires explicit named restoration for existing archived families and explains invitation behavior',async()=>{
+  const {fetch}=showDeletion({status:'archived'});
+  fireEvent.click(await screen.findByText('已刪除的小家 · 1'));
+  fireEvent.click(screen.getByRole('button',{name:'恢復 可恢復小家'}));
+  const dialog=screen.getByRole('alertdialog');
+  expect(within(dialog).getByText(/不會重新公開，也不會啟用舊邀請/)).toBeVisible();
+  fireEvent.change(within(dialog).getByRole('textbox'),{target:{value:'可恢復小家'}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'確認恢復'}));
+  await waitFor(()=>expect(screen.queryByRole('alertdialog')).toBeNull());
+  expect(fetch).toHaveBeenCalledWith('/api/life-groups/management/family/restore',expect.objectContaining({method:'POST',body:JSON.stringify({version:7,confirmName:'可恢復小家'})}));
+  expect(within(screen.getByRole('region',{name:'目前的小家'})).getByText('可恢復小家')).toBeVisible();
+  expect(toast.success).toHaveBeenCalledWith('小家已恢復，尚未開放申請');
+});
+it('prevents double submit and dismissal while a deletion request is busy',async()=>{
+  const {fetch,release}=showDeletion({deferred:true});
+  fireEvent.click(await screen.findByRole('button',{name:'刪除 可恢復小家'}));
+  const dialog=screen.getByRole('alertdialog');
+  fireEvent.change(within(dialog).getByRole('textbox'),{target:{value:'可恢復小家'}});
+  fireEvent.click(within(dialog).getByRole('button',{name:'確認刪除'}));
+  expect(within(dialog).getByRole('button',{name:'處理中…'})).toBeDisabled();
+  expect(within(dialog).getByRole('button',{name:'取消'})).toBeDisabled();
+  fireEvent.keyDown(dialog,{key:'Escape'});
+  expect(screen.getByRole('alertdialog')).toBeVisible();
+  expect(fetch.mock.calls.filter(([,opts])=>opts?.method==='DELETE')).toHaveLength(1);
+  release();
+  await waitFor(()=>expect(screen.queryByRole('alertdialog')).toBeNull());
 });
 it('creates categorized, publicly listed families and allows explicit unlisting', async () => {
   show();

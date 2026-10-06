@@ -129,7 +129,8 @@ export async function verifyCoLeadersHttp(pool:Pool,makeClient:()=>Client){
  assert.equal((await patch({leaderId:null})).status,200);assert.equal((await info(first.client)).manager,true);assert.equal((await info(replacement.client)).manager,false);
  assert.deepEqual((await pool.query('SELECT md5(row_to_json(m)::text) AS digest FROM small_group_members m WHERE group_id=$1 AND user_id=$2 AND is_active',[id,replacement.id])).rows,replacementMembership);
  assert.equal((await patch({coLeaderId:null})).status,200);assert.equal((await info(first.client)).manager,false);
- assert.equal((await patch({status:'archived'})).status,409);
+ assert.equal((await patch({status:'archived'})).status,400);
+ const blockedArchive=await settings();assert.equal((await director.client(`${root}/management/${id}`,'DELETE',{version:blockedArchive.version,confirmName:blockedArchive.name})).status,409);
  const lifecycleGroup=await create('封存雙人-'+randomUUID(),other.id,last.id);
  await pool.query('INSERT INTO small_group_members(group_id,user_id) VALUES($1,$2),($1,$3)',[lifecycleGroup,other.id,last.id]);
  const lifecycleSettings=async(status:string)=>{const rows=await (await director.client(root+'/management')).json();const g=rows.groups.find((v:{id:string})=>v.id===lifecycleGroup);return {version:g.version,name:g.name,description:g.description,meeting:g.meeting,announcement:g.announcement,listed:g.listed,status,leaderId:g.leaderId,coLeaderId:g.coLeaderId};};
@@ -138,13 +139,13 @@ export async function verifyCoLeadersHttp(pool:Pool,makeClient:()=>Client){
  assert((await (await last.client('/api/access-control/me')).json()).appointments.some((g:{groupId:string})=>g.groupId===lifecycleGroup));
  assert.equal((await (await last.client('/api/crm/groups')).json()).find((g:{id:string})=>g.id===lifecycleGroup).memberCount,2);
  assert.equal((await (await director.client(root+'/management')).json()).groups.find((g:{id:string})=>g.id===lifecycleGroup).memberCount,2);
- assert.equal((await director.client(`${root}/management/${lifecycleGroup}`,'PATCH',await lifecycleSettings('archived'))).status,200);
+ const lifecycleDelete=await lifecycleSettings('archived');assert.equal((await director.client(`${root}/management/${lifecycleGroup}`,'DELETE',{version:lifecycleDelete.version,confirmName:lifecycleDelete.name})).status,200);
  assert(!(await (await last.client('/api/access-control/me')).json()).appointments.some((g:{groupId:string})=>g.groupId===lifecycleGroup));
  assert.equal((await last.client(`${root}/management/${lifecycleGroup}`,'PATCH',await lifecycleSettings('active'))).status,403);
- assert.equal((await director.client(`${root}/management/${lifecycleGroup}`,'PATCH',await lifecycleSettings('active'))).status,200);
+ const lifecycleRestore=await lifecycleSettings('active');assert.equal((await director.client(`${root}/management/${lifecycleGroup}/restore`,'POST',{version:lifecycleRestore.version,confirmName:lifecycleRestore.name})).status,200);
  assert.equal((await first.client(`${root}/join`,'POST',{token:lifecycleInvite.token})).status,404);
  const rollbackBefore=(await pool.query('SELECT md5(row_to_json(g)::text) AS digest FROM small_groups g WHERE id=$1',[lifecycleGroup])).rows;
- assert.equal((await director.client(`${root}/management/${lifecycleGroup}`,'PATCH',{...await lifecycleSettings('archived'),coLeaderId:null})).status,409);
+ assert.equal((await director.client(`${root}/management/${lifecycleGroup}`,'PATCH',{...await lifecycleSettings('archived'),coLeaderId:null})).status,400);
  assert.deepEqual((await pool.query('SELECT md5(row_to_json(g)::text) AS digest FROM small_groups g WHERE id=$1',[lifecycleGroup])).rows,rollbackBefore);
  const event=(await pool.query("SELECT count(*)::int AS count FROM family_membership_events WHERE group_id=$1 AND action='leaders_changed'",[id])).rows[0].count;assert(event>=4);
  const roleAfter=(await pool.query('SELECT user_id,role FROM user_roles WHERE user_id=ANY($1::uuid[]) ORDER BY user_id,role',[actors.map(a=>a.id)])).rows;assert.deepEqual(roleAfter,roleBefore);

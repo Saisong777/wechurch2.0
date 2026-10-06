@@ -100,7 +100,8 @@ export async function verifyFamilyHttp(pool: Pool, makeClient: () => Client) {
   assert.equal((await pool.query('SELECT id FROM users WHERE id=$1',[member.id])).rowCount,1);
   const events = await pool.query('SELECT action FROM family_membership_events WHERE user_id=$1',[member.id]);
   assert(events.rows.some(e=>e.action==='transferred_out'));
-  assert.equal((await leader.client(`${origin}/management/${first}`,'PATCH',{...settings,version:2,status:'archived'})).status,200);
+  assert.equal((await leader.client(`${origin}/management/${first}`,'PATCH',{...settings,version:2,status:'archived'})).status,400);
+  assert.equal((await leader.client(`${origin}/management/${first}`,'DELETE',{version:2,confirmName:settings.name})).status,200);
   assert.equal((await leader.client(`${origin}/${first}`)).status,404);
   console.log('PASS families: directory privacy, intake deduplication/scope/versioning, join approval, history privacy, message/reply, short invite rotation, atomic transfer, exit and archive');
 }

@@ -7,7 +7,7 @@ import { getCrmAccessContext, type CrmAccessContext } from './crmPermissions';
 import { getChurchAliases, getKnownChurchOptions, normalizeChurch } from './churches';
 import { GroupError } from './groupError';
 import { registeredGroupCount } from './groupRoster';
-import { familyCreateInput, familySettingsInput, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
+import { familyCreateInput, familySettingsInput, familyLifecycleInput, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
 
 async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
   const c = await pool.connect();
@@ -17,6 +17,8 @@ async function transaction<T>(work: (c: PoolClient) => Promise<T>) {
 const denied = () => new GroupError(403, '不在你的小家管理範圍內。');
 const conflict = () => new GroupError(409, '資料已更新，請重新載入後再試。');
 const fields = `g.id,g.name,g.church,g.description,g.meeting,g.audience,g.announcement,g.is_listed AS listed,g.lifecycle AS status,g.version,g.leader_user_id AS "leaderId",g.co_leader_user_id AS "coLeaderId",(SELECT display_name FROM users WHERE id=g.leader_user_id) AS "leaderName",(SELECT display_name FROM users WHERE id=g.co_leader_user_id) AS "coLeaderName"`;
+// Unlinked entries are members too. NULL must never bypass the deletion guard.
+const ordinaryMembership = `m.is_active AND NOT (m.user_id IS NOT NULL AND (m.user_id=g.leader_user_id OR m.user_id=g.co_leader_user_id OR m.user_id=g.pastor_user_id) IS TRUE)`;
 export async function familyAccess(actor: string) {
   return getCrmAccessContext(actor, await storage.getUserRole(actor), 'groups');
 }
@@ -83,13 +85,14 @@ export async function familyManagement(actor: string) {
   const a = await familyAccess(actor);
   const groups = (await pool.query(`SELECT ${fields},true AS "canManage",
     (SELECT count(*)::int FROM life_group_requests r WHERE r.group_id=g.id AND r.status='pending') AS "pendingRequestCount",
-    ${registeredGroupCount()} AS "memberCount"
+    ${registeredGroupCount()} AS "memberCount",
+    (SELECT count(*)::int FROM small_group_members m WHERE m.group_id=g.id AND ${ordinaryMembership}) AS "ordinaryMemberCount"
     FROM small_groups g WHERE ${churchPredicate('g')} AND ($1 OR ($2 AND (g.church=ANY($3::text[]) OR g.id=ANY($4::uuid[]))) OR (g.leader_user_id=$5 OR g.co_leader_user_id=$5) OR g.pastor_user_id=$5) ORDER BY g.name LIMIT 200`,
   [a.role === 'admin', a.canManageMembers, aliases(a), a.groupIds, actor])).rows;
   const requests = a.canEnterCrm && a.canManageMembers ? (await pool.query(`SELECT r.id,r.user_id AS "userId",u.display_name AS name,r.church,r.availability,r.region,r.contact,r.status,r.message,r.version,r.created_at AS "createdAt",owner.display_name AS "ownerName",g.name AS "groupName"
     FROM family_matching_requests r JOIN users u ON u.id=r.user_id LEFT JOIN users owner ON owner.id=r.owner_id LEFT JOIN small_groups g ON g.id=r.group_id
     WHERE r.church=ANY($3::text[]) AND ($1 OR r.church=ANY($2::text[])) AND r.status IN ('pending','contacting') ORDER BY r.created_at LIMIT 100`, [a.role === 'admin', aliases(a),getChurchAliases(selectedChurch())])).rows : [];
-  return { groups, requests, churches: getKnownChurchOptions().filter(c => churchAllowed(a, c.id)) };
+  return { groups: groups.map(g => ({ ...g, canDelete: churchAllowed(a, g.church) })), requests, churches: getKnownChurchOptions().filter(c => churchAllowed(a, c.id)) };
 }
 export async function updateMatching(actor: string, id: string, input: z.infer<typeof matchingUpdateInput>) {
   const a = await familyAccess(actor);
@@ -156,6 +159,7 @@ export async function updateFamily(actor: string, id: string, input: z.infer<typ
     const g = (await c.query('SELECT * FROM small_groups WHERE id=$1 FOR UPDATE', [id])).rows[0];
     if (!g || !groupAllowed(a, g)) throw denied();
     if (g.version !== input.version) throw conflict();
+    if ((g.lifecycle === 'archived') !== (input.status === 'archived')) throw new GroupError(400, '請使用刪除或恢復小家的專用操作。');
     if (g.lifecycle === 'archived' && !churchAllowed(a, g.church)) throw denied();
     // Omitted second slot from legacy clients preserves its appointment.
     const coLeaderId = input.coLeaderId === undefined ? g.co_leader_user_id ?? null : input.coLeaderId;
@@ -184,6 +188,22 @@ export async function updateFamily(actor: string, id: string, input: z.infer<typ
     await c.query('UPDATE small_groups SET name=$2,description=$3,meeting=$4,announcement=$5,is_listed=$6,lifecycle=$7,is_active=$8,leader_user_id=$9,audience=COALESCE($10,audience),co_leader_user_id=$11,version=version+1,updated_at=now() WHERE id=$1', [id, input.name, input.description, input.meeting, input.announcement, input.listed && input.status === 'active', input.status, input.status !== 'archived', input.leaderId, input.audience ?? null, coLeaderId]);
     await c.query("INSERT INTO family_membership_events(group_id,actor_id,action,reason) VALUES($1,$2,'settings',$3)", [id, actor, input.status]);
     return { ok: true };
+  });
+}
+export async function changeFamilyLifecycle(actor: string, id: string, input: z.infer<typeof familyLifecycleInput>, restore = false) {
+  const a = await familyAccess(actor);
+  return transaction(async c => {
+    const g = (await c.query('SELECT * FROM small_groups WHERE id=$1 FOR UPDATE', [id])).rows[0];
+    if (!g || !churchAllowed(a, g.church)) throw denied();
+    if (g.version !== input.version) throw conflict();
+    if (g.name !== input.confirmName) throw new GroupError(400, '小家名稱不符，請輸入完整名稱確認。');
+    if (restore ? g.lifecycle !== 'archived' : g.lifecycle === 'archived') throw new GroupError(409, restore ? '這個小家目前未刪除，請重新載入。' : '這個小家已刪除，請到已刪除的小家查看。');
+    if (!restore && (await c.query(`SELECT 1 FROM small_group_members m JOIN small_groups g ON g.id=m.group_id WHERE g.id=$1 AND ${ordinaryMembership} LIMIT 1`, [id])).rowCount) throw new GroupError(409, '還有一般成員，請先完成轉家或退出，再刪除小家。');
+    // Both directions keep invitations revoked. Recovery must be an explicit fresh listing/invite.
+    await c.query('DELETE FROM life_group_invites WHERE group_id=$1', [id]);
+    await c.query('UPDATE small_groups SET lifecycle=$2,is_active=$3,is_listed=false,version=version+1,updated_at=now() WHERE id=$1', [id, restore ? 'active' : 'archived', restore]);
+    await c.query('INSERT INTO family_membership_events(group_id,actor_id,action,reason) VALUES($1,$2,$3,$4)', [id, actor, restore ? 'restored' : 'archived', restore ? '管理者恢復小家；未重新公開或啟用舊邀請' : '管理者具名確認刪除小家；歷史資料保留']);
+    return { ok: true, status: restore ? 'active' : 'archived', version: g.version + 1 };
   });
 }
 export async function moveFamilyMember(actor: string, id: string, input: z.infer<typeof memberMoveInput>) {

@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { familyCreateInput, familyJoinInput, familySettingsInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
+import { familyCreateInput, familyJoinInput, familySettingsInput, familyLifecycleInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
 import { shareInput } from '../shared/lifeGroup';
 
 describe('family membership and community contracts', () => {
+  it('requires an exact name and positive version without accepting incidental destructive options', () => {
+    expect(familyLifecycleInput.parse({version:3,confirmName:'同行小家'})).toEqual({version:3,confirmName:'同行小家'});
+    expect(familyLifecycleInput.parse({version:3,confirmName:' 同行小家 '})).toEqual({version:3,confirmName:' 同行小家 '});
+    for (const value of [{version:0,confirmName:'同行小家'},{version:1},{version:1,confirmName:''},{version:1,confirmName:'同行小家',hardDelete:true}]) expect(familyLifecycleInput.safeParse(value).success).toBe(false);
+  });
   it('lists new official families by default with an explicit private option', () => {
     expect(familyCreateInput.parse({ name:'同行', church:'IM 行動教會' })).toMatchObject({listed:true,audience:'unspecified'});
     for (const audience of ['women','men','mixed','couples','other']) expect(familyCreateInput.parse({name:'同行',church:'IM 行動教會',audience,listed:false})).toMatchObject({audience,listed:false});

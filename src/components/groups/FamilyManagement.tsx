@@ -2,7 +2,8 @@ import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Plus, Save, X } from 'lucide-react';
+import { ArrowRight, Plus, Save, X, Trash2, RotateCcw } from 'lucide-react';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,28 +20,50 @@ export function FamilyManagement({ initialGroup = null }: { initialGroup?: strin
   const [editing, setEditing] = useState<string | null>(initialGroup), [name, setName] = useState(''), [church, setChurch] = useState('');
   const [audience, setAudience] = useState('unspecified'), [listed, setListed] = useState(true);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [lifecycleGroup, setLifecycleGroup] = useState<ManagedFamily | null>(null), [confirmName, setConfirmName] = useState('');
   const client = useQueryClient();
-  async function act(work: () => Promise<unknown>) {
+  async function act(work: () => Promise<unknown>, successMessage = '小家資料已更新') {
     setBusy(true); setError('');
-    try { await work(); await client.invalidateQueries({ queryKey: [familyBase] }); await client.invalidateQueries({ queryKey: ['crm-groups'] }); await client.invalidateQueries({ queryKey: ['access-control-admin'] }); await client.invalidateQueries({ queryKey: ['access-control-me'] }); await client.invalidateQueries({ queryKey: ['unified-members'] }); toast.success('小家資料已更新'); }
-    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    try { await work(); await client.invalidateQueries({ queryKey: [familyBase] }); await client.invalidateQueries({ queryKey: ['crm-groups'] }); await client.invalidateQueries({ queryKey: ['access-control-admin'] }); await client.invalidateQueries({ queryKey: ['access-control-me'] }); await client.invalidateQueries({ queryKey: ['unified-members'] }); toast.success(successMessage); return true; }
+    catch (e) { setError((e as Error).message); return false; } finally { setBusy(false); }
   }
   if (q.isError) return <div role="alert"><p>{q.error.message}</p><Button variant="outline" onClick={() => void q.refetch()}>重新載入</Button></div>;
   if (!q.data) return <p role="status">載入小家管理…</p>;
   const data = q.data;
-  const selected = data.groups.find(g => g.id === editing);
+  const selected = data.groups.find(g => g.id === editing && g.status !== 'archived');
+  const restoring = lifecycleGroup?.status === 'archived';
+  const blocked = !restoring && (lifecycleGroup?.ordinaryMemberCount ?? 0) > 0;
+  const openLifecycle = (g: ManagedFamily) => { setError(''); setConfirmName(''); setLifecycleGroup(g); };
+  const changeLifecycle = async () => {
+    if (!lifecycleGroup || busy || blocked || confirmName !== lifecycleGroup.name) return;
+    const ok = await act(() => request(`/management/${lifecycleGroup.id}${restoring ? '/restore' : ''}`, restoring ? 'POST' : 'DELETE', { version: lifecycleGroup.version, confirmName }), restoring ? '小家已恢復，尚未開放申請' : '小家已刪除，歷史資料已保留');
+    if (ok) { setEditing(null); setLifecycleGroup(null); setConfirmName(''); }
+  };
+  const groupItem = (g: ManagedFamily) => <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div className="min-w-0"><h3 className="font-medium">{g.name}</h3><p className="text-sm text-muted-foreground">{churchDisplayName(g.church)} · {g.status === 'archived' ? '已刪除（歷史資料保留）' : familyStatuses[g.status]} · {g.memberCount} 位成員{g.listed && ' · 開放申請'}</p><p className="text-sm text-muted-foreground">小家長：{groupLeaderNames(g)}</p>{!g.leaderId&&!g.coLeaderId&&g.status!=='archived'&&<p className="text-sm text-muted-foreground">尚未綁定小家長帳號；填寫姓名後仍須指派已加入的成員。</p>}</div><div className="flex flex-wrap gap-2">{g.status !== 'archived' && <Button disabled={busy} variant={editing === g.id ? 'secondary' : 'outline'} onClick={() => setEditing(editing === g.id ? null : g.id)}>設定與成員異動</Button>}{g.canDelete && <Button disabled={busy} variant="outline" className={g.status === 'archived' ? '' : 'text-destructive'} aria-label={`${g.status === 'archived' ? '恢復' : '刪除'} ${g.name}`} onClick={() => openLifecycle(g)}>{g.status === 'archived' ? <RotateCcw className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}{g.status === 'archived' ? '恢復小家' : '刪除小家'}</Button>}</div></li>;
   return <section className="space-y-6 [overflow-wrap:anywhere]">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">小家管理</h2><Button asChild variant="outline"><Link to="/groups">我的小家<ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <section className="space-y-3 border-b pb-4"><h3 className="font-semibold">待審核加入 · {data.groups.reduce((sum, g) => sum + (g.pendingRequestCount || 0), 0)}</h3>{data.groups.filter(g => (g.pendingRequestCount || 0) > 0).map(g => <Button key={g.id} variant="outline" onClick={() => setEditing(g.id)}>{g.name} · {g.pendingRequestCount} 位申請人<ArrowRight className="ml-2 h-4 w-4" /></Button>)}</section>
+    <section className="space-y-3 border-b pb-4"><h3 className="font-semibold">待審核加入 · {data.groups.filter(g => g.status !== 'archived').reduce((sum, g) => sum + (g.pendingRequestCount || 0), 0)}</h3>{data.groups.filter(g => g.status !== 'archived' && (g.pendingRequestCount || 0) > 0).map(g => <Button key={g.id} variant="outline" onClick={() => setEditing(g.id)}>{g.name} · {g.pendingRequestCount} 位申請人<ArrowRight className="ml-2 h-4 w-4" /></Button>)}</section>
     {selected && <FamilyEditor key={`${selected.id}:${selected.version}`} group={selected} groups={data.groups} busy={busy} act={act} close={() => setEditing(null)} />}
     <section className="space-y-4"><h3 className="font-semibold">等待安排 <span className="text-muted-foreground">{data.requests.length}</span></h3>{!data.requests.length && <p className="text-sm text-muted-foreground">目前沒有你負責範圍內的待安排申請。</p>}{data.requests.map(r => <MatchingReview key={`${r.id}:${r.version}`} item={r} groups={data.groups} busy={busy} act={act} />)}</section>
     {!!data.churches.length && <details className="border-y py-4"><summary className="cursor-pointer font-medium">開啟新小家</summary><form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e => { e.preventDefault(); void act(async () => { await request('/management', 'POST', { name, church: church || data.churches[0].id, audience, listed }); setName(''); }); }}><label className="min-w-0 space-y-2 text-sm">小家名稱<Input required value={name} maxLength={160} onChange={e => setName(e.target.value)} /></label><label className="min-w-0 space-y-2 text-sm">所屬教會<select className={selectClass} value={church || data.churches[0].id} onChange={e => setChurch(e.target.value)}>{data.churches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label className="space-y-2 text-sm">小家類型<select className={selectClass} value={audience} onChange={e => setAudience(e.target.value)}>{Object.entries(familyAudiences).map(([v,label]) => <option key={v} value={v}>{label}</option>)}</select></label><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={listed} onChange={e => setListed(e.target.checked)} />公開簡介，開放申請加入</label><Button className="w-fit" disabled={busy || !name.trim()}><Plus className="mr-2 h-4 w-4" />建立小家</Button></form></details>}
-    <ul className="divide-y">{data.groups.map(g => <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><h3 className="font-medium">{g.name}</h3><p className="text-sm text-muted-foreground">{churchDisplayName(g.church)} · {familyStatuses[g.status]} · {g.memberCount} 位成員{g.listed && ' · 開放申請'}</p><p className="text-sm text-muted-foreground">小家長：{groupLeaderNames(g)}</p>{!g.leaderId&&!g.coLeaderId&&g.status!=='archived'&&<p className="text-sm text-muted-foreground">尚未綁定小家長帳號；填寫姓名後仍須指派已加入的成員。</p>}</div><Button variant={editing === g.id ? 'secondary' : 'outline'} onClick={() => setEditing(editing === g.id ? null : g.id)}>設定與成員異動</Button></li>)}</ul>
+    <section aria-label="目前的小家"><h3 className="font-semibold">目前的小家</h3><ul className="divide-y">{data.groups.filter(g => g.status !== 'archived').map(groupItem)}</ul>{!data.groups.some(g => g.status !== 'archived') && <p className="py-3 text-sm text-muted-foreground">目前沒有運作中或暫停的小家。</p>}</section>
+    <details className="border-t pt-4"><summary className="cursor-pointer font-medium">已刪除的小家 · {data.groups.filter(g => g.status === 'archived').length}</summary><p className="mt-3 text-sm text-muted-foreground">歷史資料保留；原本封存的小家也在此處。恢復後須另外開放申請及產生新邀請。</p><ul className="divide-y">{data.groups.filter(g => g.status === 'archived').map(groupItem)}</ul></details>
+    <AlertDialog open={!!lifecycleGroup} onOpenChange={open => { if (!open && !busy) { setLifecycleGroup(null); setConfirmName(''); setError(''); } }}>
+      <AlertDialogContent className="max-h-[85dvh] max-w-[calc(100vw-2rem)] overflow-y-auto [overflow-wrap:anywhere] sm:max-w-lg">
+        <AlertDialogHeader><AlertDialogTitle>{restoring ? '恢復小家' : '刪除小家'}：{lifecycleGroup?.name}</AlertDialogTitle><AlertDialogDescription>{restoring ? '恢復小家運作，保留原有成員及小家長；不會重新公開，也不會啟用舊邀請。' : '刪除後，小家將從一般名單移除並停止加入；帳號、筆記、讀經進度與小家歷史資料會保留，可在已刪除的小家恢復。'}</AlertDialogDescription></AlertDialogHeader>
+        {blocked && <p role="status" className="text-sm text-destructive">還有 {lifecycleGroup?.ordinaryMemberCount} 筆一般成員資料，請先到「設定與成員異動」完成轉家或退出，再刪除小家。</p>}
+        <form className="space-y-4" onSubmit={e => { e.preventDefault(); void changeLifecycle(); }}>
+          <label className="block space-y-2 text-sm">請輸入小家完整名稱確認<Input autoComplete="off" disabled={busy || blocked} value={confirmName} onChange={e => setConfirmName(e.target.value)} maxLength={160} /></label>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <AlertDialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => { setLifecycleGroup(null); setConfirmName(''); setError(''); }}>取消</Button><Button type="submit" variant={restoring ? 'default' : 'destructive'} disabled={busy || blocked || confirmName !== lifecycleGroup?.name}>{busy ? '處理中…' : restoring ? '確認恢復' : '確認刪除'}</Button></AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
     {!data.groups.length && <p className="text-muted-foreground">目前沒有可管理的小家。</p>}
   </section>;
 }
-type Act = (work: () => Promise<unknown>) => Promise<void>;
+type Act = (work: () => Promise<unknown>) => Promise<boolean>;
 function MatchingReview({ item, groups, busy, act }: { item: FamilyRequest; groups: ManagedFamily[]; busy: boolean; act: Act }) {
   const [groupId, setGroupId] = useState(''), [message, setMessage] = useState('');
   const update = (status: 'contacting' | 'matched' | 'cancelled') => act(() => request(`/management/matching/${item.id}`, 'PATCH', { version: item.version, status, groupId: groupId || null, message }));
@@ -53,7 +76,7 @@ function FamilyEditor({ group, groups, busy, act, close }: { group: ManagedFamil
   const q = useFamilyQuery<{ members: GroupMember[]; requests: { id: string; name: string; message?: string; createdAt?: string }[]; canChangeLeader: boolean; history: { action: string; name: string; actorName: string; reason: string; targetName: string; createdAt: string }[] }>(`/management/${group.id}`);
   const [form, setForm] = useState({ version: group.version, name: group.name, description: group.description, meeting: group.meeting, audience: group.audience || 'unspecified', announcement: group.announcement, listed: group.listed, status: group.status, leaderId: group.leaderId, coLeaderId: group.coLeaderId ?? null });
   const [member, setMember] = useState(''), [target, setTarget] = useState(''), [reason, setReason] = useState('');
-  const actions: Record<string,string> = { created: '開啟小家', joined: '加入', declined: '未通過申請', left: '自行退出', removed: '移出', transferred_in: '轉入', transferred_out: '轉出', leader_changed: '小家長交接', leaders_changed: '共同小家長交接', settings: '更新設定' };
+  const actions: Record<string,string> = { created: '開啟小家', joined: '加入', declined: '未通過申請', left: '自行退出', removed: '移出', transferred_in: '轉入', transferred_out: '轉出', leader_changed: '小家長交接', leaders_changed: '共同小家長交接', settings: '更新設定', archived: '刪除小家（歷史保留）', restored: '恢復小家' };
   const duplicateLeaders = !!form.leaderId && form.leaderId === form.coLeaderId;
   const leadershipChanged = form.leaderId !== group.leaderId || form.coLeaderId !== (group.coLeaderId ?? null);
   const selectedLeaderNames = [form.leaderId,form.coLeaderId].filter(Boolean).map(id => q.data?.members.find(member => member.id === id)?.name || (id === group.leaderId ? group.leaderName : group.coLeaderName) || '已指派帳號').join('、') || '尚未指派';
@@ -70,7 +93,7 @@ function FamilyEditor({ group, groups, busy, act, close }: { group: ManagedFamil
       <label className="space-y-2 text-sm">聚會時間與地區（公開簡介）<Input maxLength={200} value={form.meeting} onChange={e => setForm({ ...form, meeting: e.target.value })} /></label>
       <label className="space-y-2 text-sm sm:col-span-2">小家簡介（公開）<Textarea maxLength={500} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
       <label className="space-y-2 text-sm sm:col-span-2">置頂公告（僅小家成員可見）<Textarea rows={3} maxLength={2000} value={form.announcement} onChange={e => setForm({ ...form, announcement: e.target.value })} /></label>
-      <label className="space-y-2 text-sm">狀態<select className={selectClass} value={form.status} onChange={e => setForm({ ...form, status: e.target.value as typeof form.status })}>{Object.entries(familyStatuses).map(([v,label]) => <option key={v} value={v} disabled={v==='archived'&&!q.data?.canChangeLeader}>{label}</option>)}</select></label>
+      <label className="space-y-2 text-sm">狀態<select className={selectClass} value={form.status} onChange={e => setForm({ ...form, status: e.target.value as typeof form.status })}>{Object.entries(familyStatuses).filter(([v]) => v !== 'archived').map(([v,label]) => <option key={v} value={v}>{label}</option>)}</select></label>
       {q.data?.canChangeLeader && <>
         <label className="space-y-2 text-sm">小家長（一）<select className={selectClass} value={form.leaderId || ''} onChange={e => setForm({ ...form, leaderId: e.target.value || null })}><option value="">尚未指派</option>{q.data.members.filter(m => m.id !== form.coLeaderId).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
         <label className="space-y-2 text-sm">小家長（二）<select className={selectClass} value={form.coLeaderId || ''} onChange={e => setForm({ ...form, coLeaderId: e.target.value || null })}><option value="">尚未指派</option>{q.data.members.filter(m => m.id !== form.leaderId).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>

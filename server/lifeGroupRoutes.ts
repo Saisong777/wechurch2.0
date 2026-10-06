@@ -6,7 +6,7 @@ import { careInput, careUpdateInput, commentInput, groupCreateInput, shareEditIn
 import * as groups from './lifeGroupRepository';
 import { isTestDeployment, stagingTicket } from './deploymentSafety';
 import * as families from './familyRepository';
-import { familyCreateInput, familySettingsInput, familyJoinInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
+import { familyCreateInput, familySettingsInput, familyLifecycleInput, familyJoinInput, invitationToken, matchingInput, matchingUpdateInput, memberMoveInput } from '../shared/family';
 import { apiIdentity, boundedWindowLimiter } from './requestLimits';
 
 export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string | null>) {
@@ -42,6 +42,8 @@ export function lifeGroupRoutes(resolveUserId: (req: Request) => Promise<string 
   router.get('/management/:id', async (req, res) => { res.json(await families.managedFamilyDetail(res.locals.actor, uuid.parse(req.params.id))); });
   router.post('/management/:id/requests/:userId', async (req, res) => { res.json(await families.decideManagedJoin(res.locals.actor, uuid.parse(req.params.id), uuid.parse(req.params.userId), z.object({ approve: z.boolean() }).parse(req.body).approve)); });
   router.patch('/management/:id', async (req, res) => { res.json(await families.updateFamily(res.locals.actor, uuid.parse(req.params.id), familySettingsInput.parse(req.body))); });
+  router.delete('/management/:id', async (req, res) => { res.json(await families.changeFamilyLifecycle(res.locals.actor, uuid.parse(req.params.id), familyLifecycleInput.parse(req.body))); });
+  router.post('/management/:id/restore', async (req, res) => { res.json(await families.changeFamilyLifecycle(res.locals.actor, uuid.parse(req.params.id), familyLifecycleInput.parse(req.body), true)); });
   router.post('/management/:id/move', async (req, res) => { res.json(await families.moveFamilyMember(res.locals.actor, uuid.parse(req.params.id), memberMoveInput.parse(req.body))); });
   router.get('/sources', async (req, res) => { res.json(await groups.shareSources(res.locals.actor, z.enum(['note', 'prayer']).parse(req.query.kind))); });
   router.param('groupId', (req, res, next, value) => { const parsed = uuid.safeParse(value); if (!parsed.success) return void res.status(400).json({ error: '小家編號無效。' }); res.locals.groupId = parsed.data; next(); });
