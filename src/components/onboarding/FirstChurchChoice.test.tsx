@@ -99,3 +99,28 @@ it('does not refresh a church scope after recovery resolves to a different accou
   show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:'火樂'}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));
   await waitFor(()=>expect(auth.refreshAuth).toHaveBeenCalledTimes(1));expect(context.refreshChurch).not.toHaveBeenCalled();
 });
+it.each(['火樂','__choice_none'])('recovers %s on a later manual retry after both POST response and first status read fail',async selected=>{
+  let posted=false,allowRecovery=false;const original=vi.mocked(fetch).getMockImplementation()!;
+  vi.mocked(fetch).mockImplementation(async(url,init)=>{
+    if(init?.method==='POST'){
+      posted=true;const input=JSON.parse(init.body as string);status={...status,currentChurch:input.churchId,canChoose:false,choiceLocked:true,reason:input.churchId===null?'no_church':'assigned'};
+      throw new Error('Committed but response timed out');
+    }
+    if(posted&&!allowRecovery)return new Response('{}',{status:503});
+    return original(url,init);
+  });
+  show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:selected}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));
+  await screen.findByText('教會選擇狀態暫時無法確認。');expect(auth.refreshAuth).not.toHaveBeenCalled();expect(context.refreshChurch).not.toHaveBeenCalled();
+  allowRecovery=true;fireEvent.click(screen.getByRole('button',{name:'重新確認選擇資格'}));
+  await waitFor(()=>expect(context.refreshChurch).toHaveBeenCalledTimes(1));expect(auth.refreshAuth).toHaveBeenCalledTimes(1);expect(screen.queryByRole('combobox')).toBeNull();
+  expect(vi.mocked(fetch).mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+});
+it('does not apply the recovered manual retry to a different account',async()=>{
+  let posted=false,allowRecovery=false;const original=vi.mocked(fetch).getMockImplementation()!;
+  vi.mocked(fetch).mockImplementation(async(url,init)=>{
+    if(init?.method==='POST'){posted=true;status={...status,currentChurch:'火樂',canChoose:false,choiceLocked:true,reason:'assigned'};throw new Error('Committed but response timed out');}
+    if(posted&&!allowRecovery)return new Response('{}',{status:503});return original(url,init);
+  });
+  show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:'火樂'}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));await screen.findByText('教會選擇狀態暫時無法確認。');
+  allowRecovery=true;auth.refreshAuth.mockResolvedValue({id:'other-member'});fireEvent.click(screen.getByRole('button',{name:'重新確認選擇資格'}));await waitFor(()=>expect(auth.refreshAuth).toHaveBeenCalledTimes(1));expect(context.refreshChurch).not.toHaveBeenCalled();
+});
