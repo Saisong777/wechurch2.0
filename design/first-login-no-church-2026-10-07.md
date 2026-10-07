@@ -15,7 +15,7 @@ Status reason 新增 `no_church`；context、管理者未分派列表及登入�
 
 ## 使用流程
 
-所有 SPA routes 均包在 AppLayout。登入狀態未解析、教會 context 未完成或錯誤、onboarding pending/error/缺資料以及 canChoose，均不 mount route children、主選單、教會切換或新手導覽。這包含個人筆記和深連結。只有選擇／重試／登出介面可見；教會 context 錯誤優先於 disabled query 的 pending，避免無法重試的轉圈。匿名公開頁保留。
+所有 SPA routes 均包在 AppLayout。登入狀態未解析、教會 context 未完成或錯誤、onboarding pending/error/缺資料以及 canChoose，均不 mount route children、主選單、教會切換或新手導覽。這包含個人筆記和深連結。只有選擇／重試／登出介面可見；POST 回應遺失時，只有後續 status 明確讀回已選定教會／沒有教會才重新整理同一帳號及 church context，避免已選定卻留在舊未分派畫面；讀回失敗不宣稱完成，帳號切換後不套舊範圍。教會 context 錯誤優先於 disabled query 的 pending，避免無法重試的轉圈。匿名公開頁保留。
 
 已明選沒有教會的人，頂部顯示「目前沒有教會」；教會私有頁說明個人筆記、聖經可用及日後聯繫管理者，不再催首次選擇。原教會 API 的 server scope guard 保持；個人 owner API 保持原身分驗證，不把 UI gate 當資料授權邊界。
 

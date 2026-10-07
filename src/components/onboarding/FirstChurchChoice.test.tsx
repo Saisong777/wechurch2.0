@@ -12,7 +12,7 @@ const choices = [{id:'IM 行動教會',name:'iM行動教會'},{id:'火樂',name:
 let status: {currentChurch:string|null;canChoose:boolean;choiceLocked:boolean;choices:typeof choices;reason:string};
 let failPost = false; const clients: QueryClient[] = [];
 beforeEach(() => {
-  auth.user = {id:'new-member'}; auth.loading = false; auth.refreshAuth.mockReset(); auth.signOut.mockReset();context.loading=false;context.error='';context.refreshChurch.mockReset(); failPost = false;
+  auth.user = {id:'new-member'}; auth.loading = false; auth.refreshAuth.mockReset().mockResolvedValue({id:'new-member'}); auth.signOut.mockReset();context.loading=false;context.error='';context.refreshChurch.mockReset(); failPost = false;
   setChurchScope(null, false);
   status = {currentChurch:null,canChoose:true,choiceLocked:false,choices,reason:'choose'};
   vi.stubGlobal('fetch',vi.fn(async(_url,init) => {
@@ -73,4 +73,29 @@ it('fails closed on an inconsistent selection response and offers logout',async(
 
 it('offers context recovery even while the disabled onboarding query remains pending',async()=>{
   context.error='教會資料失敗';show();expect(await screen.findByText('教會資料暫時無法確認。')).toBeVisible();expect(screen.queryByText('正在確認教會選擇…')).toBeNull();fireEvent.click(screen.getByRole('button',{name:'重新載入教會資料'}));expect(context.refreshChurch).toHaveBeenCalledTimes(1);expect(screen.getByRole('button',{name:'登出'})).toBeEnabled();
+});
+it.each(['火樂','__choice_none'])('recovers the verified committed %s choice after its POST response is lost',async selected=>{
+  const original=vi.mocked(fetch).getMockImplementation()!;
+  vi.mocked(fetch).mockImplementation(async(url,init)=>{
+    if(init?.method==='POST'){
+      const input=JSON.parse(init.body as string);status={...status,currentChurch:input.churchId,canChoose:false,choiceLocked:true,reason:input.churchId===null?'no_church':'assigned'};
+      throw new Error('Response lost after commit');
+    }
+    return original(url,init);
+  });
+  show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:selected}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));
+  await waitFor(()=>expect(context.refreshChurch).toHaveBeenCalledTimes(1));expect(auth.refreshAuth).toHaveBeenCalledTimes(1);expect(screen.queryByRole('combobox')).toBeNull();
+});
+it('keeps an uncertain write behind the recovery gate when the follow-up status also fails',async()=>{
+  let posted=false;const original=vi.mocked(fetch).getMockImplementation()!;
+  vi.mocked(fetch).mockImplementation(async(url,init)=>{if(init?.method==='POST')posted=true;if(posted)return new Response('{}',{status:503});return original(url,init);});
+  show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:'火樂'}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));
+  expect(await screen.findByText('教會選擇狀態暫時無法確認。')).toBeVisible();expect(auth.refreshAuth).not.toHaveBeenCalled();expect(context.refreshChurch).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'重新確認選擇資格'})).toBeEnabled();
+});
+it('does not refresh a church scope after recovery resolves to a different account',async()=>{
+  const original=vi.mocked(fetch).getMockImplementation()!;
+  auth.refreshAuth.mockResolvedValue({id:'other-member'});
+  vi.mocked(fetch).mockImplementation(async(url,init)=>{if(init?.method==='POST'){status={...status,currentChurch:'火樂',canChoose:false,choiceLocked:true,reason:'assigned'};throw new Error('Response lost');}return original(url,init);});
+  show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:'火樂'}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));
+  await waitFor(()=>expect(auth.refreshAuth).toHaveBeenCalledTimes(1));expect(context.refreshChurch).not.toHaveBeenCalled();
 });

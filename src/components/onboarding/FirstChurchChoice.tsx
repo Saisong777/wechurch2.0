@@ -35,14 +35,23 @@ export function FirstChurchChoice() {
     try {
       await choose.mutateAsync(attempt.current);
       if (actor.current !== submittingActor) return;
-      await refreshAuth();
-      if (actor.current !== submittingActor) return;
+      const refreshedActor = await refreshAuth();
+      if (actor.current !== submittingActor || refreshedActor?.id !== submittingActor) return;
       await church?.refreshChurch();
       setConfirming(false);
     } catch (error) {
       if (actor.current !== submittingActor) return;
       setMessage((error as Error).message);
-      await status.refetch();
+      const recovered = await status.refetch();
+      // The server may have committed the choice before its response was lost.
+      // Only a verified completed choice can refresh the authenticated scope.
+      if (!recovered.isError && recovered.data && ['assigned','no_church'].includes(recovered.data.reason) && actor.current === submittingActor) {
+        const refreshedActor = await refreshAuth();
+        if (actor.current !== submittingActor || refreshedActor?.id !== submittingActor) return;
+        await church?.refreshChurch();
+        setConfirming(false);
+        setMessage('');
+      }
     }
   };
   return <section aria-labelledby="initial-church-title" className="mx-auto my-3 max-w-2xl space-y-4 rounded-lg border border-primary/30 bg-background p-5 [overflow-wrap:anywhere]">
