@@ -6,7 +6,7 @@ import { pool } from './db';
 import { GroupError } from './groupError';
 import { getKnownChurchOptions, normalizeChurch } from '../shared/churches';
 
-export interface ChurchContext { actorId:string; actorChurch:string|null; selectedChurch:string|null; isSystemAdmin:boolean; }
+export interface ChurchContext { actorId:string; actorChurch:string|null; selectedChurch:string|null; isSystemAdmin:boolean; choiceNone?:boolean; }
 export class ChurchScopeError extends GroupError { constructor(status:number,public code:string,message:string){super(status,message);} }
 const requestChurch = new AsyncLocalStorage<ChurchContext>();
 export const churchContext = () => requestChurch.getStore();
@@ -21,7 +21,7 @@ export function assertSelectedChurch(church:string|null|undefined) {
 }
 export function churchContextResponse(context:ChurchContext) {
   return {actorChurch:context.actorChurch,selectedChurch:context.selectedChurch,isSystemAdmin:context.isSystemAdmin,
-    allowedOptions:getKnownChurchOptions().filter(c=>context.isSystemAdmin||c.id===context.actorChurch),requiresApproval:!context.actorChurch&&!context.isSystemAdmin};
+    allowedOptions:getKnownChurchOptions().filter(c=>context.isSystemAdmin||c.id===context.actorChurch),requiresApproval:!context.actorChurch&&!context.isSystemAdmin,choiceNone:context.choiceNone===true};
 }
 export function resolveChurchContext(actorId:string,actorChurch:string|null,isSystemAdmin:boolean,header?:string,query?:unknown):ChurchContext {
   const options=getKnownChurchOptions();
@@ -49,9 +49,10 @@ export function churchContextMiddleware(resolveId:(req:Request)=>Promise<string|
       const invitedIntake=req.method==='POST'&&req.path==='/potential-members'&&typeof req.body?.shortCode==='string';
       const gated=!invitedIntake&&!messageInvite&&!guestCurrentCard&&!ownerWithdrawal&&(churchFeaturePrefixes.some(p=>req.path===p||req.path.startsWith(`${p}/`))||req.path==='/users'||req.path==='/sessions'||(req.method==='POST'&&req.path==='/icebreaker/games'));
       if(!actor){if(gated||req.path==='/church-context')return void res.status(401).json({error:'請先登入。'});return next();}
-      const row=(await pool.query("SELECT u.church,EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='admin') AS admin FROM users u WHERE u.id=$1",[actor])).rows[0];
+      const row=(await pool.query("SELECT u.church,u.church_choice_none,EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=u.id AND r.role='admin') AS admin FROM users u WHERE u.id=$1",[actor])).rows[0];
       if(!row)return void res.status(401).json({error:'請重新登入。'});
       const context=resolveChurchContext(actor,row.church,row.admin,req.get('X-WeChurch-Church'),req.query.church);
+      context.choiceNone=row.church_choice_none===true;
       res.setHeader('Cache-Control','private, no-store');
       if(gated&&!context.selectedChurch)throw new ChurchScopeError(403,'CHURCH_APPROVAL_REQUIRED','請等待管理者核定所屬教會，再使用教會功能。');
       requestChurch.run(context,next);

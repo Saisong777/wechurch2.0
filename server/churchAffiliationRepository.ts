@@ -4,7 +4,7 @@ import { getKnownChurchOptions, normalizeChurch } from '../shared/churches';
 import { arrivalChurchChanged } from './churchLoginRepository';
 export async function pendingChurchAffiliations() {
   if(!churchContext()?.isSystemAdmin)throw new ChurchScopeError(403,'CHURCH_SCOPE_FORBIDDEN','需要系統管理權限。');
-  return (await pool.query('SELECT id,display_name AS "displayName",email,church FROM users WHERE church IS NULL ORDER BY created_at,id LIMIT 500')).rows;
+  return (await pool.query('SELECT id,display_name AS "displayName",email,church,church_choice_none AS "choiceNone" FROM users WHERE church IS NULL ORDER BY created_at,id LIMIT 500')).rows;
 }
 export async function approveChurchAffiliation(actor:string,target:string,updates:{expectedChurch?:string|null;church?:string|null;displayName?:string;avatarUrl?:string|null;birthday?:string|null;userGender?:string|null;address?:string|null}) {
   const next=normalizeChurch(updates.church);
@@ -18,7 +18,7 @@ export async function approveChurchAffiliation(actor:string,target:string,update
     const before=(await c.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[target])).rows[0];
     if(!before){await c.query('ROLLBACK');return undefined;}
     if(!Object.hasOwn(updates,'expectedChurch')||normalizeChurch(updates.expectedChurch)!==normalizeChurch(before.church))throw new ChurchScopeError(409,'CHURCH_AFFILIATION_CONFLICT','核定資料已更新，請重新載入後再試。');
-    if(normalizeChurch(before.church)!==next){
+    if(normalizeChurch(before.church)!==next || before.church_choice_none===true){
       const groups=(await c.query('SELECT * FROM small_groups WHERE leader_user_id=$1 OR co_leader_user_id=$1 OR pastor_user_id=$1 OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=small_groups.id AND m.user_id=$1 AND m.is_active) ORDER BY id FOR UPDATE',[target])).rows;
       for(const g of groups.filter(g=>normalizeChurch(g.church)!==next)){
         await c.query('UPDATE small_group_members SET is_active=false,updated_at=now() WHERE group_id=$1 AND user_id=$2 AND is_active',[g.id,target]);
@@ -35,7 +35,7 @@ export async function approveChurchAffiliation(actor:string,target:string,update
       await arrivalChurchChanged(c,actor,target,next);
     }
     const fields:{[key:string]:string}={displayName:'display_name',avatarUrl:'avatar_url',birthday:'birthday',userGender:'user_gender',address:'address'};
-    const values:unknown[]=[target,next];const sets=['church=$2','church_choice_locked=true'];
+    const values:unknown[]=[target,next];const sets=['church=$2','church_choice_locked=true','church_choice_none=false'];
     for(const [key,col] of Object.entries(fields))if(Object.hasOwn(updates,key)){values.push(updates[key as keyof typeof updates]);sets.push(`${col}=$${values.length}`);}
     const after=(await c.query(`UPDATE users SET ${sets.join(',')},updated_at=now() WHERE id=$1 RETURNING id`,values)).rows[0];
     await c.query('COMMIT');return after;

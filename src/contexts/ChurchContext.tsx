@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createQueryClient, queryClient as personalClient } from '@/lib/queryClient';
 import { churchScopeKey, setChurchScope, subscribeChurchScope } from '@/lib/churchFetch';
 
-export type ChurchContextData = { actorChurch:string|null; selectedChurch:string|null; isSystemAdmin:boolean; allowedOptions:{id:string;name:string}[]; requiresApproval:boolean };
+export type ChurchContextData = { actorChurch:string|null; selectedChurch:string|null; isSystemAdmin:boolean; allowedOptions:{id:string;name:string}[]; requiresApproval:boolean; choiceNone?:boolean };
 type ChurchState = { data:ChurchContextData|null; loading:boolean; error:string; identity:string; selectChurch:(id:string)=>Promise<void>; refreshChurch:()=>Promise<void> };
 const Context = createContext<ChurchState | null>(null);
 export function useChurchContext() { return useContext(Context); }
@@ -53,6 +53,6 @@ export function ChurchPageBoundary({children,personal=false,allowPendingOwner=fa
   if(church.loading)return <section role="status" className="mx-auto max-w-lg p-6">正在確認教會歸屬…</section>;
   if(church.error)return <section role="alert" className="mx-auto max-w-lg space-y-3 p-6"><p>{church.error}</p><button type="button" className="min-h-11 underline" onClick={()=>void church.refreshChurch()}>重新確認教會</button></section>;
   if(church.data?.isSystemAdmin&&!church.data.selectedChurch)return <section role="status" className="mx-auto max-w-lg p-6">請先選擇目前教會，確認要管理的分享牆、小家與課表。</section>;
-  if(church.data?.requiresApproval&&!allowPendingOwner)return <section className="mx-auto max-w-lg space-y-3 p-6"><h1 className="text-lg font-semibold">先確認教會歸屬</h1><p>請完成頁面上方的首次教會選擇。已經選過或需要變更教會時，請聯繫管理者協助。確認後即可使用教會的分享牆、小家與課表；個人筆記與聖經仍可使用。</p><a href="/learn/my-notes" className="mr-4 inline-flex min-h-11 items-center underline">個人筆記</a><a href="/learn/bible" className="inline-flex min-h-11 items-center underline">聖經</a><button className="block min-h-11 underline" onClick={()=>void church.refreshChurch()}>重新確認教會</button></section>;
+  if(church.data?.requiresApproval&&!allowPendingOwner)return <section className="mx-auto max-w-lg space-y-3 p-6"><h1 className="text-lg font-semibold">{church.data.choiceNone?'目前沒有教會':'教會歸屬待確認'}</h1><p>{church.data.choiceNone?'你已確認目前沒有教會，可以繼續使用個人筆記與聖經。教會分享牆、小家與課表只開放該教會的會員；日後加入教會，請聯繫管理者協助調整。':'你的教會歸屬需要管理者協助確認。確認後即可使用教會的分享牆、小家與課表；個人筆記與聖經仍可使用。'}</p><a href="/learn/my-notes" className="mr-4 inline-flex min-h-11 items-center underline">個人筆記</a><a href="/learn/bible" className="inline-flex min-h-11 items-center underline">聖經</a><button className="block min-h-11 underline" onClick={()=>void church.refreshChurch()}>重新確認教會</button></section>;
   return <div key={church.identity}>{children}</div>;
 }

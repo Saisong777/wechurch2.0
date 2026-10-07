@@ -37,6 +37,42 @@ export async function verifyChurchOnboardingHttp(pool:Pool,makeClient:()=>Client
  assert.equal((await makeClient()('/api/me/church-onboarding')).status,401);
  assert.equal((await makeClient()('/api/bible/books')).status,200,'unmatched public Bible API stays anonymous');
  const status=await (await member.client('/api/me/church-onboarding')).json();assert.equal(status.canChoose,true);assert.equal(status.choices.length,3);
+
+ // Explicit none is a completed choice, not an omitted/empty/unknown church.
+ const noChurch=await fixture('No church confirmed'),noneChoice={churchId:null,requestId:randomUUID()};
+ for(const invalidChoice of [{requestId:randomUUID()},{churchId:'',requestId:randomUUID()},{churchId:'__unassigned',requestId:randomUUID()},{churchId:'unknown-new-church',requestId:randomUUID()}])assert.equal((await noChurch.client('/api/me/church-onboarding','POST',invalidChoice)).status,400);
+ const noneResponse=await noChurch.client('/api/me/church-onboarding','POST',noneChoice);assert.equal(noneResponse.status,200);assert.equal((await noneResponse.json()).initialChoiceChurch,null);
+ const noneStatus=await(await noChurch.client('/api/me/church-onboarding')).json();assert.equal(noneStatus.reason,'no_church');assert.equal(noneStatus.canChoose,false);assert.equal(noneStatus.currentChurch,null);
+ assert.equal((await noChurch.client('/api/me/church-onboarding','POST',noneChoice)).status,200,'same null request is idempotent');
+ assert.equal((await noChurch.client('/api/me/church-onboarding','POST',{...noneChoice,churchId:'火樂'})).status,409,'same request cannot change null to church');
+ assert.equal((await noChurch.client('/api/me/church-onboarding','POST',{churchId:'火樂',requestId:randomUUID()})).status,403,'different request cannot repeat selection');
+ let noneUser=(await pool.query('SELECT church,church_choice_locked,church_choice_none FROM users WHERE id=$1',[noChurch.id])).rows[0];assert.deepEqual(noneUser,{church:null,church_choice_locked:true,church_choice_none:true});
+ assert.equal((await pool.query("SELECT count(*)::int n FROM church_affiliation_events WHERE user_id=$1 AND source='initial_choice' AND next_church IS NULL",[noChurch.id])).rows[0].n,1);
+ const noneContext=await(await noChurch.client('/api/church-context')).json();assert.equal(noneContext.selectedChurch,null);assert.equal(noneContext.choiceNone,true);assert.deepEqual(noneContext.allowedOptions,[]);
+ for(const path of ['/api/devotion-wall','/api/life-groups','/api/reading-plans','/api/admin/church-login-inbox'])assert.equal((await noChurch.client(path)).status,403,`no church cannot use ${path}`);
+ assert.equal((await noChurch.client('/api/bible/books')).status,200,'no church retains public Scripture');
+ assert.equal((await noChurch.client('/api/devotional-notes')).status,200,'no church retains owner-only personal notes');
+ assert.equal((await noChurch.client('/api/auth/email-login','POST',{email:noChurch.email,password:noChurch.password})).status,200);
+ assert.equal((await(await noChurch.client('/api/me/church-onboarding')).json()).reason,'no_church','relogin preserves explicit no church');
+ assert.equal((await(await admin.client('/api/admin/church-affiliations/pending')).json()).users.find((u:{id:string})=>u.id===noChurch.id).choiceNone,true);
+ assert.equal((await(await admin.client('/api/admin/church-login-inbox?scope=unassigned')).json()).arrivals.find((u:{userId:string})=>u.userId===noChurch.id).choiceNone,true);
+ assert(!JSON.stringify(await(await pastor.client('/api/admin/church-login-inbox')).json()).includes(noChurch.id),'no church identity is not shared with church staff');
+ await assert.rejects(pool.query("UPDATE users SET church='火樂' WHERE id=$1",[noChurch.id]),/users_church_choice_none_valid/,'DB prevents a flagged-none account from acquiring church scope');
+ // Administrative null-to-null confirmation clears the explicit self choice and keeps it locked.
+ assert.equal((await admin.client(`/api/users/${noChurch.id}/profile`,'PATCH',{church:null,expectedChurch:null})).status,200);
+ assert.equal((await pool.query("SELECT count(*)::int n FROM church_affiliation_events WHERE user_id=$1 AND actor_id=$2 AND source='admin' AND previous_church IS NULL AND next_church IS NULL",[noChurch.id,admin.id])).rows[0].n,1,'none classification cleared by admin leaves an audit event');
+ assert.equal((await pool.query('SELECT church_choice_locked FROM users WHERE id=$1',[noChurch.id])).rows[0].church_choice_locked,true);
+ assert.equal((await(await noChurch.client('/api/me/church-onboarding')).json()).reason,'manager_required');
+ assert.equal((await admin.client(`/api/users/${noChurch.id}/profile`,'PATCH',{church:'火樂',expectedChurch:null})).status,200);
+ noneUser=(await pool.query('SELECT church,church_choice_locked,church_choice_none FROM users WHERE id=$1',[noChurch.id])).rows[0];assert.deepEqual(noneUser,{church:'火樂',church_choice_locked:true,church_choice_none:false});
+ assert.equal((await noChurch.client('/api/me/church-onboarding','POST',noneChoice)).status,200,'old receipt replays without overwriting the manager decision');
+ assert.equal((await(await noChurch.client('/api/me/church-onboarding')).json()).currentChurch,'火樂');
+ const raceNone=await fixture('None versus church race');
+ const noneRace=await Promise.all([raceNone.client('/api/me/church-onboarding','POST',{churchId:null,requestId:randomUUID()}),raceNone.client('/api/me/church-onboarding','POST',{churchId:'火樂',requestId:randomUUID()})]);assert.deepEqual(noneRace.map(r=>r.status).sort(),[200,403]);
+ assert.equal((await pool.query('SELECT count(*)::int n FROM church_affiliation_events WHERE user_id=$1',[raceNone.id])).rows[0].n,1);
+ // Global administrators without an affiliation keep recovery access and cannot accidentally self-assign.
+ assert.equal((await(await admin.client('/api/me/church-onboarding')).json()).canChoose,false);
+ assert.equal((await admin.client('/api/me/church-onboarding','POST',{churchId:null,requestId:randomUUID()})).status,403);
  const requestId=randomUUID(),choice={churchId:'IM 行動教會',requestId};
  const concurrent=await Promise.all([member.client('/api/me/church-onboarding','POST',choice),member.client('/api/me/church-onboarding','POST',{churchId:'火樂',requestId:randomUUID()})]);
  assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,403]);

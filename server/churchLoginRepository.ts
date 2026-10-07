@@ -23,7 +23,7 @@ async function transaction<T>(work: (c: PoolClient) => Promise<T>, readonly = fa
 }
 async function lockMember(c: PoolClient, id: string) {
   await c.query("SELECT pg_advisory_xact_lock(hashtext('church-affiliation:' || $1))",[id]);
-  const row=(await c.query('SELECT id,church,church_choice_locked,church_login_seen FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];
+  const row=(await c.query('SELECT id,church,church_choice_locked,church_choice_none,church_login_seen FROM users WHERE id=$1 FOR UPDATE',[id])).rows[0];
   if(!row)throw new GroupError(401,'請重新登入。');return row;
 }
 export async function enqueueArrival(c: PoolClient, userId: string, church: string | null, reason: string, reopen=false) {
@@ -69,21 +69,21 @@ export async function recordSuccessfulLogin(identity: SessionIdentity | undefine
   });
 }
 export async function onboardingStatus(id: string): Promise<ChurchOnboardingStatus> {
-  const user=(await pool.query(`SELECT church,church_choice_locked,EXISTS(SELECT 1 FROM church_affiliation_events e WHERE e.user_id=users.id
+  const user=(await pool.query(`SELECT church,church_choice_locked,church_choice_none,EXISTS(SELECT 1 FROM user_roles r WHERE r.user_id=users.id AND r.role='admin') AS admin,EXISTS(SELECT 1 FROM church_affiliation_events e WHERE e.user_id=users.id
     AND (e.previous_church IS NOT NULL OR e.next_church IS NOT NULL)) AS history FROM users WHERE id=$1`,[id])).rows[0];
   if(!user)throw new GroupError(401,'請重新登入。');
   const currentChurch=normalizeChurch(user.church), valid=knownChurch(currentChurch);
-  const choiceLocked=!!user.church_choice_locked||user.church!==null||!!user.history;
-  return {currentChurch,canChoose:!choiceLocked,choiceLocked,choices:getKnownChurchOptions(),reason:valid?'assigned':choiceLocked?'manager_required':'choose'};
+  const choiceLocked=!!user.church_choice_locked||user.church!==null||!!user.history||!!user.admin;
+  return {currentChurch,canChoose:!choiceLocked,choiceLocked,choices:getKnownChurchOptions(),reason:valid?'assigned':user.church_choice_none?'no_church':choiceLocked?'manager_required':'choose'};
 }
-export async function chooseInitialChurch(id: string, churchId: string, requestId: string, _receiptId?: string): Promise<ChurchChoiceResult> {
-  const church=knownChurch(normalizeChurch(churchId));if(!church)throw new GroupError(400,'請選擇有效教會。');
+export async function chooseInitialChurch(id: string, churchId: string | null, requestId: string, _receiptId?: string): Promise<ChurchChoiceResult> {
+  const church=churchId===null?null:knownChurch(normalizeChurch(churchId));if(churchId!==null&&!church)throw new GroupError(400,'請選擇有效教會，或明確選擇目前沒有教會。');
   return transaction(async c=>{
     const user=await lockMember(c,id);
     const previous=(await c.query("SELECT next_church FROM church_affiliation_events WHERE user_id=$1 AND request_id=$2 AND source='initial_choice'",[id,requestId])).rows[0];
     if(previous){if(previous.next_church!==church)throw conflict();return {ok:true,currentChurch:normalizeChurch(user.church),initialChoiceChurch:church,replayed:true,choiceLocked:true};}
-    if(user.church_choice_locked||user.church!==null||(await c.query('SELECT 1 FROM church_affiliation_events WHERE user_id=$1 AND (previous_church IS NOT NULL OR next_church IS NOT NULL) LIMIT 1',[id])).rowCount)throw new GroupError(403,'教會已選定，後續請由管理者調整。');
-    await c.query('UPDATE users SET church=$2,church_choice_locked=true,updated_at=now() WHERE id=$1',[id,church]);
+    if(user.church_choice_locked||user.church!==null||(await c.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin' UNION ALL SELECT 1 FROM church_affiliation_events WHERE user_id=$1 AND (previous_church IS NOT NULL OR next_church IS NOT NULL) LIMIT 1",[id])).rowCount)throw new GroupError(403,'教會已選定，後續請由管理者調整。');
+    await c.query('UPDATE users SET church=$2,church_choice_locked=true,church_choice_none=$3,updated_at=now() WHERE id=$1',[id,church,church===null]);
     await c.query("INSERT INTO church_affiliation_events(actor_id,user_id,previous_church,next_church,source,request_id) VALUES($1,$1,NULL,$2,'initial_choice',$3)",[id,church,requestId]);
     await arrivalChurchChanged(c,id,id,church,'initial_choice');
     return {ok:true,currentChurch:church,initialChoiceChurch:church,replayed:false,choiceLocked:true};
@@ -121,7 +121,7 @@ export async function loginSummary(id:string){return transaction(async c=>summar
 export async function loginInbox(id:string,scope:'church'|'unassigned'|undefined,cursor:{at:string;id:string}|undefined,limit:number):Promise<ChurchLoginInbox>{
   return transaction(async c=>{
     const a=await staff(c,id),mode=scope||(!a.church&&a.admin?'unassigned':'church'),church=arrivalScope(a,mode),today=taipeiToday();
-    const rows=(await c.query(`SELECT r.id,r.user_id AS "userId",coalesce(NULLIF(u.display_name,''),'會員') AS name,NULLIF(u.email,'') AS email,u.church AS "currentChurch",r.church,r.reason,r.status,r.version,
+    const rows=(await c.query(`SELECT r.id,r.user_id AS "userId",coalesce(NULLIF(u.display_name,''),'會員') AS name,NULLIF(u.email,'') AS email,u.church AS "currentChurch",u.church_choice_none AS "choiceNone",r.church,r.reason,r.status,r.version,
       r.created_at AS "createdAt",r.updated_at AS "updatedAt",to_char(r.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorAt"
       FROM church_member_arrivals r JOIN users u ON u.id=r.user_id WHERE r.status='pending' AND r.church IS NOT DISTINCT FROM $1 AND r.church IS NOT DISTINCT FROM (${currentScopeSql})
       AND ($2::timestamptz IS NULL OR (r.created_at,r.id)<($2::timestamptz,$3::uuid)) ORDER BY r.created_at DESC,r.id DESC LIMIT $4`,[church,cursor?.at?cursor.at.replace(/Z$/,'+00:00'):null,cursor?.id||null,limit+1])).rows;

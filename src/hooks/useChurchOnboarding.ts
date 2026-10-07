@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChurchContext, useChurchScopeKey } from '@/contexts/ChurchContext';
 import { churchFetch } from '@/lib/churchFetch';
 import type { ChurchOnboardingStatus, ChurchLoginSummary, ChurchChoiceResult } from '@shared/churchOnboarding';
+import { churchOnboardingStatusSchema } from '@shared/churchOnboarding';
 export type { ChurchOnboardingStatus, ChurchLoginSummary } from '@shared/churchOnboarding';
 
 export const onboardingKey = '/api/me/church-onboarding';
@@ -29,7 +30,7 @@ export function useChurchOnboarding() {
   const scope = useChurchScopeKey();
   return useQuery<ChurchOnboardingStatus>({
     queryKey: [onboardingKey, user?.id, scope], enabled: !!user && !loading && !church?.loading,
-    queryFn: ({ signal }) => churchOnboardingRequest(onboardingKey, { signal }), retry: false,
+    queryFn: async ({ signal }) => churchOnboardingStatusSchema.parse(await churchOnboardingRequest(onboardingKey, { signal })), retry: false,
     staleTime: 10000, refetchInterval: 30000, refetchIntervalInBackground: false,
   });
 }
@@ -37,7 +38,7 @@ export function useChurchOnboarding() {
 export function useChooseInitialChurch() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: { churchId: string; requestId: string }) => churchOnboardingRequest<ChurchChoiceResult>(onboardingKey, {
+    mutationFn: (input: { churchId: string | null; requestId: string }) => churchOnboardingRequest<ChurchChoiceResult>(onboardingKey, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }),
     onSuccess: async () => {

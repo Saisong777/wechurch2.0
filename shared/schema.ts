@@ -39,10 +39,11 @@ export const users = pgTable("users", {
   address: text("address"),
   church: text("church"),
   churchChoiceLocked: boolean('church_choice_locked').notNull().default(false),
+  churchChoiceNone: boolean('church_choice_none').notNull().default(false),
   churchLoginSeen: boolean('church_login_seen').notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, t => ({ choiceNone: check('users_church_choice_none_valid', sql`NOT ${t.churchChoiceNone} OR (${t.church} IS NULL AND ${t.churchChoiceLocked})`) }));
 
 export const googleAccountLinks = pgTable('google_account_links', {
   googleSubject: text('google_subject').primaryKey(),

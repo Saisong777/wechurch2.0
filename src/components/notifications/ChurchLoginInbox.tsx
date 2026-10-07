@@ -73,10 +73,10 @@ function InboxContent({scope}: {scope: 'church' | 'unassigned'}) {
     {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
     <section aria-labelledby="church-arrivals-title">
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 id="church-arrivals-title" className="font-semibold">待關懷名單</h3><Button variant="ghost" disabled={query.isFetching} onClick={() => void query.refetch()}>更新名單</Button></div>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">{scope === 'unassigned' ? '這些登入帳號尚未選定教會，請確認本人意願再協助歸屬。' : '新登入或新加入教會的人會保留在這裡，直到管理者確認已關懷。'} 標記由同範圍同工共用。</p>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">{scope === 'unassigned' ? '這裡包含尚待確認歸屬，以及已確認目前沒有教會的帳號。請尊重本人選擇，確認意願後再協助歸屬。' : '新登入或新加入教會的人會保留在這裡，直到管理者確認已關懷。'} 標記由同範圍同工共用。</p>
       {!data.arrivals.length && <p className="py-4 text-sm">目前沒有待處理的人員。</p>}
       <ul className="divide-y">{data.arrivals.map(arrival => <li key={arrival.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <div className="min-w-0 flex-1"><p className="font-medium">{arrival.name || '未填姓名'}</p><p className="mt-1 text-sm text-muted-foreground">{arrival.email || '未提供帳號信箱'}</p><p className="mt-1 text-sm text-muted-foreground">{arrivalReason[arrival.reason]} · {arrival.church ? churchDisplayName(arrival.church) : '尚未選定教會'}</p><time className="mt-1 block text-sm text-muted-foreground" dateTime={arrival.createdAt}>{time(arrival.createdAt)}</time></div>
+        <div className="min-w-0 flex-1"><p className="font-medium">{arrival.name || '未填姓名'}</p><p className="mt-1 text-sm text-muted-foreground">{arrival.email || '未提供帳號信箱'}</p><p className="mt-1 text-sm text-muted-foreground">{arrival.choiceNone ? '已確認目前沒有教會' : arrivalReason[arrival.reason]} · {arrival.church ? churchDisplayName(arrival.church) : arrival.choiceNone ? '目前沒有教會' : '教會歸屬待確認'}</p><time className="mt-1 block text-sm text-muted-foreground" dateTime={arrival.createdAt}>{time(arrival.createdAt)}</time></div>
         <Button variant="outline" disabled={action.isPending} onClick={() => action.mutate({arrival})}>標記已關懷<span className="sr-only">：{arrival.name || '未填姓名'}</span></Button>
       </li>)}</ul>
       {(cursors.length > 1 || data.nextCursor) && <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={cursors.length === 1 || query.isFetching} onClick={() => setCursors(previous => previous.slice(0, -1))}>上一頁人員</Button><Button variant="outline" disabled={!data.nextCursor || query.isFetching} onClick={() => setCursors(previous => [...previous, data.nextCursor])}>下一頁人員</Button></div>}
@@ -100,7 +100,7 @@ export function ChurchLoginInbox() {
   return <section className="border-b py-4 [overflow-wrap:anywhere]" aria-labelledby="church-login-inbox-title">
     <h2 id="church-login-inbox-title" className="text-lg font-semibold">登入與新成員通知</h2>
     <p className="mt-1 text-sm text-muted-foreground">{summary.data.total} 項待關懷或未查看的每日彙整</p>
-    {church?.data?.isSystemAdmin && selected && <label className="mt-3 block space-y-1 text-sm">通知範圍<select aria-label="登入通知範圍" className="min-h-11 w-full rounded-md border bg-background px-3" value={scope} onChange={event => setScope(event.target.value as 'church' | 'unassigned')}><option value="church">{churchDisplayName(selected)}</option><option value="unassigned">尚未選定教會</option></select></label>}
+    {church?.data?.isSystemAdmin && selected && <label className="mt-3 block space-y-1 text-sm">通知範圍<select aria-label="登入通知範圍" className="min-h-11 w-full rounded-md border bg-background px-3" value={scope} onChange={event => setScope(event.target.value as 'church' | 'unassigned')}><option value="church">{churchDisplayName(selected)}</option><option value="unassigned">沒有教會／歸屬待確認</option></select></label>}
     <InboxContent key={`${church?.identity || ''}:${active}`} scope={active} />
   </section>;
 }

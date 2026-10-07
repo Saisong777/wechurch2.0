@@ -4,19 +4,21 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FirstChurchChoice } from './FirstChurchChoice';
 import { setChurchScope } from '@/lib/churchFetch';
-const auth = vi.hoisted(() => ({user: {id: 'new-member'} as {id:string} | null, loading: false, refreshAuth: vi.fn()}));
+const auth = vi.hoisted(() => ({user: {id: 'new-member'} as {id:string} | null, loading: false, refreshAuth: vi.fn(), signOut: vi.fn()}));
 vi.mock('@/contexts/AuthContext', () => ({useAuth: () => auth}));
+const context=vi.hoisted(()=>({loading:false,error:'',refreshChurch:vi.fn()}));
+vi.mock('@/contexts/ChurchContext',async(importOriginal)=>({...await importOriginal<typeof import('@/contexts/ChurchContext')>(),useChurchContext:()=>context}));
 const choices = [{id:'IM 行動教會',name:'iM行動教會'},{id:'火樂',name:'火樂'}];
 let status: {currentChurch:string|null;canChoose:boolean;choiceLocked:boolean;choices:typeof choices;reason:string};
 let failPost = false; const clients: QueryClient[] = [];
 beforeEach(() => {
-  auth.user = {id:'new-member'}; auth.loading = false; auth.refreshAuth.mockReset(); failPost = false;
+  auth.user = {id:'new-member'}; auth.loading = false; auth.refreshAuth.mockReset(); auth.signOut.mockReset();context.loading=false;context.error='';context.refreshChurch.mockReset(); failPost = false;
   setChurchScope(null, false);
   status = {currentChurch:null,canChoose:true,choiceLocked:false,choices,reason:'choose'};
   vi.stubGlobal('fetch',vi.fn(async(_url,init) => {
     if(init?.method === 'POST') {
       if(failPost) return new Response(JSON.stringify({error:'網路暫時無法確認'}),{status:503});
-      const input = JSON.parse(init.body as string); status = {...status,currentChurch:input.churchId,canChoose:false,choiceLocked:true,reason:'assigned'};
+      const input = JSON.parse(init.body as string); status = {...status,currentChurch:input.churchId,canChoose:false,choiceLocked:true,reason:input.churchId===null?'no_church':'assigned'};
       return new Response(JSON.stringify({ok:true,currentChurch:input.churchId,initialChoiceChurch:input.churchId,replayed:false,choiceLocked:true}));
     }
     return new Response(JSON.stringify(status));
@@ -52,3 +54,23 @@ it('shows a retry when eligibility cannot be verified and never invents a church
   vi.mocked(fetch).mockImplementation(async()=>new Response('{}',{status:503}));show();await screen.findByText('教會選擇狀態暫時無法確認。');expect(screen.queryByRole('combobox')).toBeNull();expect(screen.getByRole('button',{name:'重新確認選擇資格'})).toBeEnabled();
 });
 it('makes no request for an anonymous visitor',async()=>{auth.user=null;show();await waitFor(()=>expect(fetch).not.toHaveBeenCalled());expect(screen.queryByRole('combobox')).toBeNull();});
+
+it('confirms no church with an explicit null and does not offer a second choice',async()=>{
+  show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:'__choice_none'}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));
+  expect(screen.getByText(/確認「目前沒有教會」/)).toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:'返回選擇'}));expect(vi.mocked(fetch).mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
+  fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));
+  await waitFor(()=>expect(auth.refreshAuth).toHaveBeenCalledTimes(1));
+  const writes=vi.mocked(fetch).mock.calls.filter(([,init])=>init?.method==='POST');expect(writes).toHaveLength(1);expect(JSON.parse(writes[0][1]!.body as string).churchId).toBeNull();expect(screen.queryByRole('combobox')).toBeNull();
+});
+it('reads future catalog entries from the API without defaulting to them',async()=>{
+  status={...status,choices:[...choices,{id:'future-church',name:'未來教會'}]};show();
+  expect(await screen.findByRole('option',{name:'未來教會'})).toBeInTheDocument();expect(screen.getByRole('combobox')).toHaveValue('');
+});
+it('fails closed on an inconsistent selection response and offers logout',async()=>{
+  status={...status,canChoose:false,reason:'choose'};show();await screen.findByText('教會選擇狀態暫時無法確認。');expect(screen.queryByRole('combobox')).toBeNull();fireEvent.click(screen.getByRole('button',{name:'登出'}));expect(auth.signOut).toHaveBeenCalledTimes(1);
+});
+
+it('offers context recovery even while the disabled onboarding query remains pending',async()=>{
+  context.error='教會資料失敗';show();expect(await screen.findByText('教會資料暫時無法確認。')).toBeVisible();expect(screen.queryByText('正在確認教會選擇…')).toBeNull();fireEvent.click(screen.getByRole('button',{name:'重新載入教會資料'}));expect(context.refreshChurch).toHaveBeenCalledTimes(1);expect(screen.getByRole('button',{name:'登出'})).toBeEnabled();
+});

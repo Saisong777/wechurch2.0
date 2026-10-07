@@ -30,8 +30,8 @@ try {
     finally { migrationClient.release(); }
   }
   if(legacyIds.length){
-    const rows=(await pool.query('SELECT id,church_choice_locked,church_login_seen FROM users WHERE id=ANY($1::uuid[])',[legacyIds])).rows;
-    for(const row of rows){assert.equal(row.church_login_seen,true);assert.equal(row.church_choice_locked,row.id!==legacyIds[1]);}
+    const rows=(await pool.query('SELECT id,church_choice_locked,church_choice_none,church_login_seen FROM users WHERE id=ANY($1::uuid[])',[legacyIds])).rows;
+    for(const row of rows){assert.equal(row.church_login_seen,true);assert.equal(row.church_choice_none,false);assert.equal(row.church_choice_locked,row.id!==legacyIds[1]);}
     assert.equal((await pool.query('SELECT count(*)::int n FROM church_member_arrivals WHERE user_id=ANY($1::uuid[])',[legacyIds])).rows[0].n,0);
     console.log('PASS onboarding migration: assigned/cleared-history locked, never-assigned eligible, historical accounts not falsely announced');
   }

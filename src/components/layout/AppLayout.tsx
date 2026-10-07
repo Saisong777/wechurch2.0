@@ -1,4 +1,4 @@
-import { ChurchPageBoundary } from '@/contexts/ChurchContext';
+import { ChurchPageBoundary, useChurchContext } from '@/contexts/ChurchContext';
 import { ChurchControl } from './ChurchControl';
 import { ReactNode, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -21,10 +21,17 @@ const hiddenNavPaths = ['/login', '/reset-password', '/admin', '/admin/crm', '/u
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const church = useChurchContext();
   const onboarding = useChurchOnboarding();
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
   const mobileHeader = useMemo(() => ({ actionsTarget, setActionsTarget }), [actionsTarget]);
+
+  // Do not mount route children (including personal pages) until first-login
+  // affiliation is explicitly confirmed. Deep links use this same boundary.
+  if (authLoading || user && (church?.loading || church?.error || onboarding.isPending || onboarding.isError || !onboarding.data || onboarding.data.canChoose)) {
+    return <div className="app-shell min-h-screen bg-brand-warm"><NetworkStatusBanner /><main className="mx-auto w-full max-w-2xl px-4 py-8"><FirstChurchChoice key={user?.id || 'loading'} /></main></div>;
+  }
 
   const showNav = !hiddenNavPaths.some(path =>
     location.pathname === path || location.pathname.startsWith(path + '/')
