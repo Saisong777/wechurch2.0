@@ -45,6 +45,7 @@ interface DevotionalNoteDialogProps {
   verseText: string;
   noteId?: string;
   inline?: boolean;
+  devotionalDate?: string;
 }
 
 function NoteEditorSurface({ open, inline, sharing, loading, onOpenChange, children }: {
@@ -152,11 +153,12 @@ export function DevotionalNoteDialog({
   verseText,
   noteId,
   inline = false,
+  devotionalDate,
 }: DevotionalNoteDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const userId = user?.id || '';
-  const draftScope = `devotional:${noteId || verseReference}`;
+  const draftScope = `devotional:${noteId || `${devotionalDate ? `${devotionalDate}:` : ''}${verseReference}`}`;
   const discardDraft = () => { try { clearDeviceDraft(userId,draftScope); } catch { /* Keep the current form recoverable. */ } };
   const [form, setForm] = useState<FormFields>(emptyForm);
   const [baseline, setBaseline] = useState<FormFields>(emptyForm);
@@ -206,11 +208,11 @@ export function DevotionalNoteDialog({
 
     const url = noteId
       ? `/api/devotional-notes/${noteId}`
-      : `/api/devotional-notes/by-reference?ref=${encodeURIComponent(verseReference)}`;
+      : `/api/devotional-notes/by-reference?ref=${encodeURIComponent(verseReference)}${devotionalDate ? `&date=${encodeURIComponent(devotionalDate)}` : ''}`;
 
     const localNote = noteId
       ? findLocalDevotionalNoteById(noteId, userId)
-      : findLocalDevotionalNoteByReference(verseReference, userId);
+      : findLocalDevotionalNoteByReference(verseReference, userId, devotionalDate);
     if (localNote) {
       setLoadedNote(localNote);
       applyNoteToForm(localNote, setExistingId, setDisplayReference, setDisplayText, loadForm);
@@ -226,7 +228,7 @@ export function DevotionalNoteDialog({
         return res.json();
       })
       .then((data) => {
-        if (cancelled || !data || data.userId !== userId || (localNote && localNote.syncStatus !== 'synced')) return;
+        if (cancelled || !data || data.userId !== userId || (devotionalDate && data.sourceDevotionalDate !== devotionalDate) || (localNote && localNote.syncStatus !== 'synced')) return;
         setLoadedNote(data);
         applyNoteToForm(data, setExistingId, setDisplayReference, setDisplayText, loadForm);
       })
@@ -238,7 +240,7 @@ export function DevotionalNoteDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, verseReference, noteId, userId, loadForm]);
+  }, [open, verseReference, devotionalDate, noteId, userId, loadForm]);
 
   const handleSave = async (share = false) => {
     if (!userId) {
@@ -259,6 +261,7 @@ export function DevotionalNoteDialog({
       const result = await saveDevotionalNote(userId, {
         ...previous,
         id: existingId || createLocalDevotionalNoteId(),
+        sourceDevotionalDate: previous?.sourceDevotionalDate || devotionalDate || null,
         verseReference: displayReference,
         verseText: displayText,
         readingPlanId: previous?.readingPlanId || null,
@@ -327,6 +330,7 @@ export function DevotionalNoteDialog({
               toast({ title: '目前輸入已保留，請再次儲存以同步' });
             }} />}
             <DeviceDraft<FormFields> key={`${userId}:${draftScope}`} owner={userId} scope={draftScope} revision={loadedNote?.version ?? null} value={form} dirty={dirty} busy={isSaving} schema={formSchema} restore={value=>setForm(value)} preview={value => <>{value.observation}{'\n\n'}{Object.values(value.coreInsightNote).join('\n')}{'\n\n'}{value.actionPlan}</>} />
+            {devotionalDate && <p className="text-sm text-muted-foreground">靈修日期：{devotionalDate}</p>}
             <details className="note-editor-scripture">
               <summary>
                 <span className="min-w-0 flex-1" data-testid="text-verse-reference">{displayReference}</span>

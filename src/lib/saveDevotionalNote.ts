@@ -11,10 +11,10 @@ export async function saveDevotionalNote(userId: string, input: LocalDevotionalN
   };
   // Save a recoverable, account-scoped draft before attempting a network write.
   upsertLocalDevotionalNote(draft, userId);
-  const { id, userId: _owner, syncStatus: _status, createdAt: _created, updatedAt: _updated, ...payload } = draft;
+  const { id, userId: _owner, syncStatus: _status, createdAt: _created, updatedAt: _updated, sourceDevotionalDate, sourceLabel: _sourceLabel, ...payload } = draft;
   try {
     const response = id.startsWith('local-devotional-')
-      ? await apiRequest('POST', '/api/devotional-notes', payload)
+      ? await apiRequest('POST', '/api/devotional-notes', { ...payload, ...(sourceDevotionalDate ? { devotionalDate: sourceDevotionalDate } : {}) })
       : await apiRequest('PATCH', `/api/devotional-notes/${encodeURIComponent(id)}`, payload);
     const saved = await response.json();
     if (!saved?.id || saved.userId !== userId) throw new Error('Invalid save confirmation');

@@ -188,11 +188,11 @@ export interface IStorage {
   getDevotionalNotes(userId: string): Promise<DevotionalNote[]>;
   getDevotionalNoteByPlanDay(planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
   getDevotionalNoteByPlanDayForUser(userId: string, planId: string, dayNumber: number): Promise<DevotionalNote | undefined>;
-  createDevotionalNote(note: InsertDevotionalNote, clientId?: string): Promise<DevotionalNote | undefined>;
+  createDevotionalNote(note: InsertDevotionalNote, clientId?: string, devotionalDate?: string): Promise<DevotionalNote | undefined>;
   updateDevotionalNote(id: string, updates: Partial<InsertDevotionalNote>): Promise<DevotionalNote | undefined>;
   updateDevotionalNoteForUser(id: string, userId: string, updates: Partial<InsertDevotionalNote>, version?: number): Promise<DevotionalNote | undefined>;
   toggleDevotionalNoteHiddenForUser(id: string, userId: string, hidden: boolean): Promise<DevotionalNote | undefined>;
-  getDevotionalNoteByVerseReference(userId: string, verseReference: string): Promise<DevotionalNote | undefined>;
+  getDevotionalNoteByVerseReference(userId: string, verseReference: string, devotionalDate?: string): Promise<DevotionalNote | undefined>;
 
   createReadingPlanTemplate(template: InsertReadingPlanTemplate): Promise<ReadingPlanTemplate>;
   createReadingPlanTemplateItems(items: Array<{ templateId: string, dayNumber: number, bookName?: string, chapterStart?: number, chapterEnd?: number, scriptureReference?: string }>): Promise<void>;
@@ -1445,18 +1445,19 @@ export class DatabaseStorage implements IStorage {
     return note;
   }
 
-  async createDevotionalNote(note: InsertDevotionalNote, clientId?: string): Promise<DevotionalNote | undefined> {
+  async createDevotionalNote(note: InsertDevotionalNote, clientId?: string, devotionalDate?: string): Promise<DevotionalNote | undefined> {
     return db.transaction(async tx => {
     if (clientId) {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`devotional:${clientId}`},0))`);
       const deleted = await tx.execute(sql`SELECT 1 FROM devotional_note_deletions WHERE note_id=${clientId}::uuid`);
       if (deleted.rows.length) return undefined;
     }
-    const [created] = await tx.insert(devotionalNotes).values({ ...note, ...(clientId ? { id: clientId } : {}) })
+    const datedNote = { ...note, ...(devotionalDate ? { sourceDevotionalDate: devotionalDate, sourceLabel: '教會每日靈修' } : {}) };
+    const [created] = await tx.insert(devotionalNotes).values({ ...datedNote, ...(clientId ? { id: clientId } : {}) })
       .onConflictDoNothing({ target: devotionalNotes.id }).returning();
     if (created || !clientId) return created;
     const [existing] = await tx.select().from(devotionalNotes).where(and(eq(devotionalNotes.id, clientId), eq(devotionalNotes.userId, note.userId)));
-    if (!existing || !Object.entries(note).every(([key,value]) => value === undefined || value === existing[key as keyof DevotionalNote])) return undefined;
+    if (!existing || !Object.entries(datedNote).every(([key,value]) => value === undefined || value === existing[key as keyof DevotionalNote])) return undefined;
     return existing;
     });
   }
@@ -1477,11 +1478,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getDevotionalNoteByVerseReference(userId: string, verseReference: string): Promise<DevotionalNote | undefined> {
+  async getDevotionalNoteByVerseReference(userId: string, verseReference: string, devotionalDate?: string): Promise<DevotionalNote | undefined> {
     const [note] = await db.select().from(devotionalNotes).where(
       and(
         eq(devotionalNotes.userId, userId),
         eq(devotionalNotes.verseReference, verseReference),
+        devotionalDate ? eq(devotionalNotes.sourceDevotionalDate, devotionalDate) : undefined,
         isNull(devotionalNotes.readingPlanId)
       )
     ).orderBy(desc(devotionalNotes.updatedAt)).limit(1);

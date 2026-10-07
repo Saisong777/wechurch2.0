@@ -1,6 +1,8 @@
 export interface LocalDevotionalNote {
   id: string;
   version?: number;
+  sourceDevotionalDate?: string | null;
+  sourceLabel?: string | null;
   userId?: string | null;
   verseReference: string;
   verseText: string | null;
@@ -52,8 +54,8 @@ export function findLocalDevotionalNoteById(noteId: string, userId: string): Loc
   return loadLocalDevotionalNotes(userId).find((note) => note.id === noteId) || null;
 }
 
-export function findLocalDevotionalNoteByReference(verseReference: string, userId: string): LocalDevotionalNote | null {
-  return loadLocalDevotionalNotes(userId).find((note) => note.verseReference === verseReference) || null;
+export function findLocalDevotionalNoteByReference(verseReference: string, userId: string, devotionalDate?: string): LocalDevotionalNote | null {
+  return loadLocalDevotionalNotes(userId).find((note) => note.verseReference === verseReference && (!devotionalDate || note.sourceDevotionalDate === devotionalDate)) || null;
 }
 
 export function findLocalDevotionalNoteByPlanDay(

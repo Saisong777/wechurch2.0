@@ -40,7 +40,7 @@ export function journalSearchText(note: JournalNote) {
 }
 export function journalMarkdown(note: JournalNote) {
   return [`## ${journalDate(note)} · ${note.verseReference}`, note.titlePhrase,
-    note.sourceLabel ? `來源：${note.sourceLabel}；日期為讀經日期，原撰寫時間未知。` : '',
+    note.sourceLabel ? `來源：${note.sourceLabel}；日期為讀經日期${note.sourceLabel === '教會每日靈修' ? '。' : '，原撰寫時間未知。'}` : '',
     note.verseText ? `### 經文\n\n${note.verseText}` : '',
     ...journalSections(note).map(s => `### ${s.title}\n\n${s.body}`)].filter(Boolean).join('\n\n');
 }

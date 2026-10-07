@@ -5848,7 +5848,9 @@ export async function registerRoutes(app: Express) {
       if (!ref) {
         return res.status(400).json({ error: "Missing ref query parameter" });
       }
-      const note = await storage.getDevotionalNoteByVerseReference(userId, ref);
+      const date = req.query.date === undefined ? undefined : devotionDate.safeParse(req.query.date);
+      if (date && !date.success) return res.status(400).json({ error: '靈修日期格式錯誤' });
+      const note = await storage.getDevotionalNoteByVerseReference(userId, ref, date?.success ? date.data : undefined);
       res.json(note || null);
     } catch (error) {
       console.error('Error fetching devotional note by verse reference:', error);
@@ -5906,7 +5908,9 @@ export async function registerRoutes(app: Express) {
       }
       const mutationId = z.string().uuid().optional().safeParse(req.body.clientMutationId);
       if (!mutationId.success) return res.status(400).json({ error: 'Invalid save identifier' });
-      const note = await storage.createDevotionalNote(parsed.data, mutationId.data);
+      const date = req.body.devotionalDate === undefined ? undefined : devotionDate.safeParse(req.body.devotionalDate);
+      if (date && (!date.success || date.data > taipeiToday())) return res.status(400).json({ error: '請選擇今天或之前的靈修日期' });
+      const note = await storage.createDevotionalNote(parsed.data, mutationId.data, date?.success ? date.data : undefined);
       if (!note) return res.status(409).json({ error: 'Save identifier conflict' });
       res.status(201).json(note);
     } catch (error) {

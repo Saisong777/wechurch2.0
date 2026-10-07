@@ -28,3 +28,12 @@ describe('devotion share sections', () => {
     expect(composeDevotionShare(draft.sections!, [], {})).toBe('');
   });
 });
+
+
+it('preserves the devotional date in sharing context without rewriting the publication day', () => {
+  const draft = createDevotionShareDraft({ ...note, titlePhrase: null, sourceDevotionalDate: '2026-09-09' });
+  expect(draft.devotionalDate).toBe('2026-09-09');
+  expect(draft.title).toBe('2026-09-09 靈修心得');
+  expect(draft.reference).toBe(note.verseReference);
+  expect(draft).not.toHaveProperty('day');
+});

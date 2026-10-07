@@ -63,3 +63,10 @@ describe("security policy parsers", () => {
     expect(parsed.data).toEqual({ notes: "更新後的筆記", hidden: true });
   });
 });
+
+
+it('does not let a client overwrite imported devotional provenance through PATCH', () => {
+  const parsed = parseDevotionalNotePatch({ observation: '補記', sourceDevotionalDate: '2026-10-01', sourceLabel: 'changed', devotionalDate: '2026-10-01' });
+  expect(parsed.success).toBe(true);
+  if (parsed.success) expect(parsed.data).toEqual({ observation: '補記' });
+});

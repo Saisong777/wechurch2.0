@@ -26,6 +26,7 @@ try {
       SESSION_SECRET: randomUUID()+randomUUID(), DISABLE_OUTBOUND_EMAIL: '1', DISABLE_MORNING_BRIEF: '1',
       UPLOAD_ROOT: uploadRoot, RUN_CAPACITY_BENCHMARK: process.env.RUN_CAPACITY_BENCHMARK === '1' ? '1' : '0',
       RUN_CHURCH_ONBOARDING_ONLY: onboardingOnly || process.env.RUN_CHURCH_ONBOARDING_ONLY === '1' ? '1' : '0',
+      RUN_READING_HISTORY_ONLY: process.env.RUN_READING_HISTORY_ONLY === '1' ? '1' : '0',
       RUN_MULTICHURCH_ONLY: process.env.RUN_MULTICHURCH_ONLY === '1' ? '1' : '0',
       RUN_CHURCH_SIMULATION: process.env.RUN_CHURCH_SIMULATION === '1' ? '1' : '0',
       RUN_CHURCH_HISTORY: process.env.RUN_CHURCH_HISTORY === '1' ? '1' : '0',
@@ -47,6 +48,6 @@ try {
 }
 
 }
-const customMode = ['RUN_CHURCH_ONBOARDING_ONLY','RUN_MULTICHURCH_ONLY','RUN_CHURCH_SIMULATION','RUN_CHURCH_HISTORY','RUN_SECURITY_BROWSER','RUN_CAPACITY_BENCHMARK'].some(key=>process.env[key]==='1');
+const customMode = ['RUN_READING_HISTORY_ONLY','RUN_CHURCH_ONBOARDING_ONLY','RUN_MULTICHURCH_ONLY','RUN_CHURCH_SIMULATION','RUN_CHURCH_HISTORY','RUN_SECURITY_BROWSER','RUN_CAPACITY_BENCHMARK'].some(key=>process.env[key]==='1');
 await runStage(customMode?'custom':'original');
 if (!customMode) await runStage('church-onboarding', true);

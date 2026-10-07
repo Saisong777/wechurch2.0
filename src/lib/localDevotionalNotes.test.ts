@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { loadLocalDevotionalNotes, mergeLocalDevotionalNotes, removeLocalDevotionalNote, upsertLocalDevotionalNote, type LocalDevotionalNote } from './localDevotionalNotes';
+import { loadLocalDevotionalNotes, findLocalDevotionalNoteByReference, mergeLocalDevotionalNotes, removeLocalDevotionalNote, upsertLocalDevotionalNote, type LocalDevotionalNote } from './localDevotionalNotes';
 import { saveDevotionalNote } from './saveDevotionalNote';
 
 const makeNote = (id = 'local-devotional-one', userId = 'alice'): LocalDevotionalNote => ({
@@ -77,5 +77,39 @@ describe('honest save acknowledgement', () => {
   it('does not claim success when device storage fails', async () => {
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => { throw new Error('Quota'); } });
     await expect(saveDevotionalNote('alice', makeNote())).rejects.toThrow('Quota');
+  });
+});
+
+
+describe('dated devotional notes', () => {
+  it('isolates the same passage by owner and devotional date without claiming undated notes', () => {
+    upsertLocalDevotionalNote({ ...makeNote('undated'), sourceDevotionalDate: null }, 'alice');
+    upsertLocalDevotionalNote({ ...makeNote('older'), sourceDevotionalDate: '2026-09-09' }, 'alice');
+    upsertLocalDevotionalNote({ ...makeNote('newer'), sourceDevotionalDate: '2026-09-10' }, 'alice');
+    expect(findLocalDevotionalNoteByReference('John 1:1', 'alice', '2026-09-09')?.id).toBe('older');
+    expect(findLocalDevotionalNoteByReference('John 1:1', 'alice', '2026-09-08')).toBeNull();
+    expect(findLocalDevotionalNoteByReference('John 1:1', 'bob', '2026-09-09')).toBeNull();
+    expect(findLocalDevotionalNoteByReference('John 1:1', 'alice')?.id).toBe('newer');
+  });
+  it('sends a validated-date parameter on create without exposing source metadata controls', async () => {
+    const request = vi.fn().mockResolvedValue(Response.json({ ...makeNote('server-id'), sourceDevotionalDate: '2026-09-09', sourceLabel: '教會每日靈修' }));
+    vi.stubGlobal('fetch', request);
+    const result = await saveDevotionalNote('alice', { ...makeNote(), sourceDevotionalDate: '2026-09-09', sourceLabel: 'client cannot set this' });
+    expect(result.status).toBe('synced');
+    const payload = JSON.parse(request.mock.calls[0][1].body);
+    expect(payload.devotionalDate).toBe('2026-09-09');
+    expect(payload).not.toHaveProperty('sourceDevotionalDate');
+    expect(payload).not.toHaveProperty('sourceLabel');
+    expect(result.note.sourceLabel).toBe('教會每日靈修');
+  });
+  it('preserves source provenance when editing an existing imported note', async () => {
+    const imported = { ...makeNote('existing-id'), sourceDevotionalDate: '2026-08-01', sourceLabel: '舊系統備份', version: 3 };
+    const request = vi.fn().mockResolvedValue(Response.json(imported)); vi.stubGlobal('fetch', request);
+    await saveDevotionalNote('alice', imported);
+    const payload = JSON.parse(request.mock.calls[0][1].body);
+    expect(request.mock.calls[0][1].method).toBe('PATCH');
+    expect(payload).not.toHaveProperty('sourceDevotionalDate');
+    expect(payload).not.toHaveProperty('sourceLabel');
+    expect(payload).not.toHaveProperty('devotionalDate');
   });
 });

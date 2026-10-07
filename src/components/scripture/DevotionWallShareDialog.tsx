@@ -56,6 +56,7 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
   const valid=scopeMatches && draft.sourceId===initialSource.current && user?.id===initialActor.current && !!user && title.trim() && title.length<=160 && body.trim() && body.length<=maxLength && reference.trim() && reference.length<=200 && consent && destinationReady;
   return <Dialog open onOpenChange={open=>{if(!open && !busy)close();}}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl [overflow-wrap:anywhere] [&>button:last-child]:right-2 [&>button:last-child]:top-2 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center">
     <DialogHeader className="pr-8"><DialogTitle>{allowGroup?'分享靈修筆記':'分享到今日靈修牆'}</DialogTitle><DialogDescription>{groupSelected && isWall?'同時分享至所選小家及本教會靈修牆。小家以你的姓名分享；牆上可選匿名，台灣時間午夜移出公開牆。私人筆記仍保留。':isWall?'目前教會的登入成員可見。台灣時間午夜移出公開牆，個人筆記仍保留。':'只有所選小家成員可見，以你的姓名分享。私人筆記仍保留。'}</DialogDescription></DialogHeader>
+    {draft.devotionalDate && <p className="text-sm leading-6">靈修日期：{draft.devotionalDate}。分享到靈修牆時會顯示在今天的牆上。</p>}
     {context && <p className="text-sm leading-6">分享教會：{initialChurch.current ? churchDisplayName(initialChurch.current) : '等待確認'}</p>}
     {!scopeMatches && <p role="alert" className="text-sm leading-6">教會範圍已切換或尚未核定。此預覽與重試編號保留，請切回原教會後確認，或關閉並重新選擇分享內容。</p>}
     <form onSubmit={async e=>{

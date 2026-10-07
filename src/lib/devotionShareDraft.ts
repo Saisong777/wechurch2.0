@@ -4,7 +4,7 @@ import { INSIGHT_CATEGORIES, parseCategories, parseNotes } from '@/types/spiritu
 
 export function createDevotionShareDraft(note: Pick<LocalDevotionalNote,
   'id' | 'titlePhrase' | 'verseReference' | 'verseText' | 'heartbeatVerse' | 'observation' |
-  'coreInsightCategory' | 'coreInsightNote' | 'scholarsNote' | 'actionPlan' | 'coolDownNote'>): DevotionShareDraft {
+  'coreInsightCategory' | 'coreInsightNote' | 'scholarsNote' | 'actionPlan' | 'coolDownNote' | 'sourceDevotionalDate'>): DevotionShareDraft {
   const sections: DevotionShareSection[] = [];
   const add = (key: string, label: string, text: string | null | undefined) => {
     if (typeof text === 'string' && text.trim()) sections.push({ key, label, text });
@@ -23,7 +23,7 @@ export function createDevotionShareDraft(note: Pick<LocalDevotionalNote,
   add('scholarsNote', '研讀筆記', note.scholarsNote);
   add('actionPlan', '回應', note.actionPlan);
   add('coolDownNote', '安靜反思', note.coolDownNote);
-  return { sourceId: note.id, title: note.titlePhrase || '今日靈修心得', reference: note.verseReference,
+  return { sourceId: note.id, ...(note.sourceDevotionalDate ? { devotionalDate: note.sourceDevotionalDate } : {}), title: note.titlePhrase || (note.sourceDevotionalDate ? `${note.sourceDevotionalDate} 靈修心得` : '今日靈修心得'), reference: note.verseReference,
     body: sections.filter(section => section.key.startsWith('insight:')).map(section => section.text).join('\n'), sections };
 }
 

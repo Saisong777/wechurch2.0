@@ -134,3 +134,22 @@ it('does not intercept an invitation or management entry', async () => {
   await waitFor(() => expect(screen.getByText('管理小家')).toBeTruthy());
   expect(screen.getByTestId('location')).toHaveTextContent(entry + '&manage=1');
 });
+
+
+it('carries a selected historical date through sole-group redirection and group selection', async () => {
+  show(`${entry}&date=2026-09-09`);
+  await screen.findByRole('tab', { name: '一起讀經' });
+  expect(screen.getByTestId('location')).toHaveTextContent('/groups/group?view=reading&date=2026-09-09');
+  expect(screen.getByLabelText('讀經日期')).toHaveValue('2026-09-09');
+  expect(fetch).toHaveBeenCalledWith('/api/life-groups/group/reading?date=2026-09-09', expect.anything());
+});
+
+it('preserves a historical date when picking from multiple authorized groups', async () => {
+  groups = [group, { ...group, id: 'second', name: '另一個小家' }];
+  show(`${entry}&date=2026-09-09`);
+  const selector = await screen.findByRole('combobox', { name: '選擇小家' });
+  expect(screen.getByRole('link', { name: /另一個小家/ })).toHaveAttribute('href', '/groups/second?view=reading&date=2026-09-09');
+  fireEvent.change(selector, { target: { value: 'second' } });
+  await screen.findByRole('tab', { name: '一起讀經' });
+  expect(screen.getByLabelText('讀經日期')).toHaveValue('2026-09-09');
+});

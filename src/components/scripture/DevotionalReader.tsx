@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, CalendarDays, Heart, NotebookPen, PenLine, Rotate
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScriptureSection } from './ChurchScriptureSection';
+import { taipeiToday } from '@shared/churchDevotion';
 import type { ChurchReadingSummary } from '@/lib/churchReading';
 import { devotionalSections, type DevotionalSection } from '@/lib/devotionalSections';
 import './devotional-reader.css';
@@ -43,6 +44,8 @@ export function DevotionalReader({ reading, retry, onNote }: {
   const prayer: DevotionalSection[] = sections.filter(section => section.panel === 'prayer');
   if (reading.prayer) prayer.push({ title: '今日愛神', body: reading.prayer, panel: 'prayer' });
   if (reading.keyVerse) prayer.push({ title: '今日金句', body: reading.keyVerse, panel: 'prayer' });
+  const isPast = !!reading.date && reading.date < taipeiToday();
+  const dayWord = isPast ? '這一天' : '今天';
   const displayedDate = reading.date
     ? new Date(`${reading.date}T00:00:00`).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' })
     : '今天';
@@ -100,16 +103,16 @@ export function DevotionalReader({ reading, retry, onNote }: {
         {reading.loveAction && <ProseSection title="今日愛人" body={reading.loveAction} />}
         {Boolean(reading.workCommands?.length) && <ProseSection title="今日工作指令" body={reading.workCommands!.join('\n\n')} />}
         {Boolean(reading.startupSteps?.length) && <ProseSection title="7:00 啟動流程" body={reading.startupSteps!.map(step => `${step.label}\n${step.text}`).join('\n\n')} />}
-        {!devotion.length && !reading.loveAction && !reading.workCommands?.length && !reading.startupSteps?.length && <p className="py-8 text-muted-foreground">今天沒有另外的靈修短文。</p>}
-        <div className="reader-next"><Button variant="outline" onClick={() => prayer.length ? nextPanel('prayer') : onNote()}>{prayer.length ? '進入今日禱告' : '寫下今天的領受'}<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
+        {!devotion.length && !reading.loveAction && !reading.workCommands?.length && !reading.startupSteps?.length && <p className="py-8 text-muted-foreground">{dayWord}沒有另外的靈修短文。</p>}
+        <div className="reader-next"><Button variant="outline" onClick={() => prayer.length ? nextPanel('prayer') : onNote()}>{prayer.length ? (isPast ? '進入這一天的禱告' : '進入今日禱告') : `寫下${dayWord}的領受`}<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
       </TabsContent>
       {prayer.length > 0 && <TabsContent value="prayer" forceMount hidden={panel !== 'prayer'}>
         {prayer.map((section, index) => <ProseSection key={index} {...section} />)}
-        <div className="reader-next"><Button onClick={onNote}><PenLine aria-hidden="true" className="mr-2 h-4 w-4" />寫下今天的領受</Button></div>
+        <div className="reader-next"><Button onClick={onNote}><PenLine aria-hidden="true" className="mr-2 h-4 w-4" />寫下{dayWord}的領受</Button></div>
       </TabsContent>}
     </Tabs>
     <footer className="mt-4 border-t border-border pt-4">
-        <Button asChild variant="ghost"><Link to="/groups?entry=reading&view=reading"><Users aria-hidden="true" className="mr-2 h-4 w-4" />與小家一起讀經</Link></Button>
+        <Button asChild variant="ghost"><Link to={`/groups?entry=reading&view=reading${reading.date ? `&date=${encodeURIComponent(reading.date)}` : ''}`}><Users aria-hidden="true" className="mr-2 h-4 w-4" />與小家一起讀經</Link></Button>
     </footer>
   </article>;
 }

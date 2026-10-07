@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { careStatuses, type GroupCare, type GroupMember, type GroupShare, type GroupSummary, type CareUpdate, type ShareSource } from '@shared/lifeGroup';
-import { taipeiToday } from '@shared/churchDevotion';
+import { devotionDate, taipeiToday } from '@shared/churchDevotion';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import { FamilyJoinPanel } from '@/components/groups/FamilyJoinPanel';
@@ -42,6 +42,8 @@ export default function LifeGroupsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [search] = useSearchParams();
+  const readingDate = search.get('date');
+  const readingSuffix = readingDate && devotionDate.safeParse(readingDate).success && readingDate <= taipeiToday() ? `&date=${encodeURIComponent(readingDate)}` : '';
   const readingEntry = search.get('entry') === 'reading' && !groupId && search.get('manage') !== '1';
   const q = useGroupQuery<{ groups: GroupSummary[]; requests: Array<{ id: string; name: string; status: string }>; canCreate: boolean }>('');
   const client = useQueryClient();
@@ -66,15 +68,15 @@ export default function LifeGroupsPage() {
   if (loading) return <><Header title="我的小家" backTo="/" /><p role="status" className="p-6">載入中…</p></>;
   if (!user) return <><Header title="我的小家" backTo="/" /><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-semibold">{token ? '你收到一份小家邀請' : '我的小家'}</h1><Button asChild><Link to={`/login?${token ? 'mode=signup&' : ''}returnTo=${encodeURIComponent(location.pathname + location.search + window.location.hash)}`}>{token ? '登入或建立帳號' : '登入小家'}</Link></Button></main></>;
   if (readingEntry && !token && q.isSuccess && !q.isFetching && q.data.groups.length === 1) {
-    return <Navigate replace to={`/groups/${q.data.groups[0].id}?view=reading`} />;
+    return <Navigate replace to={`/groups/${q.data.groups[0].id}?view=reading${readingSuffix}`} />;
   }
   return <div className="bg-background pb-6 [overflow-wrap:anywhere]">
     <Header title="我的小家" backTo="/" />
     <main className="mx-auto max-w-5xl px-4 py-5">
-      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}${search.get('view') === 'reading' ? '?view=reading' : ''}` : '/groups')}><option value="">我參與的小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
+      {q.data && q.data.groups.length > 0 && <div className="mb-5"><select aria-label="選擇小家" className={`${selectClass} max-w-72`} value={groupId || ''} onChange={e => navigate(e.target.value ? `/groups/${e.target.value}${search.get('view') === 'reading' ? `?view=reading${readingSuffix}` : ''}` : '/groups')}><option value="">我參與的小家</option>{q.data.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>}
       {search.get('manage') === '1' ? <FamilyManagement initialGroup={search.get('family')} /> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : groupId ? <GroupWorkspace key={`${user.id}:${groupId}:${search.get('share') || ''}:${search.get('comment') || ''}`} id={groupId} initialTab={search.get('share') ? 'all' : search.get('view') || 'all'} /> : q.isPending ? <p role="status">載入小家中…</p> : <>
         {q.data?.groups.filter(g => (g.pendingRequestCount || 0) > 0).map(g => <Button key={g.id} asChild variant="outline" className="mb-4 mr-2"><Link to={`/groups?manage=1&family=${g.id}`}>{g.name} · {g.pendingRequestCount} 位等待審核<ArrowRight className="ml-2 h-4 w-4" /></Link></Button>)}
-        <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'all'}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="min-w-0 flex-1"><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小家管理' : ''}</p><p className="mt-1 text-sm text-muted-foreground">小家長：{groupLeaderNames(g)}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
+        <div className="grid gap-3 sm:grid-cols-2">{q.data?.groups.map(g => <Link key={g.id} to={`/groups/${g.id}?view=${search.get('view') || 'all'}${search.get('view') === 'reading' ? readingSuffix : ''}`} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="min-w-0 flex-1"><h2 className="font-semibold">{g.name}</h2><p className="mt-1 text-sm text-muted-foreground">{g.memberCount} 位成員{g.manager ? ' · 小家管理' : ''}</p><p className="mt-1 text-sm text-muted-foreground">小家長：{groupLeaderNames(g)}</p></div><ArrowRight className="h-5 w-5 shrink-0" /></Link>)}</div>
         {!q.data?.groups.length && <p className="py-6 text-muted-foreground">目前尚未加入小家。</p>}
         {q.data?.requests.map(r => <p key={r.id} className="border-b py-3 text-sm">{r.name} · {r.status === 'pending' ? '等待小家長確認' : '申請未通過，請聯絡小家長'}</p>)}
         <FamilyJoinPanel token={token} setToken={setToken} join={() => void submit()} joining={busy} />
@@ -129,7 +131,8 @@ function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) 
 }
 type Act = (work: () => Promise<unknown>) => Promise<void>;
 function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string; busy: boolean; act: Act; onShare: (reference: string) => void }) {
-  const [date, setDate] = useState(taipeiToday);
+  const [search] = useSearchParams();
+  const [date, setDate] = useState(() => { const value = search.get('date'); return value && devotionDate.safeParse(value).success && value <= taipeiToday() ? value : taipeiToday(); });
   const q = useGroupQuery<{ entry: { id: string; version: number; title: string; reference: string; scriptureText: string; body: string; prayer: string; loveAction: string; planName: string } | null; readers: Array<{ id: string; name: string }> }>(`/${id}/reading?date=${date}`, !!date);
   const entry = q.data?.entry;
   const scripture = useQuery({
@@ -147,13 +150,13 @@ function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string;
     scriptureStatus: entry.scriptureText ? 'ready' : scripture.isError ? 'unavailable' : scripture.data?.scriptureStatus,
   };
   const done = q.data?.readers.some(r => r.id === actor);
-  return <section className="mx-auto max-w-2xl space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">教會靈修進度</h3><Input className="w-44" aria-label="讀經日期" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
+  return <section className="mx-auto max-w-2xl space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">教會靈修進度</h3><Input className="w-44" aria-label="讀經日期" type="date" min="1900-01-01" max={taipeiToday()} value={date} onChange={e => { if (devotionDate.safeParse(e.target.value).success && e.target.value <= taipeiToday()) setDate(e.target.value); }} /></div>
     {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : !date ? <p>請選日期。</p> : q.isPending ? <p role="status">載入課表中…</p> : !entry ? <div className="space-y-3 border-y py-6"><p>這一天尚未發佈教會靈修課程。</p><Button asChild variant="outline"><Link to="/learn/bible">閱讀聖經</Link></Button></div> : <>
       <div className="space-y-3"><p className="text-sm text-muted-foreground">{entry.planName}</p><h3 className="text-xl font-semibold">{entry.title}</h3></div>
       {scripture.isFetching && !entry.scriptureText && !reading?.previewVerses.length && <p role="status" className="text-sm text-muted-foreground">正在載入經文…</p>}
       {reading && <ScriptureSection key={`${date}:${entry.reference}`} reading={reading} retry={() => scripture.refetch()} />}
       <p className="whitespace-pre-wrap leading-8">{entry.body}</p>{entry.prayer && <div className="border-l-2 border-rose-300 pl-4"><h4 className="mb-2 text-sm font-semibold">回應禱告</h4><p className="whitespace-pre-wrap leading-7">{entry.prayer}</p></div>}{entry.loveAction && <div className="border-l-2 border-emerald-300 pl-4"><h4 className="mb-2 text-sm font-semibold">愛人行動</h4><p className="whitespace-pre-wrap leading-7">{entry.loveAction}</p></div>}
-      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小家分享已讀'}</Button><Button onClick={() => onShare(entry.reference)}><Pencil className="mr-2 h-4 w-4" />分享今日領受</Button></div>
+      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小家分享已讀'}</Button><Button onClick={() => onShare(entry.reference)}><Pencil className="mr-2 h-4 w-4" />分享這一天的領受</Button></div>
       <p className="text-sm text-muted-foreground">{q.data!.readers.length ? `分享已讀：${q.data!.readers.map(r => r.name).join('、')}` : '還沒有人分享已讀。'}</p>
     </>}
   </section>;

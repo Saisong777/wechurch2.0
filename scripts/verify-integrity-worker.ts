@@ -63,7 +63,9 @@ try {
       return response;
     };
   };
-  if(process.env.RUN_CHURCH_ONBOARDING_ONLY==='1'){
+  if(process.env.RUN_READING_HISTORY_ONLY==='1'){
+    const {verifyReadingHistoryHttp}=await import('./verify-reading-history-http');await verifyReadingHistoryHttp(pool,()=>makeClient(false));
+  } else if(process.env.RUN_CHURCH_ONBOARDING_ONLY==='1'){
     const {verifyChurchOnboardingHttp}=await import('./verify-church-onboarding-http');await verifyChurchOnboardingHttp(pool,()=>makeClient(false));
   } else if(process.env.RUN_MULTICHURCH_ONLY==='1'){
     const {verifyMultichurchHttp}=await import('./verify-multichurch-http');await verifyMultichurchHttp(pool,()=>makeClient(false));

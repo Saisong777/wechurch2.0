@@ -2,10 +2,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { taipeiToday } from '@shared/churchDevotion';
 import ChurchReadingPage from './ChurchReadingPage';
 import type { ChurchReadingSummary } from '@/lib/churchReading';
 
 const state = vi.hoisted(() => ({ data: undefined as ChurchReadingSummary | undefined, isLoading: false, isError: false, refetch: vi.fn() }));
+vi.mock('@/contexts/ChurchContext', () => ({ useChurchScopeKey: () => 'test-church' }));
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => state }));
 vi.mock('@/components/layout/Header', () => ({ Header: () => <header>每日靈修</header> }));
 vi.mock('@/components/ui/feature-gate', () => ({ FeatureGate: () => <p>每日靈修 beta 測試中</p> }));
@@ -14,7 +16,7 @@ beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
   state.isLoading = false; state.isError = false; state.refetch.mockReset();
-  state.data = { id: 'published-day', date: '2026-09-12', planName: '教會課表', dayNumber: 43, scriptureReference: '以賽亞書 43:1-全', devotionalTitle: '今日已發佈標題', devotionalText: '今日已發佈短文', previewVerses: [], sourceStatus: 'church-schedule' };
+  state.data = { id: 'published-day', date: taipeiToday(), planName: '教會課表', dayNumber: 43, scriptureReference: '以賽亞書 43:1-全', devotionalTitle: '今日已發佈標題', devotionalText: '今日已發佈短文', previewVerses: [], sourceStatus: 'church-schedule' };
 });
 afterEach(cleanup);
 const show = () => render(<MemoryRouter><ChurchReadingPage /></MemoryRouter>);
@@ -68,7 +70,7 @@ it('keeps loading separate from unpublished and hides cached content on errors',
   expect(screen.queryByText('今日已發佈短文')).toBeNull();
   state.isLoading = false; state.isError = true;
   view.rerender(<MemoryRouter><ChurchReadingPage /></MemoryRouter>);
-  expect(screen.getByRole('alert')).toHaveTextContent('暫時無法取得教會靈修課表');
+  expect(screen.getByRole('alert')).toHaveTextContent('暫時無法取得');
   expect(screen.queryByText('今日已發佈短文')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '重新載入' }));
   expect(state.refetch).toHaveBeenCalledOnce();
@@ -160,7 +162,7 @@ it('keeps notes and group routes available and omits an empty prayer tab', () =>
   show();
   expect(screen.queryByRole('tab', { name: '禱告' })).toBeNull();
   expect(screen.getByRole('link', { name: '回看筆記' })).toHaveAttribute('href', '/learn/my-notes');
-  expect(screen.getByRole('link', { name: '與小家一起讀經' })).toHaveAttribute('href', '/groups?entry=reading&view=reading');
+  expect(screen.getByRole('link', { name: '與小家一起讀經' })).toHaveAttribute('href', `/groups?entry=reading&view=reading&date=${taipeiToday()}`);
 });
 
 it('remembers the reading font size, resets it, and rejects invalid saved values', () => {

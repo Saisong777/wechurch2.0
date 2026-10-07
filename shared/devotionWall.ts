@@ -31,7 +31,7 @@ export const devotionWallShareInput = z.object({
   consent: z.literal(true),
 });
 export type DevotionShareSection = { key:string;label:string;text:string };
-export type DevotionShareDraft = { sourceId:string;title:string;body:string;reference:string;sections?:DevotionShareSection[] };
+export type DevotionShareDraft = { devotionalDate?:string;sourceId:string;title:string;body:string;reference:string;sections?:DevotionShareSection[] };
 export type DevotionWallPost = { id:string;title:string;body:string;reference:string;authorName:string;anonymous:boolean;isOwner:boolean;createdAt:string;expiresAt:string };
 export type DevotionWallFeed = ReturnType<typeof devotionDayWindow> & { posts:DevotionWallPost[];nextCursor:string|null };
 export function wallTimeRemaining(feed:Pick<DevotionWallFeed,'serverNow'|'expiresAt'>,elapsedMs:number) {
