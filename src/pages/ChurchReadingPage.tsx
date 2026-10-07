@@ -48,18 +48,15 @@ export default function ChurchReadingPage() {
   return <div className="min-h-screen bg-brand-warm">
     <Header variant="compact" title="每日靈修" backTo="/" />
     <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
-      <nav aria-label="靈修日期導覽" className="mb-6 space-y-3 border-b border-border pb-5">
-        <div className="flex items-center justify-between gap-3">
-          <label htmlFor="devotion-date" className="text-sm font-semibold">選擇靈修日期</label>
-          <Button variant="ghost" className="min-h-11" disabled={valid && requested === today} onClick={() => selectDate(today)}>回到今天</Button>
+      <nav aria-label="靈修日期導覽" className="mb-4 border-b border-border pb-2">
+        <label htmlFor="devotion-date" className="sr-only">選擇靈修日期</label>
+        <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem_auto] items-center gap-0.5 sm:gap-1">
+          <Button variant="outline" size="icon" disabled={!valid || requested <= '1900-01-01'} onClick={() => selectDate(shiftDevotionDate(requested, -1))} aria-label="前一天"><ChevronLeft aria-hidden="true" className="h-4 w-4" /></Button>
+          <Input id="devotion-date" aria-label="靈修日期" className="h-11 min-h-11 min-w-0 w-full px-1 text-base" type="date" min="1900-01-01" max={today} value={valid ? requested : ''} onChange={event => selectDate(event.target.value)} />
+          <Button variant="outline" size="icon" disabled={!valid || requested >= today} onClick={() => selectDate(shiftDevotionDate(requested, 1))} aria-label="後一天"><ChevronRight aria-hidden="true" className="h-4 w-4" /></Button>
+          <Button variant="ghost" className="h-11 min-w-11 whitespace-nowrap px-2" aria-label="回到今天" disabled={valid && requested === today} onClick={() => selectDate(today)}><span className="sm:hidden">今天</span><span className="hidden sm:inline">回到今天</span></Button>
         </div>
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
-          <Button variant="outline" className="min-h-11 px-3" disabled={!valid || requested <= '1900-01-01'} onClick={() => selectDate(shiftDevotionDate(requested, -1))} aria-label="前一天"><ChevronLeft aria-hidden="true" className="h-4 w-4" /><span className="hidden sm:inline">前一天</span></Button>
-          <Input id="devotion-date" aria-label="靈修日期" className="min-h-11 min-w-0 w-full text-base" type="date" min="1900-01-01" max={today} value={valid ? requested : ''} onChange={event => selectDate(event.target.value)} />
-          <Button variant="outline" className="min-h-11 px-3" disabled={!valid || requested >= today} onClick={() => selectDate(shiftDevotionDate(requested, 1))} aria-label="後一天"><span className="hidden sm:inline">後一天</span><ChevronRight aria-hidden="true" className="h-4 w-4" /></Button>
-        </div>
-        <p className="text-sm leading-6 text-muted-foreground">漏讀也可以從這裡補上，選擇日期後閱讀當天的內容、寫下領受。</p>
-        {valid && requested < today && <p role="status" className="text-sm font-medium text-primary">正在補讀 {requested} 的靈修</p>}
+        {valid && requested < today && <p role="status" className="mt-1 text-xs font-medium leading-5 text-primary">正在補讀 {requested} 的靈修</p>}
       </nav>
       {valid ? <ReadingDay key={`${scope}:${requested}`} date={requested} scope={scope} /> : <div role="alert" className="space-y-3 py-8"><p>請選擇今天或之前的有效日期。</p></div>}
     </main>
