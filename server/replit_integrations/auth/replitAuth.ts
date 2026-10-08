@@ -1,3 +1,4 @@
+import { loginWithGroupingSession } from '../../groupingSession';
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import session from "express-session";
@@ -58,7 +59,7 @@ export async function setupAuth(app: Express) {
         const rc = await pool.query(`SELECT id FROM user_roles WHERE user_id=$1`, [userId]);
         if (rc.rows.length > 0) { await pool.query(`UPDATE user_roles SET role='admin',updated_at=NOW() WHERE user_id=$1`, [userId]); }
         else { await pool.query(`INSERT INTO user_roles (id,user_id,role,created_at,updated_at) VALUES (gen_random_uuid(),$1,'admin',NOW(),NOW())`, [userId]); }
-        req.login({ claims: { sub: devAuthId, email: devEmail, first_name: displayName, last_name: "" }, expires_at: sessionDeadline() } as any, (err) => {
+        loginWithGroupingSession(req, { claims: { sub: devAuthId, email: devEmail, first_name: displayName, last_name: "" }, expires_at: sessionDeadline() } as any, (err) => {
           if (err) return res.status(500).json({ message: "Login failed" });
           req.session.save(() => res.redirect("/"));
         });
@@ -91,7 +92,7 @@ export async function setupAuth(app: Express) {
           const code = info?.message === 'GOOGLE_ACCOUNT_LINK_REQUIRED' ? 'google_link_required' : 'google_login_failed';
           return res.redirect(`/login?error=${code}`);
         }
-        req.login(prepareLoginReceipt(user as any), err => {
+        loginWithGroupingSession(req, prepareLoginReceipt(user as any), err => {
           if (err) {console.error('[Auth] Google session failed',authErrorMetadata(err));return res.status(503).send('登入狀態暫時無法完整儲存，請重新登入。');}
           req.session.save(async saveError => {
             if(saveError){console.error('[Auth] Google session save failed',authErrorMetadata(saveError));return res.status(503).send('登入狀態暫時無法完整儲存，請重新登入。');}

@@ -126,7 +126,7 @@ export interface IStorage {
   createGroupingActivity(activity: InsertGroupingActivity): Promise<GroupingActivity>;
   updateGroupingActivity(id: string, data: Partial<GroupingActivity>): Promise<GroupingActivity | undefined>;
   getGroupingParticipants(activityId: string): Promise<GroupingParticipant[]>;
-  addGroupingParticipant(participant: InsertGroupingParticipant): Promise<GroupingParticipant>;
+  addGroupingParticipant(participant: InsertGroupingParticipant & { id?: string }): Promise<GroupingParticipant>;
   updateGroupingParticipants(activityId: string, updates: { id: string; groupNumber: number }[]): Promise<void>;
   deleteGroupingActivity(id: string): Promise<void>;
   generateUniqueShortCode(): Promise<string>;
@@ -1042,7 +1042,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(groupingParticipants).where(eq(groupingParticipants.activityId, activityId)).orderBy(asc(groupingParticipants.joinedAt));
   }
 
-  async addGroupingParticipant(participant: InsertGroupingParticipant): Promise<GroupingParticipant> {
+  async addGroupingParticipant(participant: InsertGroupingParticipant & { id?: string }): Promise<GroupingParticipant> {
     const [newParticipant] = await db.insert(groupingParticipants).values(participant).returning();
     return newParticipant;
   }
@@ -1285,12 +1285,21 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(jesusDailyContent);
   }
 
+  private readingPlanTemplateCatalogScope() {
+    const church = selectedChurch();
+    const actorId = churchContext()?.actorId;
+    return and(
+      eq(readingPlanTemplates.church, church),
+      actorId ? or(eq(readingPlanTemplates.isPublic, true), eq(readingPlanTemplates.createdBy, actorId)) : sql`false`,
+    );
+  }
+
   async getReadingPlanTemplates(): Promise<ReadingPlanTemplate[]> {
-    return db.select().from(readingPlanTemplates).where(eq(readingPlanTemplates.church,selectedChurch())).orderBy(asc(readingPlanTemplates.name));
+    return db.select().from(readingPlanTemplates).where(this.readingPlanTemplateCatalogScope()).orderBy(asc(readingPlanTemplates.name));
   }
 
   async getReadingPlanTemplate(id: string): Promise<ReadingPlanTemplate | undefined> {
-    const [template] = await db.select().from(readingPlanTemplates).where(and(eq(readingPlanTemplates.id, id),eq(readingPlanTemplates.church,selectedChurch()))).limit(1);
+    const [template] = await db.select().from(readingPlanTemplates).where(and(eq(readingPlanTemplates.id, id), this.readingPlanTemplateCatalogScope())).limit(1);
     return template;
   }
 

@@ -1,3 +1,4 @@
+import { loginWithGroupingSession } from '../../groupingSession';
 import type { Express } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
@@ -87,7 +88,7 @@ export function registerAuthRoutes(app: Express): void {
         expires_at: sessionDeadline(),
       };
 
-      req.login(prepareLoginReceipt(sessionUser), (err: any) => {
+      loginWithGroupingSession(req, prepareLoginReceipt(sessionUser), (err: any) => {
         if (err) {
           console.error("[Auth] Register session error", authErrorMetadata(err));
           return res.status(err?.code ? 503 : 500).json({ message: "註冊成功但登入狀態尚未完整保存，請手動登入" });
@@ -176,7 +177,7 @@ export function registerAuthRoutes(app: Express): void {
         expires_at: sessionDeadline(),
       };
 
-      req.login(prepareLoginReceipt(sessionUser), (err: any) => {
+      loginWithGroupingSession(req, prepareLoginReceipt(sessionUser), (err: any) => {
         if (err) {
           console.error("[Auth] Login session error", authErrorMetadata(err));
           return res.status(err?.code ? 503 : 500).json({ message: "登入失敗，請稍後重試" });

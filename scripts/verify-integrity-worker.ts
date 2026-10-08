@@ -63,7 +63,12 @@ try {
       return response;
     };
   };
-  if(process.env.RUN_READING_HISTORY_ONLY==='1'){
+  if(process.env.RUN_SECURITY_FIX_ONLY==='1'){
+    const {verifyPrivateReadingTemplatesHttp}=await import('./verify-private-reading-templates-http');
+    await verifyPrivateReadingTemplatesHttp(pool,()=>makeClient(false));
+    const {verifyGroupingPrivacyHttp}=await import('./verify-grouping-privacy-http');
+    await verifyGroupingPrivacyHttp(pool,()=>makeClient(false));
+  } else if(process.env.RUN_READING_HISTORY_ONLY==='1'){
     const {verifyReadingHistoryHttp}=await import('./verify-reading-history-http');await verifyReadingHistoryHttp(pool,()=>makeClient(false));
   } else if(process.env.RUN_CHURCH_ONBOARDING_ONLY==='1'){
     const {verifyChurchOnboardingHttp}=await import('./verify-church-onboarding-http');await verifyChurchOnboardingHttp(pool,()=>makeClient(false));
@@ -92,6 +97,10 @@ try {
   await verifyFamilyDeleteHttp(pool, makeClient);
   const { verifyNotificationsHttp } = await import('./verify-notifications-http');
   await verifyNotificationsHttp(pool,makeClient);
+  const {verifyPrivateReadingTemplatesHttp}=await import('./verify-private-reading-templates-http');
+  await verifyPrivateReadingTemplatesHttp(pool,()=>makeClient(false));
+  const {verifyGroupingPrivacyHttp}=await import('./verify-grouping-privacy-http');
+  await verifyGroupingPrivacyHttp(pool,()=>makeClient(false));
   for (const hidden of ['/uploads/.bible-study/public-20260925-v1/data/core.sqlite', '/uploads/%2ebible-study/public-20260925-v1/NOTICE.md', '/uploads/%2Ebible-study/public-20260925-v1/data/core.sqlite', '/uploads/%252ebible-study/public-20260925-v1/NOTICE.md', '/uploads/missing-file.png']) {
     assert.equal((await guest(hidden)).status, 404);
   }

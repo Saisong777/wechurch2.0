@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/queryClient';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface GroupingActivity {
   id: string;
@@ -34,7 +35,7 @@ interface GroupingParticipant {
   name: string;
   gender: string;
   groupNumber: number | null;
-  joinedAt: string;
+  joinedAt?: string;
 }
 
 type GroupingMode = 'bySize' | 'byCount';
@@ -84,7 +85,7 @@ export const RandomGrouper = () => {
     refetchInterval: viewMode === 'host' ? getPollingInterval(5000) : false,
   });
 
-  const { data: activityData, refetch: refetchActivity, error: activityError } = useQuery<{ activity: GroupingActivity; participants: GroupingParticipant[] }>({
+  const { data: activityData, refetch: refetchActivity, error: activityError } = useQuery<{ activity: GroupingActivity; participants: GroupingParticipant[]; myParticipantId: string | null; canManage: boolean }>({
     queryKey: [`/api/grouping/${currentActivityId}`],
     enabled: !!currentActivityId && viewMode === 'activity',
     refetchInterval: getPollingInterval(5000),
@@ -93,7 +94,7 @@ export const RandomGrouper = () => {
 
   const activity = activityData?.activity;
   const participants = activityData?.participants || [];
-  const isOwner = activity?.ownerId === user?.id;
+  const isOwner = activityData?.canManage === true;
   const isFinished = activity?.status === 'finished';
 
   // Detect when activity is deleted by leader and redirect to homepage
@@ -117,36 +118,28 @@ export const RandomGrouper = () => {
   }, [activityError, viewMode, currentActivityId, navigate, activityDeleted]);
 
   useEffect(() => {
-    if (!activity && viewMode === 'activity' && !activityError && !activityDeleted) {
+    if (!currentActivityId && !activity && viewMode === 'activity' && !activityError && !activityDeleted) {
       setViewMode('home');
       setCurrentActivityId(null);
     }
-  }, [activity, viewMode, activityError, activityDeleted]);
+  }, [activity, currentActivityId, viewMode, activityError, activityDeleted]);
 
   useEffect(() => {
-    if (currentActivityId) {
-      const stored = localStorage.getItem(`grouping_participant_${currentActivityId}`);
-      if (stored) {
-        setHasJoined(true);
-        setMyParticipantId(stored);
-      } else {
-        setHasJoined(false);
-        setJoinName('');
-        setJoinGender('');
-        setMyParticipantId(null);
-      }
-    }
-  }, [currentActivityId]);
+    if (!activityData || activityData.activity.id !== currentActivityId) return;
+    setHasJoined(!!activityData.myParticipantId);
+    setMyParticipantId(activityData.myParticipantId || null);
+  }, [currentActivityId, activityData]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', '/api/grouping', {
+      const response = await apiRequest('POST', '/api/grouping', {
         title: '神的安排',
         groupingMode,
         groupSize,
         groupCount,
         genderMode,
       });
+      return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/grouping/my-activities'] });
@@ -186,9 +179,6 @@ export const RandomGrouper = () => {
       queryClient.invalidateQueries({ queryKey: [`/api/grouping/${currentActivityId}`] });
       setHasJoined(true);
       setMyParticipantId(data?.id || null);
-      if (data?.id && currentActivityId) {
-        localStorage.setItem(`grouping_participant_${currentActivityId}`, data.id);
-      }
       toast.success('加入成功！');
     },
     onError: (error: any) => {
@@ -256,11 +246,6 @@ export const RandomGrouper = () => {
     setCopiedCode(true);
     toast.success('已複製代碼');
     setTimeout(() => setCopiedCode(false), 2000);
-  };
-
-  const getQRCodeUrl = (code: string) => {
-    const url = `${window.location.origin}/icebreaker?code=${code}`;
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
   };
 
   useEffect(() => {
@@ -500,7 +485,7 @@ export const RandomGrouper = () => {
           </p>
         </div>
 
-        {!isFinished && (isOwner || user?.role === 'admin') && (
+        {!isFinished && isOwner && (
           <Card className="bg-primary/5 border-primary/20">
             <CardContent className="py-4">
               <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -519,11 +504,11 @@ export const RandomGrouper = () => {
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-2">
-                  <img 
-                    src={getQRCodeUrl(activity.shortCode)} 
-                    alt="QR Code"
+                  <QRCodeSVG
+                    value={`${window.location.origin}/grouper?code=${activity.shortCode}`}
+                    title="掃碼加入活動"
+                    size={96}
                     className="w-24 h-24 rounded-lg border bg-white"
-                    loading="lazy"
                   />
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <QrCode className="w-3 h-3" />
@@ -541,14 +526,14 @@ export const RandomGrouper = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  目前參與者 ({participants.length} 人)
+                  {isOwner ? `目前參與者 (${participants.length} 人)` : '我的參與狀態'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {participants.length === 0 ? (
                   <p className="text-muted-foreground text-center py-4">
                     <Clock className="w-5 h-5 inline-block mr-2" />
-                    等待參與者加入...
+                    {isOwner ? '等待參與者加入...' : '加入後可查看自己的分組。'}
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
@@ -572,7 +557,7 @@ export const RandomGrouper = () => {
               </CardContent>
             </Card>
 
-            {!hasJoined && !(isOwner || user?.role === 'admin') && (
+            {!hasJoined && !isOwner && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">加入活動</CardTitle>
@@ -628,7 +613,7 @@ export const RandomGrouper = () => {
               </Card>
             )}
 
-            {(isOwner || user?.role === 'admin') && (
+            {isOwner && (
               <div className="flex gap-3">
                 <Button
                   onClick={() => executeMutation.mutate()}
@@ -656,7 +641,7 @@ export const RandomGrouper = () => {
         {isFinished && Object.keys(groups).length > 0 && (
           <>
             {/* Leader view - shows all groups */}
-            {(isOwner || user?.role === 'admin') ? (
+            {isOwner ? (
               <>
                 <div className="flex items-center justify-between">
                   <Badge variant="secondary" className="text-xs">

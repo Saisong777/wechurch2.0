@@ -103,6 +103,8 @@ import {
   requestContext,
 } from "./observability";
 import { readingPlanAccess, retiredOperations } from './readingPlanAccess';
+import { groupingAccess } from './groupingAccess';
+import { loginWithGroupingSession } from './groupingSession';
 import { personalPrayerRoutes } from './personalPrayerRoutes';
 import { prayerSharingRoutes } from './prayerSharingRoutes';
 import { prayerInteractionRoutes } from './prayerInteractionRoutes';
@@ -2541,6 +2543,8 @@ export async function registerRoutes(app: Express) {
   });
 
   // ========== Grouping Activities (神的安排) ==========
+  const groupingPrivacy = groupingAccess(storage, resolveUserId);
+  app.use('/api/grouping', (_req, res, next) => { res.setHeader('Cache-Control', 'private, no-store'); next(); });
 
   // Get user's own active grouping activities
   app.get("/api/grouping/my-activities", async (req, res) => {
@@ -2549,16 +2553,7 @@ export async function registerRoutes(app: Express) {
         return res.json({ activities: [] });
       }
 
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
+      const userId = await resolveUserId(req);
 
       if (!userId) {
         return res.json({ activities: [] });
@@ -2584,8 +2579,7 @@ export async function registerRoutes(app: Express) {
       if (!activity) {
         return res.status(404).json({ error: "Activity not found or already closed" });
       }
-      const participants = await storage.getGroupingParticipants(activity.id);
-      res.json({ activity, participants });
+      res.json(await groupingPrivacy.view(req, activity));
     } catch (error) {
       res.status(500).json({ error: "Failed to get activity" });
     }
@@ -2598,8 +2592,7 @@ export async function registerRoutes(app: Express) {
       if (!activity) {
         return res.status(404).json({ error: "Activity not found" });
       }
-      const participants = await storage.getGroupingParticipants(activity.id);
-      res.json({ activity, participants });
+      res.json(await groupingPrivacy.view(req, activity));
     } catch (error) {
       res.status(500).json({ error: "Failed to get activity" });
     }
@@ -2612,28 +2605,8 @@ export async function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      // Get user info from OIDC claims
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-
-      // Look up the full user info from auth storage (which includes legacyUserId)
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-
-      let userId = fullUser?.legacyUserId;
-      let role: string | undefined;
-
-      if (!userId && fullUser?.email) {
-        // Fallback: look up legacy user by email
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) {
-          userId = legacyUser.id;
-        }
-      }
-
-      if (userId) {
-        role = await storage.getUserRole(userId);
-      }
+      const userId = await resolveUserId(req);
+      const role = userId ? await storage.getUserRole(userId) : undefined;
 
       if (!role || !['leader', 'future_leader', 'admin'].includes(role)) {
         return res.status(403).json({ error: "Only leaders and admins can create grouping activities" });
@@ -2668,29 +2641,22 @@ export async function registerRoutes(app: Express) {
       if (!activity) {
         return res.status(404).json({ error: "Activity not found" });
       }
+      const own = await groupingPrivacy.owned(req, activity.id);
+      if (own) return void res.json(own);
       if (activity.status !== 'joining') {
         return res.status(400).json({ error: "Activity is not accepting participants" });
       }
 
-      const { name, gender } = req.body;
-      if (!name || !gender) {
-        return res.status(400).json({ error: "Name and gender are required" });
-      }
+      const input = z.object({ name: z.string().trim().min(1).max(100), gender: z.enum(['M', 'F']) }).safeParse(req.body);
+      if (!input.success) return void res.status(400).json({ error: '請填寫姓名與性別。' });
 
-      // Return existing record if same name already joined (handles page refresh / rejoin)
-      const existingParticipants = await storage.getGroupingParticipants(activity.id);
-      const existing = existingParticipants.find(p => p.name === name);
-      if (existing) {
-        return res.json(existing);
-      }
-
-      const participant = await storage.addGroupingParticipant({
-        activityId: activity.id,
-        name,
-        gender,
+      const participant = await groupingPrivacy.join(req, activity.id, {
+        name: input.data.name,
+        gender: input.data.gender,
       });
       res.json(participant);
     } catch (error) {
+      if (error instanceof GroupError) return void res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to join activity" });
     }
   });
@@ -2707,23 +2673,8 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Activity not found" });
       }
 
-      // Get user info from OIDC claims
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
-
-      if (activity.ownerId !== userId) {
-        const role = userId ? await storage.getUserRole(userId) : undefined;
-        if (role !== 'admin') {
-          return res.status(403).json({ error: "Only the activity owner can execute grouping" });
-        }
+      if (!await groupingPrivacy.canManage(req, activity)) {
+        return res.status(403).json({ error: "Only the activity owner can execute grouping" });
       }
 
       const participants = await storage.getGroupingParticipants(activity.id);
@@ -2799,23 +2750,8 @@ export async function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Activity not found" });
       }
 
-      // Get user info from OIDC claims
-      const claims = (req.user as any).claims || {};
-      const authUserId = claims.sub;
-      const { authStorage } = await import("./replit_integrations/auth/storage");
-      const fullUser = await authStorage.getUser(authUserId);
-
-      let userId = fullUser?.legacyUserId;
-      if (!userId && fullUser?.email) {
-        const legacyUser = await storage.getUserByEmail(fullUser.email);
-        if (legacyUser) userId = legacyUser.id;
-      }
-
-      if (activity.ownerId !== userId) {
-        const role = userId ? await storage.getUserRole(userId) : undefined;
-        if (role !== 'admin') {
-          return res.status(403).json({ error: "Only the activity owner can close it" });
-        }
+      if (!await groupingPrivacy.canManage(req, activity)) {
+        return res.status(403).json({ error: "Only the activity owner can close it" });
       }
 
       await storage.deleteGroupingActivity(activity.id);
@@ -4653,7 +4589,7 @@ export async function registerRoutes(app: Express) {
       };
 
       delete req.session.lineLogin;
-      req.login(prepareLoginReceipt(sessionUser), (loginError: unknown) => {
+      loginWithGroupingSession(req, prepareLoginReceipt(sessionUser), (loginError: unknown) => {
         if (loginError) {
           console.error("[LINE Login] Session error:", authErrorMetadata(loginError));
           return res.status(503).send('登入狀態暫時無法完整儲存，請重新登入。');
