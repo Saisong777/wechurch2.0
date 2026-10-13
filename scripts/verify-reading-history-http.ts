@@ -8,7 +8,7 @@ type Client = (path: string, method?: string, body?: unknown) => Promise<Respons
 export async function verifyReadingHistoryHttp(pool: Pool, makeClient: () => Client) {
   assert.match((await pool.query('SELECT current_database() AS name')).rows[0].name, /^wechurch_integrity_[a-f0-9]{32}$/);
   const churches = ['IM 行動教會', '桃園WeChurch', '火樂'];
-  const today = taipeiToday(), yesterday = shiftDevotionDate(today, -1), older = shiftDevotionDate(today, -2);
+  const today = taipeiToday(), tomorrow = shiftDevotionDate(today, 1), dayAfterTomorrow = shiftDevotionDate(today, 2), yesterday = shiftDevotionDate(today, -1), older = shiftDevotionDate(today, -2);
   const register = async (church: string | null) => {
     const client = makeClient(), email = `reading-history-${randomUUID()}@example.test`;
     const response = await client('/api/auth/register', 'POST', { email, password: randomUUID(), displayName: 'Synthetic history fixture' });
@@ -21,7 +21,7 @@ export async function verifyReadingHistoryHttp(pool: Pool, makeClient: () => Cli
   for (const church of churches) members.push(await register(church));
   const none = await register(null), guest = makeClient(), owner = members[0];
   const noteInput = { verseReference: '詩篇 23', verseText: 'Synthetic scripture', observation: 'Synthetic private reflection' };
-  const dates = [today, yesterday, older];
+  const dates = [today, yesterday, older, tomorrow];
   const entries: { id: string; date: string; church: string }[] = [];
   for (let i = 0; i < churches.length; i++) for (const date of dates) {
     const entry = (await pool.query(`INSERT INTO church_devotions(church,date,plan_name,day_number,scripture_reference,scripture_text,devotional_title,devotional_text,status,updated_by)
@@ -42,7 +42,27 @@ export async function verifyReadingHistoryHttp(pool: Pool, makeClient: () => Cli
   assert.equal((await guest(`/api/church-reading/today?date=${older}`)).status, 401);
   assert.equal((await none.client(`/api/church-reading/today?date=${older}`)).status, 403);
   assert.equal((await owner.client('/api/church-reading/today?date=2026-02-30')).status, 400);
-  console.log('PASS reading history: published past dates, no fallback, three isolated churches, guest and no-church boundary');
+  console.log('PASS reading history: published past/today/tomorrow dates, no fallback, three isolated churches, guest and no-church boundary');
+
+  // Tomorrow is a published-only read preview; draft content never reaches readers.
+  for (let i = 0; i < churches.length; i++) {
+    await pool.query(`INSERT INTO church_devotions(church,date,plan_name,day_number,scripture_reference,scripture_text,devotional_title,devotional_text,status,updated_by)
+      VALUES($1,$2,'Synthetic draft plan',1,'詩篇 24','Synthetic draft scripture','Secret draft title','Secret draft body','draft',$3)`, [churches[i], dayAfterTomorrow, members[i].id]);
+    const response = await members[i].client(`/api/church-reading/today?date=${dayAfterTomorrow}`);
+    assert.equal(response.status, 200);
+    const draft = await response.json();
+    assert.equal(draft.date, dayAfterTomorrow); assert.equal(draft.sourceStatus, 'unpublished');
+    assert.equal(draft.devotionalText, ''); assert(!JSON.stringify(draft).includes('Secret draft'));
+  }
+  const tomorrowEntry = entries.find(e => e.date === tomorrow && e.church === churches[0])!;
+  await pool.query("UPDATE church_devotions SET status='draft' WHERE id=$1", [tomorrowEntry.id]);
+  const unpublishedTomorrow = await owner.client(`/api/church-reading/today?date=${tomorrow}`);
+  assert.equal(unpublishedTomorrow.status, 200);
+  const preview = await unpublishedTomorrow.json();
+  assert.equal(preview.date, tomorrow); assert.equal(preview.sourceStatus, 'unpublished');
+  assert.equal(preview.devotionalText, ''); assert.notEqual(preview.id, entries.find(e => e.date === today && e.church === churches[0])!.id);
+  await pool.query("UPDATE church_devotions SET status='published' WHERE id=$1", [tomorrowEntry.id]);
+  console.log('PASS tomorrow preview: published-only read across three churches; unpublished tomorrow and draft day-after expose no draft or today fallback');
 
   const noteIds: string[] = [];
   for (const date of [yesterday, older]) {
@@ -81,6 +101,13 @@ export async function verifyReadingHistoryHttp(pool: Pool, makeClient: () => Cli
   console.log('PASS reading history: existing imported source metadata cannot be overwritten; no-church personal notes preserved');
 
   const groupId = (await pool.query("INSERT INTO small_groups(name,church,leader_user_id) VALUES('Synthetic historical readers','IM 行動教會',$1) RETURNING id", [owner.id])).rows[0].id;
+  const tomorrowProgressResponse = await owner.client(`/api/life-groups/${groupId}/reading?date=${tomorrow}`);
+  assert.equal(tomorrowProgressResponse.status, 200);
+  const tomorrowProgress = await tomorrowProgressResponse.json();
+  assert.equal(tomorrowProgress.entry.id, tomorrowEntry.id); assert.equal(tomorrowProgress.readers.length, 0);
+  const groupDraft = await owner.client(`/api/life-groups/${groupId}/reading?date=${dayAfterTomorrow}`);
+  assert.equal(groupDraft.status, 200); assert.equal((await groupDraft.json()).entry, null);
+  console.log('PASS tomorrow preview: group reads the same published tomorrow entry and hides draft schedules; existing future-note guard remains rejected above');
   const oldEntry = entries.find(e => e.date === older && e.church === churches[0])!;
   assert.equal((await owner.client(`/api/life-groups/${groupId}/reading/${oldEntry.id}`, 'PUT', { version: 1, done: true })).status, 200);
   const oldProgress = await (await owner.client(`/api/life-groups/${groupId}/reading?date=${older}`)).json();

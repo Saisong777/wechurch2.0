@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -10,25 +10,7 @@ import { DevotionalReader } from '@/components/scripture/DevotionalReader';
 import { DevotionalNoteDialog } from '@/components/scripture/DevotionalNoteDialog';
 import { fetchChurchReadingForToday, type ChurchReadingSummary } from '@/lib/churchReading';
 import { devotionDate, shiftDevotionDate, taipeiToday } from '@shared/churchDevotion';
-
-// Refresh calendar bounds after midnight and when returning from background.
-// Keep the displayed day stable until the reader chooses another day: an open
-// unsaved note must not disappear just because the calendar clock changes.
-function useTaipeiToday() {
-  const [today, setToday] = useState(taipeiToday);
-  useEffect(() => {
-    const sync = () => setToday(taipeiToday());
-    const timer = window.setInterval(sync, 30000);
-    window.addEventListener('focus', sync);
-    document.addEventListener('visibilitychange', sync);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('focus', sync);
-      document.removeEventListener('visibilitychange', sync);
-    };
-  }, []);
-  return today;
-}
+import { useTaipeiToday } from '@/hooks/useTaipeiToday';
 
 // The date is part of the route, so the existing unsaved-note guard also protects
 // date changes, browser Back/Forward and links to a different devotional day.
@@ -37,10 +19,11 @@ export default function ChurchReadingPage() {
   const scope = useChurchScopeKey();
   const [initialDay] = useState(taipeiToday);
   const today = useTaipeiToday();
+  const tomorrow = shiftDevotionDate(today, 1);
   const requested = search.get('date') ?? initialDay;
-  const valid = devotionDate.safeParse(requested).success && requested <= today;
+  const valid = devotionDate.safeParse(requested).success && requested <= tomorrow;
   function selectDate(date: string) {
-    if (!devotionDate.safeParse(date).success || date > today || date === requested) return;
+    if (!devotionDate.safeParse(date).success || date > tomorrow || date === requested) return;
     const next = new URLSearchParams(search);
     next.set('date', date);
     setSearch(next);
@@ -52,18 +35,19 @@ export default function ChurchReadingPage() {
         <label htmlFor="devotion-date" className="sr-only">選擇靈修日期</label>
         <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem_auto] items-center gap-0.5 sm:gap-1">
           <Button variant="outline" size="icon" disabled={!valid || requested <= '1900-01-01'} onClick={() => selectDate(shiftDevotionDate(requested, -1))} aria-label="前一天"><ChevronLeft aria-hidden="true" className="h-4 w-4" /></Button>
-          <Input id="devotion-date" aria-label="靈修日期" className="h-11 min-h-11 min-w-0 w-full px-1 text-base" type="date" min="1900-01-01" max={today} value={valid ? requested : ''} onChange={event => selectDate(event.target.value)} />
-          <Button variant="outline" size="icon" disabled={!valid || requested >= today} onClick={() => selectDate(shiftDevotionDate(requested, 1))} aria-label="後一天"><ChevronRight aria-hidden="true" className="h-4 w-4" /></Button>
+          <Input id="devotion-date" aria-label="靈修日期" className="h-11 min-h-11 min-w-0 w-full px-1 text-base" type="date" min="1900-01-01" max={tomorrow} value={valid ? requested : ''} onChange={event => selectDate(event.target.value)} />
+          <Button variant="outline" size="icon" disabled={!valid || requested >= tomorrow} onClick={() => selectDate(shiftDevotionDate(requested, 1))} aria-label="後一天"><ChevronRight aria-hidden="true" className="h-4 w-4" /></Button>
           <Button variant="ghost" className="h-11 min-w-11 whitespace-nowrap px-2" aria-label="回到今天" disabled={valid && requested === today} onClick={() => selectDate(today)}><span className="sm:hidden">今天</span><span className="hidden sm:inline">回到今天</span></Button>
         </div>
         {valid && requested < today && <p role="status" className="mt-1 text-xs font-medium leading-5 text-primary">正在補讀 {requested} 的靈修</p>}
+        {valid && requested > today && <p role="status" className="mt-1 text-xs font-medium leading-5 text-primary">正在預讀明天 {requested} 的靈修</p>}
       </nav>
-      {valid ? <ReadingDay key={`${scope}:${requested}`} date={requested} scope={scope} /> : <div role="alert" className="space-y-3 py-8"><p>請選擇今天或之前的有效日期。</p></div>}
+      {valid ? <ReadingDay key={`${scope}:${requested}`} date={requested} scope={scope} preview={requested > today} /> : <div role="alert" className="space-y-3 py-8"><p>請選擇明天或之前的有效日期。</p></div>}
     </main>
   </div>;
 }
 
-function ReadingDay({ date, scope }: { date: string; scope: string }) {
+function ReadingDay({ date, scope, preview }: { date: string; scope: string; preview: boolean }) {
   const { data: reading, isLoading, isError, refetch } = useQuery({
     queryKey: ['/api/church-reading/today', scope, date],
     queryFn: async () => {
@@ -81,6 +65,7 @@ function ReadingDay({ date, scope }: { date: string; scope: string }) {
   const noteSectionRef = useRef<HTMLDivElement>(null);
   const noteTriggerRef = useRef<HTMLElement | null>(null);
   const openNote = () => {
+    if (preview) return;
     noteTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (!noteOpen && reading) setNoteReading(reading);
     setNoteOpen(true);
@@ -103,7 +88,7 @@ function ReadingDay({ date, scope }: { date: string; scope: string }) {
       <div className="space-y-3 py-8"><h1 className="text-xl font-semibold">{reading.devotionalTitle}</h1><p className="text-sm text-muted-foreground">{displayedDate}</p><Button asChild variant="outline"><Link to="/learn/bible">閱讀聖經</Link></Button></div>
     ) : reading ? <>
       {reading.sourceStatus === 'fallback' && <p role="status" className="mb-4 text-sm text-muted-foreground">目前顯示備用內容，非已發佈的教會課表。</p>}
-      <DevotionalReader key={`${reading.date}:${reading.scriptureReference}`} reading={reading} retry={() => refetch()} onNote={openNote} />
+      <DevotionalReader key={`${reading.date}:${reading.scriptureReference}`} reading={reading} retry={() => refetch()} onNote={openNote} preview={preview} />
     </> : null}
     {noteContext && <div ref={noteSectionRef}>
       <DevotionalNoteDialog key={date} inline open={noteOpen} onOpenChange={changeNoteOpen}

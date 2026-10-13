@@ -29,8 +29,8 @@ function ProseSection({ title, body }: { title: string; body: string }) {
   </section>;
 }
 
-export function DevotionalReader({ reading, retry, onNote }: {
-  reading: ChurchReadingSummary; retry: () => void; onNote: () => void;
+export function DevotionalReader({ reading, retry, onNote, preview = false }: {
+  reading: ChurchReadingSummary; retry: () => void; onNote: () => void; preview?: boolean;
 }) {
   const [fontSize, setFontSize] = useState(savedFontSize);
   const [panel, setPanel] = useState('scripture');
@@ -44,8 +44,11 @@ export function DevotionalReader({ reading, retry, onNote }: {
   const prayer: DevotionalSection[] = sections.filter(section => section.panel === 'prayer');
   if (reading.prayer) prayer.push({ title: '今日愛神', body: reading.prayer, panel: 'prayer' });
   if (reading.keyVerse) prayer.push({ title: '今日金句', body: reading.keyVerse, panel: 'prayer' });
-  const isPast = !!reading.date && reading.date < taipeiToday();
-  const dayWord = isPast ? '這一天' : '今天';
+  const today = taipeiToday();
+  const isPast = !!reading.date && reading.date < today;
+  const isFuture = !!reading.date && reading.date > today;
+  const dayWord = isFuture ? '明天' : isPast ? '這一天' : '今天';
+  const noteHintId = useId();
   const displayedDate = reading.date
     ? new Date(`${reading.date}T00:00:00`).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' })
     : '今天';
@@ -73,9 +76,10 @@ export function DevotionalReader({ reading, retry, onNote }: {
         <p className="pb-2 pt-1 leading-6">{reading.planName}</p>
       </details>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={onNote}><PenLine aria-hidden="true" className="mr-2 h-4 w-4" />寫靈修筆記</Button>
+        <Button onClick={onNote} disabled={preview} aria-describedby={preview ? noteHintId : undefined}><PenLine aria-hidden="true" className="mr-2 h-4 w-4" />寫靈修筆記</Button>
         <Button asChild variant="ghost"><Link to="/learn/my-notes"><NotebookPen aria-hidden="true" className="mr-2 h-4 w-4" />回看筆記</Link></Button>
       </div>
+      {preview && <p id={noteHintId} className="text-sm text-muted-foreground">預讀期間可閱讀經文、靈修與禱告；當天即可寫筆記。</p>}
     </header>
 
     <div className="reader-font-control">
@@ -104,11 +108,11 @@ export function DevotionalReader({ reading, retry, onNote }: {
         {Boolean(reading.workCommands?.length) && <ProseSection title="今日工作指令" body={reading.workCommands!.join('\n\n')} />}
         {Boolean(reading.startupSteps?.length) && <ProseSection title="7:00 啟動流程" body={reading.startupSteps!.map(step => `${step.label}\n${step.text}`).join('\n\n')} />}
         {!devotion.length && !reading.loveAction && !reading.workCommands?.length && !reading.startupSteps?.length && <p className="py-8 text-muted-foreground">{dayWord}沒有另外的靈修短文。</p>}
-        <div className="reader-next"><Button variant="outline" onClick={() => prayer.length ? nextPanel('prayer') : onNote()}>{prayer.length ? (isPast ? '進入這一天的禱告' : '進入今日禱告') : `寫下${dayWord}的領受`}<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
+        <div className="reader-next"><Button variant="outline" disabled={preview && !prayer.length} aria-describedby={preview && !prayer.length ? noteHintId : undefined} onClick={() => prayer.length ? nextPanel('prayer') : onNote()}>{prayer.length ? (isFuture ? '進入明天的禱告' : isPast ? '進入這一天的禱告' : '進入今日禱告') : `寫下${dayWord}的領受`}<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
       </TabsContent>
       {prayer.length > 0 && <TabsContent value="prayer" forceMount hidden={panel !== 'prayer'}>
         {prayer.map((section, index) => <ProseSection key={index} {...section} />)}
-        <div className="reader-next"><Button onClick={onNote}><PenLine aria-hidden="true" className="mr-2 h-4 w-4" />寫下{dayWord}的領受</Button></div>
+        <div className="reader-next"><Button onClick={onNote} disabled={preview} aria-describedby={preview ? noteHintId : undefined}><PenLine aria-hidden="true" className="mr-2 h-4 w-4" />寫下{dayWord}的領受</Button></div>
       </TabsContent>}
     </Tabs>
     <footer className="mt-4 border-t border-border pt-4">

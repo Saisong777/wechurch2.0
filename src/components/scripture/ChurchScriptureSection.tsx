@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ChurchReadingSummary } from '@/lib/churchReading';
 import { formatScriptureText } from '@/lib/scriptureDisplay';
+import { taipeiToday } from '@shared/churchDevotion';
 
 export function ScriptureSection({ reading, retry, defaultExpanded = false }: { reading: ChurchReadingSummary; retry: () => void; defaultExpanded?: boolean }) {
   const location = useLocation();
@@ -16,6 +17,8 @@ export function ScriptureSection({ reading, retry, defaultExpanded = false }: { 
   }, [expanded, expansionKey]);
   const contentId = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const today = taipeiToday();
+  const label = reading.date && reading.date > today ? '明日經文' : reading.date && reading.date < today ? '這一天的經文' : '今日經文';
   const canCollapse = reading.previewVerses.length > 2 || Boolean(reading.scriptureText);
   const verses = expanded ? reading.previewVerses : reading.previewVerses.slice(0, 2);
   const collapseFromEnd = () => {
@@ -25,7 +28,7 @@ export function ScriptureSection({ reading, retry, defaultExpanded = false }: { 
   };
 
   return (
-    <section aria-label="今日經文" className="space-y-3 border-y border-border py-5" data-testid="daily-scripture-full">
+    <section aria-label={label} className="space-y-3 border-y border-border py-5" data-testid="daily-scripture-full">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h2 className="min-w-0 break-words text-base font-semibold">{reading.scriptureReference}</h2>
         {canCollapse && <Button ref={toggleRef} variant="ghost" size="sm" className="min-h-11 shrink-0" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(!expanded)}>

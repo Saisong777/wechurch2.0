@@ -13,7 +13,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { careStatuses, type GroupCare, type GroupMember, type GroupShare, type GroupSummary, type CareUpdate, type ShareSource } from '@shared/lifeGroup';
-import { devotionDate, taipeiToday } from '@shared/churchDevotion';
+import { devotionDate, shiftDevotionDate, taipeiToday } from '@shared/churchDevotion';
+import { useTaipeiToday } from '@/hooks/useTaipeiToday';
+import { useChurchScopeKey } from '@/contexts/ChurchContext';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 import { FamilyJoinPanel } from '@/components/groups/FamilyJoinPanel';
@@ -43,7 +45,9 @@ export default function LifeGroupsPage() {
   const location = useLocation();
   const [search] = useSearchParams();
   const readingDate = search.get('date');
-  const readingSuffix = readingDate && devotionDate.safeParse(readingDate).success && readingDate <= taipeiToday() ? `&date=${encodeURIComponent(readingDate)}` : '';
+  // Preserve an explicit date, including invalid links: the reading panel shows
+  // an error instead of silently substituting today's schedule.
+  const readingSuffix = readingDate !== null ? `&date=${encodeURIComponent(readingDate)}` : '';
   const readingEntry = search.get('entry') === 'reading' && !groupId && search.get('manage') !== '1';
   const q = useGroupQuery<{ groups: GroupSummary[]; requests: Array<{ id: string; name: string; status: string }>; canCreate: boolean }>('');
   const client = useQueryClient();
@@ -90,6 +94,9 @@ export default function LifeGroupsPage() {
 type Info = { leaderId?: string | null; coLeaderId?: string | null; leaderName?: string | null; coLeaderName?: string | null; id: string; name: string; manager: boolean; members: GroupMember[]; requests: Array<{ id: string; name: string }>; announcement?: string; meeting?: string; description?: string; status?: string };
 function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) {
   const { user } = useAuth();
+  const [search] = useSearchParams();
+  const today = useTaipeiToday();
+  const preview = (search.get('date') || today) > today;
   const q = useGroupQuery<Info>(`/${id}`);
   const [tab, setTab] = useState(['reading','note','prayer','message','all','care','info'].includes(initialTab) ? initialTab : 'all');
   const [membersOpen, setMembersOpen] = useState(false);
@@ -124,21 +131,27 @@ function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) 
       {tab === 'info' && <section className="space-y-5"><p className="whitespace-pre-wrap">{info.description}</p><div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => setMembersOpen(true)}><Users className="mr-2 h-4 w-4" />成員與邀請</Button><Button variant="outline" onClick={() => setTab('care')}><HandHeart className="mr-2 h-4 w-4" />共同關懷</Button>{info.manager && <Button asChild variant="outline"><Link to="/groups?manage=1">管理小家</Link></Button>}</div></section>}
       {tab === 'care' && <CareFeed id={id} actor={user!.id} info={info} create={() => setCareOpen(true)} busy={busy} act={act} />}
     </div>
-    {compose && tab === 'reading' && <ShareComposer id={id} groupName={info.name} {...compose} close={() => setCompose(null)} />}
+    {compose && tab === 'reading' && <ShareComposer id={id} groupName={info.name} {...compose} preview={preview} close={() => setCompose(null)} />}
     {careOpen && <CareComposer id={id} info={info} close={() => setCareOpen(false)} />}
     {membersOpen && <Members id={id} info={info} actor={user!.id} close={() => setMembersOpen(false)} />}
   </>;
 }
 type Act = (work: () => Promise<unknown>) => Promise<void>;
 function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string; busy: boolean; act: Act; onShare: (reference: string) => void }) {
-  const [search] = useSearchParams();
-  const [date, setDate] = useState(() => { const value = search.get('date'); return value && devotionDate.safeParse(value).success && value <= taipeiToday() ? value : taipeiToday(); });
-  const q = useGroupQuery<{ entry: { id: string; version: number; title: string; reference: string; scriptureText: string; body: string; prayer: string; loveAction: string; planName: string } | null; readers: Array<{ id: string; name: string }> }>(`/${id}/reading?date=${date}`, !!date);
+  const [search, setSearch] = useSearchParams();
+  const [initialDay] = useState(taipeiToday);
+  const today = useTaipeiToday();
+  const tomorrow = shiftDevotionDate(today, 1);
+  const date = search.get('date') ?? initialDay;
+  const valid = devotionDate.safeParse(date).success && date <= tomorrow;
+  const preview = date > today;
+  const scope = useChurchScopeKey();
+  const q = useGroupQuery<{ entry: { id: string; version: number; title: string; reference: string; scriptureText: string; body: string; prayer: string; loveAction: string; planName: string } | null; readers: Array<{ id: string; name: string }> }>(`/${id}/reading?date=${date}`, valid);
   const entry = q.data?.entry;
   const scripture = useQuery({
-    queryKey: ['/api/church-reading/today', date],
+    queryKey: ['/api/church-reading/today', scope, date],
     queryFn: () => fetchChurchReadingForToday(date),
-    enabled: !!entry && !entry.scriptureText && !!date,
+    enabled: valid && !!entry && !entry.scriptureText,
     staleTime: 30000,
     retry: 1,
   });
@@ -150,13 +163,15 @@ function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string;
     scriptureStatus: entry.scriptureText ? 'ready' : scripture.isError ? 'unavailable' : scripture.data?.scriptureStatus,
   };
   const done = q.data?.readers.some(r => r.id === actor);
-  return <section className="mx-auto max-w-2xl space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">教會靈修進度</h3><Input className="w-44" aria-label="讀經日期" type="date" min="1900-01-01" max={taipeiToday()} value={date} onChange={e => { if (devotionDate.safeParse(e.target.value).success && e.target.value <= taipeiToday()) setDate(e.target.value); }} /></div>
-    {q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : !date ? <p>請選日期。</p> : q.isPending ? <p role="status">載入課表中…</p> : !entry ? <div className="space-y-3 border-y py-6"><p>這一天尚未發佈教會靈修課程。</p><Button asChild variant="outline"><Link to="/learn/bible">閱讀聖經</Link></Button></div> : <>
+  return <section className="mx-auto max-w-2xl space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">教會靈修進度</h3><Input className="w-44" aria-label="讀經日期" type="date" min="1900-01-01" max={tomorrow} value={valid ? date : ''} onChange={e => { if (devotionDate.safeParse(e.target.value).success && e.target.value <= tomorrow) { const next = new URLSearchParams(search); next.set('date', e.target.value); next.set('view', 'reading'); setSearch(next); } }} /></div>
+    {valid && preview && <p role="status" className="text-sm font-medium text-primary">正在預讀明天 {date} 的靈修</p>}
+    {!valid ? <p role="alert">請選擇明天或之前的有效日期。</p> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : q.isPending ? <p role="status">載入課表中…</p> : !entry ? <div className="space-y-3 border-y py-6"><p>這一天尚未發佈教會靈修課程。</p><Button asChild variant="outline"><Link to="/learn/bible">閱讀聖經</Link></Button></div> : <>
       <div className="space-y-3"><p className="text-sm text-muted-foreground">{entry.planName}</p><h3 className="text-xl font-semibold">{entry.title}</h3></div>
       {scripture.isFetching && !entry.scriptureText && !reading?.previewVerses.length && <p role="status" className="text-sm text-muted-foreground">正在載入經文…</p>}
       {reading && <ScriptureSection key={`${date}:${entry.reference}`} reading={reading} retry={() => scripture.refetch()} />}
       <p className="whitespace-pre-wrap leading-8">{entry.body}</p>{entry.prayer && <div className="border-l-2 border-rose-300 pl-4"><h4 className="mb-2 text-sm font-semibold">回應禱告</h4><p className="whitespace-pre-wrap leading-7">{entry.prayer}</p></div>}{entry.loveAction && <div className="border-l-2 border-emerald-300 pl-4"><h4 className="mb-2 text-sm font-semibold">愛人行動</h4><p className="whitespace-pre-wrap leading-7">{entry.loveAction}</p></div>}
-      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小家分享已讀'}</Button><Button onClick={() => onShare(entry.reference)}><Pencil className="mr-2 h-4 w-4" />分享這一天的領受</Button></div>
+      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy || preview} aria-describedby={preview ? 'group-reading-preview-hint' : undefined} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小家分享已讀'}</Button><Button disabled={preview} aria-describedby={preview ? 'group-reading-preview-hint' : undefined} onClick={() => onShare(entry.reference)}><Pencil className="mr-2 h-4 w-4" />分享這一天的領受</Button></div>
+      {preview && <p id="group-reading-preview-hint" className="text-sm text-muted-foreground">預讀期間可閱讀課表；當天即可分享已讀與領受。</p>}
       <p className="text-sm text-muted-foreground">{q.data!.readers.length ? `分享已讀：${q.data!.readers.map(r => r.name).join('、')}` : '還沒有人分享已讀。'}</p>
     </>}
   </section>;
@@ -180,7 +195,7 @@ function ShareFeed({ id, kind, info, actor, busy, act, compose }: { id: string; 
     </>
   </section>;
 }
-function ShareComposer({ id, groupName, kind, reference = '', existing, close }: { id: string; groupName: string; kind: GroupShare['kind']; reference?: string; existing?: GroupShare; close: () => void }) {
+function ShareComposer({ id, groupName, kind, reference = '', existing, close, preview = false }: { id: string; groupName: string; kind: GroupShare['kind']; reference?: string; existing?: GroupShare; close: () => void; preview?: boolean }) {
   const [mutationId] = useState(() => existing?.id || crypto.randomUUID());
   const [title, setTitle] = useState(existing?.title || '');
   const [body, setBody] = useState(existing?.body || '');
@@ -196,7 +211,8 @@ function ShareComposer({ id, groupName, kind, reference = '', existing, close }:
   useEffect(() => { document.getElementById('family-composer')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); }, []);
   const dirty = title !== (existing?.title || '') || body !== (existing?.body || '') || ref !== (existing?.reference || reference) || answered !== (existing?.answered || false);
   return <section id="family-composer" className="mx-auto mb-6 max-w-2xl scroll-mt-28 space-y-4 border-y py-5 [overflow-wrap:anywhere]"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">{existing ? '編輯分享' : kind === 'note' ? '分享靈修筆記' : kind === 'prayer' ? '新增小家代禱' : '生活留言'}</h3><Button variant="ghost" disabled={busy} onClick={() => { if (!dirty || window.confirm('放棄尚未送出的內容？')) close(); }}>取消</Button></div><p className="text-sm text-muted-foreground">分享對象：{groupName} 成員；私人原稿不變。</p>
-    <form onSubmit={async e => { e.preventDefault(); setBusy(true); setError(''); try { await request(`/${id}/shares/${mutationId}`, existing ? 'PATCH' : 'PUT', existing ? { title, body, reference: ref, version: existing.version, answered } : { kind, title, body, reference: ref, sourceId: sourceId || null, consent, anonymous }); await client.invalidateQueries({ queryKey: [base] }); close(); toast.success('已分享至小家'); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><fieldset disabled={busy} className="min-w-0 space-y-4">
+    {preview && <p role="status" className="text-sm text-muted-foreground">預讀期間暫不提供分享；草稿已保留，回到原日期後可繼續。</p>}
+    <form onSubmit={async e => { e.preventDefault(); if (preview) return; setBusy(true); setError(''); try { await request(`/${id}/shares/${mutationId}`, existing ? 'PATCH' : 'PUT', existing ? { title, body, reference: ref, version: existing.version, answered } : { kind, title, body, reference: ref, sourceId: sourceId || null, consent, anonymous }); await client.invalidateQueries({ queryKey: [base] }); close(); toast.success('已分享至小家'); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}><fieldset disabled={busy || preview} className="min-w-0 space-y-4">
       {!existing && kind !== 'message' && <Field label={kind === 'note' ? '選擇已儲存的私人筆記' : '選擇私人禱告'}><select className={selectClass} value={sourceId} onChange={e => { const source = q.data?.find(s => s.id === e.target.value); setSourceId(e.target.value); if (source) { setTitle(source.title.slice(0,160)); setBody(source.body); setRef(source.reference); } }}><option value="">自行填寫</option>{q.data?.map(source => <option key={source.id} value={source.id}>{source.title}</option>)}</select>{q.isError && <span role="status" className="block text-xs text-destructive">私人內容載入失敗，仍可自行填寫。</span>}</Field>}
       <Field label="分享標題"><Input required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></Field><Field label="經文出處（選填）"><Input maxLength={500} value={ref} onChange={e => setRef(e.target.value)} /></Field><Field label="分享內容"><Textarea required rows={8} maxLength={12000} value={body} onChange={e => setBody(e.target.value)} /></Field>
       {!existing && kind === 'prayer' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={anonymous} onChange={e => setAnonymous(e.target.checked)} />匿名分享</label>}

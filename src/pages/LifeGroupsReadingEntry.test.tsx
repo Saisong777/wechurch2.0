@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { GroupSummary } from '@shared/lifeGroup';
 import LifeGroupsPage from './LifeGroupsPage';
+import { taipeiToday, shiftDevotionDate } from '@shared/churchDevotion';
 
 const auth = vi.hoisted(() => ({ user: { id: 'member' } as { id: string } | null, loading: false }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => auth }));
@@ -17,12 +18,13 @@ const group: GroupSummary = { id: 'group', name: '我的小家', church: 'church
 let groups: GroupSummary[];
 let requests: { id: string; name: string; status: string }[];
 let failure: number | undefined;
+let publishedReading = false;
 const clients: QueryClient[] = [];
 
 beforeEach(() => {
   auth.user = { id: 'member' };
   auth.loading = false;
-  groups = [group]; requests = []; failure = undefined;
+  groups = [group]; requests = []; failure = undefined; publishedReading = false;
   sessionStorage.clear();
   window.history.replaceState(null, '', '/');
   vi.stubGlobal('fetch', vi.fn(async (input: string) => {
@@ -31,13 +33,14 @@ beforeEach(() => {
     const id = path.split('/')[1];
     const selected = groups.find(g => g.id === id);
     const data = !path ? { groups, requests, canCreate: false }
-      : path.includes('/reading?') ? { entry: null, readers: [] }
+      : path.startsWith('/sources?') ? []
+      : path.includes('/reading?') ? { entry: publishedReading ? { id: 'day', version: 1, title: `靈修 ${new URL(input, 'https://test').searchParams.get('date')}`, reference: '詩篇 23', scriptureText: '完整經文', body: '已發佈短文', prayer: '回應禱告原文', loveAction: '愛人行動原文', planName: '教會課表' } : null, readers: [] }
       : { id, name: selected?.name, manager: selected?.manager, members: [{ id: 'member', name: '成員' }], requests: [] };
     return { ok: true, json: async () => data };
   }));
 });
 afterEach(() => {
-  cleanup(); clients.forEach(c => c.clear()); clients.length = 0;
+  vi.useRealTimers(); cleanup(); clients.forEach(c => c.clear()); clients.length = 0;
   vi.unstubAllGlobals();
 });
 
@@ -152,4 +155,87 @@ it('preserves a historical date when picking from multiple authorized groups', a
   fireEvent.change(selector, { target: { value: 'second' } });
   await screen.findByRole('tab', { name: '一起讀經' });
   expect(screen.getByLabelText('讀經日期')).toHaveValue('2026-09-09');
+});
+
+
+it.each([false, true])('preserves tomorrow in single and multiple groups and keeps preview actions read-only (multiple=%s)', async multiple => {
+  const tomorrow = shiftDevotionDate(taipeiToday(), 1);
+  publishedReading = true;
+  if (multiple) groups.push({ ...group, id: 'second', name: '另一個小家' });
+  show(`${entry}&date=${tomorrow}`);
+  if (multiple) {
+    const selector = await screen.findByRole('combobox', { name: '選擇小家' });
+    expect(screen.getByRole('link', { name: /另一個小家/ })).toHaveAttribute('href', `/groups/second?view=reading&date=${tomorrow}`);
+    fireEvent.change(selector, { target: { value: 'second' } });
+  }
+  await screen.findByText(`靈修 ${tomorrow}`);
+  expect(screen.getByLabelText('讀經日期')).toHaveValue(tomorrow);
+  expect(screen.getByText(`正在預讀明天 ${tomorrow} 的靈修`)).toBeTruthy();
+  expect(screen.getByText('完整經文')).toBeTruthy();
+  expect(screen.getByText('回應禱告原文')).toBeTruthy();
+  expect(screen.getByText('愛人行動原文')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '與小家分享已讀' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '分享這一天的領受' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '分享這一天的領受' }));
+  expect(screen.queryByRole('textbox', { name: '分享標題' })).toBeNull();
+  if (multiple) {
+    fireEvent.change(screen.getByRole('combobox', { name: '選擇小家' }), { target: { value: 'group' } });
+    await screen.findByText(`靈修 ${tomorrow}`);
+    expect(screen.getByTestId('location')).toHaveTextContent(`/groups/group?view=reading&date=${tomorrow}`);
+  }
+  fireEvent.change(screen.getByLabelText('讀經日期'), { target: { value: taipeiToday() } });
+  await screen.findByText(`靈修 ${taipeiToday()}`);
+  expect(screen.getByRole('button', { name: '與小家分享已讀' })).not.toBeDisabled();
+  expect(screen.getByRole('button', { name: '分享這一天的領受' })).not.toBeDisabled();
+  fireEvent.change(screen.getByLabelText('讀經日期'), { target: { value: tomorrow } });
+  await screen.findByText(`靈修 ${tomorrow}`);
+  expect(screen.getByTestId('location')).toHaveTextContent(`date=${tomorrow}`);
+  const calls = vi.mocked(fetch).mock.calls.length;
+  fireEvent.change(screen.getByLabelText('讀經日期'), { target: { value: shiftDevotionDate(tomorrow, 1) } });
+  expect(screen.getByLabelText('讀經日期')).toHaveValue(tomorrow);
+  expect(fetch).toHaveBeenCalledTimes(calls);
+  expect(vi.mocked(fetch).mock.calls.every(([, init]) => init?.method !== 'PUT')).toBe(true);
+});
+it.each(['2026-02-30', shiftDevotionDate(taipeiToday(), 2)])('keeps invalid group date %s visible as an error without fetching a replacement day', async date => {
+  show(`${entry}&date=${date}`);
+  expect(await screen.findByRole('alert')).toHaveTextContent('請選擇明天或之前的有效日期');
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/reading?'))).toBe(false);
+  expect(screen.getByTestId('location')).toHaveTextContent(`date=${date}`);
+});
+it('keeps an unpublished tomorrow in the small group without replacing it with today', async () => {
+  const tomorrow = shiftDevotionDate(taipeiToday(), 1);
+  show(`${entry}&date=${tomorrow}`);
+  expect(await screen.findByText('這一天尚未發佈教會靈修課程。')).toBeTruthy();
+  expect(screen.getByLabelText('讀經日期')).toHaveValue(tomorrow);
+  expect(screen.queryByRole('button', { name: '與小家分享已讀' })).toBeNull();
+  expect(fetch).toHaveBeenCalledWith(`/api/life-groups/group/reading?date=${tomorrow}`, expect.anything());
+});
+it('refreshes group preview bounds at Taipei midnight without resetting the selected date', async () => {
+  vi.setSystemTime(new Date('2031-12-31T15:59:00Z'));
+  publishedReading = true;
+  show(`${entry}&date=2032-01-01`);
+  await screen.findByText('靈修 2032-01-01');
+  expect(screen.getByRole('button', { name: '與小家分享已讀' })).toBeDisabled();
+  vi.setSystemTime(new Date('2031-12-31T16:01:00Z'));
+  await act(async () => { window.dispatchEvent(new Event('focus')); });
+  expect(screen.getByLabelText('讀經日期')).toHaveValue('2032-01-01');
+  expect(screen.getByLabelText('讀經日期')).toHaveAttribute('max', '2032-01-02');
+  expect(screen.getByRole('button', { name: '與小家分享已讀' })).not.toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '分享這一天的領受' }));
+  fireEvent.change(await screen.findByRole('textbox', { name: '分享內容' }), { target: { value: '小家草稿' } });
+  vi.setSystemTime(new Date('2032-01-01T16:01:00Z'));
+  await act(async () => { window.dispatchEvent(new Event('focus')); });
+  expect(screen.getByRole('textbox', { name: '分享內容' })).toHaveValue('小家草稿');
+  expect(screen.getByLabelText('讀經日期')).toHaveValue('2032-01-01');
+  fireEvent.change(screen.getByLabelText('讀經日期'), { target: { value: '2032-01-03' } });
+  await screen.findByText('靈修 2032-01-03');
+  expect(screen.getByRole('textbox', { name: '分享內容' })).toHaveValue('小家草稿');
+  expect(screen.getByRole('textbox', { name: '分享內容' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '確認分享至小家' })).toBeDisabled();
+  fireEvent.submit(screen.getByRole('textbox', { name: '分享內容' }).closest('form')!);
+  expect(vi.mocked(fetch).mock.calls.every(([, init]) => init?.method !== 'PUT')).toBe(true);
+  fireEvent.change(screen.getByLabelText('讀經日期'), { target: { value: '2032-01-01' } });
+  await screen.findByText('靈修 2032-01-01');
+  expect(screen.getByRole('textbox', { name: '分享內容' })).toHaveValue('小家草稿');
+  expect(screen.getByRole('textbox', { name: '分享內容' })).not.toBeDisabled();
 });
