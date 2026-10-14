@@ -20,6 +20,7 @@ import { db } from "./db";
 import { careActions, careContacts, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertStudyResponseSchema, insertSavedVerseSchema, insertGroupingActivitySchema, insertGroupingParticipantSchema, insertDevotionalNoteSchema, prayerMeetings, prayerMeetingParticipants, userEmailPreferences } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sessionDeadline } from './authSessionPersistence';
+import { pageAccessMiddleware } from './pageAccessMiddleware';
 import { churchOnboardingRoutes } from './churchOnboardingRoutes';
 import { authErrorMetadata } from './authLogging';
 import { prepareLoginReceipt, recordPersistedLogin } from './churchLoginRepository';
@@ -693,6 +694,7 @@ export async function registerRoutes(app: Express) {
     throw error;
   }
 
+  app.use(pageAccessMiddleware);
   app.use('/api', churchContextMiddleware(resolveUserId));
   app.get('/api/church-context', (_req,res)=>{ const context=churchContext(); if(!context)return void res.status(401).json({error:'請先登入。'});res.json(churchContextResponse(context)); });
   app.get('/api/admin/church-affiliations/pending', requireRole('admin'), async(_req,res)=>res.json({users:await pendingChurchAffiliations()}));

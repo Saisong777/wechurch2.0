@@ -1,10 +1,17 @@
+import { safePageReturn } from '@shared/pageAccessPolicy';
 const key = 'wechurch:login-return';
 
 export function safeLoginReturn(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\') || [...value].some(char => char.charCodeAt(0) <= 32)) return '/';
-  const pathname = value.split(/[?#]/)[0];
-  if (/^\/(login|reset-password|api)(\/|$)/.test(pathname)) return '/';
-  return value;
+  return safePageReturn(value);
+}
+
+// A server redirect cannot see a fragment. Browsers inherit it on the login URL;
+// merge it back only into an explicit, validated internal return destination.
+export function requestedLoginReturn(value: string | null, fragment: string): string | null {
+  if (value === null) return null;
+  const safe = safeLoginReturn(value);
+  if (safe !== value || safe.includes('#') || !fragment.startsWith('#')) return safe;
+  return safeLoginReturn(safe + fragment);
 }
 
 export function rememberLoginReturn(value: string) {

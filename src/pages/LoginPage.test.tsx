@@ -2,8 +2,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import LoginPage from './LoginPage';
+import { loginForPage } from '@shared/pageAccessPolicy';
 const auth = vi.hoisted(() => ({ user: null as null | {id:string}, loading: false, signUp: vi.fn(async () => ({})), signIn: vi.fn(async () => ({})) }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => auth }));
 afterEach(() => { cleanup(); auth.user = null; vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
@@ -13,6 +14,16 @@ it('explains Google account conflicts without exposing provider details', async 
   render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/login?error=google_link_required']}><LoginPage /></MemoryRouter></QueryClientProvider>);
   expect(await screen.findByRole('alert')).toHaveTextContent('避免建立重複帳號');
   client.clear();
+});
+
+it('restores query and the fragment inherited from a direct protected-page server redirect', async () => {
+  auth.user = { id: 'member' };
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ google: true, emailRegistration: false }) })));
+  function ReturnedPage() { const location = useLocation(); return <p>{location.pathname + location.search + location.hash}</p>; }
+  // HTTP requests contain no fragment; browsers inherit #recent on a 302.
+  const redirect = loginForPage('/me/activity?tab=notes') + '#recent';
+  render(<MemoryRouter initialEntries={[redirect]}><Routes><Route path="/login" element={<LoginPage />} /><Route path="/me/activity" element={<ReturnedPage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByText('/me/activity?tab=notes#recent')).toBeVisible();
 });
 it('opens signup from an invitation and leaves email available without LINE', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: url === '/api/auth/options', json: async () => ({ staging: true, google: false, emailRegistration: true }) })));

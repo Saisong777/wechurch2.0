@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import type { SessionIdentity } from './authSessionVersion';
 
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -10,12 +10,16 @@ export function sessionCookieOptions() {
 }
 
 type PersistentIdentity = SessionIdentity & { expires_at?: number };
+export function hasValidPersistentSession(req: Request, now = Math.floor(Date.now() / 1000)): boolean {
+  const user = req.user as PersistentIdentity | undefined;
+  const saved = (req.session as typeof req.session & { passport?: { user?: PersistentIdentity } })?.passport?.user;
+  return !!(req.isAuthenticated() && user && saved && Number.isSafeInteger(user.expires_at) &&
+    user.expires_at && user.expires_at > now && saved.claims?.sub === user.claims?.sub);
+}
 export const persistAuthenticatedSession: RequestHandler = async (req, res, next) => {
   const user = req.user as PersistentIdentity | undefined;
   const saved = (req.session as typeof req.session & { passport?: { user?: PersistentIdentity } })?.passport?.user;
-  const now = Math.floor(Date.now() / 1000);
-  if (!req.isAuthenticated() || !user || !saved || !Number.isSafeInteger(user.expires_at) ||
-      !user.expires_at || user.expires_at <= now || saved.claims?.sub !== user.claims?.sub) {
+  if (!hasValidPersistentSession(req) || !user || !saved) {
     return void res.status(401).json({ message: 'Unauthorized' });
   }
   // deserialize creates a verified copy. Update the persisted Passport identity too.

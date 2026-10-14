@@ -11,6 +11,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { PageLoader, PageLoadRecovery } from '@/components/PageLoader';
+import { PageAccessBoundary } from '@/components/auth/PageAccessBoundary';
 
 // Resilient lazy loader — catches chunk load failures (bad network, deploy race)
 // and shows a reload prompt instead of white screen
@@ -75,13 +76,14 @@ const PrayerMeetingPage = lazyPage(() => import("./pages/PrayerMeetingPage"));
 const FeedbackPage = lazyPage(() => import('./pages/FeedbackPage'));
 const FeedbackAdminPage = lazyPage(() => import('./pages/FeedbackAdminPage'));
 const HelpPage = lazyPage(() => import('./pages/HelpPage'));
+const SiteMapPage = lazyPage(() => import('./pages/SiteMapPage'));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 
 
 setChurchScope(null);
 const router = createBrowserRouter([{ path: '*', element: (
             <ErrorBoundary fallbackTitle="頁面載入失敗">
-              <AppLayout>
+              <PageAccessBoundary><AppLayout>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<Index />} />
@@ -90,6 +92,7 @@ const router = createBrowserRouter([{ path: '*', element: (
                     <Route path="/user/notebook" element={<Navigate to="/learn/my-notes" replace />} />
                     <Route path="/feedback" element={<FeedbackPage />} />
                     <Route path="/help" element={<HelpPage />} />
+                    <Route path="/sitemap" element={<SiteMapPage />} />
                     <Route path="/admin/feedback" element={<FeedbackAdminPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/admin/crm" element={<CRMPage />} />
@@ -138,7 +141,7 @@ const router = createBrowserRouter([{ path: '*', element: (
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>
-              </AppLayout>
+              </AppLayout></PageAccessBoundary>
             </ErrorBoundary>
 )}]);
 

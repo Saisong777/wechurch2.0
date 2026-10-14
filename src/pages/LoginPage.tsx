@@ -1,6 +1,6 @@
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import React, { useState, useMemo } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { WeChurchLogo } from '@/components/icons/WeChurchLogo';
 import { SiGoogle } from 'react-icons/si';
-import { consumeLoginReturn, rememberLoginReturn } from '@/lib/loginReturn';
+import { consumeLoginReturn, rememberLoginReturn, requestedLoginReturn } from '@/lib/loginReturn';
 import { LineLoginButton } from '@/components/auth/LineLoginButton';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
 
@@ -28,14 +28,15 @@ const LoginPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { hash } = useLocation();
   const recipeTest = searchParams.get('recipeTest') === 'form-flow' ? 'form-flow' : 'default';
 
   React.useEffect(() => {
     if (!loading && user) {
       try { localStorage.removeItem('login_redirect'); } catch { /* Login return works when browser storage is disabled. */ }
-      navigate(consumeLoginReturn(searchParams.get('returnTo')), { replace: true });
+      navigate(consumeLoginReturn(requestedLoginReturn(searchParams.get('returnTo'), hash)), { replace: true });
     }
-  }, [user, loading, navigate, searchParams]);
+  }, [user, loading, navigate, searchParams, hash]);
 
   if (loading) {
     return (
@@ -86,6 +87,7 @@ const LoginForm: React.FC = () => {
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { hash } = useLocation();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>(params.get('mode') === 'signup' ? 'signup' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -248,7 +250,7 @@ const LoginForm: React.FC = () => {
   }
 
   const handleGoogleLogin = () => {
-    const returnTo = params.get('returnTo');
+    const returnTo = requestedLoginReturn(params.get('returnTo'), hash);
     if (returnTo) rememberLoginReturn(returnTo);
     window.location.href = '/api/login';
   };

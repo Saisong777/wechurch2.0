@@ -50,7 +50,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       <div className={showNav ? "mobile-page-content flex-1" : "flex-1"}>
         <ChurchPageBoundary personal={!tenantPage} allowPendingOwner={/^\/(support|work)(?:\/|$)/.test(location.pathname)}><ErrorBoundary key={location.pathname} fallbackTitle="這個頁面暫時無法載入">{children}</ErrorBoundary></ChurchPageBoundary>
       </div>
-      {showNav && <footer className="flex flex-wrap justify-center gap-6 border-t border-border bg-background px-4 py-5 text-sm"><Link to="/help" className="min-h-11 inline-flex items-center underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">使用說明</Link><Link to="/feedback" state={{from:location.pathname}} className="min-h-11 inline-flex items-center underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">意見反饋</Link></footer>}
+      {showNav && <footer className="flex flex-wrap justify-center gap-x-6 gap-y-2 border-t border-border bg-background px-4 py-5 text-sm"><Link to="/sitemap" className="min-h-11 inline-flex items-center underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">網站導覽</Link><Link to="/help" className="min-h-11 inline-flex items-center underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">使用說明</Link><Link to="/feedback" state={{from:location.pathname}} className="min-h-11 inline-flex items-center underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring">意見反饋</Link></footer>}
     </div>
     </MobileHeaderContext.Provider>
   );

@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Settings, Shield, ChevronLeft } from 'lucide-react';
+import { LogOut, User, Settings, Shield, ChevronLeft, Map } from 'lucide-react';
 import { ProfileSettingsDialog } from '@/components/user/ProfileSettingsDialog';
 import { convertToProxiedUrl } from '@/lib/storage-helpers';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -218,7 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
                   to={item.href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "flex min-h-11 items-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:px-3",
                     active
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -233,6 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           <div className="flex shrink-0 items-center gap-1">
+            <Link to="/sitemap" aria-label="網站導覽" title="網站導覽" aria-current={location.pathname === '/sitemap' ? 'page' : undefined} className="hidden min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex lg:px-2"><Map aria-hidden="true" className="h-5 w-5" /><span className="hidden lg:inline">網站導覽</span></Link>
             {backTo && (
               <button
                 onClick={() => navigate(backTo)}
