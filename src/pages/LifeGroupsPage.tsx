@@ -1,7 +1,7 @@
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { ScriptureSection } from '@/components/scripture/ChurchScriptureSection';
 import { fetchChurchReadingForToday, type ChurchReadingSummary } from '@/lib/churchReading';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { clearGroupInvitation, pendingGroupInvitation } from '@/lib/groupInvitation';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +24,10 @@ import { FamilyComments } from '@/components/groups/FamilyComments';
 import { familyBase as base, familyRequest as request, useFamilyQuery as useGroupQuery } from '@/lib/familyApi';
 import { groupLeaderNames } from '@/lib/groupLeaders';
 import { notificationTargetId } from '@shared/notifications';
+import { GroupReadingFontControl } from '@/components/groups/GroupReadingFontControl';
+import { groupReadingFontSize } from '@/components/groups/groupReadingFontPreference';
+import '@/components/scripture/devotional-reader.css';
+import { GroupReadingReflectionComposer } from '@/components/groups/GroupReadingReflectionComposer';
 
 const selectClass = 'h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm';
 function Notice({ error, retry }: { error?: Error | null; retry?: () => void }) {
@@ -95,8 +99,6 @@ type Info = { leaderId?: string | null; coLeaderId?: string | null; leaderName?:
 function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) {
   const { user } = useAuth();
   const [search] = useSearchParams();
-  const today = useTaipeiToday();
-  const preview = (search.get('date') || today) > today;
   const q = useGroupQuery<Info>(`/${id}`);
   const [tab, setTab] = useState(['reading','note','prayer','message','all','care','info'].includes(initialTab) ? initialTab : 'all');
   const [membersOpen, setMembersOpen] = useState(false);
@@ -122,7 +124,7 @@ function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) 
     <div role="tablist" aria-label="小家生活" className="mb-5 grid grid-cols-3 border-b">{([['all','小家動態',MessageCircle],['reading','一起讀經',BookOpen],['info','小家資訊',Users]] as const).map(([key,label,Icon]) => { const selected = key === 'all' ? ['all','note','prayer','message'].includes(tab) : key === 'info' ? ['info','care'].includes(tab) : tab === key; return <button key={key} role="tab" aria-selected={selected} onClick={() => { if (compose && !window.confirm('放棄尚未送出的分享？')) return; setCompose(null); setTab(key); setError(''); }} className={`flex min-h-14 min-w-0 items-center justify-center gap-2 border-b-2 px-1 text-sm ${selected ? 'border-primary font-semibold text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}><Icon className="h-4 w-4 shrink-0" />{label}</button>; })}</div>
     {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
     <div role="tabpanel">
-      {tab === 'reading' && <Reading id={id} actor={user!.id} busy={busy} act={act} onShare={reference => setCompose({ kind: 'note', reference })} />}
+      {tab === 'reading' && <Reading id={id} actor={user!.id} info={info} busy={busy} act={act} history={() => setTab('note')} compose={(kind, existing) => { setCompose({ kind, existing }); setTab('note'); }} />}
       {['all','note','prayer','message'].includes(tab) && <>
         <div className="mb-4 flex flex-wrap gap-2">{([['all','全部'],['note','亮光'],['prayer','代禱'],['message','生活']] as const).map(([key,label]) => <Button key={key} size="sm" variant={tab === key ? 'secondary' : 'ghost'} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</Button>)}</div>
         {compose && <ShareComposer key={compose.existing?.id || compose.kind} id={id} groupName={info.name} {...compose} close={() => setCompose(null)} />}
@@ -131,13 +133,12 @@ function GroupWorkspace({ id, initialTab }: { id: string; initialTab: string }) 
       {tab === 'info' && <section className="space-y-5"><p className="whitespace-pre-wrap">{info.description}</p><div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => setMembersOpen(true)}><Users className="mr-2 h-4 w-4" />成員與邀請</Button><Button variant="outline" onClick={() => setTab('care')}><HandHeart className="mr-2 h-4 w-4" />共同關懷</Button>{info.manager && <Button asChild variant="outline"><Link to="/groups?manage=1">管理小家</Link></Button>}</div></section>}
       {tab === 'care' && <CareFeed id={id} actor={user!.id} info={info} create={() => setCareOpen(true)} busy={busy} act={act} />}
     </div>
-    {compose && tab === 'reading' && <ShareComposer id={id} groupName={info.name} {...compose} preview={preview} close={() => setCompose(null)} />}
     {careOpen && <CareComposer id={id} info={info} close={() => setCareOpen(false)} />}
     {membersOpen && <Members id={id} info={info} actor={user!.id} close={() => setMembersOpen(false)} />}
   </>;
 }
 type Act = (work: () => Promise<unknown>) => Promise<void>;
-function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string; busy: boolean; act: Act; onShare: (reference: string) => void }) {
+function Reading({ id, actor, info, busy, act, history, compose }: { id: string; actor: string; info: Info; busy: boolean; act: Act; history: () => void; compose: (kind: GroupShare['kind'], existing?: GroupShare) => void }) {
   const [search, setSearch] = useSearchParams();
   const [initialDay] = useState(taipeiToday);
   const today = useTaipeiToday();
@@ -146,6 +147,10 @@ function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string;
   const valid = devotionDate.safeParse(date).success && date <= tomorrow;
   const preview = date > today;
   const scope = useChurchScopeKey();
+  const [fontSize, setFontSize] = useState(groupReadingFontSize);
+  const [editorKey, setEditorKey] = useState<string | null>(null);
+  const editorButton = useRef<HTMLButtonElement>(null);
+  const readingKey = JSON.stringify([actor, scope, id, date]);
   const q = useGroupQuery<{ entry: { id: string; version: number; title: string; reference: string; scriptureText: string; body: string; prayer: string; loveAction: string; planName: string } | null; readers: Array<{ id: string; name: string }> }>(`/${id}/reading?date=${date}`, valid);
   const entry = q.data?.entry;
   const scripture = useQuery({
@@ -167,28 +172,34 @@ function Reading({ id, actor, busy, act, onShare }: { id: string; actor: string;
     {valid && preview && <p role="status" className="text-sm font-medium text-primary">正在預讀明天 {date} 的靈修</p>}
     {!valid ? <p role="alert">請選擇明天或之前的有效日期。</p> : q.isError ? <Notice error={q.error as Error} retry={() => q.refetch()} /> : q.isPending ? <p role="status">載入課表中…</p> : !entry ? <div className="space-y-3 border-y py-6"><p>這一天尚未發佈教會靈修課程。</p><Button asChild variant="outline"><Link to="/learn/bible">閱讀聖經</Link></Button></div> : <>
       <div className="space-y-3"><p className="text-sm text-muted-foreground">{entry.planName}</p><h3 className="text-xl font-semibold">{entry.title}</h3></div>
+      <article className="church-reader space-y-5" style={{ '--reader-font-size': `${fontSize / 16}rem` } as CSSProperties}>
+      <GroupReadingFontControl value={fontSize} onChange={setFontSize} />
       {scripture.isFetching && !entry.scriptureText && !reading?.previewVerses.length && <p role="status" className="text-sm text-muted-foreground">正在載入經文…</p>}
       {reading && <ScriptureSection key={`${date}:${entry.reference}`} reading={reading} retry={() => scripture.refetch()} />}
-      <p className="whitespace-pre-wrap leading-8">{entry.body}</p>{entry.prayer && <div className="border-l-2 border-rose-300 pl-4"><h4 className="mb-2 text-sm font-semibold">回應禱告</h4><p className="whitespace-pre-wrap leading-7">{entry.prayer}</p></div>}{entry.loveAction && <div className="border-l-2 border-emerald-300 pl-4"><h4 className="mb-2 text-sm font-semibold">愛人行動</h4><p className="whitespace-pre-wrap leading-7">{entry.loveAction}</p></div>}
-      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy || preview} aria-describedby={preview ? 'group-reading-preview-hint' : undefined} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小家分享已讀'}</Button><Button disabled={preview} aria-describedby={preview ? 'group-reading-preview-hint' : undefined} onClick={() => onShare(entry.reference)}><Pencil className="mr-2 h-4 w-4" />分享這一天的領受</Button></div>
+      <p className="reader-prose whitespace-pre-wrap">{entry.body}</p>{entry.prayer && <div className="border-l-2 border-secondary pl-4"><h4 className="mb-2 text-sm font-semibold">回應禱告</h4><p className="reader-prose whitespace-pre-wrap">{entry.prayer}</p></div>}{entry.loveAction && <div className="border-l-2 border-primary pl-4"><h4 className="mb-2 text-sm font-semibold">愛人行動</h4><p className="reader-prose whitespace-pre-wrap">{entry.loveAction}</p></div>}
+      </article>
+      <div className="flex flex-wrap gap-3 border-t pt-5"><Button variant={done ? 'secondary' : 'outline'} disabled={busy || preview} aria-describedby={preview ? 'group-reading-preview-hint' : undefined} onClick={() => void act(() => request(`/${id}/reading/${entry.id}`, 'PUT', { version: entry.version, done: !done }))}>{done && <Check className="mr-2 h-4 w-4" />}{done ? '已分享讀完 · 撤回' : '與小家分享已讀'}</Button><Button ref={editorButton} disabled={preview} aria-describedby={preview ? 'group-reading-preview-hint' : undefined} onClick={() => setEditorKey(readingKey)}><Pencil className="mr-2 h-4 w-4" />分享這一天的領受</Button></div>
       {preview && <p id="group-reading-preview-hint" className="text-sm text-muted-foreground">預讀期間可閱讀課表；當天即可分享已讀與領受。</p>}
       <p className="text-sm text-muted-foreground">{q.data!.readers.length ? `分享已讀：${q.data!.readers.map(r => r.name).join('、')}` : '還沒有人分享已讀。'}</p>
+      {editorKey === readingKey && !preview && <GroupReadingReflectionComposer key={`${readingKey}:${entry.id}`} actor={actor} scope={scope} groupId={id} groupName={info.name} date={date} entry={entry} close={() => { setEditorKey(null); editorButton.current?.focus({ preventScroll: true }); }} />}
+      <Button asChild variant="ghost"><Link to="/learn/my-notes">回看私人筆記</Link></Button>
+      <section aria-label="這一天的小家領受" className="space-y-4 border-t pt-5"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">這一天的小家領受</h3><Button variant="ghost" onClick={history}>回看小家領受<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div><ShareFeed key={readingKey} id={id} kind="note" info={info} actor={actor} busy={busy} act={act} compose={compose} date={date} /></section>
     </>}
   </section>;
 }
 
-function ShareFeed({ id, kind, info, actor, busy, act, compose }: { id: string; kind: GroupShare['kind'] | 'all'; info: Info; actor: string; busy: boolean; act: Act; compose: (kind: GroupShare['kind'], existing?: GroupShare) => void }) {
+function ShareFeed({ id, kind, info, actor, busy, act, compose, date }: { id: string; kind: GroupShare['kind'] | 'all'; info: Info; actor: string; busy: boolean; act: Act; compose: (kind: GroupShare['kind'], existing?: GroupShare) => void; date?: string }) {
   const [search] = useSearchParams();
-  const targetId = notificationTargetId(search.get('share'));
+  const targetId = date ? '' : notificationTargetId(search.get('share'));
   const targetComment = notificationTargetId(search.get('comment'));
   const target = useGroupQuery<GroupShare>(`/${id}/shares/${targetId}`,!!targetId);
   const [page, setPage] = useState(0);
-  const q = useGroupQuery<GroupShare[]>(`/${id}/shares?kind=${kind}&offset=${page * 30}`);
-  return <section className="space-y-4"><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => compose('note')}><Pencil className="mr-2 h-4 w-4" />分享靈修筆記</Button><Button variant="outline" onClick={() => compose('prayer')}><Heart className="mr-2 h-4 w-4" />新增小家代禱</Button><Button variant="outline" onClick={() => compose('message')}><MessageCircle className="mr-2 h-4 w-4" />生活留言</Button></div>
+  const q = useGroupQuery<GroupShare[]>(`/${id}/shares?kind=${kind}&offset=${page * 30}${date ? `&date=${encodeURIComponent(date)}` : ''}`);
+  return <section className="space-y-4">{!date && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => compose('note')}><Pencil className="mr-2 h-4 w-4" />分享靈修筆記</Button><Button variant="outline" onClick={() => compose('prayer')}><Heart className="mr-2 h-4 w-4" />新增小家代禱</Button><Button variant="outline" onClick={() => compose('message')}><MessageCircle className="mr-2 h-4 w-4" />生活留言</Button></div>}
     {q.isError && <Notice error={q.error as Error} retry={() => q.refetch()} />}
     {q.isPending && <p role="status">載入分享中…</p>}
     <>
-      {!q.isPending && !q.isError && !q.data?.length && !targetId && <p className="py-6 text-center text-muted-foreground">{page ? '沒有更多分享。' : '還沒有分享，來和家人打聲招呼吧。'}</p>}
+      {!q.isPending && !q.isError && !q.data?.length && !targetId && <p className="py-6 text-center text-muted-foreground">{page ? '沒有更多分享。' : date ? '這一天還沒有小家領受。' : '還沒有分享，來和家人打聲招呼吧。'}</p>}
       {targetId && target.isPending && <p role="status">正在載入通知中的分享…</p>}
       {targetId && target.isError && <Notice error={target.error as Error} retry={() => void target.refetch()} />}
       <div className="space-y-4">{[...(!target.isError && target.data ? [target.data] : []),...(!q.isError ? q.data || [] : []).filter(post => post.id !== targetId)].map(post => <article key={post.id} className={`min-w-0 scroll-mt-32 rounded-lg border p-4 sm:p-5 ${post.id === targetId ? 'border-primary' : ''}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{post.authorName} · {time(post.createdAt)}{post.answered && ' · 已蒙應允'}</p><h3 className="mt-2 text-lg font-semibold">{post.title}</h3></div><div className="flex">{(post.isOwner || post.authorId === actor) && <Button size="icon" variant="ghost" title="編輯分享" aria-label={`編輯 ${post.title}`} onClick={() => compose(post.kind, post)}><Pencil className="h-4 w-4" /></Button>}{((post.isOwner || post.authorId === actor) || info.manager) && <Button size="icon" variant="ghost" title="撤回分享" aria-label={`撤回 ${post.title}`} disabled={busy} onClick={() => { if (window.confirm('撤回這則分享及其回應？私人原稿不受影響。')) void act(() => request(`/${id}/shares/${post.id}`, 'DELETE')); }}><Trash2 className="h-4 w-4" /></Button>}</div></div>{post.reference && <p className="mt-2 text-sm font-medium text-primary">{post.reference}</p>}<p className="mt-3 whitespace-pre-wrap text-sm leading-7">{post.body}</p>{post.kind === 'prayer' && <div className="mt-4"><Button size="sm" variant={post.prayed ? 'secondary' : 'outline'} disabled={busy || post.prayed} onClick={() => void act(() => request(`/${id}/shares/${post.id}/prayed`, 'PUT', {}))}><Heart className="mr-2 h-4 w-4" />{post.prayed ? '已為你禱告' : '為你禱告'} · {post.prayerCount}</Button></div>}<FamilyComments groupId={id} shareId={post.id} actor={actor} manager={info.manager} count={post.commentCount} targetCommentId={post.id === targetId ? targetComment : ''} /></article>)}</div>{q.data && !q.isError && <Pages page={page} setPage={setPage} count={q.data.length} />}

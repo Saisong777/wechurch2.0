@@ -1,5 +1,38 @@
 # WeChurch Handshake: Current Design Recipe
 
+## Shared Reading Notes Updated 2026-10-16
+
+The small-family reading view keeps Handshake A semantic tokens and the existing
+672px reading column. Its 16–26px font control shares the daily reader's browser
+preference and `church-reader` prose rules; navigation, forms, and buttons retain
+their fixed sizes. Scripture, devotion, response prayer, and love action all follow
+the selected reading size. No additional sticky navigation is introduced.
+
+Writing opens inline below the reading, with 看見 / 領受 / 回應 preloaded from
+the owner's private note for that date and reference. Each field has a separate
+share choice. The preview contains only selected fields, followed by explicit
+consent for the named small family. “儲存筆記並分享至小家” saves the complete
+private note and selected public copy in one server transaction. The separate,
+cancelable “同時標記已讀完這天進度” choice defaults on; independent read marking
+remains available. Private notebooks and the earlier general share/source flows
+remain reachable.
+
+Drafts belong to the exact owner, church, small family, date, and devotion. Closing
+or changing context preserves that draft without showing it in another context.
+Transport failures and 5xx responses retain their immutable original attempt;
+retries require an explicit click. Known 4xx rejections provide explicit draft
+recovery through reloading and comparing the latest original. If private access
+cannot be confirmed, preserve a selectable read-only draft and notebook link,
+without offering submission. Conflicts require comparing the latest original
+inline with the retained draft, and a new preview and audience consent. Tomorrow
+remains read-only. This-day family insights appear below reading; “回看小家領受”
+opens the existing paginated 亮光 history with its edit and withdrawal controls.
+
+Implementation-mode checks cover component focus, scope isolation, cancellation,
+failure/retry, conflict recovery, reading size, and preserved entry flows. These
+program checks do not claim Railway B visual or real-device acceptance; 320,
+390, and 1200px light/dark browser checks remain a separate release gate.
+
 ## Current product scope: SoulGym deferred 2026-09-28
 
 SoulGym is reserved for a separate future project. Remove its member entries, study-note

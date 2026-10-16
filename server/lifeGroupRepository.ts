@@ -4,7 +4,9 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { z } from 'zod';
 import { pool } from './db';
-import { careInput, careUpdateInput, shareInput, shareEditInput } from '../shared/lifeGroup';
+import { careInput, careUpdateInput, shareInput, shareEditInput, type ReadingReflectionInput } from '../shared/lifeGroup';
+import { shiftDevotionDate, taipeiToday } from '../shared/churchDevotion';
+import { loadReadingNote, saveReadingReflection } from './groupReadingReflection';
 import { createFamily, familyAccess } from './familyRepository';
 import { registeredGroupCount } from './groupRoster';
 import { recordInteraction, recordCommentInteraction } from './notificationRepository';
@@ -111,6 +113,7 @@ export function removeMember(id: string, actor: string, userId: string) {
 }
 export function groupReading(id: string, actor: string, date: string) {
   return withGroup(id, actor, async (c,group) => {
+    if (date > shiftDevotionDate(taipeiToday(), 1)) throw new GroupError(403, '請選擇明天或之前的日課。');
     const entry = (await c.query(`SELECT id,date::text,version,plan_name AS "planName",scripture_reference AS reference,scripture_text AS "scriptureText",devotional_title AS title,devotional_text AS body,prayer,love_action AS "loveAction" FROM church_devotions WHERE date=$1 AND status='published' AND church=$2`, [date,group.church])).rows[0] || null;
     const readers = entry ? (await c.query(`SELECT u.id,${nameSql('u')} AS name FROM life_group_reading r JOIN users u ON u.id=r.user_id JOIN small_groups g ON g.id=r.group_id WHERE r.group_id=$1 AND r.devotion_id=$2 AND r.devotion_version=$3 AND ((g.leader_user_id=u.id OR g.co_leader_user_id=u.id) OR g.pastor_user_id=u.id OR EXISTS(SELECT 1 FROM small_group_members m WHERE m.group_id=g.id AND m.user_id=u.id AND m.is_active)) ORDER BY r.created_at`, [id, entry.id, entry.version])).rows : [];
     return { entry, readers };
@@ -118,11 +121,22 @@ export function groupReading(id: string, actor: string, date: string) {
 }
 export function markReading(id: string, actor: string, devotionId: string, version: number, done: boolean) {
   return withGroup(id, actor, async (c,group) => {
-    if (!(await c.query("SELECT id FROM church_devotions WHERE id=$1 AND version=$2 AND status='published' AND church=$3 FOR SHARE", [devotionId, version,group.church])).rowCount) throw conflict();
+    const devotion = (await c.query("SELECT id,date<=(clock_timestamp() AT TIME ZONE 'Asia/Taipei')::date AS writable FROM church_devotions WHERE id=$1 AND version=$2 AND status='published' AND church=$3 FOR SHARE", [devotionId, version,group.church])).rows[0];
+    if (!devotion) throw conflict();
+    if (!devotion.writable) throw new GroupError(403, '明天的日課可預讀，請於當天再標記已讀。');
     if (done) await c.query('INSERT INTO life_group_reading(group_id,user_id,devotion_id,devotion_version) VALUES($1,$2,$3,$4) ON CONFLICT(group_id,user_id,devotion_id) DO UPDATE SET devotion_version=$4,created_at=now()', [id, actor, devotionId, version]);
     else await c.query('DELETE FROM life_group_reading WHERE group_id=$1 AND user_id=$2 AND devotion_id=$3', [id, actor, devotionId]);
     return { ok: true };
   });
+}
+export function groupReadingNote(id: string, actor: string, date: string) {
+  return withGroup(id, actor, async (c, group) => {
+    if (date > shiftDevotionDate(taipeiToday(), 1)) throw new GroupError(403, '請選擇明天或之前的日課。');
+    return loadReadingNote(c, actor, group.church, date);
+  });
+}
+export function groupReadingReflection(id: string, actor: string, devotionId: string, mutationId: string, input: ReadingReflectionInput) {
+  return withGroup(id, actor, (c, group) => saveReadingReflection(c, group, actor, devotionId, mutationId, input));
 }
 export async function shareSources(actor: string, kind: 'note' | 'prayer') {
   if (kind === 'prayer') return (await pool.query('SELECT id,title,prayer AS body,\'\' AS reference FROM personal_prayers WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 200', [actor])).rows;
@@ -135,12 +149,18 @@ async function share(c: PoolClient, groupId: string, shareId: string, actor: str
   if (!row) throw missing();
   return row;
 }
-export function listShares(id: string, actor: string, kind: string, offset: number) {
+export function listShares(id: string, actor: string, kind: string, offset: number, date: string | null = null) {
   return withGroup(id, actor, async c => (await c.query(`SELECT s.id,CASE WHEN s.is_anonymous THEN NULL ELSE s.author_id END AS "authorId",CASE WHEN s.is_anonymous THEN '匿名' ELSE ${nameSql('u')} END AS "authorName",s.is_anonymous AS anonymous,s.author_id=$2 AS "isOwner",s.kind,s.title,s.body,s.reference,s.answered,s.version,s.created_at AS "createdAt",
     EXISTS(SELECT 1 FROM life_group_prayed WHERE share_id=s.id AND user_id=$2) AS prayed,
     (SELECT count(*)::int FROM life_group_prayed WHERE share_id=s.id) AS "prayerCount",
     (SELECT count(*)::int FROM life_group_comments WHERE share_id=s.id AND withdrawn_at IS NULL) AS "commentCount"
-    FROM life_group_shares s JOIN users u ON u.id=s.author_id WHERE s.group_id=$1 AND ($3='all' OR s.kind=$3) AND s.withdrawn_at IS NULL AND ${visibleContent('s')} ORDER BY s.created_at DESC,s.id DESC LIMIT 30 OFFSET $4`, [id, actor, kind, offset])).rows);
+    FROM life_group_shares s JOIN users u ON u.id=s.author_id WHERE s.group_id=$1 AND ($3='all' OR s.kind=$3) AND s.withdrawn_at IS NULL AND ${visibleContent('s')}
+    AND ($5::date IS NULL OR (s.kind='note' AND COALESCE(
+      (SELECT r.result->>'date' FROM devotion_share_requests r WHERE r.user_id=s.author_id AND r.request_id=s.id AND r.church=(SELECT church FROM small_groups WHERE id=s.group_id)
+        AND r.result->>'operation'='group-reading-reflection-v1' AND r.result->>'groupId'=s.group_id::text AND r.result->'result'->>'shareId'=s.id::text),
+      (SELECT n.source_devotional_date::text FROM devotional_notes n WHERE n.id=s.source_id AND n.user_id=s.author_id AND n.reading_plan_id IS NULL)
+    )=$5::text))
+    ORDER BY s.created_at DESC,s.id DESC LIMIT 30 OFFSET $4`, [id, actor, kind, offset, date])).rows);
 }
 export function createShare(id: string, actor: string, shareId: string, input: z.infer<typeof shareInput>) {
   return withGroup(id, actor, async c => {

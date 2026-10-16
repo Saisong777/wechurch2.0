@@ -35,3 +35,30 @@ export type GroupComment = { id: string; authorId: string | null; isOwner?:boole
 export type GroupCare = { id: string; creatorId: string; name: string; need: string; status: keyof typeof careStatuses; nextAction: string; dueDate: string | null; responsibleId: string | null; version: number; watching: boolean; watcherCount: number; updatedAt: string };
 export type CareUpdate = { id: string; authorId: string; authorName: string; body: string; createdAt: string; status: keyof typeof careStatuses; nextAction: string; dueDate: string | null; responsibleId: string | null };
 export type ShareSource = { id: string; title: string; body: string; reference: string };
+
+export const readingReflectionFields = ['observation', 'receiving', 'response'] as const;
+export const readingReflectionLabels = { observation: '看見', receiving: '領受', response: '回應' } as const;
+export const readingReflectionInput = z.object({
+  devotionVersion: z.number().int().positive(),
+  noteId: z.string().uuid().nullable(), noteVersion: z.number().int().positive().nullable(),
+  observation: z.string().max(5000), receiving: z.string().max(5000), response: z.string().max(5000),
+  shareFields: z.array(z.enum(readingReflectionFields)).min(1, '請至少選擇一欄分享。').max(3),
+  markRead: z.boolean(), consent: z.literal(true),
+}).strict().superRefine((input, ctx) => {
+  if ((input.noteId === null) !== (input.noteVersion === null)) ctx.addIssue({ code: 'custom', message: '筆記版本不完整，請重新載入。' });
+  if (new Set(input.shareFields).size !== input.shareFields.length) ctx.addIssue({ code: 'custom', path: ['shareFields'], message: '分享欄位重複。' });
+  for (const field of input.shareFields) if (!input[field].trim()) ctx.addIssue({ code: 'custom', path: [field], message: `請填寫要分享的${readingReflectionLabels[field]}。` });
+  if (composeReadingReflection(input).length > GROUP_SHARE_MAX_LENGTH) ctx.addIssue({ code: 'custom', path: ['shareFields'], message: '所選內容超過小家分享上限。' });
+});
+export type ReadingReflectionInput = z.infer<typeof readingReflectionInput>;
+export function composeReadingReflection(input: { observation: string; receiving: string; response: string; shareFields: readonly typeof readingReflectionFields[number][] }) {
+  return readingReflectionFields.filter(field => input.shareFields.includes(field)).map(field => `${readingReflectionLabels[field]}\n${input[field].trim()}`).join('\n\n');
+}
+export const readingNoteResponse = z.object({ note: z.object({
+  id: z.string().uuid(), version: z.number().int().positive(), observation: z.string(), receiving: z.string(), response: z.string(),
+}).strict().nullable() }).strict();
+export type ReadingNoteResponse = z.infer<typeof readingNoteResponse>;
+export const readingReflectionResult = z.object({
+  noteId: z.string().uuid(), noteVersion: z.number().int().positive(), shareId: z.string().uuid(), markedRead: z.boolean(),
+}).strict();
+export type ReadingReflectionResult = z.infer<typeof readingReflectionResult>;

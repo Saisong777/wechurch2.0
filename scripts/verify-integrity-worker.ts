@@ -68,6 +68,8 @@ try {
     await verifyPrivateReadingTemplatesHttp(pool,()=>makeClient(false));
     const {verifyGroupingPrivacyHttp}=await import('./verify-grouping-privacy-http');
     await verifyGroupingPrivacyHttp(pool,()=>makeClient(false));
+  } else if(process.env.RUN_GROUP_READING_ONLY==='1'){
+    const {verifyGroupReadingWorkflowHttp}=await import('./verify-group-reading-workflow-http');await verifyGroupReadingWorkflowHttp(pool,()=>makeClient(false));
   } else if(process.env.RUN_READING_HISTORY_ONLY==='1'){
     const {verifyReadingHistoryHttp}=await import('./verify-reading-history-http');await verifyReadingHistoryHttp(pool,()=>makeClient(false));
   } else if(process.env.RUN_CHURCH_ONBOARDING_ONLY==='1'){
@@ -95,6 +97,8 @@ try {
   await verifyFamilyHttp(pool, makeClient);
   const { verifyFamilyDeleteHttp } = await import('./verify-family-delete-http');
   await verifyFamilyDeleteHttp(pool, makeClient);
+  const { verifyGroupReadingWorkflowHttp } = await import('./verify-group-reading-workflow-http');
+  await verifyGroupReadingWorkflowHttp(pool, () => makeClient(false));
   const { verifyNotificationsHttp } = await import('./verify-notifications-http');
   await verifyNotificationsHttp(pool,makeClient);
   const {verifyPrivateReadingTemplatesHttp}=await import('./verify-private-reading-templates-http');

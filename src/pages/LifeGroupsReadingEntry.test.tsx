@@ -19,13 +19,15 @@ let groups: GroupSummary[];
 let requests: { id: string; name: string; status: string }[];
 let failure: number | undefined;
 let publishedReading = false;
+let historyCount = 0;
 const clients: QueryClient[] = [];
 
 beforeEach(() => {
   auth.user = { id: 'member' };
   auth.loading = false;
-  groups = [group]; requests = []; failure = undefined; publishedReading = false;
+  groups = [group]; requests = []; failure = undefined; publishedReading = false; historyCount = 0;
   sessionStorage.clear();
+  localStorage.clear();
   window.history.replaceState(null, '', '/');
   vi.stubGlobal('fetch', vi.fn(async (input: string) => {
     const path = input.replace('/api/life-groups', '');
@@ -34,6 +36,8 @@ beforeEach(() => {
     const selected = groups.find(g => g.id === id);
     const data = !path ? { groups, requests, canCreate: false }
       : path.startsWith('/sources?') ? []
+      : path.includes('/shares?') ? new URL(input, 'https://test').searchParams.get('offset') === '30' ? [] : Array.from({ length: historyCount }, (_, index) => ({ id: `history-${index}`, authorId: 'other', authorName: '家人', kind: 'note', title: `分享 ${index}`, body: '先前分享', reference: '詩篇 23', version: 1, createdAt: '2026-09-09', commentCount: 0 }))
+      : path.includes('/reading/note?') ? { note: null }
       : path.includes('/reading?') ? { entry: publishedReading ? { id: 'day', version: 1, title: `靈修 ${new URL(input, 'https://test').searchParams.get('date')}`, reference: '詩篇 23', scriptureText: '完整經文', body: '已發佈短文', prayer: '回應禱告原文', loveAction: '愛人行動原文', planName: '教會課表' } : null, readers: [] }
       : { id, name: selected?.name, manager: selected?.manager, members: [{ id: 'member', name: '成員' }], requests: [] };
     return { ok: true, json: async () => data };
@@ -222,20 +226,71 @@ it('refreshes group preview bounds at Taipei midnight without resetting the sele
   expect(screen.getByLabelText('讀經日期')).toHaveAttribute('max', '2032-01-02');
   expect(screen.getByRole('button', { name: '與小家分享已讀' })).not.toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: '分享這一天的領受' }));
-  fireEvent.change(await screen.findByRole('textbox', { name: '分享內容' }), { target: { value: '小家草稿' } });
+  fireEvent.change(await screen.findByRole('textbox', { name: '看見' }), { target: { value: '小家草稿' } });
   vi.setSystemTime(new Date('2032-01-01T16:01:00Z'));
   await act(async () => { window.dispatchEvent(new Event('focus')); });
-  expect(screen.getByRole('textbox', { name: '分享內容' })).toHaveValue('小家草稿');
+  expect(screen.getByRole('textbox', { name: '看見' })).toHaveValue('小家草稿');
   expect(screen.getByLabelText('讀經日期')).toHaveValue('2032-01-01');
   fireEvent.change(screen.getByLabelText('讀經日期'), { target: { value: '2032-01-03' } });
   await screen.findByText('靈修 2032-01-03');
-  expect(screen.getByRole('textbox', { name: '分享內容' })).toHaveValue('小家草稿');
-  expect(screen.getByRole('textbox', { name: '分享內容' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: '確認分享至小家' })).toBeDisabled();
-  fireEvent.submit(screen.getByRole('textbox', { name: '分享內容' }).closest('form')!);
+  expect(screen.queryByRole('textbox', { name: '看見' })).toBeNull();
+  expect(screen.getByRole('button', { name: '分享這一天的領受' })).toBeDisabled();
   expect(vi.mocked(fetch).mock.calls.every(([, init]) => init?.method !== 'PUT')).toBe(true);
   fireEvent.change(screen.getByLabelText('讀經日期'), { target: { value: '2032-01-01' } });
   await screen.findByText('靈修 2032-01-01');
-  expect(screen.getByRole('textbox', { name: '分享內容' })).toHaveValue('小家草稿');
-  expect(screen.getByRole('textbox', { name: '分享內容' })).not.toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '分享這一天的領受' }));
+  expect(await screen.findByRole('textbox', { name: '看見' })).toHaveValue('小家草稿');
+  expect(screen.getByRole('textbox', { name: '看見' })).not.toBeDisabled();
+});
+
+it('shares the daily-reader font preference and scopes it to Scripture, devotion and prayer', async () => {
+  publishedReading = true;
+  localStorage.setItem('wechurch-devotion-font-size', '24');
+  show(entry);
+  const control = await screen.findByRole('slider', { name: '字級' });
+  expect(control).toHaveValue('24');
+  const reader = screen.getByText('完整經文').closest('article')!;
+  expect(reader).toHaveClass('church-reader');
+  expect(reader.style.getPropertyValue('--reader-font-size')).toBe('1.5rem');
+  expect(screen.getByText('已發佈短文')).toHaveClass('reader-prose');
+  expect(screen.getByText('回應禱告原文')).toHaveClass('reader-prose');
+  expect(reader).not.toContainElement(screen.getByRole('button', { name: '分享這一天的領受' }));
+  fireEvent.change(control, { target: { value: '26' } });
+  expect(localStorage.getItem('wechurch-devotion-font-size')).toBe('26');
+  expect(reader.style.getPropertyValue('--reader-font-size')).toBe('1.625rem');
+  fireEvent.click(screen.getByRole('button', { name: '重設閱讀字級' }));
+  expect(control).toHaveValue('20');
+});
+
+it('shows this-day insights and opens the complete historical note feed', async () => {
+  publishedReading = true;
+  show(`${entry}&date=2026-09-09`);
+  await screen.findByRole('region', { name: '這一天的小家領受' });
+  expect(fetch).toHaveBeenCalledWith('/api/life-groups/group/shares?kind=note&offset=0&date=2026-09-09', expect.anything());
+  fireEvent.click(screen.getByRole('button', { name: '回看小家領受' }));
+  expect(await screen.findByRole('button', { name: '亮光' })).toHaveAttribute('aria-pressed', 'true');
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/life-groups/group/shares?kind=note&offset=0', expect.anything()));
+  fireEvent.click(screen.getByRole('tab', { name: '一起讀經' }));
+  expect(await screen.findByLabelText('讀經日期')).toHaveValue('2026-09-09');
+});
+
+it('keeps marking read independently available without opening private notes', async () => {
+  publishedReading = true;
+  show(entry);
+  fireEvent.click(await screen.findByRole('button', { name: '與小家分享已讀' }));
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/life-groups/group/reading/day', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ version: 1, done: true }) })));
+  expect(screen.queryByRole('textbox', { name: '看見' })).toBeNull();
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/reading/note?'))).toBe(false);
+});
+
+
+it('keeps the existing historical feed pagination reachable from reading', async () => {
+  publishedReading = true; historyCount = 30; show(entry);
+  fireEvent.click(await screen.findByRole('button', { name: '回看小家領受' }));
+  const next = await screen.findByRole('button', { name: '下一頁' });
+  expect(next).not.toBeDisabled();
+  fireEvent.click(next);
+  expect(await screen.findByText('沒有更多分享。')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '上一頁' })).not.toBeDisabled();
+  expect(fetch).toHaveBeenCalledWith('/api/life-groups/group/shares?kind=note&offset=30', expect.anything());
 });
