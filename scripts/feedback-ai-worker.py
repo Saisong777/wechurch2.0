@@ -17,6 +17,11 @@ def child_env():
 def railway_env(force_refresh=False):
  file=Path.home()/'.railway/config.json'
  initial=file.read_bytes();config=json.loads(initial);user=config.get('user',{})
+ # Legacy CLI login has only user.token; do not invent OAuth expiry/refresh.
+ legacy=user.get('token')
+ if (not force_refresh and isinstance(legacy,str) and legacy and legacy==legacy.strip()
+     and not any(k in user for k in ('accessToken','refreshToken','tokenExpiresAt'))):
+  return dict(child_env(),RAILWAY_API_TOKEN=legacy,RAILWAY_NO_AUTO_UPDATE='1')
  if force_refresh or user.get('tokenExpiresAt',0)<time.time()+300:
   if not user.get('refreshToken'):raise SafeFailure('railway_login_required')
   try:
