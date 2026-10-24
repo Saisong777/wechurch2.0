@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import DiscipleQuiz from './DiscipleQuiz';
 import { PageScrollContext } from '@/contexts/PageScrollContext';
@@ -50,4 +50,24 @@ it('ignores corrupted drafts and keeps playing when tab storage is unavailable',
   vi.stubGlobal('sessionStorage', {getItem: () => '{', setItem: vi.fn(() => { throw new Error('blocked'); })}); show();
   expect(screen.queryByRole('button', {name: /繼續測驗/})).toBeNull(); fireEvent.click(screen.getByRole('button', {name: /開始探索/})); expect(screen.getByRole('status').textContent).toContain('目前無法暫存');
   fireEvent.click(screen.getAllByRole('radio')[0]); fireEvent.click(screen.getByRole('button', {name: '下一題'})); expect(screen.getByRole('heading', {level: 1}).textContent).toBe(QUESTIONS[1].text);
+});
+
+it.each(['Escape', 'cancel'])('restores the restart opener after dismissing by %s', async (method) => {
+  resultDraft(); show(); fireEvent.click(screen.getByRole('button', {name: '查看上次結果'}));
+  const opener = screen.getByRole('button', {name: /再探索一次/}); opener.focus(); fireEvent.click(opener);
+  const dialog = screen.getByRole('alertdialog');
+  if (method === 'Escape') fireEvent.keyDown(dialog, {key: 'Escape'});
+  else fireEvent.click(screen.getByRole('button', {name: '保留本次進度'}));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  await waitFor(() => expect(document.activeElement).toBe(opener));
+  expect(screen.getByRole('heading', {name: '你呈現了多種同行傾向'})).toBeTruthy();
+});
+it('keeps focus on the new first question after restart dialog cleanup', async () => {
+  resultDraft(); show(); fireEvent.click(screen.getByRole('button', {name: '查看上次結果'}));
+  const opener = screen.getByRole('button', {name: /再探索一次/}); opener.focus(); fireEvent.click(opener);
+  fireEvent.click(screen.getByRole('button', {name: '清除並重新開始'}));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', {level: 1})));
+  expect(screen.getByRole('heading', {level: 1}).textContent).toBe(QUESTIONS[0].text);
+  expect(screen.getByRole('progressbar').getAttribute('value')).toBe('0');
 });

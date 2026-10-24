@@ -18,6 +18,8 @@ export default function DiscipleQuiz() {
   const [inspected, setInspected] = useState<DiscipleId | null>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'fallback'>('idle');
   const heading = useRef<HTMLHeadingElement>(null);
+  const restartOpener = useRef<HTMLButtonElement>(null);
+  const restartWasConfirmed = useRef(false);
   const scroll = usePageScroll();
   const complete = answeredCount(answers);
   const result = useMemo(() => phase === 'result' ? computeQuiz(answers) : null, [phase, answers]);
@@ -33,7 +35,9 @@ export default function DiscipleQuiz() {
     catch { setCanSave(false); }
   }, [phase, answers, current]);
 
+  const requestRestart = () => { restartWasConfirmed.current = false; setConfirmRestart(true); };
   const restart = () => {
+    restartWasConfirmed.current = true;
     setAnswers(emptyAnswers()); setCurrent(0); setInspected(null); setCopyStatus('idle'); setSaved(null); setPhase('quiz'); setConfirmRestart(false);
   };
   const continueDraft = () => {
@@ -64,7 +68,7 @@ export default function DiscipleQuiz() {
         <div className="dq-instructions"><p><strong>怎麼回答：</strong> 回想最近三個月的實際做法；若沒遇過這個情境，選最接近你平常反應的一項。沒有標準答案，不必選「應該成為的自己」。</p><p>每題可改答案，也能回上一題。進度只在這個瀏覽器分頁暫存，不會上傳。</p></div>
         <div className="dq-intro-actions">
           {saved && answeredCount(saved.answers) > 0 && <button className="dq-primary" onClick={continueDraft}>{saved.phase === 'result' ? '查看上次結果' : `繼續測驗（已答 ${answeredCount(saved.answers)} 題）`}<ChevronRight size={18}/></button>}
-          <button className={saved && answeredCount(saved.answers) > 0 ? 'dq-secondary' : 'dq-primary'} onClick={() => saved && answeredCount(saved.answers) > 0 ? setConfirmRestart(true) : restart()}>{saved && answeredCount(saved.answers) > 0 ? '重新開始' : '開始探索'}<Compass size={18}/></button>
+          <button ref={restartOpener} className={saved && answeredCount(saved.answers) > 0 ? 'dq-secondary' : 'dq-primary'} onClick={() => saved && answeredCount(saved.answers) > 0 ? requestRestart() : restart()}>{saved && answeredCount(saved.answers) > 0 ? '重新開始' : '開始探索'}<Compass size={18}/></button>
         </div>
         <p className="dq-caption">這是自我認識與小組交流的情境遊戲，尚未做心理測量的信效度驗證，也不決定你的恩賜、價值或使命。</p>
         <details className="dq-method"><summary>關於十二位角色與計分</summary><p>每題選一個最接近的做法，該選項對應的創作角色得到一票。12 類各出現 8 次，A、B、C、D 位置各 2 次；24 題完成後才顯示結果。同分會全部並列，不靠隨機抽選或先後順序決定。每題只能選一項，各類次數會互相影響，請勿比較不同人的分數高低。</p><p>本測驗以門徒故事為靈感，保留拿但業與馬提亞；馬提亞是後來補入使徒行列，並非原始十二名單。人物稱號、心理特質與應用屬遊戲創作；結果另列經文明說及傳統對應，讓故事與想像有清楚界線。</p></details>
@@ -94,11 +98,11 @@ export default function DiscipleQuiz() {
         </article>}
         <section className="dq-breakdown" aria-label="十二種傾向的選項計數"><h2>完整同行傾向</h2><p className="dq-caption">每類有 8 次出現機會；數字是選中次數，並非準確率。相同次數依固定順序列出，無先後之分。點選任一角色，可閱讀對應反思。</p>{result.sorted.map(row => { const d = DISCIPLES.find(item => item.id === row.id)!; return <button key={d.id} className="dq-score" aria-pressed={activeId === d.id} onClick={() => inspectProfile(d.id)}><span aria-hidden="true">{d.icon}</span><span className="dq-score-name">{d.name}<small>{d.title}</small></span><span className="dq-score-track" aria-hidden="true"><span style={{width: `${row.score / 8 * 100}%`}}/></span><span className="dq-score-count">{row.score}／8</span></button>; })}</section>
         <p className="dq-caption">每人都會隨情境與成長有不同表現。這份結果適合開啟對話，不能用來判定能力、屬靈程度或分配服事。</p>
-        <div className="dq-result-actions"><button className="dq-primary" onClick={() => void copy()}><Copy size={18}/>複製結果摘要</button><button className="dq-secondary" onClick={() => setConfirmRestart(true)}><RotateCcw size={18}/>再探索一次</button></div>
+        <div className="dq-result-actions"><button className="dq-primary" onClick={() => void copy()}><Copy size={18}/>複製結果摘要</button><button ref={restartOpener} className="dq-secondary" onClick={requestRestart}><RotateCcw size={18}/>再探索一次</button></div>
         <p className="dq-caption" role="status">{copyStatus === 'copied' ? '已複製，是否分享由你決定。' : copyStatus === 'fallback' ? '無法自動複製；請選取下方摘要再複製。' : ''}</p>
         {copyStatus === 'fallback' && <textarea aria-label="可複製的結果摘要" className="dq-summary" readOnly value={summary}/>}
       </section>}
     </div>
-    <AlertDialog open={confirmRestart} onOpenChange={setConfirmRestart}><AlertDialogContent className="dq-reset-dialog"><AlertDialogHeader><AlertDialogTitle>重新開始測驗？</AlertDialogTitle><AlertDialogDescription>這會清除這個分頁的本次答案，從第一題重新探索。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>保留本次進度</AlertDialogCancel><AlertDialogAction onClick={restart}>清除並重新開始</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={confirmRestart} onOpenChange={setConfirmRestart}><AlertDialogContent className="dq-reset-dialog" onCloseAutoFocus={event => { event.preventDefault(); (restartWasConfirmed.current ? heading.current : restartOpener.current)?.focus({preventScroll: true}); }}><AlertDialogHeader><AlertDialogTitle>重新開始測驗？</AlertDialogTitle><AlertDialogDescription>這會清除這個分頁的本次答案，從第一題重新探索。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>保留本次進度</AlertDialogCancel><AlertDialogAction onClick={restart}>清除並重新開始</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </div>;
 }
