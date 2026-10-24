@@ -43,6 +43,15 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     const angle = host.dataset.worldAzimuth; fireEvent.click(screen.getByRole('button', { name: '向左旋轉城堡' })); expect(host.dataset.worldAzimuth).not.toBe(angle);
     view.unmount(); expect(callbacks.size).toBe(0); expect(disconnect).toHaveBeenCalledOnce(); expect(gpu.dispose).toHaveBeenCalledOnce(); expect(gpu.forceContextLoss).toHaveBeenCalledOnce();
   });
+  it('shifts the projection into the unobscured viewport without rebuilding the world or moving residents', () => {
+    const view = show({ paused: true }); const host = screen.getByTestId('castle-3d-world');
+    const position = host.dataset.worldResidentPosition, target = host.dataset.worldTarget;
+    view.rerender(<CastleScene places={places} selectedId="chapel" onSelect={vi.fn()} paused night={false} detailId="detail" insets={{ top: 100, right: 330, bottom: 0 }} />);
+    expect(JSON.parse(host.dataset.worldProjection || '{}')).toMatchObject({ x: 165, y: -50 });
+    expect(host.dataset.worldTarget).toBe(target); expect(host.dataset.worldResidentPosition).toBe(position); expect(gpu.instances).toBe(1);
+    view.rerender(<CastleScene places={places} selectedId="chapel" onSelect={vi.fn()} paused night={false} detailId="detail" insets={{ top: 100, right: 0, bottom: 300 }} />);
+    expect(JSON.parse(host.dataset.worldProjection || '{}')).toMatchObject({ x: 0, y: 100 }); expect(gpu.instances).toBe(1);
+  });
   it('suspends the background loop and resumes without a large movement jump', () => {
     show(); const host = screen.getByTestId('castle-3d-world'); tick(1000); tick(1050); const position = host.dataset.worldResidentPosition;
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(true); fireEvent(document, new Event('visibilitychange'));

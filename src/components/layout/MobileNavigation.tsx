@@ -37,7 +37,7 @@ export function MobileNavigation() {
     };
   }, [open]);
 
-  return <div ref={root} className="mobile-navigation sticky top-0 z-40 shrink-0 border-b border-border bg-background md:hidden" data-testid="mobile-navigation">
+  return <div ref={root} data-shell-chrome="mobile-navigation" className="mobile-navigation sticky top-0 z-40 shrink-0 border-b border-border bg-background md:hidden" data-testid="mobile-navigation">
     <div className="mobile-navigation-bar mx-auto grid min-h-[56px] max-w-xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[4px] px-[8px]">
       <button type="button" aria-label="返回上一頁" className="flex min-h-[48px] min-w-[44px] items-center justify-center whitespace-nowrap rounded-md text-[min(0.875rem,20px)] font-medium focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => { setOpen(false); if ((window.history.state?.idx ?? 0) > 0) navigate(-1); else navigate('/', { replace: true }); }}>

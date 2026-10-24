@@ -63,6 +63,8 @@ import { NotesLoadNotice } from '@/components/scripture/NotesLoadNotice';
 import { CastleHome } from '@/components/home/CastleHome';
 import { HomeModeSwitch } from '@/components/home/HomeModeSwitch';
 import { useHomeMode } from '@/hooks/useHomeMode';
+import { ChurchControl } from '@/components/layout/ChurchControl';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface DevotionalNoteSummary {
   syncStatus?: 'pending' | 'blocked' | 'synced';
@@ -522,32 +524,7 @@ const Index = () => {
       tone: 'companion-pillar--people',
     },
   ];
-  return (
-    <div className="dashboard-surface min-h-screen bg-background" data-dashboard-variant={styleLabMode ? dashboardVariant : 'together'}>
-      <header className="dashboard-header sticky top-0 z-50 w-full border-b border-border/70 bg-background/90 px-4 py-3 shadow-[0_10px_30px_-28px_rgba(30,58,95,0.45)] backdrop-blur-xl transition-all sm:px-6 sm:py-4 md:py-3">
-        <div className="container mx-auto flex items-center justify-between">
-          {/* Mobile: Left spacer */}
-          <div className="w-10 md:hidden" />
-
-          {/* Desktop: Logo on left */}
-          <Link to="/" className="hidden md:flex items-center gap-2 group shrink-0">
-            <div className="relative">
-              <WeChurchLogo size={32} className="relative group-hover:scale-105 transition-transform" />
-            </div>
-            <h1 className="text-lg font-bold text-foreground">WeChurch</h1>
-          </Link>
-
-          {/* Mobile: Center logo */}
-          <div className="flex md:hidden items-center gap-2 group">
-            <div className="relative">
-              <WeChurchLogo size={36} className="relative group-hover:scale-105 transition-transform" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">WeChurch</h1>
-            </div>
-          </div>
-
-          {/* Desktop: Navigation links */}
+  const navigationControls = (
           <nav className="hidden md:flex items-center gap-1" data-testid="nav-top-index">
             {appNavItems.map((item) => {
               const Icon = item.icon;
@@ -569,7 +546,8 @@ const Index = () => {
               );
             })}
           </nav>
-
+  );
+  const accountControls = (
           <div className="flex shrink-0 items-center justify-end gap-1">
             <AppearanceControl />
             {authLoading ? (
@@ -628,15 +606,52 @@ const Index = () => {
               </Button>
             )}
           </div>
+  );
+  return (
+    <div className="dashboard-surface min-h-screen bg-background" data-dashboard-variant={styleLabMode ? dashboardVariant : 'together'}>
+      {homeMode !== 'castle' && <header className="dashboard-header sticky top-0 z-50 w-full border-b border-border/70 bg-background/90 px-4 py-3 shadow-[0_10px_30px_-28px_rgba(30,58,95,0.45)] backdrop-blur-xl transition-all sm:px-6 sm:py-4 md:py-3">
+        <div className="container mx-auto flex items-center justify-between">
+          {/* Mobile: Left spacer */}
+          <div className="w-10 md:hidden" />
+
+          {/* Desktop: Logo on left */}
+          <Link to="/" className="hidden md:flex items-center gap-2 group shrink-0">
+            <div className="relative">
+              <WeChurchLogo size={32} className="relative group-hover:scale-105 transition-transform" />
+            </div>
+            <h1 className="text-lg font-bold text-foreground">WeChurch</h1>
+          </Link>
+
+          {/* Mobile: Center logo */}
+          <div className="flex md:hidden items-center gap-2 group">
+            <div className="relative">
+              <WeChurchLogo size={36} className="relative group-hover:scale-105 transition-transform" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">WeChurch</h1>
+            </div>
+          </div>
+
+          {/* Desktop: Navigation links */}
+          {navigationControls}
+
+          {accountControls}
         </div>
-      </header>
+      </header>}
 
       <main data-home-mode={homeMode} className={`dashboard-main mobile-readable mx-auto ${homeMode === 'castle' ? 'w-full px-3 py-3 sm:px-5' : 'container px-4 py-4 sm:px-6 md:py-8'}`}>
-        <HomeModeSwitch mode={homeMode} onChange={changeMode} />
-        <VisitReminder />
-        {notesError && <div className="mx-auto max-w-3xl"><NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} /></div>}
+        {homeMode !== 'castle' && <>
+          <HomeModeSwitch mode={homeMode} onChange={changeMode} />
+          <VisitReminder />
+          {notesError && <div className="mx-auto max-w-3xl"><NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} /></div>}
+        </>}
         {homeMode === 'castle' ? (
           <CastleHome
+            modeControls={<HomeModeSwitch mode={homeMode} onChange={changeMode} />}
+            accountControls={<><NotificationBell />{accountControls}</>}
+            navigationControls={navigationControls}
+            churchControls={<ChurchControl />}
+            notices={<><VisitReminder />{notesError && <NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} />}</>}
             churchName={!user ? 'iM 行動教會' : churchDisplayName(churchContext?.data?.selectedChurch) || 'WeChurch'}
             preview={!user}
             featureEnabled={isFeatureEnabled}
@@ -1199,7 +1214,7 @@ const Index = () => {
         )}
       </main>
 
-      <footer className="w-full py-4 px-4 mt-auto border-t border-border/50">
+      {homeMode !== 'castle' && <footer className="w-full py-4 px-4 mt-auto border-t border-border/50">
         <div className="container mx-auto max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
@@ -1215,7 +1230,7 @@ const Index = () => {
             </div>
           </div>
         </div>
-      </footer>
+      </footer>}
 
       <ProfileSettingsDialog
         open={showProfileSettings}

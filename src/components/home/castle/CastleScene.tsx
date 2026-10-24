@@ -5,14 +5,14 @@ import { Compass, Map as MapIcon, RotateCcw, RotateCw, ZoomIn, ZoomOut, type Luc
 import { buildCastleWorld, WORLD_PLACES, type PlaceId } from './world';
 
 export interface ScenePlace { id: string; name: string; label: string; icon: LucideIcon }
-export interface CastleSceneProps { places: ScenePlace[]; selectedId?: string; onSelect: (id: string) => void; paused: boolean; night: boolean; detailId: string }
-type SceneHandle = { reset: () => void; zoom: (factor: number) => void; rotate: (angle: number) => void; focus: (id: string) => void; refresh: () => void };
+export interface CastleSceneProps { places: ScenePlace[]; selectedId?: string; onSelect: (id: string) => void; paused: boolean; night: boolean; detailId: string; insets?: { top: number; right: number; bottom: number } }
+type SceneHandle = { reset: () => void; zoom: (factor: number) => void; rotate: (angle: number) => void; focus: (id: string) => void; refresh: () => void; layout: () => void };
 type SceneState = 'loading' | 'ready' | 'unsupported' | 'lost';
 
-export default function CastleScene({ places, selectedId, onSelect, paused, night, detailId }: CastleSceneProps) {
+export default function CastleScene({ places, selectedId, onSelect, paused, night, detailId, insets }: CastleSceneProps) {
   const container = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const labels = useRef(new Map<string, HTMLButtonElement>());
-  const live = useRef({ places, selectedId, onSelect, paused, night }); live.current = { places, selectedId, onSelect, paused, night };
+  const live = useRef({ places, selectedId, onSelect, paused, night, insets }); live.current = { places, selectedId, onSelect, paused, night, insets };
   const api = useRef<SceneHandle>();
   const [state, setState] = useState<SceneState>('loading');
   const [reduced, setReduced] = useState(false);
@@ -58,7 +58,8 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
         projected.project(camera);
         const x = (projected.x * .5 + .5) * width, y = (-projected.y * .5 + .5) * height;
         const labelWidth = width < 600 ? 44 : 125, labelHeight = 46;
-        const clipped = !inFront || projected.z < -1 || projected.z > 1 || x < 22 || x > width - 22 || y < 24 || y > height - 64;
+        const safe = live.current.insets;
+        const clipped = !inFront || projected.z < -1 || projected.z > 1 || x < 22 || x > width - (safe?.right || 0) - 22 || y < (safe?.top || 0) + 46 || y > height - (safe?.bottom || 0) - 64;
         const overlaps = occupied.some(p => Math.abs(p.x - x) < (p.width + labelWidth) * .48 && Math.abs(p.y - y) < (p.height + labelHeight) * .5);
         const hidden = clipped || overlaps;
         const transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%)`;
@@ -81,6 +82,8 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       host.dataset.worldAzimuth = controls.getAzimuthalAngle().toFixed(3);
       host.dataset.worldTarget = `${controls.target.x.toFixed(2)},${controls.target.y.toFixed(2)},${controls.target.z.toFixed(2)}`;
       host.dataset.worldResidentPosition = `${world.walkers[0].group.position.x.toFixed(3)},${world.walkers[0].group.position.z.toFixed(3)}`;
+      host.dataset.worldInsets = JSON.stringify(live.current.insets || { top: 0, right: 0, bottom: 0 });
+      host.dataset.worldProjection = JSON.stringify({ fov: Number(camera.fov.toFixed(2)), x: camera.view?.offsetX || 0, y: camera.view?.offsetY || 0 });
       host.dataset.worldVisible = String(!document.hidden); host.dataset.worldReducedMotion = String(reduceMotion);
     }
     function render() {
@@ -117,6 +120,20 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       const direction = camera.position.clone().sub(controls.target).normalize();
       direction.y = Math.max(.5, direction.y); direction.normalize();
       moveCamera(target.clone().addScaledVector(direction, definition.distance), target);
+    }
+    function resize() {
+      if (disposed || !renderer || !host || !host.clientWidth || !host.clientHeight) return;
+      const width = host.clientWidth, height = host.clientHeight, safe = live.current.insets;
+      camera.aspect = width / height;
+      if (safe) {
+        const availableWidth = Math.max(160, width - safe.right), availableHeight = Math.max(140, height - safe.top - safe.bottom);
+        const tangent = Math.max(Math.tan(THREE.MathUtils.degToRad(39 / 2)) * height / availableHeight, Math.tan(THREE.MathUtils.degToRad(44 / 2)) * height / availableWidth);
+        camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(tangent)), 39, 104);
+        camera.setViewOffset(width, height, safe.right / 2, (safe.bottom - safe.top) / 2, width, height);
+      } else {
+        camera.clearViewOffset(); camera.fov = camera.aspect < .85 ? 65 : camera.aspect < 1.25 ? 49 : 39;
+      }
+      camera.updateProjectionMatrix(); renderer.setSize(width, height, false); render();
     }
     function handlePointerDown(event: PointerEvent) {
       if (event.button !== 0 && event.pointerType !== 'touch') { pointerDown = null; return; }
@@ -166,9 +183,9 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
         reset: () => moveCamera(homePosition.clone(), initialTarget.clone()),
         zoom: (factor: number) => { if (!controls) return; cameraTween = null; const offset = camera.position.clone().sub(controls.target); offset.setLength(THREE.MathUtils.clamp(offset.length() * factor, 11, 86)); camera.position.copy(controls.target).add(offset); controls.update(); render(); },
         rotate: (angle: number) => { if (!controls) return; cameraTween = null; const offset = camera.position.clone().sub(controls.target); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle); camera.position.copy(controls.target).add(offset); controls.update(); render(); },
-        focus, refresh: syncAnimation,
+        focus, refresh: syncAnimation, layout: resize,
       };
-      const resize = () => { if (disposed || !renderer || !host.clientWidth || !host.clientHeight) return; camera.aspect = host.clientWidth / host.clientHeight; camera.fov = camera.aspect < .85 ? 65 : camera.aspect < 1.25 ? 49 : 39; camera.updateProjectionMatrix(); renderer.setSize(host.clientWidth, host.clientHeight, false); render(); };
+
       resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); resize();
       surface.addEventListener('pointerdown', handlePointerDown); surface.addEventListener('pointermove', handlePointerMove); surface.addEventListener('pointerup', handlePointerUp); surface.addEventListener('pointercancel', handlePointerCancel); surface.addEventListener('keydown', handleKey);
       surface.addEventListener('webglcontextlost', handleContextLost); surface.addEventListener('webglcontextrestored', handleContextRestored);
@@ -186,6 +203,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     };
   }, [attempt]);
 
+  useEffect(() => { api.current?.layout(); }, [insets?.top, insets?.right, insets?.bottom]);
   useEffect(() => { api.current?.refresh(); }, [paused, night]);
   useEffect(() => { api.current?.refresh(); }, [places, selectedId, state]);
   const select = (id: string) => { onSelect(id); api.current?.focus(id); };
@@ -195,7 +213,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       <canvas key={attempt} ref={canvas} className="castle-3d-canvas" aria-label="可以拖曳旋轉、縮放的3D城堡；方向鍵旋轉與縮放，Home回全景" tabIndex={unavailable ? -1 : 0} data-testid="castle-3d-canvas" hidden={unavailable} />
       {state === 'ready' && <div className="castle-3d-labels" aria-label="3D城堡地點">{places.map(place => { const Icon = place.icon; return <button ref={node => { if (node) labels.current.set(place.id, node); else labels.current.delete(place.id); }} key={place.id} type="button" className={`castle-3d-label ${selectedId === place.id ? 'is-selected' : ''}`} aria-label={`${place.name}・${place.label}`} aria-pressed={selectedId === place.id} aria-controls={detailId} onClick={() => select(place.id)}><span><Icon size={17} aria-hidden="true" /></span><span>{place.name}<small>{place.label}</small></span></button>; })}</div>}
       {state === 'loading' && <div className="castle-3d-loading" role="status"><Compass size={27} aria-hidden="true" /><p>正在打開城門…</p></div>}
-      {unavailable && <div className="castle-3d-fallback"><img src="/im-castle-world.webp" alt="城堡概念插畫；目前不是3D場景。" width="1536" height="1024" /><div role="status"><h2>{state === 'lost' ? '3D畫面暫時中斷' : '這個裝置目前無法開啟3D'}</h2><p>目前顯示城堡插畫。你仍可使用下方地點清單前往各個功能。</p><button type="button" onClick={() => { setState('loading'); setAttempt(value => value + 1); }}>重新開啟3D</button></div></div>}
+      {unavailable && <div className="castle-3d-fallback"><img src="/im-castle-world.webp" alt="城堡概念插畫；目前不是3D場景。" width="1536" height="1024" /><div role="status"><h2>{state === 'lost' ? '3D畫面暫時中斷' : '這個裝置目前無法開啟3D'}</h2><p>目前顯示城堡插畫。你仍可開啟「探索」，從地點清單前往各個功能。</p><button type="button" onClick={() => { setState('loading'); setAttempt(value => value + 1); }}>重新開啟3D</button></div></div>}
     </div>
     {!unavailable && <div className="castle-3d-toolbar" role="group" aria-label="3D地圖視角">
       <button type="button" onClick={() => api.current?.reset()} aria-label="重設為城堡全景"><MapIcon size={17} aria-hidden="true" /><span>全景</span></button>

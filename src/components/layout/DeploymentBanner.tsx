@@ -10,5 +10,5 @@ export function DeploymentBanner() {
     return () => { active = false; };
   }, []);
   if (!staging) return null;
-  return <aside className="border-b border-emerald-300 bg-emerald-50 px-3 py-2 text-center text-xs leading-5 text-emerald-950" aria-label="測試環境">B 測試站 · 請使用測試資料，不會同步至正式站</aside>;
+  return <aside className="deployment-banner border-b border-emerald-300 bg-emerald-50 px-3 py-2 text-center text-xs leading-5 text-emerald-950" aria-label="測試環境">B 測試站 · 請使用測試資料，不會同步至正式站</aside>;
 }

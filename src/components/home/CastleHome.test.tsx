@@ -13,6 +13,7 @@ const show = (props: Partial<CastleHomeProps> = {}) => render(<MemoryRouter><Cas
 describe('castle navigation', () => {
   it('keeps all seven existing destinations accessible without using the image', () => {
     show();
+    fireEvent.click(screen.getByRole('button', { name: '開啟城堡地點' }));
     const list = screen.getByRole('navigation', { name: '城堡所有地點' });
     const hrefs = within(list).getAllByRole('link').map(link => link.getAttribute('href'));
     expect(hrefs).toEqual(['/learn/church-reading', '/learn/bible', '/share', '/groups', '/grace-record?view=grace', '/walls', '/play']);
@@ -34,6 +35,7 @@ describe('castle navigation', () => {
     fireEvent.click(await screen.findByRole('button', { name: '禱告花園・禱告' }));
     const panel = screen.getByRole('region', { name: '目前選擇的地點' });
     expect(within(panel).getByRole('link', { name: '前往禱告' }).getAttribute('href')).toBe('/share');
+    fireEvent.click(screen.getByRole('button', { name: '開啟城堡地點' }));
     expect(screen.getByText('1 / 7')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: '禱告花園・禱告' }));
     expect(screen.getByText('1 / 7')).toBeTruthy();
@@ -55,6 +57,7 @@ describe('castle navigation', () => {
     expect(container.querySelector('.castle-home--paused')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '開啟草稿' }));
     expect(openNote).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: '開啟城堡選單' }));
     expect(screen.getByRole('link', { name: '牧養概況' }).getAttribute('href')).toBe('/work');
     expect(screen.getByRole('link', { name: '主持與管理' }).getAttribute('href')).toBe('/admin');
   });
