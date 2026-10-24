@@ -179,5 +179,5 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
 .castle-mailbox-launch:hover { background: #edf3e4; }
 .castle-mailbox-launch:focus-visible { outline: 3px solid #bd6b4b; outline-offset: 3px; }
 @media (max-width: 640px) and (orientation: portrait) {
-  .castle-home--fullscreen .castle-mailbox-launch { position: absolute; right: 62px; top: 64px; min-width: 122px; min-height: 44px; padding: 8px 12px; }
+  .castle-home--fullscreen .castle-mailbox-launch { position: static; display: flex; width: fit-content; max-width: calc(100% - 64px); min-width: 122px; min-height: 44px; margin-top: 8px; padding: 8px 12px; }
 }

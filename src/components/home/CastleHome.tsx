@@ -55,7 +55,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const [hasNotices,setHasNotices]=useState(false);
   const [panel, setPanel] = useState<'places' | 'menu' | null>(null);
   const [insets, setInsets] = useState({ top: 100, right: 0, bottom: 100 });
-  const exploreButton=useRef<HTMLButtonElement>(null),messageArea=useRef<HTMLDivElement>(null);
+  const exploreButton=useRef<HTMLButtonElement>(null),messageArea=useRef<HTMLDivElement>(null),mailbox=useRef<HTMLAnchorElement>(null);
   const topbar = useRef<HTMLDivElement>(null), drawer = useRef<HTMLElement>(null), compact = useRef<HTMLDivElement>(null), noticeArea = useRef<HTMLDivElement>(null);
   const lastTrigger = useRef<HTMLButtonElement | null>(null), wasOpen = useRef(false);
   const detailId = useId(), drawerId = useId(), messageId=useId();
@@ -74,14 +74,14 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   }, [panel,windowActive]);
   useLayoutEffect(() => {
     const measure = () => {
-      const top = Math.max(topbar.current?.getBoundingClientRect().bottom || 0, portrait?0:noticeArea.current?.getBoundingClientRect().bottom || 0) + 10;
+      const top = Math.max(topbar.current?.getBoundingClientRect().bottom || 0, portrait?mailbox.current?.getBoundingClientRect().bottom || 0:noticeArea.current?.getBoundingClientRect().bottom || 0) + 10;
       setHasNotices(Boolean(messageArea.current?.textContent?.trim()));
       const bounds = drawer.current?.getBoundingClientRect(), small = window.innerWidth <= 640;
       const next = { top, right: portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: small ? panel && bounds ? bounds.height + 20 : portrait?76:(compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
       setInsets(old => old.top === next.top && old.right === next.right && old.bottom === next.bottom ? old : next);
     };
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    [topbar.current, drawer.current, compact.current, noticeArea.current].forEach(node => node && observer?.observe(node));
+    [topbar.current, mailbox.current, drawer.current, compact.current, noticeArea.current].forEach(node => node && observer?.observe(node));
     const chromeObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(measure) : null;
     chromeObserver?.observe(document.getElementById('root') || document.body, { childList: true, subtree: true, characterData: true });
     window.addEventListener('resize', measure); measure();
@@ -99,6 +99,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     {selected && <Link className="castle-primary-link" to={selected.href}>{selected.action}<ArrowRight size={16} aria-hidden="true" /></Link>}
   </>;
 
+  const mailboxEntry=<Link ref={mailbox} className="castle-mailbox-launch" to="/feedback" state={{from:'/'}} aria-label="城堡信箱・意見與建議"><Mail size={19} aria-hidden="true"/><span>城堡信箱</span></Link>;
   const atmosphereControls=<div className="castle-atmosphere-controls" role="group" aria-label="城堡氣氛設定">
           <button type="button" onClick={() => setNight(current => !current)} aria-pressed={night} aria-label={night ? '切換日間景色' : '切換夜間景色'}>{night ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}</button>
           <button type="button" onClick={() => setPaused(current => !current)} aria-pressed={paused} aria-label={paused ? '開啟地圖動態' : '暫停地圖動態'}>{paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}</button>
@@ -118,9 +119,10 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     <div className="castle-hud" aria-label="城堡導覽與設定">
       <div className="castle-topbar" ref={topbar}>
         <div className="castle-brand" aria-labelledby="castle-title"><p><Castle size={16} aria-hidden="true" />{churchName}{preview && <span>預覽</span>}</p><h1 id="castle-title">我們的城堡</h1></div>
+        {portrait&&mailboxEntry}
         {!portrait&&<div className="castle-hud-mode">{modeControls}</div>}
         {!portrait&&atmosphereControls}
-        <div className="castle-hud-actions"><Link className="castle-mailbox-launch" to="/feedback" state={{from:'/'}} aria-label="城堡信箱・意見與建議"><Mail size={19} aria-hidden="true"/><span>城堡信箱</span></Link>
+        <div className="castle-hud-actions">{!portrait&&mailboxEntry}
           <button ref={exploreButton} data-castle-explore type="button" aria-label="開啟城堡地點" aria-expanded={panel === 'places'} aria-controls={drawerId} onClick={event => openPanel('places', event.currentTarget)}><Compass size={18} aria-hidden="true" /><span>探索</span></button>
           <button type="button" aria-label="開啟城堡選單" aria-describedby={portrait&&(hasNotices||!!presence.view.message)?messageId:undefined} aria-expanded={panel === 'menu'} aria-controls={drawerId} onClick={event => openPanel('menu', event.currentTarget)}><Menu size={19} aria-hidden="true" /><span>選單</span>{portrait&&(hasNotices||!!presence.view.message)&&<i className="castle-message-badge"><span id={messageId} className="sr-only" role="status">有訊息待查看</span></i>}</button>
         </div>

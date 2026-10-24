@@ -133,7 +133,7 @@ export default function FeedbackPage() {
     {unboundAttempt && <p role="alert" className="feedback-scope-message">這份意見的原教會無法確認，請先聯繫管理者；內容與送出編號已保留。</p>}
     {user && !contextReady && <p role="status" className="feedback-scope-message">{context?.error || (context?.loading ? '正在確認意見送往的教會…' : '教會歸屬等待管理者核定，草稿已保留。')}</p>}
     {error && <div className="feedback-error"><p role="alert">{error}</p>{activeTab==='progress'&&<Button type="button" variant="outline" onClick={()=>setActiveTab('write')}>回到待確認意見</Button>}</div>}
-    {loginRequired && <Button asChild variant="outline" onClick={() => rememberLoginReturn('/feedback')}><Link to="/login?returnTo=%2Ffeedback">重新登入後確認</Link></Button>}
+    {loginRequired && <Button asChild variant="outline" className="feedback-relogin" onClick={() => rememberLoginReturn('/feedback')}><Link to="/login?returnTo=%2Ffeedback">重新登入後確認</Link></Button>}
     {receipt && <div className="feedback-receipt"><CheckCircle2 size={24} aria-hidden="true"/><div><p role="status">已收到你的意見。可在「查看進度」閱讀後續。</p><button type="button" onClick={()=>setActiveTab('progress')}>查看處理進度<ArrowRight size={16} aria-hidden="true"/></button></div></div>}
     <div id="feedback-write-panel" className="feedback-panel" role="tabpanel" aria-labelledby="feedback-write-tab" hidden={activeTab!=='write'}>
     {pendingDrafts.length > 0 && <section className="feedback-drafts"><h2>還有其他未完成的草稿</h2><p>每份內容都會保留。選另一份時，目前內容會另存為這個帳號的草稿。{draft.locked ? '目前這份的送出結果尚未確認，請先確認，再切換草稿。' : ''}</p><ul>{pendingDrafts.map((item,index) => <li key={index}><p>{item.source === 'guest' ? '登入前草稿' : '這個帳號的另一份草稿'}：{item.draft.title}</p><Button type="button" variant="outline" disabled={busy || draft.locked} onClick={() => chooseDraft(index)}>接續這份草稿</Button></li>)}</ul></section>}

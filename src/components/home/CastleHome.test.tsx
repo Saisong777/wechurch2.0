@@ -6,9 +6,9 @@ import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testi
 import { MemoryRouter, createMemoryRouter, RouterProvider, Routes, Route } from 'react-router-dom';
 import { CastleHome, type CastleHomeProps } from './CastleHome';
 
-vi.mock('./castle/CastleScene', () => ({ default: ({ places, onSelect }: { places: { id: string; name: string; label: string }[]; onSelect: (id: string) => void }) => <div>{places.map(place => <button key={place.id} onClick={() => onSelect(place.id)} aria-label={`${place.name}・${place.label}`}>{place.name}</button>)}</div> }));
+vi.mock('./castle/CastleScene', () => ({ default: ({ places, onSelect, insets }: { places: { id: string; name: string; label: string }[]; onSelect: (id: string) => void; insets?:{top:number;right:number;bottom:number} }) => <div data-testid="scene-insets" data-insets={JSON.stringify(insets)}>{places.map(place => <button key={place.id} onClick={() => onSelect(place.id)} aria-label={`${place.name}・${place.label}`}>{place.name}</button>)}</div> }));
 
-afterEach(()=>{cleanup();vi.unstubAllGlobals();});
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const defaults: CastleHomeProps = { churchName: 'iM 行動教會', featureEnabled: () => true, featuresLoading: false, scripture: { reference: '測試經文', state: 'ready' }, hasDraft: false, onOpenNote: vi.fn(), showAdmin: false, showPastoral: false };
 const show = (props: Partial<CastleHomeProps> = {}) => render(<MemoryRouter><CastleHome {...defaults} {...props} /></MemoryRouter>);
 
@@ -99,6 +99,16 @@ describe('castle navigation', () => {
   it.each([[1280,720],[390,844],[320,568],[844,390],[640,360]])('keeps a direct mailbox entry outside the menu at %sx%s',async(width,height)=>{
     vi.stubGlobal('innerWidth',width);vi.stubGlobal('innerHeight',height);const router=createMemoryRouter([{path:'/',element:<CastleHome {...defaults}/>},{path:'/feedback',element:<p>私人信箱內容</p>}],{initialEntries:['/?mode=castle']});render(<RouterProvider router={router}/>);
     const entry=screen.getByRole('link',{name:'城堡信箱・意見與建議'});expect(entry).toBeVisible();expect(entry).toHaveAttribute('href','/feedback');expect(screen.queryByRole('navigation',{name:'我的日常與管理'})).toBeNull();fireEvent.click(entry);expect(await screen.findByText('私人信箱內容')).toBeTruthy();expect(router.state.location.state).toMatchObject({from:'/'});
+  });
+
+  it('measures the real mailbox bottom after a wrapped portrait brand and keeps one entry through orientation changes',async()=>{
+    vi.stubGlobal('innerWidth',320);vi.stubGlobal('innerHeight',568);let brandBottom=95,mailBottom=150,notifyResize=()=>{};const observe=vi.fn();
+    vi.stubGlobal('ResizeObserver',class{constructor(callback:ResizeObserverCallback){notifyResize=()=>callback([],this as unknown as ResizeObserver);}observe=observe;disconnect(){} });
+    vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function(this:HTMLElement){const bottom=this.classList.contains('castle-topbar')?brandBottom:this.classList.contains('castle-mailbox-launch')?mailBottom:0;return {x:0,y:0,top:0,left:0,right:230,width:230,height:bottom,bottom,toJSON:()=>({})} as DOMRect;});
+    const view=show({churchName:'一個需要換行的很長教會名稱與同行的家人',preview:true});const entry=screen.getByRole('link',{name:'城堡信箱・意見與建議'});expect(entry.parentElement).toHaveClass('castle-topbar');expect(entry.previousElementSibling).toHaveClass('castle-brand');expect(entry.closest('.castle-hud-actions')).toBeNull();expect(observe).toHaveBeenCalledWith(entry);
+    const insets=()=>JSON.parse(screen.getByTestId('scene-insets').dataset.insets||'{}');await waitFor(()=>expect(insets().top).toBe(160));
+    brandBottom=143;mailBottom=201;view.rerender(<MemoryRouter><CastleHome {...defaults} churchName="品牌與預覽標示換行之後仍需要安全空間的教會名稱" preview/></MemoryRouter>);act(()=>notifyResize());expect(insets().top).toBe(211);
+    vi.stubGlobal('innerWidth',844);vi.stubGlobal('innerHeight',390);brandBottom=80;fireEvent(window,new Event('resize'));expect(insets().top).toBe(90);const desktopEntry=screen.getByRole('link',{name:'城堡信箱・意見與建議'});expect(desktopEntry.closest('.castle-hud-actions')).toBeTruthy();expect(screen.getAllByRole('link',{name:'城堡信箱・意見與建議'})).toHaveLength(1);
   });
 
 });

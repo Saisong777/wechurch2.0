@@ -645,3 +645,6 @@ Static actor pieces merge by material within articulated joints. The measured am
 信箱以森林綠 #174f49、米白 #fffdf4、金 #d8c58d、薄荷 #c7e7de 呈現，宋體標題與信封插入小信箱的標誌為視覺重點；原型僅提供版面，不帶入假帳號、示意紀錄或假成功。四類為同一 draft.category 的原生 radio，保留原標題、內容、影響、同意 AI 整理及私密告知。寫下意見／查看進度以鍵盤可操作頁籤切換，表單持續掛載；送出錯誤、重新登入、真實收件結果與教會範圍提醒不藏在頁籤後。
 
 訪客可先寫，登入後接續送出與查看自己的進度。沿原 draft owner/church/session 隔離、碰撞草稿、locked 同 UUID 不確定重試、429 cooldown、consent、原 API/query；不新增匿名 POST、公開回報、附件、寄信或自動重送。只有原 server receipt 到達才顯示已收到。私人進度只列原 query 的狀態與回覆，不編造狀態歷史或回覆期限。傳統頁保留原 Header 與完整功能。手機320/390、640/844橫向的信箱與 HUD 避讓、真實登入收件及關閉後世界延續須以同版 B 驗收。
+
+
+信箱材料補註（v10第二候選）：本區選用固定米白信紙，傳統及城堡模式、亮暗偏好均採相同局部 light material；共用 Header 仍沿原外觀設定。表單使用的語意色票在本區完整控制，包含 destructive/foreground 與 accent/foreground，避免暗色主題淺紅落到米白底而降低錯誤文字對比。輸入、文字區、select 的材料／focus／invalid 規則具明確局部 specificity；重新登入操作保有段落間距。手機直式信箱位於品牌後的真實 flow，長教會名與預覽徽章可自然推開；原探索、選單及相機控制仍原位置，ResizeObserver 將實際信箱底緣納入地圖標籤 top inset，不依固定品牌高度或反覆查詢布局。
