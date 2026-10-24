@@ -187,3 +187,33 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
   .castle-home--fullscreen .castle-mailbox-launch { width: 44px; min-width: 44px; min-height: 44px; padding: 8px; }
   .castle-home--fullscreen .castle-mailbox-launch > span { display: none; }
 }
+
+/* A single friend drawer shares existing close/focus/scroll behaviour with places and menu. */
+.castle-friends-launch { position: absolute; right: max(20px, env(safe-area-inset-right, 0px)); top: calc(var(--castle-hud-top) + 89px); display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 8px 13px; border: 1px solid #d8c58d; border-radius: 16px; background: #fffdf4f5; color: #174f49; font-size: 11px; font-weight: 700; }
+.castle-friends-launch[aria-expanded='true'] { background: #c7e7de; }
+.castle-friends-content { color: #174f49; }
+.castle-friends-disclosure, .castle-friends-offline { margin: 12px 0; font-size: 11px; line-height: 1.8; }
+.castle-friends-offline { padding: 10px; border: 1px solid #d8c58d; border-radius: 10px; }
+.castle-friend-card { margin: 12px 0 16px; padding: 15px; border: 1px solid #d8c58d; border-radius: 16px; background: #f1f6e9; }
+.castle-friend-card h3 { font-family: 'Noto Serif TC','Songti TC',serif; font-size: 22px; margin: 3px 0 9px; }
+.castle-friend-card > p[role='status'] { min-height: 48px; font-size: 13px; line-height: 1.9; }
+.castle-friend-card small { display: block; margin-top: 8px; font-size: 10px; }
+.castle-friend-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.castle-friend-actions button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid #a7c4ae; border-radius: 12px; background: #fffdf4; font-size: 12px; }
+.castle-friends-list { display: grid; grid-template-columns: 1fr 1fr; padding: 0; margin: 0; list-style: none; gap: 7px; }
+.castle-friends-list button { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 56px; padding: 9px; border: 1px solid #d4dfd0; border-radius: 12px; text-align: left; background: #fffdf4; font-size: 11px; }
+.castle-friends-list button[aria-pressed='true'] { border-color: #174f49; background: #c7e7de; }
+.castle-friends-list small { display: block; margin-top: 3px; font-size: 9px; color: #547768; }
+.castle-friends-content button:focus-visible, .castle-friends-launch:focus-visible { outline: 3px solid #bd6b4b; outline-offset: 2px; }
+.castle-home--fullscreen[data-castle-panel='friends'] .castle-drawer { top: calc(var(--castle-hud-top) + 141px); }
+@media (max-width: 640px) {
+  .castle-friends-launch { top: calc(var(--castle-hud-top) + 106px); right: max(10px, env(safe-area-inset-right, 0px)); }
+}
+@media (max-width: 640px) and (orientation: portrait) {
+  .castle-friends-launch { top: calc(var(--castle-hud-top) + 116px); width: 50px; padding: 4px; flex-direction: column; gap: 1px; border-radius: 14px; }
+  .castle-friends-launch > span { font-size: 9px; line-height: 1.2; }
+  .castle-home--fullscreen .castle-3d-toolbar { top: calc(var(--castle-hud-top) + 166px); }
+  .castle-home--fullscreen[data-castle-panel='friends'] .castle-drawer { top: auto; }
+}
+
+.castle-home--fullscreen[data-castle-panel="places"] .castle-friends-launch, .castle-home--fullscreen[data-castle-panel="menu"] .castle-friends-launch { display: none; }

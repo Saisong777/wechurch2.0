@@ -1,4 +1,5 @@
 import {UnsavedChangesGuard} from '@/components/layout/UnsavedChangesGuard';
+import type {AmbientRequest} from './castle/ambientFriends';
 import {CastleWindowContext} from '@/contexts/CastleWindowContext';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +7,7 @@ import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testi
 import { MemoryRouter, createMemoryRouter, RouterProvider, Routes, Route } from 'react-router-dom';
 import { CastleHome, type CastleHomeProps } from './CastleHome';
 
-vi.mock('./castle/CastleScene', () => ({ default: ({ places, onSelect, insets }: { places: { id: string; name: string; label: string }[]; onSelect: (id: string) => void; insets?:{top:number;right:number;bottom:number} }) => <div data-testid="scene-insets" data-insets={JSON.stringify(insets)}>{places.map(place => <button key={place.id} onClick={() => onSelect(place.id)} aria-label={`${place.name}・${place.label}`}>{place.name}</button>)}</div> }));
+vi.mock('./castle/CastleScene', () => ({ default: ({ places, onSelect, insets, friendRequest, onFriendSelect }: { places: { id: string; name: string; label: string }[]; onSelect: (id: string) => void; insets?:{top:number;right:number;bottom:number};friendRequest?:AmbientRequest;onFriendSelect?:(id:string)=>void }) => <div data-testid="scene-insets" data-insets={JSON.stringify(insets)} data-friend={JSON.stringify(friendRequest)}>{places.map(place => <button key={place.id} onClick={() => onSelect(place.id)} aria-label={`${place.name}・${place.label}`}>{place.name}</button>)}<button type="button" onClick={()=>onFriendSelect?.('ambient-cat-1')}>點場景小貓</button></div> }));
 
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const defaults: CastleHomeProps = { churchName: 'iM 行動教會', featureEnabled: () => true, featuresLoading: false, scripture: { reference: '測試經文', state: 'ready' }, hasDraft: false, onOpenNote: vi.fn(), showAdmin: false, showPastoral: false };
@@ -109,6 +110,19 @@ describe('castle navigation', () => {
     const insets=()=>JSON.parse(screen.getByTestId('scene-insets').dataset.insets||'{}');await waitFor(()=>expect(insets().top).toBe(160));
     brandBottom=143;mailBottom=201;view.rerender(<MemoryRouter><CastleHome {...defaults} churchName="品牌與預覽標示換行之後仍需要安全空間的教會名稱" preview/></MemoryRouter>);act(()=>notifyResize());expect(insets().top).toBe(211);
     vi.stubGlobal('innerWidth',844);vi.stubGlobal('innerHeight',390);brandBottom=80;fireEvent(window,new Event('resize'));expect(insets().top).toBe(90);const desktopEntry=screen.getByRole('link',{name:'城堡信箱・意見與建議'});expect(desktopEntry.closest('.castle-hud-actions')).toBeTruthy();expect(screen.getAllByRole('link',{name:'城堡信箱・意見與建議'})).toHaveLength(1);
+  });
+
+  it.each([[320,568],[390,844],[640,360],[641,360],[1280,720]])('opens one accessible friends drawer at %sx%s, scrolls each selected response into view and restores focus',async(width,height)=>{
+    vi.stubGlobal('innerWidth',width);vi.stubGlobal('innerHeight',height);show();const launch=screen.getByRole('button',{name:'開啟城堡朋友'});fireEvent.click(launch);
+    expect(screen.getByRole('heading',{name:'城堡朋友'})).toBeTruthy();const list=screen.getByRole('list',{name:'所有場景朋友'});expect(within(list).getAllByRole('button')).toHaveLength(13);
+    const scroll=list.closest('.castle-drawer-scroll') as HTMLElement;scroll.scrollTop=800;fireEvent.click(within(list).getByRole('button',{name:/豆豆小狗/}));expect(scroll.scrollTop).toBe(0);expect(screen.getByRole('heading',{name:'豆豆小狗'})).toHaveFocus();
+    expect(screen.getByText(/這些是場景居民與小動物/)).toBeTruthy();await screen.findByTestId('scene-insets');expect(JSON.parse(screen.getByTestId('scene-insets').dataset.friend||'{}')).toMatchObject({id:'ambient-dog-6',action:'hello'});
+    fireEvent.click(screen.getByRole('button',{name:'輕輕摸摸'}));expect(JSON.parse(screen.getByTestId('scene-insets').dataset.friend||'{}')).toMatchObject({id:'ambient-dog-6',action:'affection',sequence:2});expect(screen.getByText(/耳朵也跟著開心晃動/)).toBeTruthy();
+    fireEvent.keyDown(document,{key:'Escape'});expect(launch).toHaveFocus();expect(screen.queryByRole('list',{name:'所有場景朋友'})).toBeNull();
+    fireEvent.click(screen.getByRole('button',{name:'開啟城堡選單'}));fireEvent.click(launch);expect(screen.queryByRole('navigation',{name:'我的日常與管理'})).toBeNull();expect(screen.getAllByRole('button',{name:'收合城堡面板'})).toHaveLength(1);
+  });
+  it('opens the same friends response from a mesh callback without navigating or claiming a real online person',async()=>{
+    show();fireEvent.click(await screen.findByRole('button',{name:'點場景小貓'}));expect(screen.getByRole('heading',{name:'餅乾小貓'})).toHaveFocus();expect(screen.getByText('場景動物')).toBeTruthy();expect(screen.getByText(/小貓豎起尾巴/)).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'收合城堡面板'}));expect(screen.getByRole('button',{name:'開啟城堡朋友'})).toHaveFocus();expect(screen.getByTestId('castle-home')).toBeTruthy();
   });
 
 });

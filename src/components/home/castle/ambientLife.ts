@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {WALK_NODES} from '@shared/castleNavigation';
+import type {AmbientAction} from './ambientFriends';
 
 type Species='cat'|'dog'|'rabbit'|'sheep';
-type Actor={group:THREE.Group;kind:'resident'|Species;route:readonly number[];speed:number;phase:number;legs:THREE.Group[];arms:THREE.Group[];ears:THREE.Group[];tail?:THREE.Group;elapsed:number;moving:boolean};
+type Actor={group:THREE.Group;kind:'resident'|Species;route:readonly number[];speed:number;phase:number;legs:THREE.Group[];arms:THREE.Group[];ears:THREE.Group[];tail?:THREE.Group;elapsed:number;moving:boolean;interaction?:{action:AmbientAction;elapsed:number;staticPose:boolean}};
 // Consecutive points are existing safe graph edges, including the closing edge.
 // Different starting phases and occasional node stops keep this a small neighbourhood, not a parade.
 // Wider silhouettes deliberately avoid the narrow bench/cottage/library turns (2–4, 5–6, 11–12).
@@ -80,8 +81,8 @@ export function createAmbientLife(){
   batch(animal);
   actors.push({group:animal,kind,route:routes[[0,2,1,0,1,2][i]],speed:kind==='rabbit'?.82:kind==='sheep'?.5:.68,phase:8+i*13,legs,arms:[],ears,tail,elapsed:0,moving:false});
  });
- // Decorative bodies never steal a building/ground tap. Terrain and trees still occlude normally.
- group.traverse(object=>{object.userData.ambientActor=true;if(object instanceof THREE.Mesh)object.raycast=()=>{};});
+ // The nearest actual visible mesh can now be greeted; environment occlusion remains intact.
+ for(const actor of actors)actor.group.traverse(object=>{object.userData.ambientActor=true;object.userData.ambientId=actor.group.name;});
  let elapsed=0,disposed=false;
  function pose(actor:Actor,time:number){
   const route=actor.route,wait=actor.kind==='resident'?1.8:actor.kind==='rabbit'?2.4:3.1;
@@ -93,15 +94,48 @@ export function createAmbientLife(){
   }
   const gait=actor.moving?Math.sin((time+actor.phase)*7):0;
   actor.legs.forEach((leg,n)=>{leg.rotation.x=gait*(actor.kind==='resident'?(n?.38:-.38):((n===0||n===3)?.32:-.32));});
-  actor.arms.forEach((arm,n)=>{arm.rotation.x=gait*(n?-.38:.38);});
+  actor.arms.forEach((arm,n)=>{arm.rotation.x=gait*(n?-.38:.38);arm.rotation.z=0;});
   actor.ears.forEach((ear,n)=>{ear.rotation.x=actor.moving?Math.sin((time+actor.phase)*5+n)*.065:0;});
   if(actor.tail)actor.tail.rotation.z=Math.sin((time+actor.phase)*3)*(actor.moving?.17:.07);
   actor.group.position.y+=actor.moving?Math.abs(gait)*(actor.kind==='rabbit'?.055:.015):0;
   actor.elapsed=time;
  }
  for(const actor of actors)pose(actor,0);
- function update(delta:number){if(disposed||!Number.isFinite(delta)||delta<=0)return;elapsed+=Math.min(.05,delta);for(const actor of actors)pose(actor,elapsed);}
- function snapshot(){const sample=(actor:Actor)=>({kind:actor.kind,position:actor.group.position.toArray().map(v=>Number(v.toFixed(4))),legs:actor.legs.map(leg=>Number(leg.rotation.x.toFixed(4))),moving:actor.moving});return {residents:7,animals:6,elapsed:Number(elapsed.toFixed(4)),resident:sample(actors[0]),animal:sample(actors[7])};}
+ function reaction(actor:Actor){
+  const active=actor.interaction;if(!active)return;
+  actor.moving=false;
+  // Readable immediately even when motion is paused. Fade the pose into the saved route gait.
+  const t=active.staticPose ? .7 : active.elapsed;
+  const fade=Math.min(1,Math.max(0,(2.8-active.elapsed)/.7));
+  const pulse=Math.sin(t*8),gentle=Math.sin(t*5);
+  actor.legs.forEach(leg=>{leg.rotation.x*=1-fade;});actor.arms.forEach(arm=>{arm.rotation.x*=1-fade;arm.rotation.z=0;});
+  if(actor.kind==='resident'){
+   actor.arms[1].rotation.x+=-(active.action==='hello'?1.8:1.35)*fade;
+   actor.arms[1].rotation.z=(.12+pulse*.12)*fade;
+   if(active.action==='affection')actor.arms[0].rotation.x+=-1.35*fade;
+  }else{
+   actor.ears.forEach((ear,n)=>{ear.rotation.x=ear.rotation.x*(1-fade)+(actor.kind==='rabbit'?-.28:gentle*.19)*(n?1:-1)*fade;});
+   if(actor.tail)actor.tail.rotation.z=actor.tail.rotation.z*(1-fade)+pulse*(actor.kind==='cat'?.6:actor.kind==='dog'?.8:.15)*fade;
+   if(actor.kind==='rabbit'&&active.action==='hello')actor.group.position.y+=Math.max(0,Math.sin(t*8))*.14*fade;
+   if(actor.kind==='dog'){actor.legs.forEach((leg,n)=>{leg.rotation.x+=pulse*(n%2?.22:-.22)*fade;});actor.group.position.y+=Math.abs(gentle)*.025*fade;}
+   if(actor.kind==='sheep')actor.group.rotation.x=gentle*.1*fade;
+  }
+ }
+ function interact(id:string,action:AmbientAction,staticPose=false){
+  if(disposed)return false;const actor=actors.find(value=>value.group.name===id);if(!actor)return false;
+  pose(actor,actor.elapsed);actor.group.rotation.x=0;actor.interaction={action,elapsed:0,staticPose};reaction(actor);return true;
+ }
+ function update(delta:number){
+  if(disposed||!Number.isFinite(delta)||delta<=0)return;const dt=Math.min(.05,delta);elapsed+=dt;
+  for(const actor of actors){
+   const active=actor.interaction;
+   if(active){
+    active.elapsed=Math.min(2.8,active.elapsed+dt);pose(actor,actor.elapsed);actor.group.rotation.x=0;reaction(actor);
+    if(active.elapsed>=2.8){actor.interaction=undefined;pose(actor,actor.elapsed);actor.group.rotation.x=0;}
+   }else pose(actor,actor.elapsed+dt);
+  }
+ }
+ function snapshot(){const sample=(actor:Actor)=>({kind:actor.kind,position:actor.group.position.toArray().map(v=>Number(v.toFixed(4))),legs:actor.legs.map(leg=>Number(leg.rotation.x.toFixed(4))),moving:actor.moving,interaction:actor.interaction?{action:actor.interaction.action,elapsed:Number(actor.interaction.elapsed.toFixed(4))}:null});return {residents:7,animals:6,elapsed:Number(elapsed.toFixed(4)),resident:sample(actors[0]),animal:sample(actors[7])};}
  function dispose(){if(disposed)return;disposed=true;group.removeFromParent();geometries.forEach(value=>value.dispose());materials.forEach(value=>value.dispose());}
- return {group,actors,update,snapshot,dispose};
+ return {group,actors,update,interact,snapshot,dispose};
 }

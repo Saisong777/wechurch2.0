@@ -31,13 +31,53 @@ it('moves along paths with distinct stops and finite clamped animation time, fre
  const transforms=()=>{life.group.updateMatrixWorld(true);const values:number[][]=[];life.group.traverse(object=>values.push(object.matrix.toArray()));return values;};const still=transforms(),time=life.snapshot().elapsed;
  life.update(0);life.update(NaN);life.update(-1);expect(transforms()).toEqual(still);expect(life.snapshot().elapsed).toBe(time);life.update(999);expect(life.snapshot().elapsed).toBeCloseTo(time+.05);life.dispose();
 });
-it('does not raycast any decorative body and disposes owned resources once',()=>{
+it('tags real interactive meshes and disposes owned resources once',()=>{
  const life=createAmbientLife(),geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();let meshes=0;
- life.group.traverse(object=>{if(object instanceof THREE.Mesh){meshes++;const hits:THREE.Intersection[]=[];object.raycast(new THREE.Raycaster(),hits);expect(hits).toEqual([]);geometries.add(object.geometry);materials.add(object.material as THREE.Material);}});
+ life.group.traverse(object=>{if(object instanceof THREE.Mesh){meshes++;expect(object.raycast).toBe(THREE.Mesh.prototype.raycast);expect(typeof object.userData.ambientId).toBe('string');geometries.add(object.geometry);materials.add(object.material as THREE.Material);}});
  expect(meshes).toBeLessThan(220);const spies=[...geometries,...materials].map(resource=>vi.spyOn(resource,'dispose'));life.dispose();life.dispose();for(const spy of spies)expect(spy).toHaveBeenCalledOnce();vi.restoreAllMocks();
 });
 
-it('lets a real ray pass through an ambient character onto the original ground while trees still occlude',()=>{
- const world=buildCastleWorld();world.group.updateMatrixWorld(true);const character=world.ambient.actors[0].group.position;const ray=new THREE.Raycaster(new THREE.Vector3(character.x,20,character.z),new THREE.Vector3(0,-1,0));const hits=ray.intersectObject(world.group,true);expect(hits.length).toBeGreaterThan(0);expect(hits[0].object.userData.walkSurface).toBe(true);expect(hits.some(hit=>hit.object.userData.ambientActor)).toBe(false);
+it('hits actual ambient geometry before the original ground while trees still occlude',()=>{
+ const world=buildCastleWorld();world.group.updateMatrixWorld(true);const character=world.ambient.actors[0].group.position;const ray=new THREE.Raycaster(new THREE.Vector3(character.x,20,character.z),new THREE.Vector3(0,-1,0));const hits=ray.intersectObject(world.group,true);expect(hits.length).toBeGreaterThan(0);expect(hits[0].object.userData.ambientId).toBe('ambient-resident-1');expect(hits.some(hit=>hit.object.userData.walkSurface)).toBe(true);
  ray.set(new THREE.Vector3(-20,20,0),new THREE.Vector3(0,-1,0));const tree=ray.intersectObject(world.group,true)[0];expect(tree).toBeTruthy();expect(tree.object.userData.walkSurface).not.toBe(true);world.dispose();
+});
+
+
+it('stops each greeted actor on its own route clock, shows species reactions and resumes without catching up',()=>{
+ const life=createAmbientLife();for(let n=0;n<20;n++)life.update(.05);
+ for(const actor of life.actors){
+  const id=actor.group.name,time=actor.elapsed,point=actor.group.position.clone();expect(life.interact(id,'hello')).toBe(true);expect(actor.interaction?.elapsed).toBe(0);
+  const initial=actor.group.children.map(child=>child.rotation.toArray());for(let n=0;n<8;n++)life.update(.05);
+  expect(actor.elapsed).toBe(time);expect(actor.moving).toBe(false);expect(actor.group.position.x).toBe(point.x);expect(actor.group.position.z).toBe(point.z);
+  const differentJoints=JSON.stringify(actor.group.children.map(child=>child.rotation.toArray()))!==JSON.stringify(initial);expect(differentJoints||actor.kind==='rabbit'||actor.kind==='sheep').toBe(true);
+  let before=actor.group.position.clone();for(let n=0;n<62;n++){life.update(.05);const step=Math.hypot(actor.group.position.x-before.x,actor.group.position.z-before.z);expect(step).toBeLessThan(.06);before=actor.group.position.clone();}
+  expect(actor.interaction).toBeUndefined();expect(actor.elapsed).toBeLessThan(time+1);expect(actor.elapsed).toBeGreaterThan(time);
+ }
+ expect(life.interact('forged-real-avatar','hello')).toBe(false);life.dispose();
+});
+it('keeps a static response with every transform and interaction clock frozen until update, including repeated actions',()=>{
+ const life=createAmbientLife();for(const actor of life.actors){expect(life.interact(actor.group.name,'affection',true)).toBe(true);}
+ const matrices=()=>{life.group.updateMatrixWorld(true);const result:number[][]=[];life.group.traverse(value=>result.push(value.matrix.toArray()));return result;};const before=matrices(),times=life.actors.map(actor=>actor.interaction?.elapsed);
+ life.snapshot();life.update(0);life.update(NaN);expect(matrices()).toEqual(before);expect(life.actors.map(actor=>actor.interaction?.elapsed)).toEqual(times);
+ const resident=life.actors[0];expect(resident.arms.every(arm=>arm.rotation.x< -1)).toBe(true);life.interact(resident.group.name,'hello',true);expect(resident.arms[0].rotation.x).toBe(0);expect(resident.arms[1].rotation.x).toBeLessThan(-1);life.dispose();
+});
+
+
+it('keeps the actual greeting and affection poses clear along every actor route heading and endpoint',()=>{
+ const world=buildCastleWorld(),errors=new Set<string>();
+ for(const actor of world.ambient.actors)for(const action of ['hello','affection'] as const){
+  world.ambient.interact(actor.group.name,action);
+  for(let frame=0;frame<56;frame++){
+   world.ambient.update(.05);if(frame%7!==0&&frame!==55)continue;
+   for(let edge=0;edge<actor.route.length;edge++){
+    const a=WALK_NODES[actor.route[edge]],b=WALK_NODES[actor.route[(edge+1)%actor.route.length]];
+    for(let n=0;n<=12;n++){
+     const t=n/12;actor.group.position.set(a[0]+(b[0]-a[0])*t,.23,a[1]+(b[1]-a[1])*t);actor.group.rotation.y=Math.atan2(b[0]-a[0],b[1]-a[1]);actor.group.updateWorldMatrix(true,true);const body=new THREE.Box3().setFromObject(actor.group);
+     for(const obstacle of world.obstacleBounds)if(body.intersectsBox(obstacle.box))errors.add(`${actor.kind} ${action} ${actor.route[edge]}-${actor.route[(edge+1)%actor.route.length]}: ${obstacle.kind}`);
+     for(const obstacle of BUILDING_FOOTPRINTS)if(body.max.x>obstacle.x-obstacle.halfX&&body.min.x<obstacle.x+obstacle.halfX&&body.max.z>obstacle.z-obstacle.halfZ&&body.min.z<obstacle.z+obstacle.halfZ)errors.add(`${actor.kind} ${action}: ${obstacle.id}`);
+    }
+   }
+  }
+ }
+ expect([...errors]).toEqual([]);world.dispose();
 });

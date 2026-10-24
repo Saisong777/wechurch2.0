@@ -1,3 +1,4 @@
+import type {AmbientAction, AmbientRequest} from './ambientFriends';
 import {castleProjection} from './camera';
 import type { CastleRoster } from '@shared/castlePresence';
 import {nearestWalkNode} from '@shared/castleNavigation';
@@ -8,15 +9,15 @@ import { Compass, Map as MapIcon, RotateCcw, RotateCw, ZoomIn, ZoomOut, type Luc
 import { buildCastleWorld, WORLD_PLACES, type PlaceId } from './world';
 
 export interface ScenePlace { id: string; name: string; label: string; icon: LucideIcon }
-export interface CastleSceneProps { places: ScenePlace[]; selectedId?: string; onSelect: (id: string) => void; paused: boolean; night: boolean; detailId: string; presence?: {roster:CastleRoster|null;receivedAt:number}; onMove?: (target:number)=>void; insets?: { top: number; right: number; bottom: number } }
-type SceneHandle = { reset: () => void; zoom: (factor: number) => void; rotate: (angle: number) => void; focus: (id: string) => void; refresh: () => void; layout: () => void; presence:()=>void };
+export interface CastleSceneProps { places: ScenePlace[]; selectedId?: string; onSelect: (id: string) => void; paused: boolean; night: boolean; detailId: string; presence?: {roster:CastleRoster|null;receivedAt:number}; onMove?: (target:number)=>void; insets?: { top: number; right: number; bottom: number }; friendRequest?: AmbientRequest; onFriendSelect?:(id:string)=>void; onFriendsReady?:(ready:boolean)=>void }
+type SceneHandle = { reset: () => void; zoom: (factor: number) => void; rotate: (angle: number) => void; focus: (id: string) => void; refresh: () => void; layout: () => void; presence:()=>void; friend:(id:string,action:AmbientAction)=>void };
 type SceneState = 'loading' | 'ready' | 'unsupported' | 'lost';
 
-export default function CastleScene({ places, selectedId, onSelect, paused, night, detailId, insets, presence, onMove }: CastleSceneProps) {
+export default function CastleScene({ places, selectedId, onSelect, paused, night, detailId, insets, presence, onMove, friendRequest, onFriendSelect, onFriendsReady }: CastleSceneProps) {
   const container = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const residentLabels=useRef(new Map<string,HTMLSpanElement>());
   const labels = useRef(new Map<string, HTMLButtonElement>());
-  const live = useRef({ places, selectedId, onSelect, paused, night, insets, presence,onMove }); live.current = { places, selectedId, onSelect, paused, night, insets, presence,onMove };
+  const live = useRef({ places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady }); live.current = { places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady };
   const api = useRef<SceneHandle>();
   const [state, setState] = useState<SceneState>('loading');
   const [reduced, setReduced] = useState(false);
@@ -158,7 +159,8 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       const enabled = new Set(live.current.places.map(place => place.id));
       // Include terrain/trees as occluders; never pick a building behind the visible surface.
       const intersections = raycaster.intersectObject(world.group, true);
-      const hit = intersections.find(intersection=>!intersection.object.userData.ambientActor); if (!hit) return;
+      const hit = intersections[0]; if (!hit) return;
+      if(hit.object.userData.ambientId){const id=hit.object.userData.ambientId as string;if(live.current.onFriendSelect)live.current.onFriendSelect(id);else api.current?.friend(id,'hello');return;}
       let object: THREE.Object3D | null = hit.object;
       while (object && !object.userData.placeId) object = object.parent;
       const id = object?.userData.placeId; if (id && enabled.has(id)) { live.current.onSelect(id); focus(id); } else if(!id&&hit.object.userData.walkSurface&&live.current.presence?.roster?.avatars.some(a=>a.isSelf)){live.current.onMove?.(nearestWalkNode(hit.point.x,hit.point.z));}
@@ -192,7 +194,13 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
         reset: () => moveCamera(homePosition.clone(), initialTarget.clone()),
         zoom: (factor: number) => { if (!controls) return; cameraTween = null; const offset = camera.position.clone().sub(controls.target); offset.setLength(THREE.MathUtils.clamp(offset.length() * factor, 11, 86)); camera.position.copy(controls.target).add(offset); controls.update(); render(); },
         rotate: (angle: number) => { if (!controls) return; cameraTween = null; const offset = camera.position.clone().sub(controls.target); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle); camera.position.copy(controls.target).add(offset); controls.update(); render(); },
-        focus, refresh: syncAnimation, layout: resize, presence:()=>{world?.setPresence(live.current.presence?.roster?.avatars||[],live.current.presence?.roster?.serverNow||0,live.current.presence?.receivedAt||0);render();},
+        focus, friend:(id,action)=>{
+          const actor=world?.ambient.actors.find(candidate=>candidate.group.name===id);if(!actor||!controls)return;
+          world?.ambient.interact(id,action,live.current.paused||reduceMotion||document.hidden);
+          const target=actor.group.position.clone().add(new THREE.Vector3(0,.8,0));
+          const direction=camera.position.clone().sub(controls.target).normalize();direction.y=Math.max(.5,direction.y);direction.normalize();
+          moveCamera(target.clone().addScaledVector(direction,12),target);render();
+        }, refresh: syncAnimation, layout: resize, presence:()=>{world?.setPresence(live.current.presence?.roster?.avatars||[],live.current.presence?.roster?.serverNow||0,live.current.presence?.receivedAt||0);render();},
       };
 
       resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); resize();
@@ -212,6 +220,8 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     };
   }, [attempt]);
 
+  useEffect(()=>{live.current.onFriendsReady?.(state==='ready');},[state]);
+  useEffect(()=>{if(state==='ready'&&friendRequest)api.current?.friend(friendRequest.id,friendRequest.action);},[friendRequest,state]);
   useEffect(()=>{api.current?.presence();},[presence?.roster,presence?.receivedAt,state]);
   useEffect(() => { api.current?.layout(); }, [insets?.top, insets?.right, insets?.bottom]);
   useEffect(() => { api.current?.refresh(); }, [paused, night]);
@@ -234,7 +244,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       <button type="button" onClick={() => api.current?.zoom(.8)} aria-label="拉近城堡"><ZoomIn size={18} aria-hidden="true" /></button>
       <button type="button" onClick={() => api.current?.zoom(1.25)} aria-label="拉遠城堡"><ZoomOut size={18} aria-hidden="true" /></button>
     </div>}
-    {!unavailable && <p className="castle-3d-gesture">拖曳轉一圈<span>・</span>滾輪或雙指拉近<span>・</span>點建築探索</p>}
+    {!unavailable && <p className="castle-3d-gesture">拖曳轉一圈<span>・</span>滾輪或雙指拉近<span>・</span>點建築探索<span>・</span>點朋友打招呼</p>}
     <p className="castle-3d-caption">{unavailable ? '城堡插畫備用畫面' : '場景居民與動物可暫停；真人有暱稱，位置仍更新'}{reduced && !unavailable && <span>・已減少動態</span>}</p>
   </div>;
 }
