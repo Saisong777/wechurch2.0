@@ -1,4 +1,5 @@
-import { useChurchScopeKey } from '@/contexts/ChurchContext';
+import { useChurchContext, useChurchScopeKey } from '@/contexts/ChurchContext';
+import { churchDisplayName } from '@shared/churches';
 import { usePastoralAccess } from '@/hooks/usePastoralAccess';
 import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
@@ -59,6 +60,9 @@ import { toast } from 'sonner';
 import { DailyHome } from '@/components/home/DailyHome';
 import { useDevotionalNotes } from '@/hooks/useDevotionalNotes';
 import { NotesLoadNotice } from '@/components/scripture/NotesLoadNotice';
+import { CastleHome } from '@/components/home/CastleHome';
+import { HomeModeSwitch } from '@/components/home/HomeModeSwitch';
+import { useHomeMode } from '@/hooks/useHomeMode';
 
 interface DevotionalNoteSummary {
   syncStatus?: 'pending' | 'blocked' | 'synced';
@@ -193,6 +197,8 @@ function HomeSection({
 }
 
 const Index = () => {
+  const { mode: homeMode, changeMode } = useHomeMode();
+  const churchContext = useChurchContext();
   const [searchParams] = useSearchParams();
   const requestedDashboardVariant = searchParams.get('dashboardVariant');
   const dashboardVariant = requestedDashboardVariant === 'b' || requestedDashboardVariant === 'c' || requestedDashboardVariant === 'd'
@@ -625,10 +631,23 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="dashboard-main mobile-readable container mx-auto px-4 py-4 sm:px-6 md:py-8">
+      <main className={`dashboard-main mobile-readable ${homeMode === 'castle' ? 'w-full' : 'container'} mx-auto px-4 py-4 sm:px-6 md:py-8`}>
+        <HomeModeSwitch mode={homeMode} onChange={changeMode} />
         <VisitReminder />
         {notesError && <div className="mx-auto max-w-3xl"><NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} /></div>}
-        {!styleLabMode ? (
+        {homeMode === 'castle' ? (
+          <CastleHome
+            churchName={!user ? 'iM 行動教會' : churchDisplayName(churchContext?.data?.selectedChurch) || 'WeChurch'}
+            preview={!user}
+            featureEnabled={isFeatureEnabled}
+            featuresLoading={featuresLoading}
+            scripture={{ reference: todayScripture.title, state: churchReadingLoading ? 'loading' : churchReadingError ? 'error' : churchReading.sourceStatus === 'unpublished' ? 'unpublished' : 'ready' }}
+            hasDraft={!!user && (todayDevotionalNote?.syncStatus === 'pending' || todayDevotionalNote?.syncStatus === 'blocked')}
+            onOpenNote={() => user ? setShowDevotionalEditor(true) : navigate('/login')}
+            showPastoral={canCreateSession || (!pastoralAccess.isError && pastoralAccess.data?.available === true)}
+            showAdmin={!featuresLoading && canCreateSession}
+          />
+        ) : !styleLabMode ? (
           <DailyHome
             date={todayLabel}
             scripture={{ reference: todayScripture.title, preview: churchScripturePreview(churchReading), href: todayScripture.href }}
