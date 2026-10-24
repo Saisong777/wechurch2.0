@@ -235,6 +235,6 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       <button type="button" onClick={() => api.current?.zoom(1.25)} aria-label="拉遠城堡"><ZoomOut size={18} aria-hidden="true" /></button>
     </div>}
     {!unavailable && <p className="castle-3d-gesture">拖曳轉一圈<span>・</span>滾輪或雙指拉近<span>・</span>點建築探索</p>}
-    <p className="castle-3d-caption">{unavailable ? '城堡插畫備用畫面' : '散步居民與小動物為場景角色；暱稱玩偶是真人'}{reduced && !unavailable && <span>・已減少動態</span>}</p>
+    <p className="castle-3d-caption">{unavailable ? '城堡插畫備用畫面' : '場景居民與動物可暫停；真人有暱稱，位置仍更新'}{reduced && !unavailable && <span>・已減少動態</span>}</p>
   </div>;
 }

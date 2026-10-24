@@ -93,7 +93,7 @@ html.castle-immersive-active, .castle-immersive-active body, .castle-immersive-a
   .castle-drawer-heading { padding: 5px 9px 5px 16px; }
   .castle-drawer-heading > button { min-width: 40px; min-height: 40px; }
   .castle-drawer-scroll { padding: 0 13px 12px; }
-  .castle-compact-place { left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); width: auto; padding: 9px 8px 9px 12px; border-radius: 18px; }
+  .castle-compact-place { left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: max(20px, env(safe-area-inset-bottom, 0px)); width: auto; padding: 9px 8px 9px 12px; border-radius: 18px; }
   .castle-compact-place .castle-place-detail { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 7px; }
   .castle-compact-place .castle-detail-icon { width: 30px; height: 30px; }
   .castle-compact-place .castle-primary-link { grid-column: 3; grid-row: 1; justify-content: center; font-size: 10px; padding: 8px 10px; min-height: 42px; white-space: nowrap; }
@@ -105,7 +105,7 @@ html.castle-immersive-active, .castle-immersive-active body, .castle-immersive-a
   .castle-home--fullscreen .castle-3d-gesture { left: 12px; bottom: calc(var(--castle-panel-bottom) + 72px); font-size: 8px; padding: 6px 8px; }
   .castle-home--fullscreen .castle-3d-caption { right: 12px; bottom: 1px; padding: 1px 4px; font-size: 7px; }
 }
-@media (max-height: 450px) and (min-width: 641px) { .castle-brand h1 { font-size: 17px; } .castle-brand { padding: 7px 11px; } .castle-drawer { top: calc(var(--castle-hud-top) + 68px); bottom: 12px; width: 300px; } .castle-compact-place { width: 310px; padding: 8px 10px; bottom: 12px; } .castle-compact-place .castle-primary-link { min-height: 35px; padding: 7px 11px; } .castle-home--fullscreen .castle-3d-gesture { display: none; } .castle-hud-notices { top: calc(var(--castle-hud-top) + 75px); max-height: 27dvh; } }
+@media (max-height: 450px) and (min-width: 641px) { .castle-brand h1 { font-size: 17px; } .castle-brand { padding: 7px 11px; } .castle-drawer { top: calc(var(--castle-hud-top) + 68px); bottom: 12px; width: 300px; } .castle-compact-place { width: 310px; padding: 8px 10px; bottom: max(20px, env(safe-area-inset-bottom, 0px)); } .castle-compact-place .castle-primary-link { min-height: 35px; padding: 7px 11px; } .castle-home--fullscreen .castle-3d-gesture { display: none; } .castle-hud-notices { top: calc(var(--castle-hud-top) + 75px); max-height: 27dvh; } }
 /* Avoid an inline body lock: Radix dialogs can safely retain their own scroll state. */
 html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !important; }
 @media (max-width: 640px) { .castle-home--fullscreen:not([data-castle-panel='closed']) .castle-brand h1 { display: none; } .castle-home--fullscreen:not([data-castle-panel='closed']) .castle-brand { align-self: center; } }
