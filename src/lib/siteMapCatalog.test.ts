@@ -8,7 +8,7 @@ const access: MyAccess = { permissions: [], grants: [], canManageAccess: false, 
 const visibleHrefs = (viewer: SiteMapViewer) => matchingSiteMapSections(viewer, '').flatMap(section => section.entries.map(entry => entry.href));
 
 it('uses only real local canonical routes and excludes retired, token and record-specific destinations', () => {
-  const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../AppRoutes.tsx', import.meta.url), 'utf8');
   const entries = siteMapSections.flatMap(section => section.entries);
   expect(new Set(entries.map(entry => entry.href)).size).toBe(entries.length);
   for (const entry of entries) {
