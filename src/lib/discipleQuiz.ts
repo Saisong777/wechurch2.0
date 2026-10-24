@@ -28,7 +28,7 @@ export function parseQuizDraft(raw: string | null): QuizDraft | null {
 }
 
 export function computeQuiz(answers: readonly (number | null)[]) {
-  if (answers.length !== QUESTIONS.length || !answers.every(validAnswer)) throw new Error('請完成全部題目，再查看結果。');
+  if (answers.length !== QUESTIONS.length || !Array.from(answers).every(validAnswer)) throw new Error('請完成全部題目，再查看結果。');
   const scores: Record<DiscipleId, number> = Object.fromEntries(DISCIPLE_IDS.map(id => [id, 0])) as Record<DiscipleId, number>;
   answers.forEach((answer, index) => { scores[QUESTIONS[index].options[answer as number].role] += 1; });
   const sorted = DISCIPLE_IDS.map(id => ({id, score: scores[id]})).sort((a, b) => b.score - a.score);

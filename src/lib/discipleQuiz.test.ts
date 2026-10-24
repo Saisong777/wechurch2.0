@@ -24,6 +24,9 @@ describe('twelve scoring contract', () => {
       expect(computeQuiz(answers).leaders.map(r => r.id)).toEqual([id]);
     }
   });
+  it('rejects sparse arrays instead of treating missing slots as completed answers', () => {
+    expect(() => computeQuiz(Array(24))).toThrow();
+  });
   it('recomputes from the answer set, without retaining the previous choice', () => {
     const answers = Array(24).fill(0); const original = computeQuiz(answers); answers[0] = 1; const changed = computeQuiz(answers);
     expect(changed.scores[QUESTIONS[0].options[0].role]).toBe(original.scores[QUESTIONS[0].options[0].role] - 1);
