@@ -32,7 +32,7 @@ it('resumes the actual saved answer and question after unmount', () => {
 it('completes all 24 answers and shows all tied leaders without a forced primary', () => {
   show(); fireEvent.click(screen.getByRole('button', {name: /開始探索/}));
   for (let i = 0; i < 24; i++) { fireEvent.click(screen.getAllByRole('radio')[0]); fireEvent.click(screen.getByRole('button', {name: i === 23 ? /看看同行組合/ : '下一題'})); }
-  expect(screen.getByRole('heading', {name: '你呈現了多種同行傾向'})).toBeTruthy(); expect(within(screen.getByRole('generic', {name: '並列的同行傾向'})).getAllByRole('button')).toHaveLength(12);
+  expect(screen.getByRole('heading', {name: '你呈現了多種同行傾向'})).toBeTruthy(); expect(within(screen.getByRole('group', {name: '並列的同行傾向'})).getAllByRole('button')).toHaveLength(12);
   expect(screen.queryByRole('article')).toBeNull(); fireEvent.click(screen.getByRole('button', {name: /彼得・勇敢開路者/})); expect(screen.getByRole('article', {name: '彼得的同行反思'})).toBeTruthy();
   expect(screen.getByText(/每類有 8 次出現機會/)).toBeTruthy();
 });
