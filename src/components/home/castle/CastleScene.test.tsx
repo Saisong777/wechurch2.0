@@ -148,4 +148,11 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused={false} night={false} detailId="detail" friendRequest={request}/>);vi.spyOn(document,'hidden','get').mockReturnValue(true);fireEvent(document,new Event('visibilitychange'));expect(callbacks.size).toBe(0);expect(host.dataset.worldAmbient).toBe(frozen);vi.spyOn(document,'hidden','get').mockReturnValue(false);fireEvent(document,new Event('visibilitychange'));tick(100000);expect(host.dataset.worldAmbient).toBe(frozen);tick(100050);expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction.elapsed).toBe(.1);expect(gpu.instances).toBe(1);
   });
 
+  it('does not replay a consumed greeting or fly back after WebGL restore, but new same/different friend requests still work',()=>{
+    const first={id:'ambient-resident-1',action:'hello' as const,sequence:1},view=show({paused:true,friendRequest:first}),host=screen.getByTestId('castle-3d-world');expect(host.dataset.worldCamera).toBe('12.00');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).not.toBeNull();
+    const surface=screen.getByTestId('castle-3d-canvas');fireEvent(surface,new Event('webglcontextlost',{cancelable:true}));fireEvent(surface,new Event('webglcontextrestored'));expect(host.dataset.worldState).toBe('ready');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).toBeNull();expect(Number(host.dataset.worldCamera)).toBeGreaterThan(50);expect(host.dataset.worldTarget).toBe('0.00,0.70,2.00');
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail"/>);view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{...first,sequence:2}}/>);expect(host.dataset.worldCamera).toBe('12.00');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).toMatchObject({action:'hello'});
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'affection',sequence:3}}/>);expect(JSON.parse(host.dataset.worldAmbient||'{}').animal.interaction).toMatchObject({action:'affection'});expect(gpu.instances).toBe(2);
+  });
+
 });

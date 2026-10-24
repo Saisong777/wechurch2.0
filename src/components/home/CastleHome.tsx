@@ -56,10 +56,11 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const [hasNotices,setHasNotices]=useState(false);
   const [panel, setPanel] = useState<'places' | 'menu' | 'friends' | null>(null);
   const [friendRequest,setFriendRequest]=useState<AmbientRequest>();
+  const friendSequence=useRef(0);
   const [friendsReady,setFriendsReady]=useState(false);
   const friendButton=useRef<HTMLButtonElement>(null),friendHeading=useRef<HTMLHeadingElement>(null);
   const activeFriend=AMBIENT_FRIENDS.find(friend=>friend.id===friendRequest?.id);
-  const greetFriend=(id:string,action:AmbientAction='hello')=>{if(!AMBIENT_FRIENDS.some(friend=>friend.id===id))return;lastTrigger.current=friendButton.current;setPanel('friends');setFriendRequest(previous=>({id,action,sequence:(previous?.sequence||0)+1}));};
+  const greetFriend=(id:string,action:AmbientAction='hello')=>{if(!AMBIENT_FRIENDS.some(friend=>friend.id===id))return;lastTrigger.current=friendButton.current;setPanel('friends');setFriendRequest({id,action,sequence:++friendSequence.current});};
   const [insets, setInsets] = useState({ top: 100, right: 0, bottom: 100 });
   const exploreButton=useRef<HTMLButtonElement>(null),messageArea=useRef<HTMLDivElement>(null),mailbox=useRef<HTMLAnchorElement>(null);
   const topbar = useRef<HTMLDivElement>(null), drawer = useRef<HTMLElement>(null), compact = useRef<HTMLDivElement>(null), noticeArea = useRef<HTMLDivElement>(null);
@@ -73,6 +74,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     if (panel) { const content=drawer.current?.querySelector<HTMLElement>('.castle-drawer-scroll');if(content)content.scrollTop=0; drawer.current?.querySelector<HTMLButtonElement>('[data-castle-close]')?.focus({ preventScroll: true }); wasOpen.current = true; }
     else if (wasOpen.current) { lastTrigger.current?.focus({ preventScroll: true }); wasOpen.current = false; }
   }, [panel]);
+  useLayoutEffect(()=>{if(panel!=='friends')setFriendRequest(undefined);},[panel]);
   useLayoutEffect(()=>{if(panel!=='friends'||!friendRequest)return;const content=drawer.current?.querySelector<HTMLElement>('.castle-drawer-scroll');if(content)content.scrollTop=0;friendHeading.current?.focus({preventScroll:true});},[friendRequest,panel]);
   useEffect(() => {
     if (!panel||windowActive) return;
@@ -84,7 +86,8 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
       const top = Math.max(topbar.current?.getBoundingClientRect().bottom || 0, portrait?mailbox.current?.getBoundingClientRect().bottom || 0:noticeArea.current?.getBoundingClientRect().bottom || 0) + 10;
       setHasNotices(Boolean(messageArea.current?.textContent?.trim()));
       const bounds = drawer.current?.getBoundingClientRect(), small = window.innerWidth <= 640;
-      const next = { top, right: portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: small ? panel && bounds ? bounds.height + 20 : portrait?76:(compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
+      const sideFriends=small&&window.innerWidth>window.innerHeight&&panel==='friends';
+      const next = { top, right: sideFriends&&bounds?Math.max(0,window.innerWidth-bounds.left)+10:portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: sideFriends?0:small ? panel && bounds ? bounds.height + 20 : portrait?76:(compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
       setInsets(old => old.top === next.top && old.right === next.right && old.bottom === next.bottom ? old : next);
     };
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;

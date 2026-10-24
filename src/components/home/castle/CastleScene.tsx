@@ -19,6 +19,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
   const labels = useRef(new Map<string, HTMLButtonElement>());
   const live = useRef({ places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady }); live.current = { places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady };
   const api = useRef<SceneHandle>();
+  const playedFriendSequence=useRef<number>();
   const [state, setState] = useState<SceneState>('loading');
   const [reduced, setReduced] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -221,7 +222,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
   }, [attempt]);
 
   useEffect(()=>{live.current.onFriendsReady?.(state==='ready');},[state]);
-  useEffect(()=>{if(state==='ready'&&friendRequest)api.current?.friend(friendRequest.id,friendRequest.action);},[friendRequest,state]);
+  useEffect(()=>{if(state!=='ready'||!friendRequest||playedFriendSequence.current===friendRequest.sequence)return;playedFriendSequence.current=friendRequest.sequence;api.current?.friend(friendRequest.id,friendRequest.action);},[friendRequest,state]);
   useEffect(()=>{api.current?.presence();},[presence?.roster,presence?.receivedAt,state]);
   useEffect(() => { api.current?.layout(); }, [insets?.top, insets?.right, insets?.bottom]);
   useEffect(() => { api.current?.refresh(); }, [paused, night]);

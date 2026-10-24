@@ -217,3 +217,16 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
 }
 
 .castle-home--fullscreen[data-castle-panel="places"] .castle-friends-launch, .castle-home--fullscreen[data-castle-panel="menu"] .castle-friends-launch { display: none; }
+
+
+/* Short landscape keeps notices left and the friends sheet right, never stacked over its close. */
+@media (max-width: 640px) and (orientation: landscape) {
+  .castle-home--fullscreen { --castle-friends-width: min(330px, 55vw); }
+  .castle-home--fullscreen .castle-hud-notices { width: calc(100vw - 134px - max(10px, env(safe-area-inset-left, 0px)) - max(10px, env(safe-area-inset-right, 0px))); }
+  .castle-home--fullscreen .castle-hud-notices .castle-presence { max-width: 100%; }
+  .castle-home--fullscreen[data-castle-panel='friends'] .castle-friends-launch { display: none; }
+  .castle-home--fullscreen[data-castle-panel='friends'] .castle-drawer { top: calc(var(--castle-hud-top) + 106px); bottom: max(20px, env(safe-area-inset-bottom, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); left: auto; width: var(--castle-friends-width); height: auto; max-height: none; }
+  .castle-home--fullscreen[data-castle-panel='friends'] .castle-hud-notices { width: calc(100vw - var(--castle-friends-width) - max(10px, env(safe-area-inset-left, 0px)) - max(10px, env(safe-area-inset-right, 0px)) - 10px); }
+  .castle-home--fullscreen[data-castle-panel='friends'] .castle-drawer-heading > button { min-width: 44px; min-height: 44px; }
+  .castle-home--fullscreen[data-castle-panel='friends'] .castle-3d-toolbar, .castle-home--fullscreen[data-castle-panel='friends'] .castle-3d-gesture { display: none; }
+}
