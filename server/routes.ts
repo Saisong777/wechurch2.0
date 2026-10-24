@@ -1,3 +1,5 @@
+import { castlePresenceRoutes, castleLeaseVerifier } from './castlePresenceRoutes';
+import { CastlePresenceStore } from './castlePresenceStore';
 import { churchContextMiddleware, churchContext, churchContextResponse, selectedChurch, assertSelectedChurch, lockChurchContext, churchWrite } from './churchContext';
 import { approveChurchAffiliation, pendingChurchAffiliations } from './churchAffiliationRepository';
 import type { Express, RequestHandler } from "express";
@@ -715,6 +717,7 @@ export async function registerRoutes(app: Express) {
   const readLimit = boundedWindowLimiter({ max: Number(process.env.API_RATE_LIMIT_MAX || 600), key: apiIdentity });
   const writeLimit = boundedWindowLimiter({ max: Number(process.env.API_WRITE_RATE_LIMIT_MAX || 120), key: apiIdentity });
   app.use('/api', (req, res, next) => (['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? readLimit : writeLimit)(req, res, next));
+  app.use('/api/castle-presence', castlePresenceRoutes(new CastlePresenceStore(castleLeaseVerifier(pool)), isAuthenticated));
 
   // Retire old clients without sending member content to model providers.
   app.all([

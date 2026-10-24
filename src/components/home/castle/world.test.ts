@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { advanceWalker, buildCastleWorld, BUILDING_FOOTPRINTS, WALK_EDGES, WALK_NODES, WORLD_PLACES } from './world';
+import { buildCastleWorld, BUILDING_FOOTPRINTS, WALK_EDGES, WALK_NODES, WORLD_PLACES } from './world';
 
 describe('miniature castle world', () => {
   it('keeps every full walking edge outside actual building footprints with a body margin', () => {
@@ -30,33 +30,28 @@ describe('miniature castle world', () => {
     expect([...collisions]).toEqual([]);
     world.dispose();
   });
-  it('creates all seven real mesh destinations and sixteen articulated residents without scene image textures', () => {
+  it('creates all seven real mesh destinations and only explicitly supplied articulated residents without scene image textures', () => {
     const world = buildCastleWorld();
     expect(Object.keys(world.places)).toEqual(Object.keys(WORLD_PLACES));
     for (const [id, group] of Object.entries(world.places)) {
       expect(group.userData.placeId).toBe(id);
       expect(group.children.some(child => child instanceof THREE.Mesh)).toBe(true);
     }
-    expect(world.residentCount).toBe(16);
+    expect(world.residentCount).toBe(0);
+    world.setPresence([{avatarId:'test-person',alias:'同行者',preset:'jade',isSelf:true,motion:{sequence:0,path:[[0,15]],startedAt:0,durationMs:0}}],0,0);expect(world.residentCount).toBe(1);
     for (const walker of world.walkers) { expect(walker.arms).toHaveLength(2); expect(walker.legs).toHaveLength(2); expect(walker.group.children.length).toBeGreaterThan(7); }
     let meshCount = 0;
     world.group.traverse(object => { if (object instanceof THREE.Mesh) { meshCount++; const material = object.material as THREE.MeshStandardMaterial; expect(material.map).toBeNull(); } });
-    expect(meshCount).toBeGreaterThan(200); // Static meshes are batched; people retain their joint hierarchy.
+    expect(meshCount).toBeGreaterThan(50); // Static meshes are batched; people retain their joint hierarchy.
     expect(meshCount).toBeLessThan(450);
     world.dispose();
   });
-  it('moves residents along graph edges, swings legs, and clamps a long background delta', () => {
-    const world = buildCastleWorld(), person = world.walkers[0];
-    const start = person.group.position.clone();
-    world.update(90);
-    expect(start.distanceTo(person.group.position)).toBeLessThan(.08);
-    expect(start.distanceTo(person.group.position)).toBeGreaterThan(0);
-    expect(person.legs[0].rotation.x).not.toBe(0);
-    const state = { from: 0, to: 1, progress: .99, speed: 1, seed: 11 };
-    for (let i = 0; i < 1000; i++) advanceWalker(state, .05);
-    expect(state.progress).toBeGreaterThanOrEqual(0); expect(state.progress).toBeLessThan(1);
-    expect(WALK_EDGES.some(([a, b]) => (a === state.from && b === state.to) || (a === state.to && b === state.from))).toBe(true);
-    world.dispose();
+  it('interpolates only authoritative motion and removes departed residents without rebuilding scenery',()=>{
+    const world=buildCastleWorld();const places=world.places;
+    world.setPresence([{avatarId:'a',alias:'同行者',preset:'jade',isSelf:true,motion:{sequence:1,path:[[0,15],[0,10.5]],startedAt:1000,durationMs:3000}}],1000,0);
+    const person=world.walkers[0];world.updateResidents(1500,true);expect(person.group.position.z).toBeCloseTo(12.75);expect(person.legs[0].rotation.x).not.toBe(0);
+    world.updateResidents(1500,false);expect(Math.abs(person.legs[0].rotation.x)).toBe(0);expect(person.group.position.z).toBeCloseTo(12.75);
+    world.setPresence([],2000,1500);expect(world.walkers).toEqual([]);expect(world.places).toBe(places);expect(person.group.parent).toBeNull();world.dispose();
   });
   it('disposes geometry and materials when the scene owner unmounts', () => {
     const world = buildCastleWorld(), geometry = vi.spyOn(THREE.BufferGeometry.prototype, 'dispose'), material = vi.spyOn(THREE.Material.prototype, 'dispose');

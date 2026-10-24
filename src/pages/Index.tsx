@@ -647,6 +647,8 @@ const Index = () => {
         </>}
         {homeMode === 'castle' ? (
           <CastleHome
+            signedIn={!!user}
+            presenceScope={user&&!churchContext?.loading&&!churchContext?.error&&churchContext?.data?.selectedChurch&&!churchContext.data.requiresApproval?JSON.stringify([user.id,churchContext.data.selectedChurch]):null}
             modeControls={<HomeModeSwitch mode={homeMode} onChange={changeMode} />}
             accountControls={<><NotificationBell />{accountControls}</>}
             navigationControls={navigationControls}

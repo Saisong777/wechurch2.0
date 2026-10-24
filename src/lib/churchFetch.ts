@@ -12,7 +12,7 @@ export function setChurchScope(next: VerifiedChurchScope | null, active = true) 
 }
 // Explicit same-origin tenant routes only. Auth/OAuth, Bible and private notebook requests stay unchanged.
 export function isChurchApi(path: string, method = 'GET') {
-  return /^\/api\/(?:me\/church-onboarding|me\/church-login-summary|admin\/church-login-inbox|prayers|prayer-sharing|devotion-wall|life-groups|families|church-reading|admin\/church-devotions|admin\/church-affiliations|crm|access-control|care-visits|feedback|admin\/feedback|notifications|reading-plans|user-reading-plans|user-reading-progress|support|mentoring)(?:\/|$)/.test(path)
+  return /^\/api\/(?:me\/church-onboarding|me\/church-login-summary|admin\/church-login-inbox|castle-presence|prayers|prayer-sharing|devotion-wall|life-groups|families|church-reading|admin\/church-devotions|admin\/church-affiliations|crm|access-control|care-visits|feedback|admin\/feedback|notifications|reading-plans|user-reading-plans|user-reading-progress|support|mentoring)(?:\/|$)/.test(path)
     || /^\/api\/(?:message-cards|message-card-downloads|card-questions|icebreaker\/cards)(?:\/|$)/.test(path)
     || path === '/api/sessions' || (path === '/api/icebreaker/games' && method === 'POST')
     || /^\/api\/(?:users|user-roles|potential-members|churches)(?:\/|$)/.test(path);

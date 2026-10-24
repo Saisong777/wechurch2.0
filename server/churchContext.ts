@@ -38,7 +38,7 @@ export function resolveChurchContext(actorId:string,actorChurch:string|null,isSy
   return {actorId,actorChurch:verified,selectedChurch:isSystemAdmin?(requested||verified):verified,isSystemAdmin};
 }
 // These roots contain church content. Owner-only profile/notes/prayers/reading-progress are not gated here.
-export const churchFeaturePrefixes=['/devotion-wall','/prayers','/church-reading','/admin/church-devotions','/life-groups','/families','/crm','/access-control','/care-visits','/feedback','/admin/feedback','/notifications','/reading-plans','/churches','/potential-members','/user-roles','/message-cards','/message-card-downloads','/card-questions','/icebreaker/cards'];
+export const churchFeaturePrefixes=['/castle-presence','/devotion-wall','/prayers','/church-reading','/admin/church-devotions','/life-groups','/families','/crm','/access-control','/care-visits','/feedback','/admin/feedback','/notifications','/reading-plans','/churches','/potential-members','/user-roles','/message-cards','/message-card-downloads','/card-questions','/icebreaker/cards'];
 export function churchContextMiddleware(resolveId:(req:Request)=>Promise<string|null>):RequestHandler {
   return async(req,res,next)=>{
     try {

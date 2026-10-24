@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { WALK_NODES,WALK_EDGES,sampleCastleMotion } from '@shared/castleNavigation';
+import { CASTLE_MAX_RESIDENTS,type CastleAvatar } from '@shared/castlePresence';
+export { WALK_NODES,WALK_EDGES } from '@shared/castleNavigation';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const WORLD_PLACES = {
@@ -12,11 +15,6 @@ export const WORLD_PLACES = {
 };
 export type PlaceId = keyof typeof WORLD_PLACES;
 // Every edge is a walkable path outside the footprint of buildings and walls.
-export const WALK_NODES = [
-  [0, 15], [0, 10.5], [0, 5.5], [0, 1], [-6.5, 4], [-11, 4.5], [-15, 8.5],
-  [-9.5, -2.5], [-8, -12], [0, -12], [10, -11], [10, -3], [12, 4.5], [16, 6.5], [9, 12.7], [13, 12.7],
-] as const;
-export const WALK_EDGES = [[0, 1], [1, 2], [2, 3], [2, 4], [4, 5], [5, 6], [5, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [12, 15], [15, 14], [14, 1], [12, 2]] as const;
 export const BUILDING_FOOTPRINTS = [
   { id: 'castle', x: 0, z: -5.7, halfX: 5.4, halfZ: 4.7 },
   { id: 'tower', x: -13, z: -6.5, halfX: 2.3, halfZ: 2.3 },
@@ -27,26 +25,6 @@ export const BUILDING_FOOTPRINTS = [
   { id: 'fountain', x: 14, z: -7, halfX: 2.2, halfZ: 2.2 },
   { id: 'pavilion', x: 9, z: 9, halfX: 2.4, halfZ: 2.4 },
 ] as const;
-
-export type WalkerState = { from: number; to: number; progress: number; speed: number; seed: number };
-export function advanceWalker(state: WalkerState, delta: number) {
-  let remaining = Math.min(.05, Math.max(0, delta)) * state.speed;
-  while (remaining > 0) {
-    const a = WALK_NODES[state.from], b = WALK_NODES[state.to];
-    const length = Math.hypot(a[0] - b[0], a[1] - b[1]);
-    const travel = Math.min(remaining, (1 - state.progress) * length);
-    state.progress += travel / length;
-    remaining -= travel;
-    if (state.progress >= 1 - 1e-8) {
-      const options = WALK_EDGES.flatMap(([a, b]) => a === state.to ? [b] : b === state.to ? [a] : []).filter(n => n !== state.from);
-      state.seed = (state.seed * 1664525 + 1013904223) >>> 0;
-      const next = options.length ? options[state.seed % options.length] : state.from;
-      state.from = state.to; state.to = next; state.progress = 0;
-    }
-  }
-  const a = WALK_NODES[state.from], b = WALK_NODES[state.to];
-  return { x: THREE.MathUtils.lerp(a[0], b[0], state.progress), z: THREE.MathUtils.lerp(a[1], b[1], state.progress), angle: Math.atan2(b[0] - a[0], b[1] - a[1]) };
-}
 
 export function buildCastleWorld() {
   const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
@@ -111,7 +89,7 @@ export function buildCastleWorld() {
     for (const m of meshes) m.removeFromParent();
     for (const [material, entry] of batches) {
       const merged = mergeGeometries(entry.geometries, false); entry.geometries.forEach(g => g.dispose());
-      if (merged) { const m = new THREE.Mesh(geo(merged), material); m.castShadow = entry.shadow; m.receiveShadow = true; group.add(m); }
+      if (merged) { const m = new THREE.Mesh(geo(merged), material); m.castShadow = entry.shadow; m.receiveShadow = true; if(group===environment&&(material===pathMat||material===grass))m.userData.walkSurface=true; group.add(m); }
     }
   }
 
@@ -276,9 +254,11 @@ export function buildCastleWorld() {
 
   const clothes = [mat(0xd88065), mat(0xe3b854), mat(0x3d8986), mat(0x677cac), mat(0xf0e6cc), mat(0x8b79a5)];
   const skins = [mat(0xdca582), mat(0xa97455), mat(0xf0c6a1), mat(0xc58c68)]; const hair = [mat(0x49392f), mat(0x8c603b), mat(0xddd5bd)]; const trousers = [mat(0x435865), mat(0x756957), mat(0x465c51)];
-  const walkers: { group: THREE.Group; state: WalkerState; arms: THREE.Group[]; legs: THREE.Group[]; phase: number }[] = [];
-  for (let i = 0; i < 16; i++) {
-    const person = new THREE.Group(); person.name = `resident-${i + 1}`; world.add(person);
+  const walkers: { group: THREE.Group; avatar: CastleAvatar; arms: THREE.Group[]; legs: THREE.Group[]; phase: number }[] = [];
+  let rosterTime=0,receivedTime=0;
+  function createResident(avatar:CastleAvatar) {
+    const i=['coral','sunshine','jade','blue','ivory','violet'].indexOf(avatar.preset);
+    const person = new THREE.Group(); person.name = `resident-${avatar.avatarId}`; world.add(person);
     const outfit = clothes[i % clothes.length], skin = skins[i % skins.length], pants = trousers[i % trousers.length];
     cylinder(person, outfit, 0, .88, 0, .21, .55); ball(person, skin, 0, 1.36, 0, .185, .21); ball(person, hair[i % 3], 0, 1.48, -.025, .19, .12, .18);
     // Tiny noses show the direction residents are looking while turning.
@@ -292,10 +272,20 @@ export function buildCastleWorld() {
     }
     if (i % 4 === 0) { box(person, coral, 0, .87, -.24, .3, .35, .14); }
     if (i % 5 === 0) { cylinder(person, gold, 0, 1.58, 0, .27, .055); }
-    const edge = WALK_EDGES[i % WALK_EDGES.length];
-    const state = { from: edge[0] as number, to: edge[1] as number, progress: ((i * 37) % 100) / 100, speed: .62 + (i % 4) * .09, seed: i + 11 };
-    const position = advanceWalker(state, 0); person.position.set(position.x, Math.hypot(position.x, position.z - 5.5) < 3.5 ? .31 : .16, position.z); person.rotation.y = position.angle; person.scale.setScalar(.85 + (i % 3) * .07);
-    walkers.push({ group: person, state, arms, legs, phase: i * .8 });
+    person.scale.setScalar(.97);
+    const walker={group:person,avatar,arms,legs,phase:i*.8};walkers.push(walker);return walker;
+  }
+  function setPresence(avatars:readonly CastleAvatar[],serverNow:number,receivedAt=performance.now()) {
+    const ids=new Set(avatars.slice(0,CASTLE_MAX_RESIDENTS).map(a=>a.avatarId));
+    for(let i=walkers.length-1;i>=0;i--)if(!ids.has(walkers[i].avatar.avatarId)){walkers[i].group.removeFromParent();walkers.splice(i,1);}
+    for(const avatar of avatars.slice(0,CASTLE_MAX_RESIDENTS)){let walker=walkers.find(w=>w.avatar.avatarId===avatar.avatarId);if(walker&&walker.avatar.preset!==avatar.preset){walker.group.removeFromParent();walkers.splice(walkers.indexOf(walker),1);walker=undefined;}if(walker)walker.avatar=avatar;else createResident(avatar);}
+    rosterTime=serverNow;receivedTime=receivedAt;updateResidents(receivedAt,false);
+  }
+  function updateResidents(now=performance.now(),animate=true) {
+    const time=rosterTime+Math.max(0,Math.min(6000,now-receivedTime));
+    for(const walker of walkers){const position=sampleCastleMotion(walker.avatar.motion,time);walker.group.position.set(position.x,Math.hypot(position.x,position.z-5.5)<3.5?.31:.16,position.z);if(position.moving)walker.group.rotation.y=position.angle;
+      const swing=position.moving&&animate?Math.sin(time*.0065+walker.phase):0;walker.arms.forEach((arm,i)=>{arm.rotation.x=swing*(i?-.45:.45);});walker.legs.forEach((leg,i)=>{leg.rotation.x=swing*(i?.42:-.42);});
+    }
   }
 
   for (const place of Object.values(places)) batch(place); batch(environment);
@@ -308,11 +298,6 @@ export function buildCastleWorld() {
   let elapsed = 0;
   function update(delta: number) {
     const dt = Math.max(0, Math.min(.05, delta)); elapsed += dt;
-    for (const walker of walkers) {
-      const position = advanceWalker(walker.state, dt); walker.group.position.set(position.x, (Math.hypot(position.x, position.z - 5.5) < 3.5 ? .31 : .16) + Math.abs(Math.sin(elapsed * 7 + walker.phase)) * .025, position.z); walker.group.rotation.y = position.angle;
-      walker.arms.forEach((arm, i) => { arm.rotation.x = Math.sin(elapsed * 6.5 + walker.phase + i * Math.PI) * .45; });
-      walker.legs.forEach((leg, i) => { leg.rotation.x = -Math.sin(elapsed * 6.5 + walker.phase + i * Math.PI) * .42; });
-    }
     boats.forEach((boat, i) => { boat.position.y = -3.1 + Math.sin(elapsed * 1.5 + i * 2) * .1; boat.rotation.z = Math.sin(elapsed + i) * .045; });
     animatedFlags.forEach((flag, i) => { const position = flag.geometry.attributes.position; for (let j = 0; j < position.count; j++) { const x = position.getX(j); position.setZ(j, Math.sin(x * 5 + elapsed * 3 + i) * .08 * (x + .5)); } position.needsUpdate = true; });
     const positions = seaGeometry.attributes.position;
@@ -321,5 +306,5 @@ export function buildCastleWorld() {
   }
   function night(value: boolean) { glowMat.emissive.setHex(value ? 0xffc563 : 0x000000); glowMat.emissiveIntensity = value ? .9 : 0; seaMaterial.color.setHex(value ? 0x255d70 : 0x62bfb9); }
   function dispose() { geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
-  return { group: world, places, walkers, update, night, dispose, residentCount: walkers.length, obstacleBounds };
+  return { group: world, places, walkers, setPresence, updateResidents, update, night, dispose, get residentCount(){return walkers.length;}, obstacleBounds };
 }

@@ -34,8 +34,8 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B)', () => {
   it('mounts one renderer, moves residents, pauses animation and preserves manual camera controls', () => {
     const view = show(); const host = screen.getByTestId('castle-3d-world');
-    expect(host.dataset.worldState).toBe('ready'); expect(host.dataset.worldResidents).toBe('16'); expect(gpu.instances).toBe(1);
-    tick(1000); const start = host.dataset.worldResidentPosition; tick(1050); expect(host.dataset.worldResidentPosition).not.toBe(start);
+    expect(host.dataset.worldState).toBe('ready'); expect(host.dataset.worldResidents).toBe('0'); expect(gpu.instances).toBe(1);
+    tick(1000); const start = host.dataset.worldResidentPosition; tick(1050); expect(host.dataset.worldResidentPosition).toBe(start);
     view.rerender(<CastleScene places={places} selectedId="chapel" onSelect={vi.fn()} paused night={false} detailId="detail" />);
     expect(callbacks.size).toBe(0); const still = host.dataset.worldResidentPosition;
     const before = Number(host.dataset.worldCamera); fireEvent.click(screen.getByRole('button', { name: '拉近城堡' }));
@@ -94,4 +94,12 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     fireEvent.pointerUp(surface, { pointerId: 4, pointerType: 'mouse', button: 0, clientX: 100, clientY: 100 });
     expect(select).toHaveBeenCalledWith('chapel');
   });
+  it('moves only a joined self on short ground clicks and keeps building clicks for exploration',()=>{
+    let ground=true;vi.spyOn(THREE.Raycaster.prototype,'intersectObject').mockImplementation(object=>{let hit:THREE.Object3D|undefined;object.traverse(child=>{if(ground?child.userData.walkSurface:child.userData.placeId==='chapel')hit=child;});return hit?[{object:hit,distance:1,point:new THREE.Vector3(0,0,10.5)}]:[];});
+    const move=vi.fn(),select=vi.fn(),presence={roster:{instanceEpoch:'11111111-1111-4111-8111-111111111111',serverNow:1000,ttlMs:25000 as const,avatars:[{avatarId:'22222222-2222-4222-8222-222222222222',alias:'我',preset:'jade' as const,isSelf:true,motion:{sequence:0,path:[[0,15] as [number,number]],startedAt:1000,durationMs:0}}]},receivedAt:performance.now()};
+    const view=show({presence,onMove:move,onSelect:select});const surface=screen.getByTestId('castle-3d-canvas');
+    const click=()=>{fireEvent.pointerDown(surface,{pointerId:1,button:0,clientX:100,clientY:100});fireEvent.pointerUp(surface,{pointerId:1,button:0,clientX:100,clientY:100});};click();expect(move).toHaveBeenCalledWith(1);expect(select).not.toHaveBeenCalled();ground=false;click();expect(select).toHaveBeenCalledWith('chapel');expect(move).toHaveBeenCalledTimes(1);
+    view.rerender(<CastleScene places={places} onSelect={select} paused night={false} detailId="detail" onMove={move}/>);ground=true;click();expect(move).toHaveBeenCalledTimes(1);expect(screen.getByTestId('castle-3d-world').dataset.worldResidents).toBe('0');
+  });
+
 });

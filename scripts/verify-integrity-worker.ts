@@ -55,9 +55,9 @@ try {
   process.env.PUBLIC_BASE_URL = origin;
   const makeClient = (approvedFixture=true) => {
     const cookies = new Map<string,string>();
-    return async (path: string, method='GET', body?: unknown) => {
+    return async (path: string, method='GET', body?: unknown, extraHeaders:Record<string,string>={}) => {
       const multipart = body instanceof FormData;
-      const response = await fetch(origin+path,{method, headers:{...(!multipart ? {'Content-Type':'application/json'} : {}),origin,cookie:[...cookies].map(([key,value])=>`${key}=${value}`).join('; ')},body:body===undefined?undefined:multipart?body:JSON.stringify(body),redirect:'manual'});
+      const response = await fetch(origin+path,{method, headers:{...(!multipart ? {'Content-Type':'application/json'} : {}),origin,...extraHeaders,cookie:[...cookies].map(([key,value])=>`${key}=${value}`).join('; ')},body:body===undefined?undefined:multipart?body:JSON.stringify(body),redirect:'manual'});
       for(const cookie of response.headers.getSetCookie()) { const value=cookie.split(';')[0]; const split=value.indexOf('='); cookies.set(value.slice(0,split),value.slice(split+1)); }
       if(approvedFixture&&path==='/api/auth/register'&&response.status===200&&body&&typeof body==='object'&&'email' in body)await pool.query("UPDATE users SET church='IM 行動教會' WHERE email=$1",[(body as {email:string}).email]);
       return response;
@@ -87,6 +87,7 @@ try {
     }
   } else {
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
+  const {verifyCastlePresenceHttp}=await import('./verify-castle-presence-http');await verifyCastlePresenceHttp(pool,makeClient);
   const { verifyCareHttp } = await import('./verify-care-http');
   await verifyCareHttp(pool, makeClient);
   const { verifyDevotionShareHttp } = await import('./verify-devotion-share-http');

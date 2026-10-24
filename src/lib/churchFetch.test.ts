@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
-import {churchFetch,setChurchScope} from './churchFetch';
+import {isChurchApi,churchFetch,setChurchScope} from './churchFetch';
 const im={actorId:'actor',actorChurch:'IM 行動教會',selectedChurch:'IM 行動教會',isSystemAdmin:true};
 beforeEach(()=>{setChurchScope(im);vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({items:[]}))));});
 afterEach(()=>{setChurchScope(null,false);vi.unstubAllGlobals();vi.restoreAllMocks();});
@@ -64,3 +64,5 @@ it('keeps invitation intake root-only and refuses guest management child writes'
 it('preserves unassigned private own profile/avatar and owner plans while blocking management children',async()=>{
  setChurchScope({...im,actorChurch:null,selectedChurch:null,isSystemAdmin:false});for(const path of ['/api/users/actor/profile','/api/users/actor/avatar','/api/user-reading-plans/plan/progress','/api/devotional-notes'])await churchFetch(path);expect(fetch).toHaveBeenCalledTimes(4);expect((await churchFetch('/api/potential-members/id',{method:'PATCH',body:'{}'})).status).toBe(403);expect((await churchFetch('/api/user-roles/id',{method:'PUT',body:'{}'})).status).toBe(403);
 });
+
+it('recognizes castle presence as a scoped church endpoint',()=>{expect(isChurchApi('/api/castle-presence/join','POST')).toBe(true);});

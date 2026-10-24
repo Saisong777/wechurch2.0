@@ -1,3 +1,6 @@
+import {useCastlePresence} from '@/hooks/useCastlePresence';
+import {CastlePresencePanel} from './CastlePresencePanel';
+import {PLACE_WALK_NODES} from '@shared/castleNavigation';
 import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, BookHeart, BookOpen, Castle, Compass, Footprints, Gamepad2, Heart, HandHeart, MessageCircle, Moon, Pause, Play, Settings, Sun, Users, Menu, X, ChevronUp, type LucideIcon } from 'lucide-react';
@@ -32,10 +35,13 @@ export interface CastleHomeProps {
   navigationControls?: ReactNode;
   churchControls?: ReactNode;
   notices?: ReactNode;
+  presenceScope?:string|null;
+  signedIn?:boolean;
 }
 
-export function CastleHome({ churchName, preview, featureEnabled, featuresLoading, scripture, hasDraft, onOpenNote, showAdmin, showPastoral, modeControls, accountControls, navigationControls, churchControls, notices }: CastleHomeProps) {
+export function CastleHome({ churchName, preview, featureEnabled, featuresLoading, scripture, hasDraft, onOpenNote, showAdmin, showPastoral, modeControls, accountControls, navigationControls, churchControls, notices, presenceScope=null,signedIn=false }: CastleHomeProps) {
   useImmersiveSurface();
+  const presence=useCastlePresence(presenceScope);
   const places = PLACES.filter(place => !place.feature || (!featuresLoading && featureEnabled(place.feature)));
   const [selectedId, setSelectedId] = useState('chapel');
   const selected = places.find(place => place.id === selectedId) || places[0];
@@ -79,13 +85,14 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
       {panel === 'places' && <p>{selected?.description || '選擇一個地點，從這裡開始同行。'}</p>}
       {selected?.id === 'chapel' && <p className="castle-today" role="status">{scripture.state === 'ready' ? `今日讀經：${scripture.reference}` : scripture.state === 'loading' ? '正在載入教會課表…' : scripture.state === 'unpublished' ? '今天的靈修尚未發佈' : '暫時無法載入教會課表'}</p>}
     </div>
+    {selected&&presence.view.status==='joined'&&<button className="castle-walk-link" type="button" onClick={()=>presence.move(PLACE_WALK_NODES[selected.id as keyof typeof PLACE_WALK_NODES])}><Footprints size={15} aria-hidden="true"/>走到這裡</button>}
     {selected && <Link className="castle-primary-link" to={selected.href}>{selected.action}<ArrowRight size={16} aria-hidden="true" /></Link>}
   </>;
 
   return <div className={`castle-home castle-home--fullscreen ${night ? 'castle-home--night' : ''} ${paused ? 'castle-home--paused' : ''}`} data-testid="castle-home" data-castle-panel={panel || 'closed'} style={{ '--castle-panel-bottom': `${insets.bottom}px` } as CSSProperties}>
     <div className="castle-map-shell castle-map-shell--3d">
       <Suspense fallback={<div className="castle-3d-loading-fallback" role="status">正在打開城門…</div>}>
-        <CastleScene places={places} selectedId={selected?.id} onSelect={selectPlace} paused={paused} night={night} detailId={detailId} insets={insets} />
+        <CastleScene places={places} selectedId={selected?.id} onSelect={selectPlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} />
       </Suspense>
     </div>
     <div className="castle-hud" aria-label="城堡導覽與設定">
@@ -102,6 +109,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
         </div>
       </div>
       <div className="castle-hud-notices" ref={noticeArea}>
+        <CastlePresencePanel presence={presence} signedIn={signedIn}/>
         {notices}
         {hasDraft && <div className="castle-draft" role="status"><p>此裝置有靈修草稿，尚未同步。</p><button type="button" onClick={onOpenNote}>開啟草稿<ArrowRight size={16} aria-hidden="true" /></button></div>}
       </div>

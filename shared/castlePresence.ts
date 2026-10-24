@@ -1,0 +1,16 @@
+import { z } from 'zod';
+export const CASTLE_TTL_MS = 25000;
+export const CASTLE_MAX_RESIDENTS = 32;
+export const castlePresetSchema = z.enum(['coral', 'sunshine', 'jade', 'blue', 'ivory', 'violet']);
+export type CastlePreset = z.infer<typeof castlePresetSchema>;
+export const castleJoinSchema = z.object({ alias: z.string().trim().min(1).max(24).refine(value => Array.from(value).every(character => { const code=character.charCodeAt(0); return code>31&&(code<127||code>159); })), preset: castlePresetSchema }).strict();
+export const castleMoveSchema = z.object({ targetNode: z.number().int().min(0).max(15) }).strict();
+export const castleEmptySchema = z.object({}).strict();
+const point = z.tuple([z.number().finite(), z.number().finite()]);
+export const castleMotionSchema = z.object({ sequence: z.number().int().nonnegative(), path: z.array(point).min(1).max(40), startedAt: z.number().finite(), durationMs: z.number().finite().nonnegative() }).strict();
+export const castleAvatarSchema = z.object({ avatarId: z.string().uuid(), alias: z.string().max(24), preset: castlePresetSchema, isSelf: z.boolean(), motion: castleMotionSchema }).strict();
+export const castleRosterSchema = z.object({ instanceEpoch: z.string().uuid(), serverNow: z.number().finite(), ttlMs: z.literal(CASTLE_TTL_MS), avatars: z.array(castleAvatarSchema).max(CASTLE_MAX_RESIDENTS) }).strict();
+export const castleJoinResponseSchema = castleRosterSchema.extend({ avatarId: z.string().uuid(), leaseToken: z.string().min(32).max(128) }).strict();
+export type CastleAvatar = z.infer<typeof castleAvatarSchema>;
+export type CastleRoster = z.infer<typeof castleRosterSchema>;
+export type CastleJoin = z.infer<typeof castleJoinSchema>;
