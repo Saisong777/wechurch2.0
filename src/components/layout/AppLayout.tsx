@@ -15,11 +15,12 @@ import { useChurchOnboarding } from '@/hooks/useChurchOnboarding';
 
 interface AppLayoutProps {
   children: ReactNode;
+  surface?: 'castle-window';
 }
 
 const hiddenNavPaths = ['/login', '/reset-password', '/admin', '/admin/crm', '/user/study'];
 
-export const AppLayout = ({ children }: AppLayoutProps) => {
+export const AppLayout = ({ children,surface }: AppLayoutProps) => {
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const church = useChurchContext();
@@ -30,7 +31,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Do not mount route children (including personal pages) until first-login
   // affiliation is explicitly confirmed. Deep links use this same boundary.
   if (authLoading || user && (church?.loading || church?.error || onboarding.isPending || onboarding.isError || !onboarding.data || onboarding.data.canChoose)) {
-    return <div className="app-shell min-h-screen bg-brand-warm"><NetworkStatusBanner /><main className="mx-auto w-full max-w-2xl px-4 py-8"><FirstChurchChoice key={user?.id || 'loading'} /></main></div>;
+    return <div className={surface?"castle-window-page bg-brand-warm":"app-shell min-h-screen bg-brand-warm"}>{!surface&&<NetworkStatusBanner />}<main className="mx-auto w-full max-w-2xl px-4 py-8"><FirstChurchChoice key={user?.id || 'loading'} /></main></div>;
   }
 
   const showNav = !hiddenNavPaths.some(path =>
@@ -38,6 +39,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   );
 
   const tenantPage = /^\/(?:admin|groups|prayer-wall|walls|devotion-wall|support|work|prayer-meeting)(?:\/|$)/.test(location.pathname) || location.pathname === '/learn/church-reading';
+  if(surface==='castle-window')return <MobileHeaderContext.Provider value={null}><div className="castle-window-page"><ChurchPageBoundary personal={!tenantPage} allowPendingOwner={/^\/(support|work)(?:\/|$)/.test(location.pathname)}><ErrorBoundary key={location.pathname} fallbackTitle="這個頁面暫時無法載入">{children}</ErrorBoundary></ChurchPageBoundary></div></MobileHeaderContext.Provider>;
   return (
     <MobileHeaderContext.Provider value={showNav ? mobileHeader : null}>
     <div className="app-shell flex flex-col bg-brand-warm">

@@ -1,3 +1,4 @@
+import {usePageScroll} from '@/contexts/PageScrollContext';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -103,6 +104,7 @@ function NoteChapter({ note, onExport, editing, setEditing }: { note: JournalNot
 }
 
 function JournalReader({ userId }: { userId: string }) {
+  const pageScroll=usePageScroll();
   const query = useDevotionalNotes<JournalNote>(userId);
   const notes = sortJournal(query.data);
   const readable = notes.filter(n => hasJournalContent(n) || n.syncStatus === 'pending' || n.syncStatus === 'blocked' || n.id.startsWith('local-devotional-'));
@@ -124,7 +126,7 @@ function JournalReader({ userId }: { userId: string }) {
   const newer = index > 0 ? readable[index - 1] : undefined;
 
   useEffect(() => { if (!query.isLoading && !selected && chapterId) setSelected(chapterId); }, [query.isLoading, selected, chapterId]);
-  useEffect(() => { if (directory) window.scrollTo({ top: 0, behavior: 'instant' }); }, [directory]);
+  useEffect(() => { if (directory) pageScroll.to(0); }, [directory,pageScroll]);
 
   // Store only this member's chapter ID and scroll offset, never the note text.
   useLayoutEffect(() => {
@@ -133,7 +135,7 @@ function JournalReader({ userId }: { userId: string }) {
     lastY.current = saved?.noteId === chapterId ? saved.y : 0;
     restoring.current = true;
     const frame = requestAnimationFrame(() => {
-      window.scrollTo({ top: lastY.current, behavior: 'instant' });
+      pageScroll.to(lastY.current);
       if (focusChapter.current) { document.getElementById('journal-chapter-title')?.focus({ preventScroll: true }); focusChapter.current = false; }
       restoring.current = false;
     });
@@ -141,15 +143,15 @@ function JournalReader({ userId }: { userId: string }) {
     let timer = 0;
     const remember = () => {
       if (restoring.current) return;
-      lastY.current = Math.max(0, window.scrollY);
+      lastY.current = Math.max(0, pageScroll.y());
       if (!timer) timer = window.setTimeout(() => { timer = 0; save(); }, 500);
     };
     const saveWhenHidden = () => { if (document.visibilityState === 'hidden') save(); };
-    window.addEventListener('scroll', remember, { passive: true });
+    const stopScroll=pageScroll.listen(remember);
     window.addEventListener('pagehide', save);
     document.addEventListener('visibilitychange', saveWhenHidden);
-    return () => { save(); cancelAnimationFrame(frame); window.clearTimeout(timer); window.removeEventListener('scroll', remember); window.removeEventListener('pagehide', save); document.removeEventListener('visibilitychange', saveWhenHidden); };
-  }, [chapterId, directory, editing, query.isLoading, userId]);
+    return () => { save(); cancelAnimationFrame(frame); window.clearTimeout(timer); stopScroll(); window.removeEventListener('pagehide', save); document.removeEventListener('visibilitychange', saveWhenHidden); };
+  }, [chapterId, directory, editing, query.isLoading, userId,pageScroll]);
 
   const openNote = (note: JournalNote) => { focusChapter.current = true; setSelected(note.id); setDirectory(false); };
   const exportAll = () => exportNotes(notes, query.isError);

@@ -567,3 +567,39 @@ height at 390×844 and 320×568. This is a composition check, not visual accepta
 Root must verify the same frozen release on B at both sizes, open/close both sheets,
 check error/presence actions and 44px targets, then recheck landscape/desktop and
 traditional-mode scroll. No localhost UI acceptance or author visual self-signoff.
+
+## Castle content windows (2026-10-24)
+
+Use the same existing data router and real lazy page definitions for the castle
+background and the foreground content. On desktop the content is a centered
+window with visible castle context; mobile uses an almost full-height sheet.
+The window has a fixed 44px close/return header and its own scroll viewport.
+Keep that viewport as an isolated fixed-position containing block so a page's
+mobile selection toolbar stays below the window header; nested Radix portals
+remain above it. Bible chapter changes and notebook reading positions use a
+narrow viewport scroll context, with the original window scroll fallback for
+ordinary pages. No global scroll monkeypatch or copied page content.
+
+Castle navigation uses ordinary links and the original permission/feature gates.
+Supported internal content routes inherit a successfully committed castle origin;
+redirects, query changes and nested routes remain real URL entries. A bounded
+50-entry tab registry remembers only history keys and whitelisted home UI mode,
+never content, tokens, membership or arbitrary state. Marked reloads can restore
+a new window instance; unmarked deep links remain ordinary pages. Refresh still
+rebuilds WebGL and presence. Security/admin/external OAuth flows retain full-page
+behavior. Closing pushes the safe complete origin URL through the existing
+unsaved-change blocker. Back can reopen the last content entry; an explicit
+full-page exit also traverses the blocker.
+
+Keep the same castle DOM/scene/presence while a window is active and make its
+background inert. Background Escape listeners stop, while the topmost Radix
+Dialog/Select/AlertDialog owns Escape and focus. On successful opening only,
+close the home editor/account UI that ordinary route departure would unmount;
+blocked Stay must retain the draft and keep the window closed. Modal body locks
+remain owned by Radix. The existing castle class owns only its own CSS.
+
+Author CPU integration verifies committed navigation, one background mount,
+redirects/params/query/Back/Forward/reload/explicit exit, dirty Stay/Discard,
+nested Escape, focus and independent scroll. Root and independent QA must still
+verify real page content, GPU state, fixed toolbars/portals and mobile layouts on
+the same B release. No author UI self-signoff or localhost preview.

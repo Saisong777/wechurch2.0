@@ -1,3 +1,4 @@
+import {CastleWindowContext} from '@/contexts/CastleWindowContext';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
@@ -80,6 +81,11 @@ describe('castle navigation', () => {
   it('announces notices that change inside an existing text node',async()=>{
     vi.stubGlobal('innerWidth',390);vi.stubGlobal('innerHeight',844);const view=show({notices:<div role="alert"> </div>});const menu=screen.getByRole('button',{name:'開啟城堡選單'});expect(menu.hasAttribute('aria-describedby')).toBe(false);
     view.rerender(<MemoryRouter><CastleHome {...defaults} notices={<div role="alert">筆記載入失敗，請開選單重試</div>}/></MemoryRouter>);await waitFor(()=>expect(menu.hasAttribute('aria-describedby')).toBe(true));fireEvent.click(menu);expect(screen.getByRole('alert').textContent).toContain('筆記載入失敗');
+  });
+
+  it('resets drawer scroll only when switching panels, and does not consume Escape behind a feature window',()=>{
+    const view=show();fireEvent.click(screen.getByRole('button',{name:'開啟城堡選單'}));const scroll=document.querySelector<HTMLElement>('.castle-drawer-scroll')!;scroll.scrollTop=450;fireEvent.click(screen.getByRole('button',{name:'開啟城堡地點'}));expect(scroll.scrollTop).toBe(0);scroll.scrollTop=120;
+    view.rerender(<MemoryRouter><CastleWindowContext.Provider value><CastleHome {...defaults}/></CastleWindowContext.Provider></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:'開啟城堡地點'}));fireEvent.keyDown(document,{key:'Escape'});expect(screen.getByTestId('castle-home').dataset.castlePanel).toBe('places');
   });
 
 });

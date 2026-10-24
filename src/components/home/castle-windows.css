@@ -1,0 +1,11 @@
+.castle-window-backdrop { position: fixed; inset: 0; z-index: 47; background: #163d3b83; backdrop-filter: blur(3px); }
+.castle-feature-window { position: fixed; z-index: 48; inset: 40px 24px 24px; width: min(1120px, calc(100vw - 48px)); margin: auto; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border: 1px solid #e5edde; border-radius: 20px; background: hsl(var(--background)); color: hsl(var(--foreground)); box-shadow: 0 20px 80px #163d3b5c; }
+.castle-window-header { position: relative; z-index: 2; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 62px; padding: 8px 14px 8px 20px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background)); }
+.castle-window-header h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.castle-window-header > div { display: flex; gap: 8px; }
+.castle-window-header button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 8px 12px; border-radius: 12px; font-size: 12px; background: hsl(var(--muted)); }
+.castle-window-scroll { position: relative; isolation: isolate; transform: translateZ(0); flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.castle-window-page { min-height: 100%; }
+.castle-window-page .min-h-screen { min-height: 100%; }
+.castle-feature-window button:focus-visible, .castle-feature-window a:focus-visible { outline: 3px solid #bd4b32; outline-offset: 2px; }
+@media(max-width:640px){ .castle-feature-window { inset: max(30px, env(safe-area-inset-top,0px)) 0 0; width: 100vw; max-height: calc(100dvh - max(30px, env(safe-area-inset-top,0px))); border-radius: 18px 18px 0 0; } .castle-window-header { padding: 6px 8px 6px 14px; gap: 6px; } .castle-window-header button { padding: 8px; } .castle-window-header h2 { font-size: 13px; } .castle-window-header button span { font-size: 10px; } }

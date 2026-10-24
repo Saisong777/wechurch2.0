@@ -1,3 +1,4 @@
+import {PageScrollContext} from '@/contexts/PageScrollContext';
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -37,3 +38,5 @@ it('returns to the selected Bible chapter without resetting the reading scroll',
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('創世記 2章');
   expect(scroll).not.toHaveBeenCalled();
 });
+
+it('changes Bible chapters through the supplied window viewport instead of the global page',()=>{const native=vi.spyOn(window,'scrollTo').mockImplementation(()=>{}),inside=vi.fn();const router=createMemoryRouter([{path:'/bible',element:<PageScrollContext.Provider value={{to:inside,y:()=>0,listen:()=>()=>{}}}><BiblePage/></PageScrollContext.Provider>}],{initialEntries:[{pathname:'/bible',key:'window-chapter'}]});render(<RouterProvider router={router}/>);fireEvent.click(screen.getAllByTestId(/^button-category-/)[0]);fireEvent.click(screen.getByTestId('button-book-1'));fireEvent.click(screen.getByTestId('button-chapter-2'));expect(inside).toHaveBeenCalledWith(0);expect(native).not.toHaveBeenCalled();});

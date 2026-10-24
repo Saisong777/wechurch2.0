@@ -1,7 +1,8 @@
+import {useCastleWindowActive} from '@/contexts/CastleWindowContext';
 import { useChurchContext, useChurchScopeKey } from '@/contexts/ChurchContext';
 import { churchDisplayName } from '@shared/churches';
 import { usePastoralAccess } from '@/hooks/usePastoralAccess';
-import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from 'react';
+import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { AppearanceControl } from '@/components/theme/AppearanceControl';
@@ -199,6 +200,7 @@ function HomeSection({
 }
 
 const Index = () => {
+  const castleWindowActive=useCastleWindowActive();
   const { mode: homeMode, changeMode } = useHomeMode();
   const churchContext = useChurchContext();
   const [searchParams] = useSearchParams();
@@ -223,6 +225,9 @@ const Index = () => {
   const { data: personalPrayerRecords = [], isError: personalPrayerError, isLoading: prayersLoading, refetch: retryPrayers } = usePersonalPrayers();
   const [devotionalDraft, setDevotionalDraft] = useState<HomeDevotionalDraft>(EMPTY_DEVOTIONAL_DRAFT);
   const [savedHomeDevotionalNote, setSavedHomeDevotionalNote] = useState<DevotionalNoteSummary | null>(null);
+  // A successful route commit already passed the original unsaved-change blocker.
+  // Close only the UI that a normal page departure would have unmounted.
+  useLayoutEffect(()=>{if(castleWindowActive){setShowDevotionalEditor(false);setShowProfileSettings(false);setSavedHomeDevotionalNote(null);}},[castleWindowActive]);
   const [isSavingDevotional, setIsSavingDevotional] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     if (typeof window === 'undefined') return DEFAULT_HOME_SECTIONS;

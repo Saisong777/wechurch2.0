@@ -1,3 +1,4 @@
+import {PageScrollContext} from '@/contexts/PageScrollContext';
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -236,3 +237,5 @@ it('uses the same page editor and prevents chapter switches while editing', () =
   expect(screen.getByRole('button', { name: /上一篇/ })).toBeEnabled();
   client.clear();
 });
+
+it('opens its directory using the supplied content viewport without scrolling the castle',()=>{const client=new QueryClient({defaultOptions:{queries:{staleTime:Infinity,retry:false}}});client.setQueryData(['/api/devotional-notes','reader'],[]);client.setQueryData(['/api/im-reading-history','reader'],[]);const inside=vi.fn();render(<PageScrollContext.Provider value={{to:inside,y:()=>70,listen:()=>()=>{}}}><QueryClientProvider client={client}><MemoryRouter><MyNotesPage/></MemoryRouter></QueryClientProvider></PageScrollContext.Provider>);openDirectory();expect(inside).toHaveBeenCalledWith(0);expect(window.scrollTo).not.toHaveBeenCalled();client.clear();});

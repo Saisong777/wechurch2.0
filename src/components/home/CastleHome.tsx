@@ -1,3 +1,4 @@
+import {useCastleWindowActive} from '@/contexts/CastleWindowContext';
 import {isPortraitCastle} from './castle/camera';
 import {useCastlePresence} from '@/hooks/useCastlePresence';
 import {CastlePresencePanel} from './CastlePresencePanel';
@@ -42,6 +43,7 @@ export interface CastleHomeProps {
 
 export function CastleHome({ churchName, preview, featureEnabled, featuresLoading, scripture, hasDraft, onOpenNote, showAdmin, showPastoral, modeControls, accountControls, navigationControls, churchControls, notices, presenceScope=null,signedIn=false }: CastleHomeProps) {
   useImmersiveSurface();
+  const windowActive=useCastleWindowActive();
   const presence=useCastlePresence(presenceScope);
   const places = PLACES.filter(place => !place.feature || (!featuresLoading && featureEnabled(place.feature)));
   const [selectedId, setSelectedId] = useState('chapel');
@@ -60,14 +62,14 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const openPanel = (next: 'places' | 'menu', trigger: HTMLButtonElement) => { lastTrigger.current = trigger; setPanel(current => current === next ? null : next); };
   useLayoutEffect(()=>{const resize=()=>setPortrait(isPortraitCastle(window.innerWidth,window.innerHeight));window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
   useLayoutEffect(() => {
-    if (panel) { drawer.current?.querySelector<HTMLButtonElement>('[data-castle-close]')?.focus({ preventScroll: true }); wasOpen.current = true; }
+    if (panel) { const content=drawer.current?.querySelector<HTMLElement>('.castle-drawer-scroll');if(content)content.scrollTop=0; drawer.current?.querySelector<HTMLButtonElement>('[data-castle-close]')?.focus({ preventScroll: true }); wasOpen.current = true; }
     else if (wasOpen.current) { lastTrigger.current?.focus({ preventScroll: true }); wasOpen.current = false; }
   }, [panel]);
   useEffect(() => {
-    if (!panel) return;
+    if (!panel||windowActive) return;
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) setPanel(null); };
     document.addEventListener('keydown', escape); return () => document.removeEventListener('keydown', escape);
-  }, [panel]);
+  }, [panel,windowActive]);
   useLayoutEffect(() => {
     const measure = () => {
       const top = Math.max(topbar.current?.getBoundingClientRect().bottom || 0, portrait?0:noticeArea.current?.getBoundingClientRect().bottom || 0) + 10;
@@ -117,7 +119,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
         {!portrait&&<div className="castle-hud-mode">{modeControls}</div>}
         {!portrait&&atmosphereControls}
         <div className="castle-hud-actions">
-          <button ref={exploreButton} type="button" aria-label="開啟城堡地點" aria-expanded={panel === 'places'} aria-controls={drawerId} onClick={event => openPanel('places', event.currentTarget)}><Compass size={18} aria-hidden="true" /><span>探索</span></button>
+          <button ref={exploreButton} data-castle-explore type="button" aria-label="開啟城堡地點" aria-expanded={panel === 'places'} aria-controls={drawerId} onClick={event => openPanel('places', event.currentTarget)}><Compass size={18} aria-hidden="true" /><span>探索</span></button>
           <button type="button" aria-label="開啟城堡選單" aria-describedby={portrait&&(hasNotices||!!presence.view.message)?messageId:undefined} aria-expanded={panel === 'menu'} aria-controls={drawerId} onClick={event => openPanel('menu', event.currentTarget)}><Menu size={19} aria-hidden="true" /><span>選單</span>{portrait&&(hasNotices||!!presence.view.message)&&<i className="castle-message-badge"><span id={messageId} className="sr-only" role="status">有訊息待查看</span></i>}</button>
         </div>
       </div>

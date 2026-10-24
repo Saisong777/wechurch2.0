@@ -1,3 +1,4 @@
+import {usePageScroll} from '@/contexts/PageScrollContext';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -95,6 +96,7 @@ const BiblePage = () => {
 };
 
 const BibleReader = ({ entryKey }: { entryKey: string }) => {
+  const pageScroll=usePageScroll();
   const initialView = useRef(bibleViews.get(entryKey));
   const [selectedBook, setSelectedBook] = useState<string | null>(initialView.current?.book ?? null);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(initialView.current?.chapter ?? null);
@@ -130,11 +132,11 @@ const BibleReader = ({ entryKey }: { entryKey: string }) => {
   const previousSelection = useRef([selectedBook, selectedChapter, isSearching]);
   useEffect(() => {
     const next = [selectedBook, selectedChapter, isSearching];
-    if (next.some((value, index) => value !== previousSelection.current[index])) window.scrollTo(0, 0);
+    if (next.some((value, index) => value !== previousSelection.current[index])) pageScroll.to(0);
     previousSelection.current = next;
     bibleViews.set(entryKey, { book: selectedBook, chapter: selectedChapter, search: searchQuery, searching: isSearching });
     if (bibleViews.size > 100) bibleViews.delete(bibleViews.keys().next().value!);
-  }, [entryKey, selectedBook, selectedChapter, isSearching, searchQuery]);
+  }, [entryKey, selectedBook, selectedChapter, isSearching, searchQuery,pageScroll]);
 
   const { data: books = [], isError: booksError } = useQuery<BibleBook[]>({
     queryKey: ['/api/bible/books'],
