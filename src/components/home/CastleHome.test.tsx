@@ -141,6 +141,13 @@ describe('castle navigation', () => {
     fireEvent.click(screen.getByRole('button',{name:'點場景小貓'}));expect(screen.getByTestId('castle-home').dataset.castleSpeaking).toBe('true');expect(insets().bottom).toBe(76);expect(screen.getByRole('link',{name:'登入加入'})).toBeVisible();expect(castleProjection(width,height,insets())).toEqual(before);
     fireEvent.click(screen.getByRole('button',{name:'結束場景對話'}));expect(screen.getByTestId('castle-home').dataset.castleSpeaking).toBe('false');expect(insets().bottom).toBe(76);expect(castleProjection(width,height,insets())).toEqual(before);
   });
+  it('preserves the measured compact inset and true640-landscape projection when the bubble hides its preview',async()=>{
+    vi.stubGlobal('innerWidth',640);vi.stubGlobal('innerHeight',360);
+    vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function(this:HTMLElement){const compact=this.classList.contains('castle-compact-place'),height=compact&&this.closest<HTMLElement>('[data-castle-speaking]')?.dataset.castleSpeaking!=='true'?137:0;return {x:0,y:0,top:0,left:0,right:0,width:0,height,bottom:height,toJSON:()=>({})} as DOMRect;});
+    show();await screen.findByTestId('scene-insets');const insets=()=>JSON.parse(screen.getByTestId('scene-insets').dataset.insets||'{}');expect(insets().bottom).toBe(157);const before=castleProjection(640,360,insets());
+    fireEvent.click(screen.getByRole('button',{name:'點場景小貓'}));expect(document.querySelector<HTMLElement>('.castle-compact-place')!.getBoundingClientRect().height).toBe(0);expect(insets().bottom).toBe(157);expect(castleProjection(640,360,insets())).toEqual(before);
+    fireEvent.click(screen.getByRole('button',{name:'結束場景對話'}));expect(insets().bottom).toBe(157);expect(castleProjection(640,360,insets())).toEqual(before);
+  });
   it('does not consume foreground Escape or clear a pending actor selection',async()=>{
     const content=(active:boolean)=><MemoryRouter><CastleWindowContext.Provider value={active}><CastleHome {...defaults}/></CastleWindowContext.Provider></MemoryRouter>;const view=render(content(false));fireEvent.click(screen.getByRole('button',{name:'開啟城堡朋友'}));fireEvent.click(screen.getByRole('button',{name:/餅乾小貓/}));await screen.findByTestId('scene-insets');const request=screen.getByTestId('scene-insets').dataset.friend;
     view.rerender(content(true));fireEvent.keyDown(document,{key:'Escape'});expect(screen.getByTestId('castle-home').dataset.castlePanel).toBe('closed');expect(screen.getByTestId('scene-insets').dataset.friend).toBe(request);

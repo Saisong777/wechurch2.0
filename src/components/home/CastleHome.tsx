@@ -60,6 +60,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const friendSequence=useRef(0);
   const [speaking,setSpeaking]=useState(false);
   const [hudObstacles,setHudObstacles]=useState<BubbleRect[]>([]);
+  const visibleCompactHeight=useRef(80);
   const mobileEntry=useRef<HTMLDivElement>(null);
   const [friendsReady,setFriendsReady]=useState(false);
   const friendButton=useRef<HTMLButtonElement>(null);
@@ -88,7 +89,9 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
       setHasNotices(Boolean(messageArea.current?.textContent?.trim()));
       const bounds = drawer.current?.getBoundingClientRect(), small = window.innerWidth <= 640;
       const sideFriends=small&&window.innerWidth>window.innerHeight&&panel==='friends';
-      const next = { top, right: sideFriends&&bounds?Math.max(0,window.innerWidth-bounds.left)+10:portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: small&&!portrait&&speaking&&!panel?0:sideFriends?0:small ? panel && bounds ? bounds.height + 20 : portrait?76:(compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
+      const measuredCompact=compact.current?.getBoundingClientRect().height||0;
+      if(!speaking&&!panel&&!portrait&&measuredCompact>0)visibleCompactHeight.current=measuredCompact;
+      const next = { top, right: sideFriends&&bounds?Math.max(0,window.innerWidth-bounds.left)+10:portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: sideFriends?0:small ? panel && bounds ? bounds.height + 20 : portrait?76:visibleCompactHeight.current + 20 : 0 };
       setInsets(old => old.top === next.top && old.right === next.right && old.bottom === next.bottom ? old : next);
       const occupied=[topbar.current,noticeArea.current,compact.current,friendButton.current,mobileEntry.current].flatMap(node=>{if(!node)return [];const rect=node.getBoundingClientRect();return rect.width>0&&rect.height>0?[{left:rect.left,top:rect.top,width:rect.width,height:rect.height}]:[];});
       setHudObstacles(old=>JSON.stringify(old)===JSON.stringify(occupied)?old:occupied);

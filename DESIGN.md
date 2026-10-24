@@ -689,3 +689,10 @@ CPU 驗證涵蓋實際 mesh 點選及遮擋、各物種關節、路線停步與�
 實際角色 head world position 沿原 render 路徑投影，包含暫停時的 orbit、zoom、resize、權威 roster 重繪；無每幀 React state、額外 renderer 或 timer。泡泡依真正 HUD refs、相機列與 safe area 多候選避讓；上方放不下可側置／下置，有限 clamp 並以 SVG 尖角誠實指回實際頭部，優先不蓋頭。可見角色不因空間擁擠而靜默消失；真正後方、frustum 外或被實體遮擋的 anchor 才隱藏本文與尖角。泡泡活躍暫收目前地點 compact 預覽，關閉復原；探索、信箱與建築入口保持可用。
 
 開啟 HUD 抽屜／前景內容視窗時暫隱泡泡並取消待補焦點；返回不追焦。本文只朗讀最新角色回應，泡泡無 modal/trap；關閉或 Escape 回朋友入口，前景視窗仍持有 Escape／inert。context loss 清除泡泡，恢復不重播舊招呼或飛鏡頭；新選角仍可再次開始。CPU 專項核十三開場／三句、native 本文與動作隔離、paused 投影／resize、真 head 尖角、frustum／遮擋／前景隱藏及還焦、恢復去重、清單收回和原功能／guard。320/390 直式、640/641/844 短橫向及桌面的真實 WebGL 冒泡、44px 觸控與 HUD 避讓由同版 Railway B 獨立驗收，作者 CPU 通過不作視覺簽核。
+
+
+頭頂泡泡第三候選補註：短橫向維持最後一次可見 compact 預覽的實測高度；泡泡暫隱該預覽時不重算成零／fallback，因此 640px 橫向的真實 FOV 與 view offset 開關前後保持一致。直式原 76px 登入／標籤保護帶不變（直式 camera 分支本來就忽略 insets，不宣稱修復未成立的跳動）。當幀可見建築入口的投影矩形加入同 host 泡泡避讓，保留入口可點。
+
+清單交接焦點仍綁新 encounter key 與已 commit 的同 key 本文。尚未看見角色時保留合法相機過場的交接；但其後任何新 pointerdown／keydown（包含 Tab），以及 OrbitControls 的 wheel／drag start 鏡頭操作立即取消待補焦點，前景／HUD／context loss 亦取消，返回不可追焦。遮擋／frustum 不可見時只在狀態改變更新一次簡短 sr-only 提示；若隱藏或失去 context 前焦點確實屬於泡泡且背景仍可互動，先還給朋友入口。前景視窗或 HUD 持有鍵盤時不由背景復焦。
+
+本文按鈕使用固定、簡短的「與某某交談」名稱，以 useId 的 aria-describedby 連到當前可見台詞，讓首次鍵盤交接有目前台詞描述；可見台詞不放 live role，最新回應改在同 section、按鈕外的單一 sr-only polite／atomic 區域。這是朗讀結構穩健化；沒有宣稱原 status 必定被瀏覽器裁掉，也沒有以 DOM 測試冒稱真實輔助閱讀工具已通過。完整三句／重聊與原動作仍保留，實際朗讀及六常見尺寸的泡泡／標籤像素驗收由同版 B 完成。

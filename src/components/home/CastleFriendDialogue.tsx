@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useId, useImperativeHandle, useRef, useState } from 'react';
 import { Hand, X } from 'lucide-react';
 import { getFriendSpeech } from './castle/ambientDialogue';
 import { FRIEND_RESPONSES, type AmbientAction } from './castle/ambientFriends';
@@ -10,16 +10,19 @@ export const CastleFriendDialogue = forwardRef<CastleFriendDialogueHandle, Props
   const script = getFriendSpeech(friendId);
   const [step, setStep] = useState(0), [feedback, setFeedback] = useState<string>();
   const speech = useRef<HTMLButtonElement>(null);
+  const lineId=useId();
   useImperativeHandle(ref, () => ({ focusSpeech: () => speech.current?.focus({ preventScroll: true }) }), []);
   if (!script) return null;
   const last = step === script.lines.length - 1;
+  const line=feedback||script.lines[step];
   const gesture = (action: AmbientAction) => { setFeedback(FRIEND_RESPONSES[script.friend.kind][action]); onGesture(action); };
   return <section className="castle-rpg-speech" aria-label={`${script.friend.name}的對話泡泡`}>
-    <button ref={speech} type="button" className="castle-rpg-text" onClick={() => { setFeedback(undefined); setStep(value => value === script.lines.length - 1 ? 0 : value + 1); }}>
+    <button ref={speech} type="button" className="castle-rpg-text" aria-label={`與${script.friend.name}交談`} aria-describedby={lineId} onClick={() => { setFeedback(undefined); setStep(value => value === script.lines.length - 1 ? 0 : value + 1); }}>
       <span className="castle-rpg-name">{script.friend.name}<small>{script.friend.kind === 'resident' ? '場景居民' : '場景動物'}</small></span>
-      <span className="castle-rpg-line" role="status" aria-live="polite" aria-atomic="true">{feedback || script.lines[step]}</span>
+      <span id={lineId} className="castle-rpg-line">{line}</span>
       <span className="castle-rpg-hint">{last ? '再點一下，重新聊' : '輕點或按 Enter 接下一句'}</span>
     </button>
+    <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{line}</span>
     <div className="castle-rpg-actions">
       <button type="button" onClick={() => gesture('hello')}><Hand size={16} aria-hidden="true"/>招手</button>
       <button type="button" onClick={() => gesture('affection')}>{FRIEND_RESPONSES[script.friend.kind].action}</button>

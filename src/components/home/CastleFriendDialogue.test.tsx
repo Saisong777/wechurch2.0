@@ -15,6 +15,9 @@ describe('head bubble speech and direct actions',()=>{
   for(const line of script.lines.slice(1)){fireEvent.click(speech);expect(screen.getByRole('status')).toHaveTextContent(line);}
   expect(speech).toHaveTextContent('再點一下，重新聊');fireEvent.click(speech);expect(screen.getByRole('status')).toHaveTextContent(script.lines[0]);expect(gesture).not.toHaveBeenCalled();expect(close).not.toHaveBeenCalled();expect(region.querySelectorAll('[aria-live]')).toHaveLength(1);
  });
+ it('keeps a short stable button name and one sibling live reply outside the native button',()=>{
+  render(<CastleFriendDialogue friendId="ambient-cat-1" onGesture={vi.fn()} onClose={vi.fn()}/>);const speech=screen.getByRole('button',{name:'與餅乾小貓交談'}),status=screen.getByRole('status');expect(speech).toHaveAccessibleDescription(getFriendSpeech('ambient-cat-1')!.lines[0]);expect(speech.contains(status)).toBe(false);expect(speech.parentElement).toBe(status.parentElement);expect(speech.querySelector('[aria-live]')).toBeNull();fireEvent.click(speech);expect(speech).toHaveAccessibleName('與餅乾小貓交談');expect(speech).toHaveAccessibleDescription(getFriendSpeech('ambient-cat-1')!.lines[1]);expect(status).toHaveTextContent(getFriendSpeech('ambient-cat-1')!.lines[1]);expect(status.parentElement?.querySelectorAll('[aria-live]')).toHaveLength(1);
+ });
  it('keeps greeting and touch feedback in the same bubble and only explicit actions request body animation',()=>{
   const gesture=vi.fn(),close=vi.fn();render(<CastleFriendDialogue friendId="ambient-cat-1" onGesture={gesture} onClose={close}/>);
   fireEvent.click(screen.getByRole('button',{name:'招手'}));expect(screen.getByRole('status')).toHaveTextContent(FRIEND_RESPONSES.cat.hello);

@@ -21,6 +21,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
   const encounterSerial=useRef(0),interactionSerial=useRef(0);
   const bubbleLayer=useRef<HTMLDivElement>(null),bubbleRoot=useRef<HTMLDivElement|null>(null),bubbleTail=useRef<SVGPolygonElement>(null),toolbar=useRef<HTMLDivElement>(null);
   const bubbleSpeech=useRef<CastleFriendDialogueHandle>(null);
+  const anchorStatus=useRef<HTMLSpanElement>(null);
   const residentLabels=useRef(new Map<string,HTMLSpanElement>());
   const labels = useRef(new Map<string, HTMLButtonElement>());
   const live = useRef({ places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady,onEncounterChange,onFriendClose,bubbleEnabled,hudObstacles,encounter }); live.current = { places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady,onEncounterChange,onFriendClose,bubbleEnabled,hudObstacles,encounter };
@@ -58,6 +59,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
     let pointerDown: { id: number; x: number; y: number; moved: boolean } | null = null;
     const activePointers = new Set<number>();
+    let placeObstacles:BubbleRect[]=[];
     let multiTouch = false;
 
     function projectLabels() {
@@ -82,6 +84,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
         if (label.hidden !== hidden) label.hidden = hidden;
         if (!hidden) occupied.push({ x, y, width: labelWidth, height: labelHeight });
       }
+      placeObstacles=occupied.map(rect=>({left:rect.x-rect.width/2,top:rect.y-rect.height,width:rect.width,height:rect.height}));
     }
     function projectResidents(){
       if(!world||!host)return;
@@ -91,11 +94,15 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
         label.style.transform=`translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%)`;
       }
     }
+    function setAnchorStatus(message:string){const node=anchorStatus.current;if(node&&node.textContent!==message)node.textContent=message;}
+    function restoreOwnedBubbleFocus(){if(live.current.bubbleEnabled&&bubbleRoot.current?.contains(document.activeElement))live.current.onFriendClose?.();}
+    function cancelPendingBubbleFocus(){pendingBubbleFocusKey=undefined;}
     function projectBubble(){
       const node=bubbleRoot.current,layer=bubbleLayer.current,selected=live.current.encounter;
+      if(!selected)setAnchorStatus('');
       if(!node||!layer||!world||!controls||!host)return;
       const actor=world.ambient.actors.find(value=>value.group.name===selected?.id);
-      if(!actor||lost||!live.current.bubbleEnabled){pendingBubbleFocusKey=undefined;node.hidden=true;layer.dataset.anchorVisible='false';return;}
+      if(!actor||lost||!live.current.bubbleEnabled){pendingBubbleFocusKey=undefined;setAnchorStatus('');node.hidden=true;layer.dataset.anchorVisible='false';return;}
       world.group.updateMatrixWorld(true);camera.updateMatrixWorld();camera.getWorldDirection(forward);
       const head=actor.group.localToWorld(new THREE.Vector3(0,actor.kind==='resident'?1.85:actor.kind==='rabbit'?1.6:1.3,0));
       const inFront=head.clone().sub(camera.position).dot(forward)>0;
@@ -103,10 +110,11 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       const x=(projected.x*.5+.5)*host.clientWidth,y=(-projected.y*.5+.5)*host.clientHeight;
       let visible=inFront&&projected.z>=-1&&projected.z<=1&&x>=0&&x<=host.clientWidth&&y>=0&&y<=host.clientHeight;
       if(visible){const sight=new THREE.Raycaster(camera.position,head.clone().sub(camera.position).normalize(),0,camera.position.distanceTo(head)-.08);const first=sight.intersectObject(world.group,true)[0];if(first&&first.object.userData.ambientId!==selected?.id)visible=false;}
-      node.hidden=!visible;layer.dataset.anchorVisible=String(visible);if(!visible)return;
+      if(!visible)restoreOwnedBubbleFocus();
+      node.hidden=!visible;layer.dataset.anchorVisible=String(visible);setAnchorStatus(visible?'':'角色目前被遮住，可旋轉城堡尋找');if(!visible)return;
       const hostRect=host.getBoundingClientRect(),safe=layer.getBoundingClientRect();
       const bounds={left:safe.left-hostRect.left,top:safe.top-hostRect.top,width:safe.width||host.clientWidth-24,height:safe.height||host.clientHeight-40};
-      const obstacles=live.current.hudObstacles.map(rect=>({...rect,left:rect.left-hostRect.left,top:rect.top-hostRect.top}));const bar=toolbar.current?.getBoundingClientRect();if(bar&&bar.width&&bar.height)obstacles.push({left:bar.left-hostRect.left,top:bar.top-hostRect.top,width:bar.width,height:bar.height});
+      const obstacles=[...placeObstacles,...live.current.hudObstacles.map(rect=>({...rect,left:rect.left-hostRect.left,top:rect.top-hostRect.top}))];const bar=toolbar.current?.getBoundingClientRect();if(bar&&bar.width&&bar.height)obstacles.push({left:bar.left-hostRect.left,top:bar.top-hostRect.top,width:bar.width,height:bar.height});
       const rect=node.getBoundingClientRect();const position=placeHeadBubble({x,y},{width:rect.width||250,height:rect.height||150},bounds,obstacles);
       node.style.transform=`translate3d(${(position.left-bounds.left).toFixed(1)}px,${(position.top-bounds.top).toFixed(1)}px,0)`;
       node.dataset.head=`${x.toFixed(2)},${y.toFixed(2)}`;
@@ -199,11 +207,11 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       const id = object?.userData.placeId; if (id && enabled.has(id)) { live.current.onSelect(id); focus(id); } else if(!id&&hit.object.userData.walkSurface&&live.current.presence?.roster?.avatars.some(a=>a.isSelf)){live.current.onMove?.(nearestWalkNode(hit.point.x,hit.point.z));}
     }
     function handlePointerCancel(event: PointerEvent) { activePointers.delete(event.pointerId); pointerDown = null; }
-    function handleContextLost(event: Event) { event.preventDefault();pendingBubbleFocusKey=undefined;setEncounter(undefined); lost = true; if (raf) cancelAnimationFrame(raf); raf = 0; lastTime = 0; host!.dataset.worldState = 'lost'; setState('lost'); }
+    function handleContextLost(event: Event) { event.preventDefault();restoreOwnedBubbleFocus();setAnchorStatus('');pendingBubbleFocusKey=undefined;setEncounter(undefined); lost = true; if (raf) cancelAnimationFrame(raf); raf = 0; lastTime = 0; host!.dataset.worldState = 'lost'; setState('lost'); }
     function handleContextRestored() { if (!disposed) { setState('loading'); setAttempt(value => value + 1); } }
     function handleVisibility() { syncAnimation(); }
     function handleReducedMotion(event: MediaQueryListEvent) { reduceMotion = event.matches; setReduced(event.matches); syncAnimation(); }
-    function handleControlsStart() { cameraTween = null; }
+    function handleControlsStart() { cameraTween = null; cancelPendingBubbleFocus(); }
     function handleKey(event: KeyboardEvent) {
       if (event.target !== surface || !controls) return;
       const action = event.key;
@@ -240,7 +248,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       resizeObserver = new ResizeObserver(entries=>{if(entries.some(entry=>entry.target===host))resize();else render();}); resizeObserver.observe(host); resize();
       surface.addEventListener('pointerdown', handlePointerDown); surface.addEventListener('pointermove', handlePointerMove); surface.addEventListener('pointerup', handlePointerUp); surface.addEventListener('pointercancel', handlePointerCancel); surface.addEventListener('keydown', handleKey);
       surface.addEventListener('webglcontextlost', handleContextLost); surface.addEventListener('webglcontextrestored', handleContextRestored);
-      document.addEventListener('visibilitychange', handleVisibility); media?.addEventListener('change', handleReducedMotion);
+      document.addEventListener('visibilitychange', handleVisibility);document.addEventListener('pointerdown',cancelPendingBubbleFocus,true);document.addEventListener('keydown',cancelPendingBubbleFocus,true); media?.addEventListener('change', handleReducedMotion);
       api.current.presence();host.dataset.worldState = 'ready'; setState('ready'); syncAnimation();
     } catch {
       host.dataset.worldState = 'unsupported'; setState('unsupported');
@@ -249,7 +257,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       disposed = true; if (raf) cancelAnimationFrame(raf); api.current = undefined; cameraTween = null;
       resizeObserver?.disconnect(); controls?.removeEventListener('change', render); controls?.removeEventListener('start', handleControlsStart); controls?.dispose();
       surface.removeEventListener('pointerdown', handlePointerDown); surface.removeEventListener('pointermove', handlePointerMove); surface.removeEventListener('pointerup', handlePointerUp); surface.removeEventListener('pointercancel', handlePointerCancel); surface.removeEventListener('keydown', handleKey);
-      surface.removeEventListener('webglcontextlost', handleContextLost); surface.removeEventListener('webglcontextrestored', handleContextRestored); document.removeEventListener('visibilitychange', handleVisibility); media?.removeEventListener('change', handleReducedMotion);
+      surface.removeEventListener('webglcontextlost', handleContextLost); surface.removeEventListener('webglcontextrestored', handleContextRestored); document.removeEventListener('visibilitychange', handleVisibility);document.removeEventListener('pointerdown',cancelPendingBubbleFocus,true);document.removeEventListener('keydown',cancelPendingBubbleFocus,true); media?.removeEventListener('change', handleReducedMotion);
       world?.dispose(); sunlight.shadow.map?.dispose(); renderer?.dispose(); renderer?.forceContextLoss(); scene.clear();
     };
   }, [attempt]);
@@ -274,6 +282,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       <canvas key={attempt} ref={canvas} className="castle-3d-canvas" aria-label="可以拖曳旋轉、縮放的3D城堡；方向鍵旋轉與縮放，Home回全景" tabIndex={unavailable ? -1 : 0} data-testid="castle-3d-canvas" hidden={unavailable} />
       {state === 'ready' && <div className="castle-3d-labels" aria-label="3D城堡地點">{places.map(place => { const Icon = place.icon; return <button ref={node => { if (node) labels.current.set(place.id, node); else labels.current.delete(place.id); }} key={place.id} type="button" className={`castle-3d-label ${selectedId === place.id ? 'is-selected' : ''}`} aria-label={`${place.name}・${place.label}`} aria-pressed={selectedId === place.id} aria-controls={detailId} onClick={() => select(place.id)}><span><Icon size={17} aria-hidden="true" /></span><span>{place.name}<small>{place.label}</small></span></button>; })}</div>}
       {state==='ready'&&<div className="castle-resident-labels" aria-hidden="true">{presence?.roster?.avatars.map(avatar=><span key={avatar.avatarId} ref={node=>{if(node)residentLabels.current.set(avatar.avatarId,node);else residentLabels.current.delete(avatar.avatarId);}} className={avatar.isSelf?'is-self':''}>{avatar.alias}{avatar.isSelf?' · 我':''}</span>)}</div>}
+      <span ref={anchorStatus} className="sr-only" role="status" aria-label="場景朋友位置" aria-live="polite" aria-atomic="true"/>
       <div ref={bubbleLayer} className="castle-rpg-layer" aria-label="角色頭頂對話">
         {encounter&&<><svg className="castle-rpg-tail" aria-hidden="true"><polygon ref={bubbleTail}/></svg><div ref={attachBubble} className="castle-rpg-bubble" hidden data-friend-id={encounter.id} data-encounter-key={encounter.key} onPointerDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}>
           <CastleFriendDialogue key={encounter.key} ref={bubbleSpeech} friendId={encounter.id} onClose={()=>{setEncounter(undefined);if(live.current.bubbleEnabled)live.current.onFriendClose?.();}} onGesture={action=>api.current?.friend(encounter.id,action,false)}/>
