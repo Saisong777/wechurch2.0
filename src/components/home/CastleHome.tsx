@@ -5,7 +5,7 @@ import {CastlePresencePanel} from './CastlePresencePanel';
 import {PLACE_WALK_NODES} from '@shared/castleNavigation';
 import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, BookHeart, BookOpen, Castle, Compass, Footprints, Gamepad2, Heart, HandHeart, MessageCircle, Moon, Pause, Play, Settings, Sun, Users, Menu, X, ChevronUp, type LucideIcon } from 'lucide-react';
+import { ArrowRight, BookHeart, BookOpen, Castle, Compass, Footprints, Gamepad2, Heart, HandHeart, MessageCircle, Moon, Pause, Play, Settings, Sun, Users, Menu, X, ChevronUp, Mail, type LucideIcon } from 'lucide-react';
 import './castle-home.css';
 import './castle-fullscreen.css';
 import { useImmersiveSurface } from '@/hooks/useImmersiveSurface';
@@ -120,7 +120,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
         <div className="castle-brand" aria-labelledby="castle-title"><p><Castle size={16} aria-hidden="true" />{churchName}{preview && <span>預覽</span>}</p><h1 id="castle-title">我們的城堡</h1></div>
         {!portrait&&<div className="castle-hud-mode">{modeControls}</div>}
         {!portrait&&atmosphereControls}
-        <div className="castle-hud-actions">
+        <div className="castle-hud-actions"><Link className="castle-mailbox-launch" to="/feedback" state={{from:'/'}} aria-label="城堡信箱・意見與建議"><Mail size={19} aria-hidden="true"/><span>城堡信箱</span></Link>
           <button ref={exploreButton} data-castle-explore type="button" aria-label="開啟城堡地點" aria-expanded={panel === 'places'} aria-controls={drawerId} onClick={event => openPanel('places', event.currentTarget)}><Compass size={18} aria-hidden="true" /><span>探索</span></button>
           <button type="button" aria-label="開啟城堡選單" aria-describedby={portrait&&(hasNotices||!!presence.view.message)?messageId:undefined} aria-expanded={panel === 'menu'} aria-controls={drawerId} onClick={event => openPanel('menu', event.currentTarget)}><Menu size={19} aria-hidden="true" /><span>選單</span>{portrait&&(hasNotices||!!presence.view.message)&&<i className="castle-message-badge"><span id={messageId} className="sr-only" role="status">有訊息待查看</span></i>}</button>
         </div>
@@ -147,7 +147,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
               <Link to="/me/activity"><Heart size={16} aria-hidden="true" />待回應</Link>
               {showPastoral && <Link to="/work"><Users size={16} aria-hidden="true" />牧養概況</Link>}
               {showAdmin && <Link to="/admin"><Settings size={16} aria-hidden="true" />主持與管理</Link>}
-              <Link to="/sitemap">網站導覽</Link><Link to="/help">使用說明</Link><Link to="/feedback" state={{ from: '/' }}>意見反饋</Link>
+              <Link to="/sitemap">網站導覽</Link><Link to="/help">使用說明</Link><Link to="/feedback" state={{ from: '/' }}>城堡信箱</Link>
             </nav>
             </>}
           </div>

@@ -96,4 +96,9 @@ describe('castle navigation', () => {
     view.rerender(<MemoryRouter><CastleWindowContext.Provider value><CastleHome {...defaults}/></CastleWindowContext.Provider></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:'開啟城堡地點'}));fireEvent.keyDown(document,{key:'Escape'});expect(screen.getByTestId('castle-home').dataset.castlePanel).toBe('places');
   });
 
+  it.each([[1280,720],[390,844],[320,568],[844,390],[640,360]])('keeps a direct mailbox entry outside the menu at %sx%s',async(width,height)=>{
+    vi.stubGlobal('innerWidth',width);vi.stubGlobal('innerHeight',height);const router=createMemoryRouter([{path:'/',element:<CastleHome {...defaults}/>},{path:'/feedback',element:<p>私人信箱內容</p>}],{initialEntries:['/?mode=castle']});render(<RouterProvider router={router}/>);
+    const entry=screen.getByRole('link',{name:'城堡信箱・意見與建議'});expect(entry).toBeVisible();expect(entry).toHaveAttribute('href','/feedback');expect(screen.queryByRole('navigation',{name:'我的日常與管理'})).toBeNull();fireEvent.click(entry);expect(await screen.findByText('私人信箱內容')).toBeTruthy();expect(router.state.location.state).toMatchObject({from:'/'});
+  });
+
 });

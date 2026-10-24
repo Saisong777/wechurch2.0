@@ -636,3 +636,12 @@ Seven fictional walking residents and six miniature animals (two cats, two dogs,
 Ambient actors own a separate group/resources and are never inserted into authenticated presence, avatar labels or online counts. A compact readable scene caption explains the distinction. They follow only existing safe walk edges with staggered phases, speed variation and short node pauses. Their time advances only inside the existing clamped world update loop: pause, reduced motion and background visibility freeze every position/joint; manual camera renders and authoritative real-member position updates do not advance ambient time. Terrain/building selection ignores ambient bodies while retaining real environment occlusion.
 
 Static actor pieces merge by material within articulated joints. The measured ambient addition is 162 meshes, not zero rendering cost; the tested world remains below the existing <450-mesh limit (245 without a real avatar; 259 with one real avatar). Unmount/rebuild disposes ambient geometry/materials exactly once. CPU tests cover route clearance against actual obstacles, animated species/joints, stops, bounded time, complete freeze independent of real presence, picking and resource cleanup. Final visibility and mobile performance require same-source Railway B WebGL evidence; source/test success is not visual signoff.
+
+
+## 城堡信箱（2026-10-24 / feedback-corner-v10）
+
+常駐文字與信封入口沿既有 HUD，不加入第八個3D地點、walk node 或人數。桌面橫列可見，手機直式置於品牌下方、探索與選單控制左側；不覆蓋右側縮放列、底部登入或角色說明。入口維持真實 /feedback Link 與 from:'/'，沿原同路由內容視窗與回城堡焦點。
+
+信箱以森林綠 #174f49、米白 #fffdf4、金 #d8c58d、薄荷 #c7e7de 呈現，宋體標題與信封插入小信箱的標誌為視覺重點；原型僅提供版面，不帶入假帳號、示意紀錄或假成功。四類為同一 draft.category 的原生 radio，保留原標題、內容、影響、同意 AI 整理及私密告知。寫下意見／查看進度以鍵盤可操作頁籤切換，表單持續掛載；送出錯誤、重新登入、真實收件結果與教會範圍提醒不藏在頁籤後。
+
+訪客可先寫，登入後接續送出與查看自己的進度。沿原 draft owner/church/session 隔離、碰撞草稿、locked 同 UUID 不確定重試、429 cooldown、consent、原 API/query；不新增匿名 POST、公開回報、附件、寄信或自動重送。只有原 server receipt 到達才顯示已收到。私人進度只列原 query 的狀態與回覆，不編造狀態歷史或回覆期限。傳統頁保留原 Header 與完整功能。手機320/390、640/844橫向的信箱與 HUD 避讓、真實登入收件及關閉後世界延續須以同版 B 驗收。

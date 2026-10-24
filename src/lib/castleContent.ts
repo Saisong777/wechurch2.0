@@ -1,4 +1,4 @@
-export type CastleContentEmblem='castle'|'book'|'heart'|'users'|'journal'|'messages'|'tools'|'leaf';
+export type CastleContentEmblem='castle'|'book'|'heart'|'users'|'journal'|'messages'|'tools'|'leaf'|'mail';
 export interface CastleContentMetadata { place:string; activity:string; emblem:CastleContentEmblem }
 const entry=(place:string,activity:string,emblem:CastleContentEmblem):CastleContentMetadata=>({place,activity,emblem});
 const metadata:Record<string,CastleContentMetadata>={
@@ -18,7 +18,7 @@ const metadata:Record<string,CastleContentMetadata>={
  '/me':entry('我的日常','個人設定','leaf'),'/me/activity':entry('我的日常','待回應','leaf'),'/me/sharing':entry('我的日常','我的分享','journal'),
  '/me/love-journey':entry('我的日常','愛的旅程','heart'),'/me/mentoring':entry('我的日常','門訓陪伴','users'),
  '/notifications':entry('城堡信箱','通知','messages'),'/sitemap':entry('城堡指引','網站導覽','leaf'),
- '/help':entry('城堡指引','使用說明','book'),'/feedback':entry('城堡信箱','意見反饋','messages'),
+ '/help':entry('城堡指引','使用說明','book'),'/feedback':entry('城堡信箱','意見與建議','mail'),
  '/login':entry('歡迎回來','登入城堡','castle'),'/notebook':entry('話語之塔','筆記本','journal'),'/user/notebook':entry('話語之塔','筆記本','journal'),
 };
 // UI naming only: route admission, feature flags and authorization stay in their existing guards.

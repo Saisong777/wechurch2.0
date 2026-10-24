@@ -10,3 +10,5 @@ it('names every current finite supported content route and never grants route ac
  for(const path of paths){expect(castleContentPath(path)).toBe(true);expect(castleContentMetadata(path).activity).not.toBe('教會日常');}
  expect(castleContentPath('/admin')).toBe(false);expect(castleContentPath('/reset-password')).toBe(false);expect(castleContentMetadata('/unknown','?token=private').activity).toBe('教會日常');
 });
+
+it('uses the castle mailbox title and envelope without changing route admission',()=>{expect(castleContentPath('/feedback')).toBe(true);expect(castleContentMetadata('/feedback')).toEqual({place:'城堡信箱',activity:'意見與建議',emblem:'mail'});});

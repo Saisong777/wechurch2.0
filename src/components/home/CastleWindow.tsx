@@ -1,7 +1,7 @@
 import {useCallback,useLayoutEffect,useMemo,useRef,type ReactNode} from 'react';
 import {useLocation,useNavigate,useNavigationType} from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
-import {X,Castle,BookOpen,Heart,Users,BookHeart,MessageCircle,Compass,Leaf} from 'lucide-react';
+import {X,Castle,BookOpen,Heart,Users,BookHeart,MessageCircle,Compass,Leaf,Mail} from 'lucide-react';
 import {castleContentMetadata} from '@/lib/castleContent';
 import {CastleContentPresentationContext} from '@/contexts/CastleContentPresentationContext';
 import {castleOriginHref,type CastleOrigin} from '@/lib/castleWindows';
@@ -23,7 +23,7 @@ export function CastleWindow({origin,children}:{origin:CastleOrigin;children:Rea
  useLayoutEffect(()=>{const node=viewport.current,savedPositions=positions.current;if(!node)return;node.scrollTop=action==='POP'?savedPositions.get(location.key)||0:0;return()=>{savedPositions.set(location.key,node.scrollTop);if(savedPositions.size>50)savedPositions.delete(savedPositions.keys().next().value!);};},[location.key,action]);
  const close=()=>void navigate(castleOriginHref(origin));
  const metadata=castleContentMetadata(location.pathname,location.search);
- const Emblem={castle:Castle,book:BookOpen,heart:Heart,users:Users,journal:BookHeart,messages:MessageCircle,tools:Compass,leaf:Leaf}[metadata.emblem];
+ const Emblem={castle:Castle,book:BookOpen,heart:Heart,users:Users,journal:BookHeart,messages:MessageCircle,tools:Compass,leaf:Leaf,mail:Mail}[metadata.emblem];
  return <CastleContentPresentationContext.Provider value><Dialog.Root open modal onOpenChange={open=>{if(!open)close();}}><Dialog.Portal>
   <Dialog.Overlay className="castle-window-backdrop"/>
   <Dialog.Content className="castle-feature-window" aria-describedby={undefined} onOpenAutoFocus={event=>{event.preventDefault();title.current?.focus();}} onCloseAutoFocus={event=>{event.preventDefault();const previous=trigger.current;requestAnimationFrame(()=>{if(previous?.isConnected&&previous!==document.body&&previous!==document.documentElement&&!previous.closest('[hidden],[inert]'))previous.focus({preventScroll:true});else document.querySelector<HTMLButtonElement>('[data-castle-explore]')?.focus({preventScroll:true});});}} onPointerDownOutside={event=>event.preventDefault()}>

@@ -173,3 +173,11 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
 
 /* One readable scene-character distinction, below the mobile join pill. */
 .castle-home--fullscreen .castle-3d-caption { bottom: 2px; font-size: 10px; line-height: 1.4; padding: 1px 4px; max-width: calc(100% - 24px); }
+
+/* A permanent feedback entry uses existing HUD space, never an eighth world destination. */
+.castle-mailbox-launch { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; min-width: 44px; padding: 8px 13px; border: 1px solid #d8c58d; border-radius: 14px; background: #fffdf4f5; color: #174f49; font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 3px 16px #285a4410; }
+.castle-mailbox-launch:hover { background: #edf3e4; }
+.castle-mailbox-launch:focus-visible { outline: 3px solid #bd6b4b; outline-offset: 3px; }
+@media (max-width: 640px) and (orientation: portrait) {
+  .castle-home--fullscreen .castle-mailbox-launch { position: absolute; right: 62px; top: 64px; min-width: 122px; min-height: 44px; padding: 8px 12px; }
+}

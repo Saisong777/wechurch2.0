@@ -42,6 +42,6 @@ describe('immersive homepage presentation', () => {
     fireEvent.click(screen.getByRole('button', { name: '原筆記重試' })); fireEvent.click(screen.getByRole('button', { name: '開啟草稿' })); expect(retry).toHaveBeenCalledOnce(); expect(draft).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: '開啟城堡選單' })); fireEvent.click(screen.getByRole('button', { name: '原帳號與外觀控制' })); fireEvent.click(screen.getByRole('button', { name: '原教會範圍控制' }));
     expect(account).toHaveBeenCalledOnce(); expect(scope).toHaveBeenCalledOnce(); expect(screen.getByRole('link', { name: '原小家入口' }).getAttribute('href')).toBe('/groups');
-    expect(screen.getByRole('link', { name: '意見反饋' }).getAttribute('href')).toBe('/feedback');
+    expect(screen.getByRole('link', { name: '城堡信箱' }).getAttribute('href')).toBe('/feedback');
   });
 });
