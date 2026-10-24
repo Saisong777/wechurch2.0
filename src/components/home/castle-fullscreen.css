@@ -230,3 +230,18 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
   .castle-home--fullscreen[data-castle-panel='friends'] .castle-drawer-heading > button { min-width: 44px; min-height: 44px; }
   .castle-home--fullscreen[data-castle-panel='friends'] .castle-3d-toolbar, .castle-home--fullscreen[data-castle-panel='friends'] .castle-3d-gesture { display: none; }
 }
+
+
+/* Two short dialogue turns live inside the existing card and drawer, with no new overlay. */
+.castle-dialogue { margin-top: 16px; padding-top: 14px; border-top: 1px solid #b8ceba; overflow-wrap: anywhere; }
+.castle-dialogue h4 { margin: 0; font-size: 15px; font-weight: 700; }
+.castle-dialogue-help { margin: 6px 0 12px; color: #547768; font-size: 10px; line-height: 1.8; }
+.castle-dialogue-history { color: #547768; font-size: 12px; line-height: 1.9; }
+.castle-dialogue-history p { margin: 9px 0; }
+.castle-dialogue-history .is-player { padding: 8px 10px; border-radius: 10px; background: #dceee0; color: #174f49; }
+.castle-dialogue-reply { margin: 12px 0; font-size: 13px; line-height: 1.9; scroll-margin-block: 8px; }
+.castle-dialogue-reply:focus { outline: 2px solid #bd6b4b; outline-offset: 4px; border-radius: 4px; }
+.castle-dialogue-choices { display: grid; gap: 8px; }
+.castle-dialogue-choices button { min-width: 44px; min-height: 44px; width: 100%; padding: 10px 12px; border: 1px solid #9dbda5; border-radius: 12px; color: #174f49; background: #fffdf4; text-align: left; white-space: normal; font-size: 12px; line-height: 1.7; }
+.castle-dialogue-choices button:hover { background: #c7e7de; }
+.castle-dialogue-choices .castle-dialogue-change { border-color: transparent; background: transparent; text-decoration: underline; text-underline-offset: 3px; }

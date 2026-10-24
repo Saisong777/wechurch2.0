@@ -1,3 +1,4 @@
+import {getFriendDialogue} from './castle/ambientDialogue';
 import {UnsavedChangesGuard} from '@/components/layout/UnsavedChangesGuard';
 import type {AmbientRequest} from './castle/ambientFriends';
 import {CastleWindowContext} from '@/contexts/CastleWindowContext';
@@ -133,6 +134,20 @@ describe('castle navigation', () => {
     drawerLeft=266;fireEvent(window,new Event('resize'));expect(insets().right).toBe(384);fireEvent.click(screen.getByRole('button',{name:'開啟城堡地點'}));expect(insets()).toMatchObject({right:0,bottom:216});fireEvent.click(screen.getByRole('button',{name:'開啟城堡選單'}));expect(insets()).toMatchObject({right:0,bottom:216});
     fireEvent.click(screen.getByRole('button',{name:'開啟城堡朋友'}));vi.stubGlobal('innerWidth',320);vi.stubGlobal('innerHeight',568);fireEvent(window,new Event('resize'));expect(insets()).toMatchObject({right:64,bottom:216});
     vi.stubGlobal('innerWidth',641);vi.stubGlobal('innerHeight',360);fireEvent(window,new Event('resize'));expect(insets()).toMatchObject({right:358,bottom:0});
+  });
+
+  it.each([[320,568],[390,844],[640,360],[641,360],[844,390]])('keeps local dialogue inside the shared drawer at %sx%s without replaying the scene request, resets on switch and close',async(width,height)=>{
+    vi.stubGlobal('innerWidth',width);vi.stubGlobal('innerHeight',height);show();fireEvent.click(screen.getByRole('button',{name:'開啟城堡朋友'}));fireEvent.click(screen.getByRole('button',{name:/餅乾小貓/}));await screen.findByTestId('scene-insets');const scene=screen.getByTestId('scene-insets'),request=scene.dataset.friend,script=getFriendDialogue('ambient-cat-1')!;
+    const entry=screen.getByRole('button',{name:'聊兩句'});expect(entry.parentElement?.firstElementChild).toBe(entry);fireEvent.click(entry);expect(screen.getByText(script.opening)).toHaveFocus();expect(scene.dataset.friend).toBe(request);
+    const scroll=screen.getByRole('list',{name:'所有場景朋友'}).closest('.castle-drawer-scroll') as HTMLElement;scroll.scrollTop=400;
+    fireEvent.click(screen.getByRole('button',{name:script.topics[0].line}));expect(screen.getByText(script.topics[0].reply)).toHaveFocus();expect(scene.dataset.friend).toBe(request);fireEvent.click(screen.getByRole('button',{name:script.topics[0].followUps[0].line}));expect(screen.getByText(script.topics[0].followUps[0].reply)).toHaveFocus();expect(scene.dataset.friend).toBe(request);fireEvent.click(entry);expect(screen.getByText(script.topics[0].followUps[0].reply)).toHaveFocus();expect(screen.getByRole('button',{name:'再聊這個話題'})).toBeTruthy();expect(scene.dataset.friend).toBe(request);
+    fireEvent.click(screen.getByRole('button',{name:'輕輕摸摸'}));expect(screen.getByText(script.topics[0].followUps[0].reply)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:/奶油小狗/}));expect(screen.queryByText(script.topics[0].followUps[0].reply)).toBeNull();expect(screen.getByText(getFriendDialogue('ambient-dog-2')!.opening)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:'收合城堡面板'}));expect(screen.getByRole('button',{name:'開啟城堡朋友'})).toHaveFocus();fireEvent.click(screen.getByRole('button',{name:'開啟城堡朋友'}));expect(screen.getByRole('button',{name:'收合城堡面板'})).toHaveFocus();expect(screen.queryByRole('heading',{name:'聊兩句'})).toBeNull();
+  });
+  it('preserves background dialogue when a foreground castle window owns Escape',async()=>{
+    const content=(active:boolean)=><MemoryRouter><CastleWindowContext.Provider value={active}><CastleHome {...defaults}/></CastleWindowContext.Provider></MemoryRouter>;const view=render(content(false));fireEvent.click(screen.getByRole('button',{name:'開啟城堡朋友'}));fireEvent.click(screen.getByRole('button',{name:/餅乾小貓/}));const script=getFriendDialogue('ambient-cat-1')!;fireEvent.click(screen.getByRole('button',{name:script.topics[0].line}));
+    view.rerender(content(true));fireEvent.keyDown(document,{key:'Escape'});expect(screen.getByTestId('castle-home').dataset.castlePanel).toBe('friends');expect(screen.getByText(script.topics[0].reply)).toBeTruthy();
   });
 
 });

@@ -1,3 +1,6 @@
+import {createRef} from 'react';
+import {CastleFriendDialogue,type CastleFriendDialogueHandle} from '../CastleFriendDialogue';
+import {getFriendDialogue} from './ambientDialogue';
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -153,6 +156,12 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     const surface=screen.getByTestId('castle-3d-canvas');fireEvent(surface,new Event('webglcontextlost',{cancelable:true}));fireEvent(surface,new Event('webglcontextrestored'));expect(host.dataset.worldState).toBe('ready');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).toBeNull();expect(Number(host.dataset.worldCamera)).toBeGreaterThan(50);expect(host.dataset.worldTarget).toBe('0.00,0.70,2.00');
     view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail"/>);view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{...first,sequence:2}}/>);expect(host.dataset.worldCamera).toBe('12.00');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).toMatchObject({action:'hello'});
     view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'affection',sequence:3}}/>);expect(JSON.parse(host.dataset.worldAmbient||'{}').animal.interaction).toMatchObject({action:'affection'});expect(gpu.instances).toBe(2);
+  });
+
+  it('lets a paused visitor complete both dialogue rounds without advancing the world, camera or greeting sequence',()=>{
+    const dialogue=createRef<CastleFriendDialogueHandle>();render(<><CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'hello',sequence:1}}/><div className="castle-drawer-scroll"><button type="button" onClick={()=>dialogue.current?.focusLatestReply()}>聊兩句入口</button><CastleFriendDialogue ref={dialogue} friendId="ambient-cat-1"/></div></>);
+    const host=screen.getByTestId('castle-3d-world'),ambient=host.dataset.worldAmbient,camera=host.dataset.worldCamera,target=host.dataset.worldTarget,script=getFriendDialogue('ambient-cat-1')!;
+    fireEvent.click(screen.getByRole('button',{name:'聊兩句入口'}));fireEvent.click(screen.getByRole('button',{name:script.topics[0].line}));fireEvent.click(screen.getByRole('button',{name:script.topics[0].followUps[0].line}));fireEvent.click(screen.getByRole('button',{name:'聊兩句入口'}));fireEvent.click(screen.getByRole('button',{name:'再聊這個話題'}));fireEvent.click(screen.getByRole('button',{name:'換個話題'}));expect(host.dataset.worldAmbient).toBe(ambient);expect(host.dataset.worldCamera).toBe(camera);expect(host.dataset.worldTarget).toBe(target);expect(callbacks.size).toBe(0);expect(gpu.instances).toBe(1);
   });
 
 });
