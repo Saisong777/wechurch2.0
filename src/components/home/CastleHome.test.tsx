@@ -1,8 +1,9 @@
+import {UnsavedChangesGuard} from '@/components/layout/UnsavedChangesGuard';
 import {CastleWindowContext} from '@/contexts/CastleWindowContext';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
+import { MemoryRouter, createMemoryRouter, RouterProvider, Routes, Route } from 'react-router-dom';
 import { CastleHome, type CastleHomeProps } from './CastleHome';
 
 vi.mock('./castle/CastleScene', () => ({ default: ({ places, onSelect }: { places: { id: string; name: string; label: string }[]; onSelect: (id: string) => void }) => <div>{places.map(place => <button key={place.id} onClick={() => onSelect(place.id)} aria-label={`${place.name}・${place.label}`}>{place.name}</button>)}</div> }));
@@ -31,16 +32,17 @@ describe('castle navigation', () => {
     expect(screen.queryByText('今日讀經：測試經文')).toBeNull();
   });
 
-  it('opens a selected location and counts unique browsing without devotional completion claims', async () => {
-    show();
-    fireEvent.click(await screen.findByRole('button', { name: '禱告花園・禱告' }));
-    const panel = screen.getByRole('region', { name: '目前選擇的地點' });
-    expect(within(panel).getByRole('link', { name: '前往禱告' }).getAttribute('href')).toBe('/share');
-    fireEvent.click(screen.getByRole('button', { name: '開啟城堡地點' }));
-    expect(screen.getByText('1 / 7')).toBeTruthy();
-    fireEvent.click(await screen.findByRole('button', { name: '禱告花園・禱告' }));
-    expect(screen.getByText('1 / 7')).toBeTruthy();
+  it('opens real content in one scene activation and pushes once per list link', async () => {
+    const router=createMemoryRouter([{path:'*',element:<Routes><Route path="/" element={<CastleHome {...defaults}/>}/><Route path="/share" element={<p>禱告內容</p>}/><Route path="/learn/bible" element={<p>聖經內容</p>}/></Routes>}],{initialEntries:['/?mode=castle']});
+    render(<RouterProvider router={router}/>);const transitions:string[]=[];const stop=router.subscribe(state=>transitions.push(state.location.pathname));
+    fireEvent.click(await screen.findByRole('button',{name:'禱告花園・禱告'}));expect(await screen.findByText('禱告內容')).toBeTruthy();expect(transitions).toEqual(['/share']);
+    await act(async()=>router.navigate(-1));transitions.length=0;fireEvent.click(screen.getByRole('button',{name:'開啟城堡地點'}));const list=screen.getByRole('navigation',{name:'城堡所有地點'});fireEvent.click(within(list).getByRole('link',{name:/話語之塔/}));expect(await screen.findByText('聖經內容')).toBeTruthy();expect(transitions).toEqual(['/learn/bible']);stop();
     expect(screen.queryByText(/禱告完成|靈修完成|積分|排行榜/)).toBeNull();
+  });
+
+  it('uses the original unsaved guard for direct building activation',async()=>{
+    const router=createMemoryRouter([{path:'/',element:<><UnsavedChangesGuard dirty/><CastleHome {...defaults}/></>},{path:'/share',element:<p>已開啟禱告內容</p>}],{initialEntries:['/']});render(<RouterProvider router={router}/>);
+    fireEvent.click(await screen.findByRole('button',{name:'禱告花園・禱告'}));expect(await screen.findByRole('alertdialog')).toBeTruthy();expect(router.state.location.pathname).toBe('/');fireEvent.click(screen.getByRole('button',{name:'繼續編輯'}));expect(screen.getByTestId('castle-home')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'禱告花園・禱告'}));fireEvent.click(await screen.findByRole('button',{name:'放棄修改並離開'}));expect(await screen.findByText('已開啟禱告內容')).toBeTruthy();
   });
 
   it.each(['loading', 'error', 'unpublished'] as const)('does not show fallback reading as published during %s', state => {
@@ -62,10 +64,10 @@ describe('castle navigation', () => {
     expect(screen.getByRole('link', { name: '牧養概況' }).getAttribute('href')).toBe('/work');
     expect(screen.getByRole('link', { name: '主持與管理' }).getAttribute('href')).toBe('/admin');
   });
-  it('opens portrait details only on demand and returns focus to the visible exploration trigger',async()=>{
+  it('opens portrait place list only on demand and returns focus to the visible exploration trigger',async()=>{
     vi.stubGlobal('innerWidth',390);vi.stubGlobal('innerHeight',844);show();
     expect(screen.queryByRole('region',{name:'目前選擇的地點'})).toBeNull();expect(screen.getByRole('link',{name:'登入加入'}).getAttribute('href')).toBe('/login');
-    expect(screen.queryByRole('button',{name:'切換夜間景色'})).toBeNull();fireEvent.click(await screen.findByRole('button',{name:'禱告花園・禱告'}));expect(screen.getByRole('link',{name:'前往禱告'}).getAttribute('href')).toBe('/share');
+    expect(screen.queryByRole('button',{name:'切換夜間景色'})).toBeNull();fireEvent.click(await screen.findByRole('button',{name:'禱告花園・禱告'}));expect(screen.getByTestId('castle-home').dataset.castlePanel).toBe('closed');fireEvent.click(screen.getByRole('button',{name:'開啟城堡地點'}));expect(screen.getByRole('link',{name:'前往禱告'}).getAttribute('href')).toBe('/share');
     fireEvent.keyDown(document,{key:'Escape'});expect(document.activeElement).toBe(screen.getByRole('button',{name:'開啟城堡地點'}));expect(screen.queryByRole('region',{name:'目前選擇的地點'})).toBeNull();
   });
   it('surfaces an important notice badge and keeps retry, draft, mode and account controls in one mobile sheet',()=>{

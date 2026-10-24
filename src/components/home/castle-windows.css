@@ -1,11 +1,67 @@
 .castle-window-backdrop { position: fixed; inset: 0; z-index: 47; background: #163d3b83; backdrop-filter: blur(3px); }
-.castle-feature-window { position: fixed; z-index: 48; inset: 40px 24px 24px; width: min(1120px, calc(100vw - 48px)); margin: auto; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border: 1px solid #e5edde; border-radius: 20px; background: hsl(var(--background)); color: hsl(var(--foreground)); box-shadow: 0 20px 80px #163d3b5c; }
-.castle-window-header { position: relative; z-index: 2; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 62px; padding: 8px 14px 8px 20px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background)); }
-.castle-window-header h2 { margin: 0; font-size: 15px; font-weight: 700; }
-.castle-window-header > div { display: flex; gap: 8px; }
-.castle-window-header button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 8px 12px; border-radius: 12px; font-size: 12px; background: hsl(var(--muted)); }
-.castle-window-scroll { position: relative; isolation: isolate; transform: translateZ(0); flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.castle-window-page { min-height: 100%; }
+/* Foreground material tokens stay local: ordinary pages and portalled child dialogs keep their own scope. */
+.castle-feature-window {
+  --background: 49.09 100.00% 97.84%;
+  --foreground: 173.57 54.90% 20.00%;
+  --card: 49.09 100.00% 97.84%;
+  --card-foreground: 173.57 54.90% 20.00%;
+  --popover: 49.09 100.00% 97.84%;
+  --popover-foreground: 173.57 54.90% 20.00%;
+  --primary: 173.57 54.90% 20.00%;
+  --primary-foreground: 49.09 100.00% 97.84%;
+  --secondary: 163.12 40.00% 84.31%;
+  --secondary-foreground: 173.57 54.90% 20.00%;
+  --muted: 87.27 31.43% 93.14%;
+  --muted-foreground: 152.14 15.05% 36.47%;
+  --accent: 163.12 40.00% 84.31%;
+  --accent-foreground: 173.57 54.90% 20.00%;
+  --border: 62.31 25.49% 80.00%;
+  --input: 147.50 15.38% 69.41%;
+  --ring: 173.57 54.90% 20.00%;
+  --brand-indigo: 173.57 54.90% 20.00%;
+  --brand-sky: 164.73 35.48% 30.39%;
+  --scripture-surface: 49.09 100.00% 97.84%;
+  --scripture-border: 44.80 49.02% 70.00%;
+  --castle-ink: #174f49; --castle-paper: #fffdf4; --castle-mint: #c7e7de; --castle-gold: #d8c58d; --castle-clay: #bd6b4b;
+  position: fixed; z-index: 48; inset: 40px 24px 24px; width: min(1060px, calc(100vw - 48px)); margin: auto; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  border: 1px solid var(--castle-gold); border-radius: 24px; background: var(--castle-paper); color: var(--castle-ink); color-scheme: light; box-shadow: 0 24px 90px #103e3c66;
+}
+.castle-window-header { position: relative; z-index: 2; flex-shrink: 0; display: flex; align-items: center; gap: 13px; min-height: 78px; padding: 12px 18px 12px 24px; border-bottom: 1px solid var(--castle-gold); background: var(--castle-paper); }
+.castle-window-emblem { display: grid; place-items: center; flex: 0 0 46px; width: 46px; height: 46px; border: 1px solid var(--castle-gold); border-radius: 16px 16px 20px 20px; background: #f1efda; color: var(--castle-ink); }
+.castle-window-heading { flex: 1; min-width: 0; }
+.castle-window-heading p { margin: 0 0 2px; font-size: 12px; color: #576c54; }
+.castle-window-header h2 { margin: 0; font-family: 'Noto Serif TC', 'Songti TC', serif; font-size: 22px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.castle-window-header button { display: grid; place-items: center; flex-shrink: 0; height: 44px; width: 44px; border: 1px solid #b7d6c7; border-radius: 50%; background: #e3efe2; color: var(--castle-ink); }
+.castle-window-header button:hover { background: var(--castle-mint); }
+/* This containing block also keeps fixed verse tools below the persistent close header. */
+.castle-window-scroll { position: relative; isolation: isolate; transform: translateZ(0); flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-color: #9cbcac var(--castle-paper); }
+.castle-window-page { min-height: 100%; background: var(--castle-paper); }
 .castle-window-page .min-h-screen { min-height: 100%; }
-.castle-feature-window button:focus-visible, .castle-feature-window a:focus-visible { outline: 3px solid #bd4b32; outline-offset: 2px; }
-@media(max-width:640px){ .castle-feature-window { inset: max(30px, env(safe-area-inset-top,0px)) 0 0; width: 100vw; max-height: calc(100dvh - max(30px, env(safe-area-inset-top,0px))); border-radius: 18px 18px 0 0; } .castle-window-header { padding: 6px 8px 6px 14px; gap: 6px; } .castle-window-header button { padding: 8px; } .castle-window-header h2 { font-size: 13px; } .castle-window-header button span { font-size: 10px; } }
+.castle-window-page :where(main > h1, .study-heading h1, .note-chapter-heading h2) { font-family: 'Noto Serif TC', 'Songti TC', serif; color: var(--castle-ink); }
+.castle-content-tools { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 8px 24px; border-bottom: 1px solid hsl(var(--border)); background: #f1f4e9; }
+.castle-content-tools > div { flex-wrap: wrap; }
+.castle-content-tools button { min-width: 44px; min-height: 44px; border-radius: 12px; }
+.castle-window-page :where(input:not([type=checkbox]):not([type=radio]),select,textarea,[role=combobox]) { border-color: hsl(var(--input)); border-radius: 12px; background-color: #fffef9; color: var(--castle-ink); }
+.castle-window-page :where(select,[role=combobox],input:not([type=checkbox]):not([type=radio])) { min-height: 44px; }
+.castle-window-page :where(.study-controls,.note-journal-toolbar) { padding: 18px; border: 1px solid hsl(var(--border)); border-radius: 16px; background: #f1f4e9; }
+.castle-window-page .study-tool-tabs { gap: 4px; padding: 4px; border: 1px solid hsl(var(--border)); border-radius: 14px; background: #f1f4e9; }
+.castle-window-page .study-tool-tabs button { border: 0; border-radius: 10px; }
+.castle-window-page .study-tool-tabs button[aria-selected=true] { background: var(--castle-ink); color: var(--castle-paper); }
+.castle-window-page :where(.study-scripture,.note-chapter) { padding-top: 8px; }
+.castle-window-page .study-verse-text[aria-pressed=true] { background: #c7e7de88; }
+.castle-window-page .study-tokens > div { border-radius: 12px; background: #f4f4e9; }
+.castle-window-page .study-reading-mode { border-radius: 12px; }
+.castle-login-content { width: min(100%, 460px); margin: 0 auto; padding: 28px 20px; }
+.castle-login-content > p { margin-bottom: 16px; color: hsl(var(--muted-foreground)); line-height: 1.8; }
+.castle-login-content .login-form-card { border: 1px solid hsl(var(--border)); border-radius: 18px; box-shadow: none; }
+.castle-feature-window :where(button,a,input,select,textarea,[tabindex]):focus-visible { outline: 3px solid var(--castle-clay); outline-offset: 2px; }
+@media(max-width:640px){
+  .castle-feature-window { inset: max(30px, env(safe-area-inset-top,0px)) 0 0; width: 100vw; max-height: calc(100dvh - max(30px, env(safe-area-inset-top,0px))); border-radius: 22px 22px 0 0; }
+  .castle-window-header { min-height: 72px; padding: 10px 12px 10px 16px; gap: 10px; }
+  .castle-window-emblem { flex-basis: 40px; width: 40px; height: 40px; border-radius: 14px 14px 17px 17px; }
+  .castle-window-header h2 { font-size: 19px; }
+  .castle-content-tools { padding: 6px 12px; }
+  .castle-window-page .study-controls { padding: 12px; gap: 10px; }
+  .castle-login-content { padding: 22px 16px; }
+}
+@media(max-height:450px){.castle-feature-window { top: 12px; bottom: 0; }.castle-window-header { min-height: 64px; padding-top: 6px; padding-bottom: 6px; }}

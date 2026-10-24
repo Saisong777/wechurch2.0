@@ -1,3 +1,4 @@
+import {useCastleContentPresentation} from '@/contexts/CastleContentPresentationContext';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import React, { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -26,6 +27,7 @@ const bibleVerses = [
 
 const LoginPage = () => {
   const { user, loading } = useAuth();
+  const castleContent=useCastleContentPresentation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hash } = useLocation();
@@ -45,6 +47,8 @@ const LoginPage = () => {
       </div>
     );
   }
+
+  if(castleContent)return <main className="castle-login-content"><p>登入後保存讀經與筆記，也與家人一起同行。</p><LoginForm/></main>;
 
   return (
     <div
@@ -84,6 +88,7 @@ const LoginPage = () => {
 };
 
 const LoginForm: React.FC = () => {
+  const castleContent=useCastleContentPresentation();
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -271,13 +276,13 @@ const LoginForm: React.FC = () => {
         {['google_login_failed', 'google_unavailable'].includes(params.get('error') || '') && (
           <p role="alert" className="mb-4 text-sm text-destructive">Google 登入未完成，請重新嘗試。</p>
         )}
-        <p className="text-sm italic text-brand-sky mb-4 text-center leading-relaxed" data-testid="text-bible-verse">
+        {!castleContent && <p className="text-sm italic text-brand-sky mb-4 text-center leading-relaxed" data-testid="text-bible-verse">
           {randomVerse}
-        </p>
+        </p>}
 
         <div className="text-center mb-6">
           <h2 className="text-xl font-semibold text-foreground">
-            {googleOnly ? '歡迎來到 WeChurch' : mode === 'login' ? '登入帳戶' : '建立新帳戶'}
+            {googleOnly ? castleContent ? '登入，繼續同行' : '歡迎來到 WeChurch' : mode === 'login' ? '登入帳戶' : '建立新帳戶'}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {googleOnly ? '登入或建立帳號' : mode === 'login' ? 'Sign In' : 'Create Account'}

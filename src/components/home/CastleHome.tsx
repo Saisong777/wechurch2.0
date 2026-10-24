@@ -4,7 +4,7 @@ import {useCastlePresence} from '@/hooks/useCastlePresence';
 import {CastlePresencePanel} from './CastlePresencePanel';
 import {PLACE_WALK_NODES} from '@shared/castleNavigation';
 import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, BookHeart, BookOpen, Castle, Compass, Footprints, Gamepad2, Heart, HandHeart, MessageCircle, Moon, Pause, Play, Settings, Sun, Users, Menu, X, ChevronUp, type LucideIcon } from 'lucide-react';
 import './castle-home.css';
 import './castle-fullscreen.css';
@@ -43,6 +43,7 @@ export interface CastleHomeProps {
 
 export function CastleHome({ churchName, preview, featureEnabled, featuresLoading, scripture, hasDraft, onOpenNote, showAdmin, showPastoral, modeControls, accountControls, navigationControls, churchControls, notices, presenceScope=null,signedIn=false }: CastleHomeProps) {
   useImmersiveSurface();
+  const navigate=useNavigate();
   const windowActive=useCastleWindowActive();
   const presence=useCastlePresence(presenceScope);
   const places = PLACES.filter(place => !place.feature || (!featuresLoading && featureEnabled(place.feature)));
@@ -59,6 +60,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const lastTrigger = useRef<HTMLButtonElement | null>(null), wasOpen = useRef(false);
   const detailId = useId(), drawerId = useId(), messageId=useId();
   const selectPlace = (id: string) => { setSelectedId(id); setVisited(previous => previous.includes(id) ? previous : [...previous, id]); if(portrait){lastTrigger.current=exploreButton.current;setPanel('places');}else setPanel(current => current === 'menu' ? 'places' : current); };
+  const activatePlace=(id:string)=>{const place=places.find(candidate=>candidate.id===id);if(!place)return;setSelectedId(id);setVisited(previous=>previous.includes(id)?previous:[...previous,id]);void navigate(place.href);};
   const openPanel = (next: 'places' | 'menu', trigger: HTMLButtonElement) => { lastTrigger.current = trigger; setPanel(current => current === next ? null : next); };
   useLayoutEffect(()=>{const resize=()=>setPortrait(isPortraitCastle(window.innerWidth,window.innerHeight));window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
   useLayoutEffect(() => {
@@ -110,7 +112,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   return <div className={`castle-home castle-home--fullscreen ${night ? 'castle-home--night' : ''} ${paused ? 'castle-home--paused' : ''}`} data-testid="castle-home" data-castle-portrait={String(portrait)} data-castle-panel={panel || 'closed'} style={{ '--castle-panel-bottom': `${insets.bottom}px` } as CSSProperties}>
     <div className="castle-map-shell castle-map-shell--3d">
       <Suspense fallback={<div className="castle-3d-loading-fallback" role="status">正在打開城門…</div>}>
-        <CastleScene places={places} selectedId={selected?.id} onSelect={selectPlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} />
+        <CastleScene places={places} selectedId={selected?.id} onSelect={activatePlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} />
       </Suspense>
     </div>
     <div className="castle-hud" aria-label="城堡導覽與設定">

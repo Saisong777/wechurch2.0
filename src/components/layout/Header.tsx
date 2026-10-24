@@ -1,3 +1,4 @@
+import {useCastleContentPresentation} from '@/contexts/CastleContentPresentationContext';
 import React, { useContext, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MobileHeaderContext } from './MobileHeaderContext';
@@ -35,7 +36,13 @@ interface HeaderProps {
   backTo?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = props => {
+  const castleContent=useCastleContentPresentation();
+  if(castleContent)return props.rightContent ? <div className="castle-content-tools" role="toolbar" aria-label="內容工具">{props.rightContent}</div> : null;
+  return <TraditionalHeader {...props}/>;
+};
+
+const TraditionalHeader: React.FC<HeaderProps> = ({
   title = 'WeChurch',
   subtitle,
   showLogo = true,

@@ -603,3 +603,14 @@ redirects/params/query/Back/Forward/reload/explicit exit, dirty Stay/Discard,
 nested Escape, focus and independent scroll. Root and independent QA must still
 verify real page content, GPU state, fixed toolbars/portals and mobile layouts on
 the same B release. No author UI self-signoff or localhost preview.
+
+
+## Castle place content (2026-10-24 / v6)
+
+Building/label activation directly opens the real destination in the existing same-router window. Ground movement, orbit and modified DOM links remain their original operations. A finite route metadata map supplies a place emblem, actual place and function title; no location/query values become display names or permission decisions.
+
+The foreground alone provides CastleContentPresentationContext. The conventional Header becomes only its original rightContent business tools (Bible mobile search and A−/A+); logo, site navigation, back/account/appearance and ReadingNavigation are absent there. Traditional and background headers retain their original branch. Bible/reading/notes remain available from castle places/menu and real content links.
+
+Material recipe: forest #174f49, ivory parchment #fffdf4, mint #c7e7de, gold #d8c58d, terracotta #bd6b4b. The place emblem, restrained serif function title and single 44px close control are the signature. Scoped foreground tokens carry the material into reading surfaces, local category tabs, forms and filters; destructive/validation colors keep their semantics. Scripture text keeps its existing font sizing and reading behavior. Mobile uses a near-full-height parchment sheet with its own scroll; viewport containing block and nested portal precedence stay intact.
+
+The login window contains the original LoginForm and its errors/actions without marketing/brand/verse decoration. Options fetch, handlers, OAuth and return targets remain unchanged. No new data, permissions, backend or dependencies. Verify single activation/history push, foreground-only styling/tools, traditional restore, current-function naming, nested dialogs, dirty close/Back and first-layout scroll cleanup; final desktop/mobile/landscape appearance is verified on Railway B by the coordinator, not by CPU checks.
