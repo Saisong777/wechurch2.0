@@ -536,3 +536,34 @@ spiritual scores or decorative charts. A gathering roster uses four explicit
 states; unrecorded is never absence. Shared content retains its existing audience
 and private records stay out of leader totals. See
 `design/leader-dashboard-2026-09-28.md` for implementation boundaries.
+
+## Castle portrait immersion (2026-10-24)
+
+The iM castle is an explorable world. On portrait screens up to 640px wide, use
+vertical space for a close view rather than fitting the entire island width.
+The initial/reset camera keeps its established position and a 42° vertical field
+of view, with a 5.5% downward composition offset. The island may extend beyond the
+horizontal edges. Opening a sheet changes label occlusion, never camera scale;
+resizing changes projection while preserving the user's zoom, orbit and target.
+Desktop and landscape retain their existing fit and inset rules.
+
+Use the castle's existing jade, ivory stone, coral and warm daylight palette,
+serif brand heading and system UI type. A compact brand anchor, 46px exploration
+and menu controls, a right-hand 44px camera rail and a short login/presence entry
+leave the world dominant. The default portrait view has no large detail or status
+card. Building selection opens the existing places sheet with its real route;
+mode, night/pause, account, church, full presence and notices remain in the menu
+sheet. Notices, drafts and connection failures have a visible badge/status entry;
+the full explanation and retry/leave actions remain available there. Each slot
+renders once. Sheets scroll internally and return focus when closed.
+
+Reference audit trail: Root observed the supplied mobile policy-island reference
+on 2026-10-24. Borrowed only close portrait composition, compact floating controls
+and on-demand bottom sheets. No logo, identity, copy, code or reference assets are
+used in the product. The existing iM Three geometry and access boundaries remain.
+
+CPU projection predicts the real island geometry occupies about 66% of portrait
+height at 390×844 and 320×568. This is a composition check, not visual acceptance.
+Root must verify the same frozen release on B at both sizes, open/close both sheets,
+check error/presence actions and 44px targets, then recheck landscape/desktop and
+traditional-mode scroll. No localhost UI acceptance or author visual self-signoff.

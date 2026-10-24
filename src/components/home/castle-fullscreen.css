@@ -134,3 +134,39 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
   .castle-home--fullscreen:is([data-castle-panel='places'], [data-castle-panel='menu']) .castle-3d-toolbar,
   .castle-home--fullscreen:is([data-castle-panel='places'], [data-castle-panel='menu']) .castle-3d-gesture { display: none; }
 }
+
+/* Portrait: enter the world close up; the detailed controls live in the sheet. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .castle-home--fullscreen .castle-topbar { display: block; }
+  .castle-home--fullscreen .castle-brand { width: fit-content; max-width: calc(100% - 64px); padding: 8px 11px; border-radius: 12px; }
+  .castle-home--fullscreen .castle-brand h1 { display: block; font-size: 17px; margin-top: 2px; }
+  .castle-home--fullscreen .castle-brand > p { font-size: 9px; }
+  .castle-home--fullscreen .castle-hud-actions { position: absolute; top: 0; right: 0; flex-direction: column; gap: 6px; }
+  .castle-home--fullscreen .castle-hud-actions > button { position: relative; width: 46px; min-height: 46px; flex-direction: column; gap: 1px; padding: 4px; border-radius: 14px; }
+  .castle-home--fullscreen .castle-hud-actions > button > span { display: block; font-size: 9px; line-height: 1.2; }
+  .castle-home--fullscreen .castle-hud-actions .castle-message-badge { position: absolute; top: -4px; right: -4px; width: 9px; height: 9px; border: 2px solid #fff8ed; border-radius: 50%; background: #cb6c45; }
+  .castle-home--fullscreen .castle-3d-toolbar { top: calc(var(--castle-hud-top) + 116px); bottom: auto; left: auto; right: max(10px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 2px; padding: 3px; border-radius: 15px; box-shadow: 0 3px 16px #285a4410; }
+  .castle-home--fullscreen .castle-3d-toolbar button { width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border-radius: 11px; }
+  .castle-home--fullscreen .castle-3d-toolbar button > span { display: none; }
+  .castle-home--fullscreen:not([data-castle-panel='closed']) .castle-3d-toolbar { display: none; }
+  .castle-home--fullscreen .castle-3d-gesture { display: none; }
+  .castle-home--fullscreen .castle-drawer { height: min(58dvh, 490px); max-height: calc(100dvh - var(--castle-hud-top) - 75px); }
+  .castle-home--fullscreen .castle-drawer-heading > button { min-width: 44px; min-height: 44px; }
+  .castle-home--fullscreen .castle-drawer button, .castle-home--fullscreen .castle-drawer a, .castle-home--fullscreen .castle-drawer summary { min-height: 44px; min-width: 44px; }
+  .castle-home--fullscreen .castle-drawer input, .castle-home--fullscreen .castle-drawer select { min-height: 44px; }
+  .castle-home--fullscreen .castle-3d-toolbar > span { width: 22px; height: 1px; margin: 2px 0; }
+  .castle-home--fullscreen .castle-drawer .castle-primary-link { margin-left: 0; }
+  .castle-mobile-preferences { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 0; }
+  .castle-mobile-preferences .home-mode-switch button { min-height: 44px; padding: 0 11px; }
+  .castle-mobile-preferences .castle-atmosphere-controls { display: flex; position: static; padding: 2px; }
+  .castle-mobile-preferences .castle-atmosphere-controls button { width: 44px; min-height: 44px; }
+  .castle-menu-notices { display: grid; gap: 12px; padding-bottom: 12px; }
+  .castle-menu-notices .castle-presence { width: 100%; padding: 10px; }
+  .castle-menu-notices .castle-presence p, .castle-menu-notices .castle-presence details { display: block; font-size: 12px; }
+  .castle-menu-notices .castle-draft { margin: 0; padding: 12px; }
+  .castle-menu-notices [role='alert'] { padding: 12px; }
+  .castle-mobile-entry { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: max(20px, env(safe-area-inset-bottom, 0px)); pointer-events: auto; }
+  .castle-mobile-entry > a, .castle-mobile-entry > button { display: flex; align-items: center; gap: 7px; min-height: 44px; max-width: calc(100vw - 24px); padding: 9px 15px; border: 1px solid #fff8; border-radius: 24px; background: #fffdf4ed; box-shadow: 0 3px 16px #285a4410; color: #174f49; font-size: 12px; font-weight: 600; }
+  .castle-home--fullscreen:not([data-castle-panel='closed']) .castle-mobile-entry { display: none; }
+  .castle-home--fullscreen .castle-3d-caption { max-width: calc(100% - 24px); }
+}

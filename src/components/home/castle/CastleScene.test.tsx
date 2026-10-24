@@ -102,4 +102,14 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     view.rerender(<CastleScene places={places} onSelect={select} paused night={false} detailId="detail" onMove={move}/>);ground=true;click();expect(move).toHaveBeenCalledTimes(1);expect(screen.getByTestId('castle-3d-world').dataset.worldResidents).toBe('0');
   });
 
+  it('preserves zoom/orbit/target through portrait sheets and orientation changes with one renderer',()=>{
+    vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(390);vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(844);
+    const view=show({paused:true,insets:{top:100,right:64,bottom:76}}),host=screen.getByTestId('castle-3d-world');expect(JSON.parse(host.dataset.worldProjection||'{}').fov).toBe(42);
+    fireEvent.click(screen.getByRole('button',{name:'拉近城堡'}));fireEvent.click(screen.getByRole('button',{name:'向左旋轉城堡'}));const distance=host.dataset.worldCamera,angle=host.dataset.worldAzimuth,target=host.dataset.worldTarget;
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" insets={{top:100,right:64,bottom:490}}/>);expect(JSON.parse(host.dataset.worldProjection||'{}').fov).toBe(42);expect(host.dataset.worldCamera).toBe(distance);
+    vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(844);vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(390);view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" insets={{top:101,right:0,bottom:0}}/>);expect(host.dataset.worldCamera).toBe(distance);expect(host.dataset.worldAzimuth).toBe(angle);expect(host.dataset.worldTarget).toBe(target);expect(gpu.instances).toBe(1);
+    vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(390);vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(844);view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" insets={{top:100,right:64,bottom:76}}/>);expect(JSON.parse(host.dataset.worldProjection||'{}').fov).toBe(42);expect(host.dataset.worldCamera).toBe(distance);
+    fireEvent.click(screen.getByRole('button',{name:'重設為城堡全景'}));expect(Number(host.dataset.worldCamera)).toBeCloseTo(62.34,1);expect(JSON.parse(host.dataset.worldProjection||'{}').fov).toBe(42);
+  });
+
 });

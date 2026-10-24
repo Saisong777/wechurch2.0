@@ -1,3 +1,4 @@
+import {castleProjection} from './camera';
 import type { CastleRoster } from '@shared/castlePresence';
 import {nearestWalkNode} from '@shared/castleNavigation';
 import { useEffect, useRef, useState } from 'react';
@@ -136,14 +137,10 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       if (disposed || !renderer || !host || !host.clientWidth || !host.clientHeight) return;
       const width = host.clientWidth, height = host.clientHeight, safe = live.current.insets;
       camera.aspect = width / height;
-      if (safe) {
-        const availableWidth = Math.max(160, width - safe.right), availableHeight = Math.max(140, height - safe.top - safe.bottom);
-        const tangent = Math.max(Math.tan(THREE.MathUtils.degToRad(39 / 2)) * height / availableHeight, Math.tan(THREE.MathUtils.degToRad(44 / 2)) * height / availableWidth);
-        camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(tangent)), 39, 104);
-        camera.setViewOffset(width, height, safe.right / 2, (safe.bottom - safe.top) / 2, width, height);
-      } else {
-        camera.clearViewOffset(); camera.fov = camera.aspect < .85 ? 65 : camera.aspect < 1.25 ? 49 : 39;
-      }
+      const projection=castleProjection(width,height,safe);
+      camera.fov=projection.fov;
+      if(safe||projection.portrait)camera.setViewOffset(width,height,projection.offsetX,projection.offsetY,width,height);
+      else camera.clearViewOffset();
       camera.updateProjectionMatrix(); renderer.setSize(width, height, false); render();
     }
     function handlePointerDown(event: PointerEvent) {

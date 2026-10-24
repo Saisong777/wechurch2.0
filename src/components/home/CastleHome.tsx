@@ -1,3 +1,4 @@
+import {isPortraitCastle} from './castle/camera';
 import {useCastlePresence} from '@/hooks/useCastlePresence';
 import {CastlePresencePanel} from './CastlePresencePanel';
 import {PLACE_WALK_NODES} from '@shared/castleNavigation';
@@ -47,13 +48,17 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const selected = places.find(place => place.id === selectedId) || places[0];
   const [visited, setVisited] = useState<string[]>([]);
   const [night, setNight] = useState(false), [paused, setPaused] = useState(false);
+  const [portrait,setPortrait]=useState(()=>isPortraitCastle(window.innerWidth,window.innerHeight));
+  const [hasNotices,setHasNotices]=useState(false);
   const [panel, setPanel] = useState<'places' | 'menu' | null>(null);
   const [insets, setInsets] = useState({ top: 100, right: 0, bottom: 100 });
+  const exploreButton=useRef<HTMLButtonElement>(null),messageArea=useRef<HTMLDivElement>(null);
   const topbar = useRef<HTMLDivElement>(null), drawer = useRef<HTMLElement>(null), compact = useRef<HTMLDivElement>(null), noticeArea = useRef<HTMLDivElement>(null);
   const lastTrigger = useRef<HTMLButtonElement | null>(null), wasOpen = useRef(false);
-  const detailId = useId(), drawerId = useId();
-  const selectPlace = (id: string) => { setSelectedId(id); setVisited(previous => previous.includes(id) ? previous : [...previous, id]); setPanel(current => current === 'menu' ? 'places' : current); };
+  const detailId = useId(), drawerId = useId(), messageId=useId();
+  const selectPlace = (id: string) => { setSelectedId(id); setVisited(previous => previous.includes(id) ? previous : [...previous, id]); if(portrait){lastTrigger.current=exploreButton.current;setPanel('places');}else setPanel(current => current === 'menu' ? 'places' : current); };
   const openPanel = (next: 'places' | 'menu', trigger: HTMLButtonElement) => { lastTrigger.current = trigger; setPanel(current => current === next ? null : next); };
+  useLayoutEffect(()=>{const resize=()=>setPortrait(isPortraitCastle(window.innerWidth,window.innerHeight));window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
   useLayoutEffect(() => {
     if (panel) { drawer.current?.querySelector<HTMLButtonElement>('[data-castle-close]')?.focus({ preventScroll: true }); wasOpen.current = true; }
     else if (wasOpen.current) { lastTrigger.current?.focus({ preventScroll: true }); wasOpen.current = false; }
@@ -65,18 +70,19 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   }, [panel]);
   useLayoutEffect(() => {
     const measure = () => {
-      const top = Math.max(topbar.current?.getBoundingClientRect().bottom || 0, noticeArea.current?.getBoundingClientRect().bottom || 0) + 10;
+      const top = Math.max(topbar.current?.getBoundingClientRect().bottom || 0, portrait?0:noticeArea.current?.getBoundingClientRect().bottom || 0) + 10;
+      setHasNotices(Boolean(messageArea.current?.textContent?.trim()));
       const bounds = drawer.current?.getBoundingClientRect(), small = window.innerWidth <= 640;
-      const next = { top, right: !small && panel && bounds ? bounds.width + 28 : 0, bottom: small ? panel && bounds ? bounds.height + 20 : (compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
+      const next = { top, right: portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: small ? panel && bounds ? bounds.height + 20 : portrait?76:(compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
       setInsets(old => old.top === next.top && old.right === next.right && old.bottom === next.bottom ? old : next);
     };
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     [topbar.current, drawer.current, compact.current, noticeArea.current].forEach(node => node && observer?.observe(node));
     const chromeObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(measure) : null;
-    chromeObserver?.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
+    chromeObserver?.observe(document.getElementById('root') || document.body, { childList: true, subtree: true, characterData: true });
     window.addEventListener('resize', measure); measure();
     return () => { observer?.disconnect(); chromeObserver?.disconnect(); window.removeEventListener('resize', measure); };
-  }, [panel]);
+  }, [panel,portrait]);
   const SelectedIcon = selected?.icon || Compass;
   const seenCount = places.filter(place => visited.includes(place.id)).length;
   const selectedContent = <>
@@ -89,7 +95,17 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     {selected && <Link className="castle-primary-link" to={selected.href}>{selected.action}<ArrowRight size={16} aria-hidden="true" /></Link>}
   </>;
 
-  return <div className={`castle-home castle-home--fullscreen ${night ? 'castle-home--night' : ''} ${paused ? 'castle-home--paused' : ''}`} data-testid="castle-home" data-castle-panel={panel || 'closed'} style={{ '--castle-panel-bottom': `${insets.bottom}px` } as CSSProperties}>
+  const atmosphereControls=<div className="castle-atmosphere-controls" role="group" aria-label="城堡氣氛設定">
+          <button type="button" onClick={() => setNight(current => !current)} aria-pressed={night} aria-label={night ? '切換日間景色' : '切換夜間景色'}>{night ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}</button>
+          <button type="button" onClick={() => setPaused(current => !current)} aria-pressed={paused} aria-label={paused ? '開啟地圖動態' : '暫停地圖動態'}>{paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}</button>
+        </div>;
+  const messageContent=<>{notices}{hasDraft&&<div className="castle-draft" role="status"><p>此裝置有靈修草稿，尚未同步。</p><button type="button" onClick={onOpenNote}>開啟草稿<ArrowRight size={16} aria-hidden="true"/></button></div>}</>;
+  const noticesContent=<div className={portrait?'castle-menu-notices':'castle-hud-notices'} ref={noticeArea}>
+    <CastlePresencePanel presence={presence} signedIn={signedIn}/>
+    {portrait?<div ref={messageArea}>{messageContent}</div>:messageContent}
+  </div>;
+
+  return <div className={`castle-home castle-home--fullscreen ${night ? 'castle-home--night' : ''} ${paused ? 'castle-home--paused' : ''}`} data-testid="castle-home" data-castle-portrait={String(portrait)} data-castle-panel={panel || 'closed'} style={{ '--castle-panel-bottom': `${insets.bottom}px` } as CSSProperties}>
     <div className="castle-map-shell castle-map-shell--3d">
       <Suspense fallback={<div className="castle-3d-loading-fallback" role="status">正在打開城門…</div>}>
         <CastleScene places={places} selectedId={selected?.id} onSelect={selectPlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} />
@@ -98,21 +114,15 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     <div className="castle-hud" aria-label="城堡導覽與設定">
       <div className="castle-topbar" ref={topbar}>
         <div className="castle-brand" aria-labelledby="castle-title"><p><Castle size={16} aria-hidden="true" />{churchName}{preview && <span>預覽</span>}</p><h1 id="castle-title">我們的城堡</h1></div>
-        <div className="castle-hud-mode">{modeControls}</div>
-        <div className="castle-atmosphere-controls" role="group" aria-label="城堡氣氛設定">
-          <button type="button" onClick={() => setNight(current => !current)} aria-pressed={night} aria-label={night ? '切換日間景色' : '切換夜間景色'}>{night ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}</button>
-          <button type="button" onClick={() => setPaused(current => !current)} aria-pressed={paused} aria-label={paused ? '開啟地圖動態' : '暫停地圖動態'}>{paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}</button>
-        </div>
+        {!portrait&&<div className="castle-hud-mode">{modeControls}</div>}
+        {!portrait&&atmosphereControls}
         <div className="castle-hud-actions">
-          <button type="button" aria-label="開啟城堡地點" aria-expanded={panel === 'places'} aria-controls={drawerId} onClick={event => openPanel('places', event.currentTarget)}><Compass size={18} aria-hidden="true" /><span>探索</span></button>
-          <button type="button" aria-label="開啟城堡選單" aria-expanded={panel === 'menu'} aria-controls={drawerId} onClick={event => openPanel('menu', event.currentTarget)}><Menu size={19} aria-hidden="true" /><span>選單</span></button>
+          <button ref={exploreButton} type="button" aria-label="開啟城堡地點" aria-expanded={panel === 'places'} aria-controls={drawerId} onClick={event => openPanel('places', event.currentTarget)}><Compass size={18} aria-hidden="true" /><span>探索</span></button>
+          <button type="button" aria-label="開啟城堡選單" aria-describedby={portrait&&(hasNotices||!!presence.view.message)?messageId:undefined} aria-expanded={panel === 'menu'} aria-controls={drawerId} onClick={event => openPanel('menu', event.currentTarget)}><Menu size={19} aria-hidden="true" /><span>選單</span>{portrait&&(hasNotices||!!presence.view.message)&&<i className="castle-message-badge"><span id={messageId} className="sr-only" role="status">有訊息待查看</span></i>}</button>
         </div>
       </div>
-      <div className="castle-hud-notices" ref={noticeArea}>
-        <CastlePresencePanel presence={presence} signedIn={signedIn}/>
-        {notices}
-        {hasDraft && <div className="castle-draft" role="status"><p>此裝置有靈修草稿，尚未同步。</p><button type="button" onClick={onOpenNote}>開啟草稿<ArrowRight size={16} aria-hidden="true" /></button></div>}
-      </div>
+      {!portrait&&noticesContent}
+      {portrait&&<div className="castle-mobile-entry">{!signedIn?<Link to="/login"><Users size={16} aria-hidden="true"/>登入加入</Link>:<button type="button" aria-controls={drawerId} aria-expanded={panel==='menu'} onClick={event=>openPanel('menu',event.currentTarget)}><Users size={16} aria-hidden="true"/>{presence.view.status==='disconnected'||presence.view.status==='expired'?'連線中斷・重連':presence.view.status==='connecting'?'城堡連線中…':presence.view.status==='joined'?`城堡內 ${presence.view.roster?.avatars.length||0} 人`:'加入城堡'}</button>}</div>}
       <aside ref={drawer} id={drawerId} className="castle-drawer" hidden={!panel} aria-labelledby={`${drawerId}-title`}>
         <div className="castle-drawer-heading"><h2 id={`${drawerId}-title`}>{panel === 'menu' ? '教會與我的日常' : '城堡地點'}</h2><button data-castle-close type="button" aria-label="收合城堡面板" onClick={() => setPanel(null)}><X size={19} aria-hidden="true" /></button></div>
         <div className="castle-drawer-scroll">
@@ -121,7 +131,9 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
             <nav className="castle-place-list" aria-label="城堡所有地點">{places.map(place => { const Icon = place.icon; return <Link to={place.href} key={place.id} onClick={() => selectPlace(place.id)}><Icon size={19} aria-hidden="true" /><span>{place.name}<small>{place.label}</small></span><ArrowRight size={15} aria-hidden="true" /></Link>; })}</nav>
             <div className="castle-exploration"><Footprints size={16} aria-hidden="true" /><span>你的探索足跡<strong>{seenCount} / {places.length}</strong></span><small>僅記錄這次瀏覽的地點</small></div>
           </>}
-          {panel === 'menu' && <>
+          <div hidden={panel!=='menu'}>
+            {portrait&&<><div className="castle-mobile-preferences"><div className="castle-hud-mode">{modeControls}</div>{atmosphereControls}</div>{noticesContent}</>}
+            {panel==='menu'&&<>
             <div className="castle-account-slot">{accountControls}</div>
             <div className="castle-nav-slot">{navigationControls}</div>
             <div className="castle-church-slot">{churchControls}</div>
@@ -133,11 +145,12 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
               {showAdmin && <Link to="/admin"><Settings size={16} aria-hidden="true" />主持與管理</Link>}
               <Link to="/sitemap">網站導覽</Link><Link to="/help">使用說明</Link><Link to="/feedback" state={{ from: '/' }}>意見反饋</Link>
             </nav>
-          </>}
+            </>}
+          </div>
         </div>
       </aside>
-      <div ref={compact} className="castle-compact-place" hidden={!!panel}>
-        {!panel && <div className="castle-place-detail" id={detailId} role="region" aria-label="目前選擇的地點" aria-live="polite">{selectedContent}</div>}
+      <div ref={compact} className="castle-compact-place" hidden={!!panel||portrait}>
+        {!panel&&!portrait && <div className="castle-place-detail" id={detailId} role="region" aria-label="目前選擇的地點" aria-live="polite">{selectedContent}</div>}
         <button className="castle-compact-expand" type="button" aria-label="展開城堡地點" onClick={event => openPanel('places', event.currentTarget)}><ChevronUp size={16} aria-hidden="true" /></button>
       </div>
     </div>
