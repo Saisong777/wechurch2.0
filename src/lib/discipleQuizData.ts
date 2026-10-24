@@ -421,7 +421,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q09",
     "chapter": "共同完成",
-    "text": "準備大型活動時，哪個角色最讓你有投入感？",
+    "text": "回想最近準備活動或合作時，你最常先處理哪類事情？",
     "options": [
       {
         "text": "把流程、名單和細節整理得清清楚楚",
@@ -490,22 +490,22 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q12",
     "chapter": "共同完成",
-    "text": "你最希望夥伴如何形容你在團隊中的貢獻？",
+    "text": "回想最近一次合作，你實際最常做的是？",
     "options": [
       {
-        "text": "願意理解人，也能說出大家忽略的感受",
+        "text": "留意夥伴的感受，花時間聽他說",
         "role": "john"
       },
       {
-        "text": "讓資訊與事情變得有條理、容易接手",
+        "text": "整理資訊和分工，讓接手的人容易理解",
         "role": "matthew"
       },
       {
-        "text": "需要開始或做決定時，願意站出來承擔",
+        "text": "需要開始或做決定時，站出來承擔",
         "role": "peter"
       },
       {
-        "text": "答應的事會持續做完，讓人可以放心",
+        "text": "把答應的事持續做完，維持日常照應",
         "role": "jamesA"
       }
     ]
@@ -605,7 +605,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q17",
     "chapter": "在意的事",
-    "text": "看到一個長期存在的問題，你通常最想？",
+    "text": "看到一個長期存在的問題，你通常會先？",
     "options": [
       {
         "text": "找出需要改變的規則，開始推動改善",
@@ -651,7 +651,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q19",
     "chapter": "在意的事",
-    "text": "下個月可能有新的服務機會，你會如何預備？",
+    "text": "最近面對新的服務或工作機會，你通常怎麼預備？",
     "options": [
       {
         "text": "先練習需要的能力，等機會出現就能補位",
@@ -674,22 +674,22 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q20",
     "chapter": "在意的事",
-    "text": "完成一次合作後，你最想保留下來的是？",
+    "text": "完成最近一次合作後，你會先做什麼？",
     "options": [
       {
-        "text": "彼此能坦誠說話，也容得下不同聲音",
+        "text": "和夥伴真實討論分歧，也說出自己的想法",
         "role": "nathanael"
       },
       {
-        "text": "清楚的紀錄和方法，讓下次做得更順",
+        "text": "整理這次的紀錄和方法，方便下次使用",
         "role": "matthew"
       },
       {
-        "text": "這次累積的準備，未來需要時能派上用場",
+        "text": "把累積的資料與練習整理好，留待需要時接上",
         "role": "matthias"
       },
       {
-        "text": "真正改善了什麼，讓後來的人更容易參與",
+        "text": "檢查改善是否有用，繼續調整不合適的安排",
         "role": "simonZ"
       }
     ]
@@ -697,7 +697,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q21",
     "chapter": "走向日常",
-    "text": "你發現自己犯了錯，最想先做哪一步？",
+    "text": "你發現自己犯了錯，通常先做哪一步？",
     "options": [
       {
         "text": "真實承認自己的部分，不急著找藉口",
@@ -720,7 +720,7 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q22",
     "chapter": "走向日常",
-    "text": "如果一週只能多留一段時間幫忙，你比較想？",
+    "text": "最近抽出時間幫忙時，你比較常做哪一種事？",
     "options": [
       {
         "text": "陪一位有需要的人，好好關心他的近況",
@@ -743,22 +743,22 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q23",
     "chapter": "走向日常",
-    "text": "朋友問你：「最近想練習什麼？」你比較認同？",
+    "text": "最近想幫助身邊的人時，你通常先做什麼？",
     "options": [
       {
-        "text": "更敏銳地看見別人的需要，適時伸手",
+        "text": "詢問近況和需要，找適合的方式支持",
         "role": "thaddaeus"
       },
       {
-        "text": "多認識不同的人，讓彼此有機會連結",
+        "text": "介紹可以一起合作或彼此幫助的人",
         "role": "andrew"
       },
       {
-        "text": "更耐心地理解自己和別人的內心",
+        "text": "耐心聽對方說，理解他內心的想法",
         "role": "john"
       },
       {
-        "text": "培養需要的能力，準備好接受新的託付",
+        "text": "先練習可能需要的能力，備好用得上的東西",
         "role": "matthias"
       }
     ]
@@ -766,22 +766,22 @@ export const QUESTIONS: readonly QuizQuestion[] = [
   {
     "id": "q24",
     "chapter": "走向日常",
-    "text": "想像下一次一起出發，你最想帶給同行的人什麼？",
+    "text": "最近團隊要開始新計畫時，你比較常怎麼參與？",
     "options": [
       {
-        "text": "願意先踏出一步的勇氣，讓大家有個開始",
+        "text": "先提議試一個小步驟，帶大家開始",
         "role": "peter"
       },
       {
-        "text": "發現不合適的地方就一起改變的行動力",
+        "text": "指出舊安排不合適的地方，嘗試推動改進",
         "role": "simonZ"
       },
       {
-        "text": "能安心分享心裡話、被理解的關係",
+        "text": "先聽大家的期待和擔心，幫彼此理解",
         "role": "john"
       },
       {
-        "text": "把想法變成可行步驟、照顧現實需要的方法",
+        "text": "弄清楚資源與限制，把想法拆成實際步驟",
         "role": "philip"
       }
     ]
