@@ -19,7 +19,7 @@ const PLACES: Place[] = [
   { id: 'groups', name: '小家聚落', label: '小家', description: '信仰的路，一起走。在小家裡分享生活、彼此扶持。', href: '/groups', action: '前往我的小家', icon: Users },
   { id: 'grace', name: '恩典書庫', label: '恩典記錄', description: '把值得記得的恩典留下來。回頭看見，在日常中一路同行的神。', href: '/grace-record?view=grace', action: '打開恩典記錄簿', icon: BookHeart, feature: 'we_share' },
   { id: 'square', name: '同行廣場', label: '分享牆', description: '在這裡聽見彼此的故事，分享生活，也送出一份鼓勵。', href: '/walls', action: '前往分享牆', icon: MessageCircle },
-  { id: 'play', name: '相聚小亭', label: '工具', description: '準備一場相聚。用話語卡、破冰與分組工具，讓人更靠近。', href: '/play', action: '探索相聚工具', icon: Gamepad2, feature: 'we_play' },
+  { id: 'play', name: '相聚小亭', label: '十二門徒人格', description: '透過生活情境，發現自己的同行傾向，再找一位朋友聊聊。', href: '/play/disciple-quiz', action: '探索十二門徒人格', icon: Gamepad2, feature: 'we_play' },
 ];
 
 export interface CastleHomeProps {
@@ -46,7 +46,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const navigate=useNavigate();
   const windowActive=useCastleWindowActive();
   const presence=useCastlePresence(presenceScope);
-  const places = PLACES.filter(place => !place.feature || (!featuresLoading && featureEnabled(place.feature)));
+  const places = PLACES.filter(place => (!place.feature || (!featuresLoading && featureEnabled(place.feature))) && (place.id !== 'play' || featureEnabled('disciple_quiz')));
   const [selectedId, setSelectedId] = useState('chapel');
   const selected = places.find(place => place.id === selectedId) || places[0];
   const [visited, setVisited] = useState<string[]>([]);

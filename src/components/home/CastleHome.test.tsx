@@ -18,14 +18,14 @@ describe('castle navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: '開啟城堡地點' }));
     const list = screen.getByRole('navigation', { name: '城堡所有地點' });
     const hrefs = within(list).getAllByRole('link').map(link => link.getAttribute('href'));
-    expect(hrefs).toEqual(['/learn/church-reading', '/learn/bible', '/share', '/groups', '/grace-record?view=grace', '/walls', '/play']);
+    expect(hrefs).toEqual(['/learn/church-reading', '/learn/bible', '/share', '/groups', '/grace-record?view=grace', '/walls', '/play/disciple-quiz']);
     expect(screen.queryByRole('link', { name: /牧養概況/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /主持與管理/ })).toBeNull();
   });
 
   it('hides disabled features from markers, details, and the alternative list', () => {
     const { container } = show({ featureEnabled: key => key !== 'we_play' && key !== 'we_learn' });
-    expect(container.querySelector('a[href="/play"]')).toBeNull();
+    expect(container.querySelector('a[href="/play/disciple-quiz"]')).toBeNull();
     expect(container.querySelector('a[href="/learn/church-reading"]')).toBeNull();
     expect(screen.queryByRole('button', { name: /相聚小亭/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /同行主堡/ })).toBeNull();
@@ -49,6 +49,12 @@ describe('castle navigation', () => {
     show({ scripture: { reference: '不可顯示的備援經文', state } });
     expect(screen.queryByText(/不可顯示的備援經文/)).toBeNull();
     expect(screen.getByRole('link', { name: '前往每日靈修' })).toBeTruthy();
+  });
+
+  it('keeps only the personality activity in the pavilion and respects its child feature flag', () => {
+    const { container } = show({featureEnabled: key => key !== 'disciple_quiz'});
+    expect(container.querySelector('a[href="/play/disciple-quiz"]')).toBeNull();
+    expect(screen.queryByRole('button', {name: /相聚小亭/})).toBeNull();
   });
 
   it('supports night mode, motion pause, and unsynced drafts', () => {

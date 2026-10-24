@@ -1,3 +1,5 @@
+import { useCastleContentPresentation } from '@/contexts/CastleContentPresentationContext';
+import DiscipleQuizPage from './DiscipleQuizPage';
 import { BookOpen, Gamepad2, ScrollText, Shuffle } from 'lucide-react';
 import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
 import { FeatureGate } from '@/components/ui/feature-gate';
@@ -42,8 +44,8 @@ const actions: Array<FeaturePortalAction & { featureKeys: string[] }> = [
   },
   {
     id: 'disciple-quiz',
-    title: '測門徒人格',
-    subtitle: '你像哪個門徒？',
+    title: '十二門徒人格',
+    subtitle: '發現你的同行組合',
     icon: ScrollText,
     href: '/play/disciple-quiz',
     tone: 'bg-orange-500/15',
@@ -55,8 +57,11 @@ const actions: Array<FeaturePortalAction & { featureKeys: string[] }> = [
 ];
 
 export const WePlayPage = () => {
+  const castleContent = useCastleContentPresentation();
   const { isFeatureEnabled } = useFeatureToggles();
   const enabledActions = actions.filter((action) => action.featureKeys.every(isFeatureEnabled));
+
+  if (castleContent) return <DiscipleQuizPage />;
 
   return (
     <FeatureGate

@@ -614,3 +614,16 @@ The foreground alone provides CastleContentPresentationContext. The conventional
 Material recipe: forest #174f49, ivory parchment #fffdf4, mint #c7e7de, gold #d8c58d, terracotta #bd6b4b. The place emblem, restrained serif function title and single 44px close control are the signature. Scoped foreground tokens carry the material into reading surfaces, local category tabs, forms and filters; destructive/validation colors keep their semantics. Scripture text keeps its existing font sizing and reading behavior. Mobile uses a near-full-height parchment sheet with its own scroll; viewport containing block and nested portal precedence stay intact.
 
 The login window contains the original LoginForm and its errors/actions without marketing/brand/verse decoration. Options fetch, handlers, OAuth and return targets remain unchanged. No new data, permissions, backend or dependencies. Verify single activation/history push, foreground-only styling/tools, traditional restore, current-function naming, nested dialogs, dirty close/Back and first-layout scroll cleanup; final desktop/mobile/landscape appearance is verified on Railway B by the coordinator, not by CPU checks.
+
+
+## 2026-10-24 · 十二門徒人格／相聚小亭
+
+沿用 iM 城堡・地點內容配方：森林綠 #174f49、米白 #fffdf4、薄荷 #c7e7de、金 #d8c58d、陶土 #bd6b4b。標題沿既有 Noto Serif TC／Songti TC，正文用系統無襯線；不再載入外部字體、棕黑金色滿頁背景或固定全頁紋理。十二個門徒紋章作為相聚的視覺記號，故事與閱讀優先。
+
+相聚小亭唯一活動為十二門徒人格，點建築直接開測驗；城堡內舊 /play 也呈現同一測驗，傳統 /play 保留四個既有工具。沿用 we_play + disciple_quiz 層級開關，載入／錯誤時不開測驗。
+
+24題四選一、選取後按下一題、可回頭修改；以真實近期行為作答。十二類各8次、A/B/C/D各2次，同分全部並列。題庫配對近均衡（54對各2次、12對各3次），不是所有對完全相同；數字為選中次數，不冒充機率、準確率或常模。這是未經心理計量信效度驗證的情境遊戲；創作角色、經文明說及傳統對應分列。
+
+結果可查看回答依據、可能強項、成長方向、同行小任務及朋友提問。只在分頁 sessionStorage 暫存有版本且驗證過的答案／題號，不上傳、不存身分、沒有自動分享。重新開始需確認；複製失敗提供可選取摘要。44px操作、手機單欄、內捲與標題焦點、原生radio鍵盤、無自動跳題及延遲計時器；尊重減少動態偏好。保留城堡Window原捲動介面及關閉／子視窗語意。
+
+驗收需含：計分公平與12類可獨勝、全部同分、不完整／異常草稿、回頭修改不疊分、重載續作與重測取消、關閉再進、複製失敗、feature failclosed、城堡單入口／傳統工具保留，桌面390/320/橫向真B流程。來源及限制見 disciple-quiz-v7 的研究與獨立QA，結構檢查不等於真人效度。
