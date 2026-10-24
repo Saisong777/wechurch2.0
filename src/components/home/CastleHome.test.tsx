@@ -1,3 +1,4 @@
+import {castleProjection} from './castle/camera';
 import {useEffect} from 'react';
 import {UnsavedChangesGuard} from '@/components/layout/UnsavedChangesGuard';
 import type {AmbientRequest} from './castle/ambientFriends';
@@ -8,7 +9,7 @@ import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testi
 import { MemoryRouter, createMemoryRouter, RouterProvider, Routes, Route } from 'react-router-dom';
 import { CastleHome, type CastleHomeProps } from './CastleHome';
 
-vi.mock('./castle/CastleScene', () => ({ default: function StubScene({ places, onSelect, insets, friendRequest, onFriendSelect,onFriendsReady }: { places: { id: string; name: string; label: string }[]; onSelect: (id: string) => void; insets?:{top:number;right:number;bottom:number};friendRequest?:AmbientRequest;onFriendSelect?:(id:string)=>void;onFriendsReady?:(ready:boolean)=>void }) {useEffect(()=>onFriendsReady?.(true),[onFriendsReady]);return <div data-testid="scene-insets" data-insets={JSON.stringify(insets)} data-friend={JSON.stringify(friendRequest)}>{places.map(place => <button key={place.id} onClick={() => onSelect(place.id)} aria-label={`${place.name}・${place.label}`}>{place.name}</button>)}<button type="button" onClick={()=>onFriendSelect?.('ambient-cat-1')}>點場景小貓</button></div>;} }));
+vi.mock('./castle/CastleScene', () => ({ default: function StubScene({ places, onSelect, insets, friendRequest, onFriendSelect,onFriendsReady,onEncounterChange }: { places: { id: string; name: string; label: string }[]; onSelect: (id: string) => void; insets?:{top:number;right:number;bottom:number};friendRequest?:AmbientRequest;onFriendSelect?:(id:string)=>void;onFriendsReady?:(ready:boolean)=>void;onEncounterChange?:(active:boolean)=>void }) {useEffect(()=>onFriendsReady?.(true),[onFriendsReady]);return <div data-testid="scene-insets" data-insets={JSON.stringify(insets)} data-friend={JSON.stringify(friendRequest)}>{places.map(place => <button key={place.id} onClick={() => onSelect(place.id)} aria-label={`${place.name}・${place.label}`}>{place.name}</button>)}<button type="button" onClick={()=>{onFriendSelect?.('ambient-cat-1');onEncounterChange?.(true);}}>點場景小貓</button><button type="button" onClick={()=>onEncounterChange?.(false)}>結束場景對話</button></div>;} }));
 
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const defaults: CastleHomeProps = { churchName: 'iM 行動教會', featureEnabled: () => true, featuresLoading: false, scripture: { reference: '測試經文', state: 'ready' }, hasDraft: false, onOpenNote: vi.fn(), showAdmin: false, showPastoral: false };
@@ -134,6 +135,12 @@ describe('castle navigation', () => {
     vi.stubGlobal('innerWidth',641);vi.stubGlobal('innerHeight',360);fireEvent(window,new Event('resize'));expect(insets()).toMatchObject({right:358,bottom:0});
   });
 
+  it.each([[320,568],[390,844]])('preserves the portrait join-pill label band and actual camera projection while speaking at %sx%s',async(width,height)=>{
+    vi.stubGlobal('innerWidth',width);vi.stubGlobal('innerHeight',height);show();await screen.findByTestId('scene-insets');
+    const insets=()=>JSON.parse(screen.getByTestId('scene-insets').dataset.insets||'{}');expect(insets().bottom).toBe(76);const before=castleProjection(width,height,insets());
+    fireEvent.click(screen.getByRole('button',{name:'點場景小貓'}));expect(screen.getByTestId('castle-home').dataset.castleSpeaking).toBe('true');expect(insets().bottom).toBe(76);expect(screen.getByRole('link',{name:'登入加入'})).toBeVisible();expect(castleProjection(width,height,insets())).toEqual(before);
+    fireEvent.click(screen.getByRole('button',{name:'結束場景對話'}));expect(screen.getByTestId('castle-home').dataset.castleSpeaking).toBe('false');expect(insets().bottom).toBe(76);expect(castleProjection(width,height,insets())).toEqual(before);
+  });
   it('does not consume foreground Escape or clear a pending actor selection',async()=>{
     const content=(active:boolean)=><MemoryRouter><CastleWindowContext.Provider value={active}><CastleHome {...defaults}/></CastleWindowContext.Provider></MemoryRouter>;const view=render(content(false));fireEvent.click(screen.getByRole('button',{name:'開啟城堡朋友'}));fireEvent.click(screen.getByRole('button',{name:/餅乾小貓/}));await screen.findByTestId('scene-insets');const request=screen.getByTestId('scene-insets').dataset.friend;
     view.rerender(content(true));fireEvent.keyDown(document,{key:'Escape'});expect(screen.getByTestId('castle-home').dataset.castlePanel).toBe('closed');expect(screen.getByTestId('scene-insets').dataset.friend).toBe(request);

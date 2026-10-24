@@ -39,7 +39,8 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     let controls: OrbitControls | undefined;
     let world: ReturnType<typeof buildCastleWorld> | undefined;
     let resizeObserver: ResizeObserver | undefined;
-    let observedBubble:HTMLDivElement|null=null,pendingBubbleFocus=false;
+    let observedBubble:HTMLDivElement|null=null;
+    let pendingBubbleFocusKey:number|undefined;
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     let reduceMotion = media?.matches ?? false; setReduced(reduceMotion);
     const scene = new THREE.Scene();
@@ -94,7 +95,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       const node=bubbleRoot.current,layer=bubbleLayer.current,selected=live.current.encounter;
       if(!node||!layer||!world||!controls||!host)return;
       const actor=world.ambient.actors.find(value=>value.group.name===selected?.id);
-      if(!actor||lost||!live.current.bubbleEnabled){pendingBubbleFocus=false;node.hidden=true;layer.dataset.anchorVisible='false';return;}
+      if(!actor||lost||!live.current.bubbleEnabled){pendingBubbleFocusKey=undefined;node.hidden=true;layer.dataset.anchorVisible='false';return;}
       world.group.updateMatrixWorld(true);camera.updateMatrixWorld();camera.getWorldDirection(forward);
       const head=actor.group.localToWorld(new THREE.Vector3(0,actor.kind==='resident'?1.85:actor.kind==='rabbit'?1.6:1.3,0));
       const inFront=head.clone().sub(camera.position).dot(forward)>0;
@@ -110,7 +111,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       node.style.transform=`translate3d(${(position.left-bounds.left).toFixed(1)}px,${(position.top-bounds.top).toFixed(1)}px,0)`;
       node.dataset.head=`${x.toFixed(2)},${y.toFixed(2)}`;
       const points=position.tail.map(point=>`${(point.x-bounds.left).toFixed(1)},${(point.y-bounds.top).toFixed(1)}`).join(' ');bubbleTail.current?.setAttribute('points',points);
-      if(pendingBubbleFocus&&bubbleSpeech.current){bubbleSpeech.current.focusSpeech();pendingBubbleFocus=false;}
+      if(pendingBubbleFocusKey!==undefined&&pendingBubbleFocusKey===selected?.key&&node.dataset.encounterKey===String(selected.key)&&bubbleSpeech.current){bubbleSpeech.current.focusSpeech();pendingBubbleFocusKey=undefined;}
     }
     function applyLight() {
       if (!world) return;
@@ -198,7 +199,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       const id = object?.userData.placeId; if (id && enabled.has(id)) { live.current.onSelect(id); focus(id); } else if(!id&&hit.object.userData.walkSurface&&live.current.presence?.roster?.avatars.some(a=>a.isSelf)){live.current.onMove?.(nearestWalkNode(hit.point.x,hit.point.z));}
     }
     function handlePointerCancel(event: PointerEvent) { activePointers.delete(event.pointerId); pointerDown = null; }
-    function handleContextLost(event: Event) { event.preventDefault();pendingBubbleFocus=false;setEncounter(undefined); lost = true; if (raf) cancelAnimationFrame(raf); raf = 0; lastTime = 0; host!.dataset.worldState = 'lost'; setState('lost'); }
+    function handleContextLost(event: Event) { event.preventDefault();pendingBubbleFocusKey=undefined;setEncounter(undefined); lost = true; if (raf) cancelAnimationFrame(raf); raf = 0; lastTime = 0; host!.dataset.worldState = 'lost'; setState('lost'); }
     function handleContextRestored() { if (!disposed) { setState('loading'); setAttempt(value => value + 1); } }
     function handleVisibility() { syncAnimation(); }
     function handleReducedMotion(event: MediaQueryListEvent) { reduceMotion = event.matches; setReduced(event.matches); syncAnimation(); }
@@ -233,7 +234,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
           const target=actor.group.position.clone().add(new THREE.Vector3(0,.8,0));
           const direction=camera.position.clone().sub(controls.target).normalize();direction.y=Math.max(.5,direction.y);direction.normalize();
           moveCamera(target.clone().addScaledVector(direction,12),target);render();
-        }, openFriend:(id,keyboard)=>{if(!world?.ambient.actors.some(actor=>actor.group.name===id))return;pendingBubbleFocus=keyboard;setEncounter({id,key:++encounterSerial.current});api.current?.friend(id,'hello',keyboard);}, project:render, observeBubble:(node)=>{if(observedBubble)resizeObserver?.unobserve?.(observedBubble);observedBubble=node;if(node)resizeObserver?.observe(node);render();}, refresh: syncAnimation, layout: resize, presence:()=>{world?.setPresence(live.current.presence?.roster?.avatars||[],live.current.presence?.roster?.serverNow||0,live.current.presence?.receivedAt||0);render();},
+        }, openFriend:(id,keyboard)=>{if(!world?.ambient.actors.some(actor=>actor.group.name===id))return;const key=++encounterSerial.current;pendingBubbleFocusKey=keyboard?key:undefined;setEncounter({id,key});api.current?.friend(id,'hello',keyboard);}, project:render, observeBubble:(node)=>{if(observedBubble)resizeObserver?.unobserve?.(observedBubble);observedBubble=node;if(node)resizeObserver?.observe(node);render();}, refresh: syncAnimation, layout: resize, presence:()=>{world?.setPresence(live.current.presence?.roster?.avatars||[],live.current.presence?.roster?.serverNow||0,live.current.presence?.receivedAt||0);render();},
       };
 
       resizeObserver = new ResizeObserver(entries=>{if(entries.some(entry=>entry.target===host))resize();else render();}); resizeObserver.observe(host); resize();
@@ -253,7 +254,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     };
   }, [attempt]);
 
-  useEffect(()=>{live.current.onEncounterChange?.(!!encounter);},[encounter?.key]);
+  useEffect(()=>{live.current.onEncounterChange?.(!!encounter);},[encounter]);
   useEffect(()=>{api.current?.project();},[encounter,bubbleEnabled,hudObstacles,state]);
   useEffect(()=>{
     if(!encounter||!bubbleEnabled)return;
@@ -274,7 +275,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       {state === 'ready' && <div className="castle-3d-labels" aria-label="3D城堡地點">{places.map(place => { const Icon = place.icon; return <button ref={node => { if (node) labels.current.set(place.id, node); else labels.current.delete(place.id); }} key={place.id} type="button" className={`castle-3d-label ${selectedId === place.id ? 'is-selected' : ''}`} aria-label={`${place.name}・${place.label}`} aria-pressed={selectedId === place.id} aria-controls={detailId} onClick={() => select(place.id)}><span><Icon size={17} aria-hidden="true" /></span><span>{place.name}<small>{place.label}</small></span></button>; })}</div>}
       {state==='ready'&&<div className="castle-resident-labels" aria-hidden="true">{presence?.roster?.avatars.map(avatar=><span key={avatar.avatarId} ref={node=>{if(node)residentLabels.current.set(avatar.avatarId,node);else residentLabels.current.delete(avatar.avatarId);}} className={avatar.isSelf?'is-self':''}>{avatar.alias}{avatar.isSelf?' · 我':''}</span>)}</div>}
       <div ref={bubbleLayer} className="castle-rpg-layer" aria-label="角色頭頂對話">
-        {encounter&&<><svg className="castle-rpg-tail" aria-hidden="true"><polygon ref={bubbleTail}/></svg><div ref={attachBubble} className="castle-rpg-bubble" hidden data-friend-id={encounter.id} onPointerDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}>
+        {encounter&&<><svg className="castle-rpg-tail" aria-hidden="true"><polygon ref={bubbleTail}/></svg><div ref={attachBubble} className="castle-rpg-bubble" hidden data-friend-id={encounter.id} data-encounter-key={encounter.key} onPointerDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}>
           <CastleFriendDialogue key={encounter.key} ref={bubbleSpeech} friendId={encounter.id} onClose={()=>{setEncounter(undefined);if(live.current.bubbleEnabled)live.current.onFriendClose?.();}} onGesture={action=>api.current?.friend(encounter.id,action,false)}/>
         </div></>}
       </div>
