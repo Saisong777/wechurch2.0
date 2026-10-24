@@ -1,7 +1,6 @@
 import { useCastleContentPresentation } from '@/contexts/CastleContentPresentationContext';
 import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { usePageScroll } from '@/contexts/PageScrollContext';
 import { ArrowRight, BookOpen, Gamepad2, ScrollText, Shuffle } from 'lucide-react';
 import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
 import { FeatureGate } from '@/components/ui/feature-gate';
@@ -62,16 +61,17 @@ const actions: Array<FeaturePortalAction & { featureKeys: string[]; inPavilion?:
 
 export const WePlayPage = () => {
   const castleContent = useCastleContentPresentation();
-  const scroll = usePageScroll();
   const { isFeatureEnabled, loading, error } = useFeatureToggles();
   const enabledActions = actions.filter((action) => action.featureKeys.every(isFeatureEnabled));
   const hubReady = castleContent && !loading && !error && isFeatureEnabled('we_play');
   const pavilionActivities = hubReady ? enabledActions.filter(action => action.inPavilion) : [];
   const bindHeading = useCallback((node: HTMLHeadingElement | null) => {
-    if (!node || !hubReady) return;
-    scroll.to(0);
-    node.focus({ preventScroll: true });
-  }, [hubReady, scroll]);
+    if (!node) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || active.closest('.castle-window-heading')) {
+      node.focus({ preventScroll: true });
+    }
+  }, []);
 
   return (
     <FeatureGate
@@ -86,7 +86,7 @@ export const WePlayPage = () => {
             <p className="pavilion-eyebrow">城堡裡的相聚時光</p>
             <h1 ref={bindHeading} tabIndex={-1}>相聚小亭</h1>
             <p className="pavilion-lead">挑個小活動，一起玩吧。</p>
-            <nav className="pavilion-activities" aria-label="相聚小亭活動">
+            {!!pavilionActivities.length && <nav className="pavilion-activities" aria-label="相聚小亭活動">
               {pavilionActivities.map(activity => (
                 <Link key={activity.id} to={activity.href} className="pavilion-activity" aria-labelledby={`pavilion-${activity.id}`}>
                   <span className="pavilion-activity-emblem" aria-hidden="true"><activity.icon size={30} /></span>
@@ -98,7 +98,7 @@ export const WePlayPage = () => {
                   </div>
                 </Link>
               ))}
-            </nav>
+            </nav>}
             {!pavilionActivities.length && <p className="pavilion-empty" role="status">{loading ? '正在載入小亭活動…' : error ? '暫時無法載入活動，請稍後再試。' : !isFeatureEnabled('we_play') ? '相聚小亭暫未開放，請稍後再來。' : '小亭的活動準備中，晚點再來看看。'}</p>}
             <p className="pavilion-future">這裡還會陸續加入新的小遊戲與互動，讓每次相聚多一點驚喜。</p>
           </div>
