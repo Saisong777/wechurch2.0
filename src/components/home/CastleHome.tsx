@@ -1,5 +1,5 @@
-import {CastleFriendDialogue,type CastleFriendDialogueHandle} from './CastleFriendDialogue';
-import {AMBIENT_FRIENDS,FRIEND_RESPONSES,type AmbientAction,type AmbientRequest} from './castle/ambientFriends';
+import type {BubbleRect} from './castle/bubbleLayout';
+import {AMBIENT_FRIENDS,type AmbientRequest} from './castle/ambientFriends';
 import {useCastleWindowActive} from '@/contexts/CastleWindowContext';
 import {isPortraitCastle} from './castle/camera';
 import {useCastlePresence} from '@/hooks/useCastlePresence';
@@ -58,11 +58,12 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const [panel, setPanel] = useState<'places' | 'menu' | 'friends' | null>(null);
   const [friendRequest,setFriendRequest]=useState<AmbientRequest>();
   const friendSequence=useRef(0);
-  const friendDialogue=useRef<CastleFriendDialogueHandle>(null);
+  const [speaking,setSpeaking]=useState(false);
+  const [hudObstacles,setHudObstacles]=useState<BubbleRect[]>([]);
+  const mobileEntry=useRef<HTMLDivElement>(null);
   const [friendsReady,setFriendsReady]=useState(false);
-  const friendButton=useRef<HTMLButtonElement>(null),friendHeading=useRef<HTMLHeadingElement>(null);
-  const activeFriend=AMBIENT_FRIENDS.find(friend=>friend.id===friendRequest?.id);
-  const greetFriend=(id:string,action:AmbientAction='hello')=>{if(!AMBIENT_FRIENDS.some(friend=>friend.id===id))return;lastTrigger.current=friendButton.current;setPanel('friends');setFriendRequest({id,action,sequence:++friendSequence.current});};
+  const friendButton=useRef<HTMLButtonElement>(null);
+  const chooseFriend=(id:string)=>{if(!friendsReady||!AMBIENT_FRIENDS.some(friend=>friend.id===id))return;setPanel(null);setFriendRequest({id,action:'hello',sequence:++friendSequence.current});};
   const [insets, setInsets] = useState({ top: 100, right: 0, bottom: 100 });
   const exploreButton=useRef<HTMLButtonElement>(null),messageArea=useRef<HTMLDivElement>(null),mailbox=useRef<HTMLAnchorElement>(null);
   const topbar = useRef<HTMLDivElement>(null), drawer = useRef<HTMLElement>(null), compact = useRef<HTMLDivElement>(null), noticeArea = useRef<HTMLDivElement>(null);
@@ -76,8 +77,6 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     if (panel) { const content=drawer.current?.querySelector<HTMLElement>('.castle-drawer-scroll');if(content)content.scrollTop=0; drawer.current?.querySelector<HTMLButtonElement>('[data-castle-close]')?.focus({ preventScroll: true }); wasOpen.current = true; }
     else if (wasOpen.current) { lastTrigger.current?.focus({ preventScroll: true }); wasOpen.current = false; }
   }, [panel]);
-  useLayoutEffect(()=>{if(panel!=='friends')setFriendRequest(undefined);},[panel]);
-  useLayoutEffect(()=>{if(panel!=='friends'||!friendRequest)return;const content=drawer.current?.querySelector<HTMLElement>('.castle-drawer-scroll');if(content)content.scrollTop=0;friendHeading.current?.focus({preventScroll:true});},[friendRequest,panel]);
   useEffect(() => {
     if (!panel||windowActive) return;
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) setPanel(null); };
@@ -89,8 +88,10 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
       setHasNotices(Boolean(messageArea.current?.textContent?.trim()));
       const bounds = drawer.current?.getBoundingClientRect(), small = window.innerWidth <= 640;
       const sideFriends=small&&window.innerWidth>window.innerHeight&&panel==='friends';
-      const next = { top, right: sideFriends&&bounds?Math.max(0,window.innerWidth-bounds.left)+10:portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: sideFriends?0:small ? panel && bounds ? bounds.height + 20 : portrait?76:(compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
+      const next = { top, right: sideFriends&&bounds?Math.max(0,window.innerWidth-bounds.left)+10:portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: speaking&&!panel?0:sideFriends?0:small ? panel && bounds ? bounds.height + 20 : portrait?76:(compact.current?.getBoundingClientRect().height || 80) + 20 : 0 };
       setInsets(old => old.top === next.top && old.right === next.right && old.bottom === next.bottom ? old : next);
+      const occupied=[topbar.current,noticeArea.current,compact.current,friendButton.current,mobileEntry.current].flatMap(node=>{if(!node)return [];const rect=node.getBoundingClientRect();return rect.width>0&&rect.height>0?[{left:rect.left,top:rect.top,width:rect.width,height:rect.height}]:[];});
+      setHudObstacles(old=>JSON.stringify(old)===JSON.stringify(occupied)?old:occupied);
     };
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     [topbar.current, mailbox.current, drawer.current, compact.current, noticeArea.current].forEach(node => node && observer?.observe(node));
@@ -98,7 +99,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     chromeObserver?.observe(document.getElementById('root') || document.body, { childList: true, subtree: true, characterData: true });
     window.addEventListener('resize', measure); measure();
     return () => { observer?.disconnect(); chromeObserver?.disconnect(); window.removeEventListener('resize', measure); };
-  }, [panel,portrait]);
+  }, [panel,portrait,speaking]);
   const SelectedIcon = selected?.icon || Compass;
   const seenCount = places.filter(place => visited.includes(place.id)).length;
   const selectedContent = <>
@@ -122,10 +123,10 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     {portrait?<div ref={messageArea}>{messageContent}</div>:messageContent}
   </div>;
 
-  return <div className={`castle-home castle-home--fullscreen ${night ? 'castle-home--night' : ''} ${paused ? 'castle-home--paused' : ''}`} data-testid="castle-home" data-castle-portrait={String(portrait)} data-castle-panel={panel || 'closed'} style={{ '--castle-panel-bottom': `${insets.bottom}px` } as CSSProperties}>
+  return <div className={`castle-home castle-home--fullscreen ${night ? 'castle-home--night' : ''} ${paused ? 'castle-home--paused' : ''}`} data-testid="castle-home" data-castle-portrait={String(portrait)} data-castle-panel={panel || 'closed'} data-castle-speaking={String(speaking)} style={{ '--castle-panel-bottom': `${insets.bottom}px` } as CSSProperties}>
     <div className="castle-map-shell castle-map-shell--3d">
       <Suspense fallback={<div className="castle-3d-loading-fallback" role="status">正在打開城門…</div>}>
-        <CastleScene places={places} selectedId={selected?.id} onSelect={activatePlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} friendRequest={friendRequest} onFriendSelect={greetFriend} onFriendsReady={setFriendsReady} />
+        <CastleScene places={places} selectedId={selected?.id} onSelect={activatePlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} friendRequest={friendRequest} onFriendSelect={()=>setPanel(null)} onFriendsReady={setFriendsReady} onEncounterChange={setSpeaking} onFriendClose={()=>friendButton.current?.focus({preventScroll:true})} bubbleEnabled={!windowActive&&!panel} hudObstacles={hudObstacles} />
       </Suspense>
     </div>
     <div className="castle-hud" aria-label="城堡導覽與設定">
@@ -141,21 +142,14 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
       </div>
       <button ref={friendButton} className="castle-friends-launch" type="button" aria-label="開啟城堡朋友" aria-expanded={panel==='friends'} aria-controls={drawerId} onClick={event=>openPanel('friends',event.currentTarget)}><PawPrint size={19} aria-hidden="true"/><span>城堡朋友</span></button>
       {!portrait&&noticesContent}
-      {portrait&&<div className="castle-mobile-entry">{!signedIn?<Link to="/login"><Users size={16} aria-hidden="true"/>登入加入</Link>:<button type="button" aria-controls={drawerId} aria-expanded={panel==='menu'} onClick={event=>openPanel('menu',event.currentTarget)}><Users size={16} aria-hidden="true"/>{presence.view.status==='disconnected'||presence.view.status==='expired'?'連線中斷・重連':presence.view.status==='connecting'?'城堡連線中…':presence.view.status==='joined'?`城堡內 ${presence.view.roster?.avatars.length||0} 人`:'加入城堡'}</button>}</div>}
+      {portrait&&<div ref={mobileEntry} className="castle-mobile-entry">{!signedIn?<Link to="/login"><Users size={16} aria-hidden="true"/>登入加入</Link>:<button type="button" aria-controls={drawerId} aria-expanded={panel==='menu'} onClick={event=>openPanel('menu',event.currentTarget)}><Users size={16} aria-hidden="true"/>{presence.view.status==='disconnected'||presence.view.status==='expired'?'連線中斷・重連':presence.view.status==='connecting'?'城堡連線中…':presence.view.status==='joined'?`城堡內 ${presence.view.roster?.avatars.length||0} 人`:'加入城堡'}</button>}</div>}
       <aside ref={drawer} id={drawerId} className="castle-drawer" hidden={!panel} aria-labelledby={`${drawerId}-title`}>
         <div className="castle-drawer-heading"><h2 id={`${drawerId}-title`}>{panel === 'friends'?'城堡朋友':panel === 'menu' ? '教會與我的日常' : '城堡地點'}</h2><button data-castle-close type="button" aria-label="收合城堡面板" onClick={() => setPanel(null)}><X size={19} aria-hidden="true" /></button></div>
         <div className="castle-drawer-scroll">
           {panel==='friends'&&<section className="castle-friends-content" aria-label="場景朋友互動">
             <p className="castle-friends-disclosure">這些是場景居民與小動物，陪你逛城堡；有暱稱的玩偶才是真人。互動只在這次畫面中。</p>
-            {!friendsReady&&<p role="status" className="castle-friends-offline">3D畫面開啟後，就能看見朋友的動作。現在仍可從清單讀取招呼。</p>}
-            {activeFriend&&<div className="castle-friend-card">
-              <p className="castle-eyebrow">{activeFriend.kind==='resident'?'場景居民':'場景動物'}</p><h3 ref={friendHeading} tabIndex={-1}>{activeFriend.name}</h3>
-              <p role="status" aria-live="polite" aria-atomic="true" key={friendRequest?.sequence}>{FRIEND_RESPONSES[activeFriend.kind][friendRequest?.action||'hello']}</p>
-              <div className="castle-friend-actions"><button type="button" onClick={()=>friendDialogue.current?.focusLatestReply()}>聊兩句</button><button type="button" onClick={()=>greetFriend(activeFriend.id)}><Hand size={17} aria-hidden="true"/>打招呼</button><button type="button" onClick={()=>greetFriend(activeFriend.id,'affection')}>{FRIEND_RESPONSES[activeFriend.kind].action}</button></div>
-              {(paused)&&<small>地圖動態已暫停，朋友會安靜地回應你。</small>}
-              <CastleFriendDialogue ref={friendDialogue} friendId={activeFriend.id}/>
-            </div>}
-            <ul className="castle-friends-list" aria-label="所有場景朋友">{AMBIENT_FRIENDS.map(friend=><li key={friend.id}><button type="button" aria-pressed={activeFriend?.id===friend.id} onClick={()=>greetFriend(friend.id)}><span>{friend.name}<small>{friend.kind==='resident'?'散步居民':friend.kind==='cat'?'小貓':friend.kind==='dog'?'小狗':friend.kind==='rabbit'?'小兔':'小羊'}</small></span><Hand size={17} aria-hidden="true"/></button></li>)}</ul>
+            {!friendsReady&&<p role="status" className="castle-friends-offline">目前無法和朋友交談。恢復3D後，再選朋友就能看見頭頂對話。</p>}
+            <ul className="castle-friends-list" aria-label="所有場景朋友">{AMBIENT_FRIENDS.map(friend=><li key={friend.id}><button type="button" disabled={!friendsReady} onClick={()=>chooseFriend(friend.id)}><span>{friend.name}<small>{friend.kind==='resident'?'散步居民':friend.kind==='cat'?'小貓':friend.kind==='dog'?'小狗':friend.kind==='rabbit'?'小兔':'小羊'}</small></span><Hand size={17} aria-hidden="true"/></button></li>)}</ul>
           </section>}
           {panel === 'places' && <>
             <div className="castle-place-detail" id={detailId} role="region" aria-label="目前選擇的地點" aria-live="polite">{selectedContent}</div>

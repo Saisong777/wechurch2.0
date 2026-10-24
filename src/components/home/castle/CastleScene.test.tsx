@@ -1,6 +1,4 @@
-import {createRef} from 'react';
-import {CastleFriendDialogue,type CastleFriendDialogueHandle} from '../CastleFriendDialogue';
-import {getFriendDialogue} from './ambientDialogue';
+import {getFriendSpeech} from './ambientDialogue';
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +15,7 @@ vi.mock('three', async importOriginal => {
   } };
 });
 const places = [{ id: 'chapel', name: '同行主堡', label: '每日靈修', icon: Castle }];
-let callbacks: Map<number, FrameRequestCallback>, frameId: number, reduced: boolean;
+let callbacks: Map<number, FrameRequestCallback>, frameId: number, reduced: boolean, notifyWorldResize:()=>void;
 const disconnect = vi.fn();
 function tick(now: number) { const next = [...callbacks.values()]; callbacks.clear(); act(() => next.forEach(callback => callback(now))); }
 function show(props: Partial<React.ComponentProps<typeof CastleScene>> = {}) { return render(<CastleScene places={places} selectedId="chapel" onSelect={vi.fn()} paused={false} night={false} detailId="detail" {...props} />); }
@@ -29,7 +27,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'setPointerCapture', { configurable: true, value: vi.fn() }); Object.defineProperty(HTMLCanvasElement.prototype, 'releasePointerCapture', { configurable: true, value: vi.fn() });
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { const id = ++frameId; callbacks.set(id, callback); return id; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => callbacks.delete(id));
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect = disconnect; });
+  notifyWorldResize=()=>{};vi.stubGlobal('ResizeObserver', class { constructor(private callback:ResizeObserverCallback){} observe(node:Element) { if(node.getAttribute('data-testid')==='castle-3d-world')notifyWorldResize=()=>this.callback([{target:node} as ResizeObserverEntry],this as unknown as ResizeObserver); } unobserve() {} disconnect = disconnect; });
   vi.stubGlobal('matchMedia', () => ({ get matches() { return reduced; }, addEventListener() {}, removeEventListener() {} }));
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -137,10 +135,14 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     reduced=true;const view=show({friendRequest:{id:'ambient-resident-1',action:'hello',sequence:1}}),host=screen.getByTestId('castle-3d-world');expect(host.dataset.worldCamera).toBe('12.00');expect(callbacks.size).toBe(0);
     const ambient=()=>JSON.parse(host.dataset.worldAmbient||'{}');expect(ambient().resident.interaction).toMatchObject({action:'hello',elapsed:0});const frozen=host.dataset.worldAmbient;
     fireEvent.click(screen.getByRole('button',{name:'向左旋轉城堡'}));fireEvent.click(screen.getByRole('button',{name:'拉近城堡'}));expect(host.dataset.worldAmbient).toBe(frozen);
-    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'affection',sequence:2}}/>);expect(ambient().animal.interaction).toMatchObject({action:'affection',elapsed:0});expect(callbacks.size).toBe(0);expect(gpu.instances).toBe(1);
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'hello',sequence:2}}/>);expect(ambient().animal.interaction).toMatchObject({action:'hello',elapsed:0});expect(callbacks.size).toBe(0);expect(gpu.instances).toBe(1);
   });
   it('does not pretend an unavailable 3D scene can play a friend animation',()=>{
     gpu.fail=true;const ready=vi.fn();show({friendRequest:{id:'ambient-cat-1',action:'hello',sequence:1},onFriendsReady:ready});expect(ready).toHaveBeenLastCalledWith(false);expect(callbacks.size).toBe(0);expect(screen.getByText('這個裝置目前無法開啟3D')).toBeTruthy();
+  });
+
+  it('discards requests made while WebGL is unavailable rather than playing them after retry',()=>{
+    gpu.fail=true;show({friendRequest:{id:'ambient-cat-1',action:'hello',sequence:1}});expect(document.querySelector('.castle-rpg-bubble')).toBeNull();gpu.fail=false;fireEvent.click(screen.getByRole('button',{name:'重新開啟3D'}));expect(screen.getByTestId('castle-3d-world').dataset.worldState).toBe('ready');expect(document.querySelector('.castle-rpg-bubble')).toBeNull();expect(screen.getByTestId('castle-3d-world').dataset.worldInteractionSequence).toBe('0');
   });
 
   it('advances an active greeting only on the existing delta loop, not presence/camera/hidden renders',()=>{
@@ -155,13 +157,39 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     const first={id:'ambient-resident-1',action:'hello' as const,sequence:1},view=show({paused:true,friendRequest:first}),host=screen.getByTestId('castle-3d-world');expect(host.dataset.worldCamera).toBe('12.00');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).not.toBeNull();
     const surface=screen.getByTestId('castle-3d-canvas');fireEvent(surface,new Event('webglcontextlost',{cancelable:true}));fireEvent(surface,new Event('webglcontextrestored'));expect(host.dataset.worldState).toBe('ready');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).toBeNull();expect(Number(host.dataset.worldCamera)).toBeGreaterThan(50);expect(host.dataset.worldTarget).toBe('0.00,0.70,2.00');
     view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail"/>);view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{...first,sequence:2}}/>);expect(host.dataset.worldCamera).toBe('12.00');expect(JSON.parse(host.dataset.worldAmbient||'{}').resident.interaction).toMatchObject({action:'hello'});
-    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'affection',sequence:3}}/>);expect(JSON.parse(host.dataset.worldAmbient||'{}').animal.interaction).toMatchObject({action:'affection'});expect(gpu.instances).toBe(2);
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'hello',sequence:3}}/>);expect(JSON.parse(host.dataset.worldAmbient||'{}').animal.interaction).toMatchObject({action:'hello'});expect(gpu.instances).toBe(2);
   });
 
-  it('lets a paused visitor complete both dialogue rounds without advancing the world, camera or greeting sequence',()=>{
-    const dialogue=createRef<CastleFriendDialogueHandle>();render(<><CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={{id:'ambient-cat-1',action:'hello',sequence:1}}/><div className="castle-drawer-scroll"><button type="button" onClick={()=>dialogue.current?.focusLatestReply()}>聊兩句入口</button><CastleFriendDialogue ref={dialogue} friendId="ambient-cat-1"/></div></>);
-    const host=screen.getByTestId('castle-3d-world'),ambient=host.dataset.worldAmbient,camera=host.dataset.worldCamera,target=host.dataset.worldTarget,script=getFriendDialogue('ambient-cat-1')!;
-    fireEvent.click(screen.getByRole('button',{name:'聊兩句入口'}));fireEvent.click(screen.getByRole('button',{name:script.topics[0].line}));fireEvent.click(screen.getByRole('button',{name:script.topics[0].followUps[0].line}));fireEvent.click(screen.getByRole('button',{name:'聊兩句入口'}));fireEvent.click(screen.getByRole('button',{name:'再聊這個話題'}));fireEvent.click(screen.getByRole('button',{name:'換個話題'}));expect(host.dataset.worldAmbient).toBe(ambient);expect(host.dataset.worldCamera).toBe(camera);expect(host.dataset.worldTarget).toBe(target);expect(callbacks.size).toBe(0);expect(gpu.instances).toBe(1);
+  it('opens character speech immediately and advances its three lines without advancing the world, camera or greeting sequence',()=>{
+    vi.spyOn(THREE.Raycaster.prototype,'intersectObject').mockReturnValue([]);
+    const close=vi.fn();show({paused:true,friendRequest:{id:'ambient-cat-1',action:'hello',sequence:1},onFriendClose:close});
+    const host=screen.getByTestId('castle-3d-world'),bubble=document.querySelector<HTMLElement>('.castle-rpg-bubble')!,script=getFriendSpeech('ambient-cat-1')!;
+    expect(bubble.hidden).toBe(false);expect(screen.getByText(script.lines[0])).toBeTruthy();const speech=bubble.querySelector<HTMLButtonElement>('.castle-rpg-text')!;expect(speech).toHaveFocus();
+    const frozen=host.dataset.worldAmbient,camera=host.dataset.worldCamera,target=host.dataset.worldTarget,sequence=host.dataset.worldInteractionSequence;
+    fireEvent.click(speech);expect(screen.getByText(script.lines[1])).toBeTruthy();fireEvent.click(speech);expect(screen.getByText(script.lines[2])).toBeTruthy();expect(host.dataset.worldAmbient).toBe(frozen);expect(host.dataset.worldCamera).toBe(camera);expect(host.dataset.worldTarget).toBe(target);expect(host.dataset.worldInteractionSequence).toBe(sequence);
+    fireEvent.click(screen.getByRole('button',{name:'輕輕摸摸'}));expect(host.dataset.worldInteractionSequence).toBe('2');expect(host.dataset.worldCamera).toBe(camera);expect(JSON.parse(host.dataset.worldAmbient||'{}').animal.interaction).toMatchObject({action:'affection',elapsed:0});fireEvent.keyDown(document,{key:'Escape'});expect(document.querySelector('.castle-rpg-bubble')).toBeNull();expect(close).toHaveBeenCalledOnce();expect(gpu.instances).toBe(1);
   });
-
+  it('reprojects the real head on paused orbit, zoom and resize without replaying speech or creating a loop',()=>{
+    vi.spyOn(THREE.Raycaster.prototype,'intersectObject').mockReturnValue([]);show({paused:true,friendRequest:{id:'ambient-resident-1',action:'hello',sequence:1}});
+    const host=screen.getByTestId('castle-3d-world'),bubble=document.querySelector<HTMLElement>('.castle-rpg-bubble')!,frozen=host.dataset.worldAmbient,angle=host.dataset.worldAzimuth;
+    fireEvent.click(screen.getByRole('button',{name:'向左旋轉城堡'}));expect(host.dataset.worldAzimuth).not.toBe(angle);expect(bubble.hidden).toBe(false);const before=bubble.dataset.head;fireEvent.click(screen.getByRole('button',{name:'拉近城堡'}));expect(bubble.dataset.head).not.toBe(before);expect(host.dataset.worldAmbient).toBe(frozen);expect(host.dataset.worldInteractionSequence).toBe('1');expect(callbacks.size).toBe(0);
+    vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(390);vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(844);act(()=>notifyWorldResize());expect(bubble.dataset.head).not.toBe(before);expect(gpu.instances).toBe(1);
+    const tail=document.querySelector('polygon')!.getAttribute('points')!.split(' ')[1].split(',').map(Number),projected=bubble.dataset.head!.split(',').map(Number);expect(tail[0]).toBeCloseTo(projected[0],0);expect(tail[1]).toBeCloseTo(projected[1],0);
+  });
+  it('hides both body and tail behind an occluder or foreground HUD and does not steal focus when the foreground returns',()=>{
+    let occluded=false;vi.spyOn(THREE.Raycaster.prototype,'intersectObject').mockImplementation(()=>occluded?[{object:new THREE.Mesh(),distance:1,point:new THREE.Vector3()}]:[]);
+    const request={id:'ambient-cat-1',action:'hello' as const,sequence:1},view=show({paused:true,friendRequest:request,bubbleEnabled:false}),host=screen.getByTestId('castle-3d-world');
+    const layer=document.querySelector<HTMLElement>('.castle-rpg-layer')!,bubble=document.querySelector<HTMLElement>('.castle-rpg-bubble')!;expect(bubble.hidden).toBe(true);expect(layer.dataset.anchorVisible).toBe('false');
+    const outside=document.createElement('button');document.body.append(outside);outside.focus();view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={request} bubbleEnabled/>);expect(bubble.hidden).toBe(false);expect(outside).toHaveFocus();
+    occluded=true;fireEvent.click(screen.getByRole('button',{name:'向右旋轉城堡'}));expect(bubble.hidden).toBe(true);expect(layer.dataset.anchorVisible).toBe('false');
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" friendRequest={request} bubbleEnabled={false}/>);fireEvent.keyDown(document,{key:'Escape'});expect(document.querySelector('.castle-rpg-bubble')).toBeTruthy();expect(host.dataset.worldInteractionSequence).toBe('1');outside.remove();
+  });
+  it('projects the walking head on the existing loop and hides a genuinely behind-camera anchor on a manual render',()=>{
+    vi.spyOn(THREE.Raycaster.prototype,'intersectObject').mockReturnValue([]);const request={id:'ambient-resident-1',action:'hello' as const,sequence:1},view=show({friendRequest:request});tick(1000);for(let n=1;n<=18;n++)tick(1000+n*50);
+    const bubble=document.querySelector<HTMLElement>('.castle-rpg-bubble')!,start=bubble.dataset.head;for(let n=19;n<=80;n++)tick(1000+n*50);expect(bubble.dataset.head).not.toBe(start);expect(screen.getByText(getFriendSpeech(request.id)!.lines[0])).toBeTruthy();
+    const camera=gpu.render.mock.calls.at(-1)![1] as THREE.PerspectiveCamera;camera.lookAt(camera.position.clone().add(new THREE.Vector3(0,100,0)));camera.updateMatrixWorld();view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night detailId="detail" friendRequest={request}/>);expect(bubble.hidden).toBe(true);expect(document.querySelector<HTMLElement>('.castle-rpg-layer')!.dataset.anchorVisible).toBe('false');expect(screen.getByTestId('castle-3d-world').dataset.worldInteractionSequence).toBe('1');expect(callbacks.size).toBe(0);
+  });
+  it('clears the head bubble on context loss and does not replay its old request on restore',()=>{
+    vi.spyOn(THREE.Raycaster.prototype,'intersectObject').mockReturnValue([]);show({paused:true,friendRequest:{id:'ambient-cat-1',action:'hello',sequence:1}});expect(document.querySelector('.castle-rpg-bubble')).toBeTruthy();const surface=screen.getByTestId('castle-3d-canvas');fireEvent(surface,new Event('webglcontextlost',{cancelable:true}));expect(document.querySelector('.castle-rpg-bubble')).toBeNull();fireEvent(surface,new Event('webglcontextrestored'));expect(document.querySelector('.castle-rpg-bubble')).toBeNull();expect(screen.getByTestId('castle-3d-world').dataset.worldCamera).not.toBe('12.00');
+  });
 });

@@ -1,25 +1,32 @@
+import {CastleFriendDialogue,type CastleFriendDialogueHandle} from '../CastleFriendDialogue';
+import {placeHeadBubble,type BubbleRect} from './bubbleLayout';
 import type {AmbientAction, AmbientRequest} from './ambientFriends';
 import {castleProjection} from './camera';
 import type { CastleRoster } from '@shared/castlePresence';
 import {nearestWalkNode} from '@shared/castleNavigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Compass, Map as MapIcon, RotateCcw, RotateCw, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react';
 import { buildCastleWorld, WORLD_PLACES, type PlaceId } from './world';
 
 export interface ScenePlace { id: string; name: string; label: string; icon: LucideIcon }
-export interface CastleSceneProps { places: ScenePlace[]; selectedId?: string; onSelect: (id: string) => void; paused: boolean; night: boolean; detailId: string; presence?: {roster:CastleRoster|null;receivedAt:number}; onMove?: (target:number)=>void; insets?: { top: number; right: number; bottom: number }; friendRequest?: AmbientRequest; onFriendSelect?:(id:string)=>void; onFriendsReady?:(ready:boolean)=>void }
-type SceneHandle = { reset: () => void; zoom: (factor: number) => void; rotate: (angle: number) => void; focus: (id: string) => void; refresh: () => void; layout: () => void; presence:()=>void; friend:(id:string,action:AmbientAction)=>void };
+export interface CastleSceneProps { places: ScenePlace[]; selectedId?: string; onSelect: (id: string) => void; paused: boolean; night: boolean; detailId: string; presence?: {roster:CastleRoster|null;receivedAt:number}; onMove?: (target:number)=>void; insets?: { top: number; right: number; bottom: number }; friendRequest?: AmbientRequest; onFriendSelect?:(id:string)=>void; onFriendsReady?:(ready:boolean)=>void; onEncounterChange?:(active:boolean)=>void; onFriendClose?:()=>void; bubbleEnabled?:boolean; hudObstacles?:readonly BubbleRect[] }
+type SceneHandle = { reset: () => void; zoom: (factor: number) => void; rotate: (angle: number) => void; focus: (id: string) => void; refresh: () => void; layout: () => void; presence:()=>void; friend:(id:string,action:AmbientAction,focus?:boolean)=>void; openFriend:(id:string,keyboard:boolean)=>void; project:()=>void; observeBubble:(node:HTMLDivElement|null)=>void };
 type SceneState = 'loading' | 'ready' | 'unsupported' | 'lost';
 
-export default function CastleScene({ places, selectedId, onSelect, paused, night, detailId, insets, presence, onMove, friendRequest, onFriendSelect, onFriendsReady }: CastleSceneProps) {
+export default function CastleScene({ places, selectedId, onSelect, paused, night, detailId, insets, presence, onMove, friendRequest, onFriendSelect, onFriendsReady, onEncounterChange, onFriendClose, bubbleEnabled=true, hudObstacles=[] }: CastleSceneProps) {
   const container = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
+  const [encounter,setEncounter]=useState<{id:string;key:number}>();
+  const encounterSerial=useRef(0),interactionSerial=useRef(0);
+  const bubbleLayer=useRef<HTMLDivElement>(null),bubbleRoot=useRef<HTMLDivElement|null>(null),bubbleTail=useRef<SVGPolygonElement>(null),toolbar=useRef<HTMLDivElement>(null);
+  const bubbleSpeech=useRef<CastleFriendDialogueHandle>(null);
   const residentLabels=useRef(new Map<string,HTMLSpanElement>());
   const labels = useRef(new Map<string, HTMLButtonElement>());
-  const live = useRef({ places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady }); live.current = { places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady };
+  const live = useRef({ places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady,onEncounterChange,onFriendClose,bubbleEnabled,hudObstacles,encounter }); live.current = { places, selectedId, onSelect, paused, night, insets, presence,onMove,onFriendSelect,onFriendsReady,onEncounterChange,onFriendClose,bubbleEnabled,hudObstacles,encounter };
   const api = useRef<SceneHandle>();
   const playedFriendSequence=useRef<number>();
+  const attachBubble=useCallback((node:HTMLDivElement|null)=>{bubbleRoot.current=node;api.current?.observeBubble(node);},[]);
   const [state, setState] = useState<SceneState>('loading');
   const [reduced, setReduced] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -32,6 +39,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     let controls: OrbitControls | undefined;
     let world: ReturnType<typeof buildCastleWorld> | undefined;
     let resizeObserver: ResizeObserver | undefined;
+    let observedBubble:HTMLDivElement|null=null,pendingBubbleFocus=false;
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     let reduceMotion = media?.matches ?? false; setReduced(reduceMotion);
     const scene = new THREE.Scene();
@@ -82,6 +90,28 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
         label.style.transform=`translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%)`;
       }
     }
+    function projectBubble(){
+      const node=bubbleRoot.current,layer=bubbleLayer.current,selected=live.current.encounter;
+      if(!node||!layer||!world||!controls||!host)return;
+      const actor=world.ambient.actors.find(value=>value.group.name===selected?.id);
+      if(!actor||lost||!live.current.bubbleEnabled){pendingBubbleFocus=false;node.hidden=true;layer.dataset.anchorVisible='false';return;}
+      world.group.updateMatrixWorld(true);camera.updateMatrixWorld();camera.getWorldDirection(forward);
+      const head=actor.group.localToWorld(new THREE.Vector3(0,actor.kind==='resident'?1.85:actor.kind==='rabbit'?1.6:1.3,0));
+      const inFront=head.clone().sub(camera.position).dot(forward)>0;
+      projected.copy(head).project(camera);
+      const x=(projected.x*.5+.5)*host.clientWidth,y=(-projected.y*.5+.5)*host.clientHeight;
+      let visible=inFront&&projected.z>=-1&&projected.z<=1&&x>=0&&x<=host.clientWidth&&y>=0&&y<=host.clientHeight;
+      if(visible){const sight=new THREE.Raycaster(camera.position,head.clone().sub(camera.position).normalize(),0,camera.position.distanceTo(head)-.08);const first=sight.intersectObject(world.group,true)[0];if(first&&first.object.userData.ambientId!==selected?.id)visible=false;}
+      node.hidden=!visible;layer.dataset.anchorVisible=String(visible);if(!visible)return;
+      const hostRect=host.getBoundingClientRect(),safe=layer.getBoundingClientRect();
+      const bounds={left:safe.left-hostRect.left,top:safe.top-hostRect.top,width:safe.width||host.clientWidth-24,height:safe.height||host.clientHeight-40};
+      const obstacles=live.current.hudObstacles.map(rect=>({...rect,left:rect.left-hostRect.left,top:rect.top-hostRect.top}));const bar=toolbar.current?.getBoundingClientRect();if(bar&&bar.width&&bar.height)obstacles.push({left:bar.left-hostRect.left,top:bar.top-hostRect.top,width:bar.width,height:bar.height});
+      const rect=node.getBoundingClientRect();const position=placeHeadBubble({x,y},{width:rect.width||250,height:rect.height||150},bounds,obstacles);
+      node.style.transform=`translate3d(${(position.left-bounds.left).toFixed(1)}px,${(position.top-bounds.top).toFixed(1)}px,0)`;
+      node.dataset.head=`${x.toFixed(2)},${y.toFixed(2)}`;
+      const points=position.tail.map(point=>`${(point.x-bounds.left).toFixed(1)},${(point.y-bounds.top).toFixed(1)}`).join(' ');bubbleTail.current?.setAttribute('points',points);
+      if(pendingBubbleFocus&&bubbleSpeech.current){bubbleSpeech.current.focusSpeech();pendingBubbleFocus=false;}
+    }
     function applyLight() {
       if (!world) return;
       const isNight = live.current.night;
@@ -92,6 +122,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       if (!host || !controls || !world) return;
       host.dataset.worldState = lost ? 'lost' : 'ready'; host.dataset.worldPaused = String(live.current.paused || reduceMotion);
       host.dataset.worldFrame = String(frame); host.dataset.worldResidents = String(world.residentCount);
+      host.dataset.worldInteractionSequence=String(interactionSerial.current);
       host.dataset.worldAmbient=JSON.stringify(world.ambient.snapshot());host.dataset.worldDrawCalls=String(renderer?.info?.render.calls??0);
       host.dataset.worldCamera = camera.position.distanceTo(controls.target).toFixed(2);
       host.dataset.worldAzimuth = controls.getAzimuthalAngle().toFixed(3);
@@ -104,7 +135,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     function render() {
       if (disposed || lost || !renderer || !controls || !world || rendering) return;
       rendering = true;
-      try { world.updateResidents(performance.now(),!live.current.paused&&!reduceMotion);projectLabels(); projectResidents(); renderer.render(scene, camera); frame++; recordState(); }
+      try { world.updateResidents(performance.now(),!live.current.paused&&!reduceMotion);projectLabels(); projectResidents(); projectBubble(); renderer.render(scene, camera); frame++; recordState(); }
       finally { rendering = false; }
     }
     function shouldAnimate() { return !disposed && !lost && !document.hidden && !live.current.paused && !reduceMotion; }
@@ -161,13 +192,13 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       // Include terrain/trees as occluders; never pick a building behind the visible surface.
       const intersections = raycaster.intersectObject(world.group, true);
       const hit = intersections[0]; if (!hit) return;
-      if(hit.object.userData.ambientId){const id=hit.object.userData.ambientId as string;if(live.current.onFriendSelect)live.current.onFriendSelect(id);else api.current?.friend(id,'hello');return;}
+      if(hit.object.userData.ambientId){const id=hit.object.userData.ambientId as string;api.current?.openFriend(id,false);live.current.onFriendSelect?.(id);return;}
       let object: THREE.Object3D | null = hit.object;
       while (object && !object.userData.placeId) object = object.parent;
       const id = object?.userData.placeId; if (id && enabled.has(id)) { live.current.onSelect(id); focus(id); } else if(!id&&hit.object.userData.walkSurface&&live.current.presence?.roster?.avatars.some(a=>a.isSelf)){live.current.onMove?.(nearestWalkNode(hit.point.x,hit.point.z));}
     }
     function handlePointerCancel(event: PointerEvent) { activePointers.delete(event.pointerId); pointerDown = null; }
-    function handleContextLost(event: Event) { event.preventDefault(); lost = true; if (raf) cancelAnimationFrame(raf); raf = 0; lastTime = 0; host!.dataset.worldState = 'lost'; setState('lost'); }
+    function handleContextLost(event: Event) { event.preventDefault();pendingBubbleFocus=false;setEncounter(undefined); lost = true; if (raf) cancelAnimationFrame(raf); raf = 0; lastTime = 0; host!.dataset.worldState = 'lost'; setState('lost'); }
     function handleContextRestored() { if (!disposed) { setState('loading'); setAttempt(value => value + 1); } }
     function handleVisibility() { syncAnimation(); }
     function handleReducedMotion(event: MediaQueryListEvent) { reduceMotion = event.matches; setReduced(event.matches); syncAnimation(); }
@@ -195,16 +226,17 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
         reset: () => moveCamera(homePosition.clone(), initialTarget.clone()),
         zoom: (factor: number) => { if (!controls) return; cameraTween = null; const offset = camera.position.clone().sub(controls.target); offset.setLength(THREE.MathUtils.clamp(offset.length() * factor, 11, 86)); camera.position.copy(controls.target).add(offset); controls.update(); render(); },
         rotate: (angle: number) => { if (!controls) return; cameraTween = null; const offset = camera.position.clone().sub(controls.target); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle); camera.position.copy(controls.target).add(offset); controls.update(); render(); },
-        focus, friend:(id,action)=>{
+        focus, friend:(id,action,shouldFocus=true)=>{
           const actor=world?.ambient.actors.find(candidate=>candidate.group.name===id);if(!actor||!controls)return;
-          world?.ambient.interact(id,action,live.current.paused||reduceMotion||document.hidden);
+          interactionSerial.current++;world?.ambient.interact(id,action,live.current.paused||reduceMotion||document.hidden);
+          if(!shouldFocus){render();return;}
           const target=actor.group.position.clone().add(new THREE.Vector3(0,.8,0));
           const direction=camera.position.clone().sub(controls.target).normalize();direction.y=Math.max(.5,direction.y);direction.normalize();
           moveCamera(target.clone().addScaledVector(direction,12),target);render();
-        }, refresh: syncAnimation, layout: resize, presence:()=>{world?.setPresence(live.current.presence?.roster?.avatars||[],live.current.presence?.roster?.serverNow||0,live.current.presence?.receivedAt||0);render();},
+        }, openFriend:(id,keyboard)=>{if(!world?.ambient.actors.some(actor=>actor.group.name===id))return;pendingBubbleFocus=keyboard;setEncounter({id,key:++encounterSerial.current});api.current?.friend(id,'hello',keyboard);}, project:render, observeBubble:(node)=>{if(observedBubble)resizeObserver?.unobserve?.(observedBubble);observedBubble=node;if(node)resizeObserver?.observe(node);render();}, refresh: syncAnimation, layout: resize, presence:()=>{world?.setPresence(live.current.presence?.roster?.avatars||[],live.current.presence?.roster?.serverNow||0,live.current.presence?.receivedAt||0);render();},
       };
 
-      resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); resize();
+      resizeObserver = new ResizeObserver(entries=>{if(entries.some(entry=>entry.target===host))resize();else render();}); resizeObserver.observe(host); resize();
       surface.addEventListener('pointerdown', handlePointerDown); surface.addEventListener('pointermove', handlePointerMove); surface.addEventListener('pointerup', handlePointerUp); surface.addEventListener('pointercancel', handlePointerCancel); surface.addEventListener('keydown', handleKey);
       surface.addEventListener('webglcontextlost', handleContextLost); surface.addEventListener('webglcontextrestored', handleContextRestored);
       document.addEventListener('visibilitychange', handleVisibility); media?.addEventListener('change', handleReducedMotion);
@@ -221,8 +253,15 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
     };
   }, [attempt]);
 
+  useEffect(()=>{live.current.onEncounterChange?.(!!encounter);},[encounter?.key]);
+  useEffect(()=>{api.current?.project();},[encounter,bubbleEnabled,hudObstacles,state]);
+  useEffect(()=>{
+    if(!encounter||!bubbleEnabled)return;
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented){setEncounter(undefined);live.current.onFriendClose?.();}};
+    document.addEventListener('keydown',escape);return()=>document.removeEventListener('keydown',escape);
+  },[encounter,bubbleEnabled]);
   useEffect(()=>{live.current.onFriendsReady?.(state==='ready');},[state]);
-  useEffect(()=>{if(state!=='ready'||!friendRequest||playedFriendSequence.current===friendRequest.sequence)return;playedFriendSequence.current=friendRequest.sequence;api.current?.friend(friendRequest.id,friendRequest.action);},[friendRequest,state]);
+  useEffect(()=>{if(!friendRequest)return;if(state==='lost'||state==='unsupported'){playedFriendSequence.current=friendRequest.sequence;return;}if(state!=='ready'||playedFriendSequence.current===friendRequest.sequence)return;playedFriendSequence.current=friendRequest.sequence;api.current?.openFriend(friendRequest.id,true);},[friendRequest,state]);
   useEffect(()=>{api.current?.presence();},[presence?.roster,presence?.receivedAt,state]);
   useEffect(() => { api.current?.layout(); }, [insets?.top, insets?.right, insets?.bottom]);
   useEffect(() => { api.current?.refresh(); }, [paused, night]);
@@ -234,10 +273,15 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       <canvas key={attempt} ref={canvas} className="castle-3d-canvas" aria-label="可以拖曳旋轉、縮放的3D城堡；方向鍵旋轉與縮放，Home回全景" tabIndex={unavailable ? -1 : 0} data-testid="castle-3d-canvas" hidden={unavailable} />
       {state === 'ready' && <div className="castle-3d-labels" aria-label="3D城堡地點">{places.map(place => { const Icon = place.icon; return <button ref={node => { if (node) labels.current.set(place.id, node); else labels.current.delete(place.id); }} key={place.id} type="button" className={`castle-3d-label ${selectedId === place.id ? 'is-selected' : ''}`} aria-label={`${place.name}・${place.label}`} aria-pressed={selectedId === place.id} aria-controls={detailId} onClick={() => select(place.id)}><span><Icon size={17} aria-hidden="true" /></span><span>{place.name}<small>{place.label}</small></span></button>; })}</div>}
       {state==='ready'&&<div className="castle-resident-labels" aria-hidden="true">{presence?.roster?.avatars.map(avatar=><span key={avatar.avatarId} ref={node=>{if(node)residentLabels.current.set(avatar.avatarId,node);else residentLabels.current.delete(avatar.avatarId);}} className={avatar.isSelf?'is-self':''}>{avatar.alias}{avatar.isSelf?' · 我':''}</span>)}</div>}
+      <div ref={bubbleLayer} className="castle-rpg-layer" aria-label="角色頭頂對話">
+        {encounter&&<><svg className="castle-rpg-tail" aria-hidden="true"><polygon ref={bubbleTail}/></svg><div ref={attachBubble} className="castle-rpg-bubble" hidden data-friend-id={encounter.id} onPointerDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}>
+          <CastleFriendDialogue key={encounter.key} ref={bubbleSpeech} friendId={encounter.id} onClose={()=>{setEncounter(undefined);if(live.current.bubbleEnabled)live.current.onFriendClose?.();}} onGesture={action=>api.current?.friend(encounter.id,action,false)}/>
+        </div></>}
+      </div>
       {state === 'loading'  && <div className="castle-3d-loading" role="status"><Compass size={27} aria-hidden="true" /><p>正在打開城門…</p></div>}
       {unavailable && <div className="castle-3d-fallback"><img src="/im-castle-world.webp" alt="城堡概念插畫；目前不是3D場景。" width="1536" height="1024" /><div role="status"><h2>{state === 'lost' ? '3D畫面暫時中斷' : '這個裝置目前無法開啟3D'}</h2><p>目前顯示城堡插畫。你仍可開啟「探索」，從地點清單前往各個功能。</p><button type="button" onClick={() => { setState('loading'); setAttempt(value => value + 1); }}>重新開啟3D</button></div></div>}
     </div>
-    {!unavailable && <div className="castle-3d-toolbar" role="group" aria-label="3D地圖視角">
+    {!unavailable && <div ref={toolbar} className="castle-3d-toolbar" role="group" aria-label="3D地圖視角">
       <button type="button" onClick={() => api.current?.reset()} aria-label="重設為城堡全景"><MapIcon size={17} aria-hidden="true" /><span>全景</span></button>
       <button type="button" onClick={() => api.current?.rotate(-.35)} aria-label="向左旋轉城堡"><RotateCcw size={17} aria-hidden="true" /></button>
       <button type="button" onClick={() => api.current?.rotate(.35)} aria-label="向右旋轉城堡"><RotateCw size={17} aria-hidden="true" /></button>
