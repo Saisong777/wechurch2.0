@@ -89,3 +89,81 @@
 .dark .castle-places, .dark .castle-everyday-links { color: #d9eadf; }
 .dark .castle-places small, .dark .castle-everyday-links > span { color: #a0b6aa; }
 .dark .castle-place-list a:hover { color: #174f49; }
+
+/* The second concept is a complete real-time miniature world. */
+.castle-map-shell--3d { background: #c7e7de; }
+.castle-3d-shell { position: relative; width: 100%; }
+.castle-3d-viewport { position: relative; width: 100%; height: clamp(600px, 74vh, 820px); overflow: hidden; }
+.castle-3d-canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-offset: -5px !important; }
+.castle-3d-canvas[hidden] { display: none; }
+.castle-3d-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.castle-3d-label { position: absolute; top: 0; left: 0; display: flex; align-items: center; gap: 0; min-height: 44px; border-radius: 25px; padding: 0; background: #fffdf4ef; box-shadow: 0 4px 16px #284e4926; color: #174f49; pointer-events: auto; will-change: transform; }
+.castle-3d-label[hidden] { display: none; }
+.castle-3d-label:after { content: ''; position: absolute; width: 8px; height: 8px; left: calc(50% - 4px); bottom: -4px; transform: rotate(45deg); background: #fffdf4; }
+.castle-3d-label > span:first-child { display: grid; place-items: center; width: 39px; height: 39px; flex-shrink: 0; border-radius: 50%; margin: 3px; }
+.castle-3d-label > span:last-child { padding: 5px 13px 5px 1px; white-space: nowrap; font-size: 11px; font-weight: 700; text-align: left; }
+.castle-3d-label small { display: block; font-size: 9px; font-weight: 400; opacity: .7; margin-top: 3px; }
+.castle-3d-label:hover > span:first-child { background: #e7c49b; }
+.castle-3d-label.is-selected { background: #174f49f2; color: #fffdf4; }
+.castle-3d-label.is-selected:after { background: #174f49; }
+.castle-3d-label.is-selected > span:first-child { background: #d98660; }
+.castle-3d-toolbar, .castle-atmosphere-controls { position: absolute; display: flex; align-items: center; padding: 5px; gap: 1px; border-radius: 30px; background: #fffdf4f2; box-shadow: 0 4px 18px #28584914; border: 1px solid #fff8; }
+.castle-3d-toolbar { bottom: 29px; left: 24px; }
+.castle-3d-toolbar button, .castle-atmosphere-controls button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; min-width: 40px; padding: 0 10px; border: 0; border-radius: 24px; font-size: 11px; color: #174f49; background: transparent; }
+.castle-3d-toolbar button:hover, .castle-atmosphere-controls button:hover { background: #e7eee3; }
+.castle-3d-toolbar > span { height: 18px; width: 1px; margin: 0 4px; background: #ced9ce; }
+.castle-atmosphere-controls { right: 24px; top: 20px; }
+.castle-atmosphere-controls button[aria-pressed='true'] { background: #e4ebdd; }
+.castle-3d-gesture { position: absolute; top: 22px; left: 25px; margin: 0; padding: 9px 12px; color: #315f55; background: #fffdf4b8; border-radius: 24px; font-size: 10px; pointer-events: none; }
+.castle-3d-gesture span { padding: 0 6px; opacity: .4; }
+.castle-3d-caption { position: absolute; right: 23px; bottom: 16px; margin: 0; padding: 4px 7px; border-radius: 4px; background: #fffdf4c9; color: #315f55; font-size: 9px; pointer-events: none; }
+.castle-3d-loading, .castle-3d-loading-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; position: absolute; inset: 0; color: #315f55; background: #c7e7de; font-size: 13px; }
+.castle-3d-loading-fallback { position: relative; min-height: 600px; }
+.castle-3d-fallback { position: absolute; inset: 0; }
+.castle-3d-fallback > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.castle-3d-fallback > div { position: absolute; bottom: 65px; left: 25px; max-width: 370px; margin-right: 25px; padding: 20px; border-radius: 18px; background: #fffdf4f5; color: #174f49; box-shadow: 0 6px 30px #1f544928; }
+.castle-3d-fallback h2 { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
+.castle-3d-fallback p { margin: 0; font-size: 12px; line-height: 1.8; }
+.castle-3d-fallback button { margin-top: 12px; min-height: 44px; border-radius: 24px; background: #174f49; color: #fffdf4; padding: 0 18px; font-size: 12px; }
+.castle-intro { padding-top: 18px; padding-bottom: 14px; grid-template-columns: 1fr auto; gap: 2px 24px; }
+.castle-intro h1 { font-size: clamp(27px, 2.5vw, 36px); margin-top: 3px; }
+.castle-explore-link { min-height: 30px; margin-top: 2px; font-size: 11px; }
+@media (max-width: 700px) {
+  .castle-3d-viewport { height: clamp(510px, 71svh, 740px); }
+  .castle-3d-loading-fallback { min-height: 510px; }
+  .castle-intro { padding: 15px 20px 11px; }
+  .castle-intro h1 { font-size: 27px; line-height: 1.4; }
+  .castle-intro h1 br { display: none; }
+  .castle-intro-copy { margin-top: 6px; font-size: 11px; }
+  .castle-explore-link { min-height: 26px; margin-top: 2px; }
+  .castle-atmosphere-controls { top: 12px; right: 12px; }
+  .castle-atmosphere-controls button { min-height: 38px; min-width: 38px; padding: 0 8px; }
+  .castle-atmosphere-controls button span { display: none; }
+  .castle-3d-gesture { top: 15px; left: 13px; max-width: calc(100% - 125px); padding: 8px 9px; font-size: 9px; }
+  .castle-3d-gesture span { padding: 0 2px; }
+  .castle-3d-toolbar { left: 12px; bottom: 32px; padding: 3px; }
+  .castle-3d-toolbar button { min-height: 40px; min-width: 38px; padding: 0 7px; }
+  .castle-3d-toolbar button span { display: none; }
+  .castle-3d-caption { right: 12px; bottom: 9px; font-size: 8px; }
+  .castle-3d-label > span:last-child { display: none; }
+  .castle-3d-label > span:first-child { width: 38px; height: 38px; }
+  .castle-3d-fallback > div { left: 15px; bottom: 45px; margin-right: 15px; padding: 17px; }
+}
+[data-home-mode='castle'] .home-mode-bar { margin-bottom: 10px; }
+.castle-explorer { position: relative; }
+.castle-home .castle-intro { position: absolute; top: 18px; left: 22px; z-index: 2; display: block; padding: 12px 16px; border-radius: 16px; background: #fffdf4e6; pointer-events: none; }
+.castle-home .castle-intro .castle-eyebrow { font-size: 10px; }
+.castle-home .castle-intro .castle-eyebrow > span { font-size: 8px; }
+.castle-home .castle-intro h1 { font-size: 24px; line-height: 1.35; margin-top: 6px; }
+.castle-home .castle-intro h1 br, .castle-home .castle-intro-copy, .castle-home .castle-explore-link { display: none; }
+.castle-3d-viewport { height: clamp(620px, 82vh, 850px); }
+.castle-3d-gesture { top: auto; bottom: 92px; }
+@media (max-width: 700px) {
+  .castle-home .castle-intro { top: 12px; left: 12px; max-width: calc(100% - 120px); padding: 10px 12px; border-radius: 13px; }
+  .castle-home .castle-intro h1 { font-size: 19px; letter-spacing: .02em; margin-top: 4px; }
+  .castle-home .castle-intro .castle-eyebrow { font-size: 9px; flex-wrap: wrap; gap: 5px; }
+  .castle-home .castle-intro .castle-eyebrow > svg { width: 14px; }
+  .castle-home .castle-intro .castle-eyebrow > span { padding: 1px 5px; }
+  .castle-3d-viewport { height: clamp(540px, 76svh, 740px); }
+  .castle-3d-gesture { bottom: 90px; max-width: calc(100% - 25px); }
+}

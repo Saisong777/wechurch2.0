@@ -631,7 +631,7 @@ const Index = () => {
         </div>
       </header>
 
-      <main className={`dashboard-main mobile-readable ${homeMode === 'castle' ? 'w-full' : 'container'} mx-auto px-4 py-4 sm:px-6 md:py-8`}>
+      <main data-home-mode={homeMode} className={`dashboard-main mobile-readable mx-auto ${homeMode === 'castle' ? 'w-full px-3 py-3 sm:px-5' : 'container px-4 py-4 sm:px-6 md:py-8'}`}>
         <HomeModeSwitch mode={homeMode} onChange={changeMode} />
         <VisitReminder />
         {notesError && <div className="mx-auto max-w-3xl"><NotesLoadNotice onRetry={() => { void retryNotes(); }} busy={notesFetching} /></div>}
