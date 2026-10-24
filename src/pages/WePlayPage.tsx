@@ -1,11 +1,14 @@
 import { useCastleContentPresentation } from '@/contexts/CastleContentPresentationContext';
-import DiscipleQuizPage from './DiscipleQuizPage';
-import { BookOpen, Gamepad2, ScrollText, Shuffle } from 'lucide-react';
+import { useLayoutEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { usePageScroll } from '@/contexts/PageScrollContext';
+import { ArrowRight, BookOpen, Gamepad2, ScrollText, Shuffle } from 'lucide-react';
 import { FeaturePortalPage, FeaturePortalAction } from '@/components/product/FeaturePortalPage';
 import { FeatureGate } from '@/components/ui/feature-gate';
 import { useFeatureToggles } from '@/hooks/useFeatureToggles';
+import './pavilion.css';
 
-const actions: Array<FeaturePortalAction & { featureKeys: string[] }> = [
+const actions: Array<FeaturePortalAction & { featureKeys: string[]; inPavilion?: boolean }> = [
   {
     id: 'icebreaker',
     title: '抽破冰題',
@@ -44,6 +47,7 @@ const actions: Array<FeaturePortalAction & { featureKeys: string[] }> = [
   },
   {
     id: 'disciple-quiz',
+    inPavilion: true,
     title: '十二門徒人格',
     subtitle: '發現你的同行組合',
     icon: ScrollText,
@@ -58,22 +62,53 @@ const actions: Array<FeaturePortalAction & { featureKeys: string[] }> = [
 
 export const WePlayPage = () => {
   const castleContent = useCastleContentPresentation();
-  const { isFeatureEnabled } = useFeatureToggles();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const scroll = usePageScroll();
+  const { isFeatureEnabled, loading, error } = useFeatureToggles();
   const enabledActions = actions.filter((action) => action.featureKeys.every(isFeatureEnabled));
-
-  if (castleContent) return <DiscipleQuizPage />;
+  const pavilionActivities = enabledActions.filter(action => action.inPavilion);
+  const hubReady = castleContent && !loading && !error && isFeatureEnabled('we_play');
+  useLayoutEffect(() => {
+    if (!hubReady) return;
+    scroll.to(0);
+    heading.current?.focus({ preventScroll: true });
+  }, [hubReady, scroll]);
 
   return (
     <FeatureGate
       featureKey="we_play"
-      title="小工具維護中"
-      description="現場互動工具目前暫時關閉，請稍後再試"
+      title={castleContent ? '相聚小亭暫未開放' : '小工具維護中'}
+      description="互動活動目前暫時關閉，請稍後再試"
     >
-      <FeaturePortalPage
+      {castleContent ? (
+        <main className="pavilion-hub">
+          <div className="pavilion-content">
+            <div className="pavilion-sign" aria-hidden="true"><Gamepad2 size={30} /></div>
+            <p className="pavilion-eyebrow">城堡裡的相聚時光</p>
+            <h1 ref={heading} tabIndex={-1}>相聚小亭</h1>
+            <p className="pavilion-lead">挑個小活動，一起玩吧。</p>
+            <nav className="pavilion-activities" aria-label="相聚小亭活動">
+              {pavilionActivities.map(activity => (
+                <Link key={activity.id} to={activity.href} className="pavilion-activity" aria-labelledby={`pavilion-${activity.id}`}>
+                  <span className="pavilion-activity-emblem" aria-hidden="true"><activity.icon size={30} /></span>
+                  <div>
+                    <p className="pavilion-eyebrow">認識自己 · 認識彼此</p>
+                    <h2 id={`pavilion-${activity.id}`}>{activity.title}</h2>
+                    <p>24 個生活情境，發現你的同行組合。</p>
+                    <span className="pavilion-start">開始探索 <ArrowRight size={18} aria-hidden="true" /></span>
+                  </div>
+                </Link>
+              ))}
+            </nav>
+            {!pavilionActivities.length && <p className="pavilion-empty" role="status">小亭的活動準備中，晚點再來看看。</p>}
+            <p className="pavilion-future">這裡還會陸續加入新的小遊戲與互動，讓每次相聚多一點驚喜。</p>
+          </div>
+        </main>
+      ) : <FeaturePortalPage
         title="小工具"
         subtitle="現場互動"
         actions={enabledActions}
-      />
+      />}
     </FeatureGate>
   );
 };
