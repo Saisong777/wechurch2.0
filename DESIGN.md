@@ -648,3 +648,5 @@ Static actor pieces merge by material within articulated joints. The measured am
 
 
 信箱材料補註（v10第二候選）：本區選用固定米白信紙，傳統及城堡模式、亮暗偏好均採相同局部 light material；共用 Header 仍沿原外觀設定。表單使用的語意色票在本區完整控制，包含 destructive/foreground 與 accent/foreground，避免暗色主題淺紅落到米白底而降低錯誤文字對比。輸入、文字區、select 的材料／focus／invalid 規則具明確局部 specificity；重新登入操作保有段落間距。手機直式信箱位於品牌後的真實 flow，長教會名與預覽徽章可自然推開；原探索、選單及相機控制仍原位置，ResizeObserver 將實際信箱底緣納入地圖標籤 top inset，不依固定品牌高度或反覆查詢布局。
+
+641–760px 窄幅 HUD 的信箱改為 44px 信封圖示，保留原 Link 的完整 aria-label，避免四欄橫列擠壓品牌並與下方真人狀態重疊；640px 以下及 761px 以上維持既有呈現。
