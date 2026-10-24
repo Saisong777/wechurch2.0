@@ -627,3 +627,12 @@ The login window contains the original LoginForm and its errors/actions without 
 結果可查看回答依據、可能強項、成長方向、同行小任務及朋友提問。只在分頁 sessionStorage 暫存有版本且驗證過的答案／題號，不上傳、不存身分、沒有自動分享。重新開始需確認；複製失敗提供可選取摘要。44px操作、手機單欄、內捲與標題焦點、原生radio鍵盤、無自動跳題及延遲計時器；尊重減少動態偏好。保留城堡Window原捲動介面及關閉／子視窗語意。
 
 驗收需含：計分公平與12類可獨勝、全部同分、不完整／異常草稿、回頭修改不疊分、重載續作與重測取消、關閉再進、複製失敗、feature failclosed、城堡單入口／傳統工具保留，桌面390/320/橫向真B流程。來源及限制見 disciple-quiz-v7 的研究與獨立QA，結構檢查不等於真人效度。
+
+
+## Castle neighbourhood life (2026-10-24 / v9)
+
+Seven fictional walking residents and six miniature animals (two cats, two dogs, a rabbit and a sheep) animate the existing 3D neighbourhood. Oversize heads, cat points/raised tails, dog floppy ears/muzzles, long rabbit ears and clustered sheep wool distinguish real mesh silhouettes. Jade, coral, sunshine, lavender and warm ivory clothing match the existing stone/sea palette. No image planes or emoji characters.
+
+Ambient actors own a separate group/resources and are never inserted into authenticated presence, avatar labels or online counts. A compact readable scene caption explains the distinction. They follow only existing safe walk edges with staggered phases, speed variation and short node pauses. Their time advances only inside the existing clamped world update loop: pause, reduced motion and background visibility freeze every position/joint; manual camera renders and authoritative real-member position updates do not advance ambient time. Terrain/building selection ignores ambient bodies while retaining real environment occlusion.
+
+Static actor pieces merge by material within articulated joints; shared low-poly primitives and colors keep the original mesh budget. Unmount/rebuild disposes ambient geometry/materials exactly once. CPU tests cover route clearance against actual obstacles, animated species/joints, stops, bounded time, complete freeze independent of real presence, picking and resource cleanup. Final visibility and mobile performance require same-source Railway B WebGL evidence; source/test success is not visual signoff.

@@ -170,3 +170,6 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
   .castle-home--fullscreen:not([data-castle-panel='closed']) .castle-mobile-entry { display: none; }
   .castle-home--fullscreen .castle-3d-caption { max-width: calc(100% - 24px); }
 }
+
+/* One readable scene-character distinction, below the mobile join pill. */
+.castle-home--fullscreen .castle-3d-caption { bottom: 2px; font-size: 10px; line-height: 1.4; padding: 1px 4px; max-width: calc(100% - 24px); }

@@ -53,6 +53,11 @@ describe('miniature castle world', () => {
     world.updateResidents(1500,false);expect(Math.abs(person.legs[0].rotation.x)).toBe(0);expect(person.group.position.z).toBeCloseTo(12.75);
     world.setPresence([],2000,1500);expect(world.walkers).toEqual([]);expect(world.places).toBe(places);expect(person.group.parent).toBeNull();world.dispose();
   });
+  it('keeps every ambient transform frozen while authoritative real-member positions continue updating',()=>{
+    const world=buildCastleWorld();world.update(.05);const positions=()=>{const values:number[][]=[];world.ambient.group.updateMatrixWorld(true);world.ambient.group.traverse(object=>values.push(object.matrix.toArray()));return values;};const frozen=positions(),snapshot=world.ambient.snapshot();
+    const avatar={avatarId:'real',alias:'真實同行者',preset:'jade' as const,isSelf:true,motion:{sequence:1,path:[[0,15] as [number,number],[0,10.5] as [number,number]],startedAt:1000,durationMs:3000}};
+    world.setPresence([avatar],1000,0);world.updateResidents(1500,false);expect(world.walkers[0].group.position.z).toBeCloseTo(12.75);expect(world.residentCount).toBe(1);expect(positions()).toEqual(frozen);expect(world.ambient.snapshot()).toEqual(snapshot);world.setPresence([],2000,1500);expect(world.residentCount).toBe(0);expect(world.ambient.actors).toHaveLength(13);expect(positions()).toEqual(frozen);world.dispose();
+  });
   it('disposes geometry and materials when the scene owner unmounts', () => {
     const world = buildCastleWorld(), geometry = vi.spyOn(THREE.BufferGeometry.prototype, 'dispose'), material = vi.spyOn(THREE.Material.prototype, 'dispose');
     world.dispose(); expect(geometry).toHaveBeenCalled(); expect(material).toHaveBeenCalled(); vi.restoreAllMocks();

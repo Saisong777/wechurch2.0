@@ -90,6 +90,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       if (!host || !controls || !world) return;
       host.dataset.worldState = lost ? 'lost' : 'ready'; host.dataset.worldPaused = String(live.current.paused || reduceMotion);
       host.dataset.worldFrame = String(frame); host.dataset.worldResidents = String(world.residentCount);
+      host.dataset.worldAmbient=JSON.stringify(world.ambient.snapshot());host.dataset.worldDrawCalls=String(renderer?.info?.render.calls??0);
       host.dataset.worldCamera = camera.position.distanceTo(controls.target).toFixed(2);
       host.dataset.worldAzimuth = controls.getAzimuthalAngle().toFixed(3);
       host.dataset.worldTarget = `${controls.target.x.toFixed(2)},${controls.target.y.toFixed(2)},${controls.target.z.toFixed(2)}`;
@@ -157,7 +158,7 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       const enabled = new Set(live.current.places.map(place => place.id));
       // Include terrain/trees as occluders; never pick a building behind the visible surface.
       const intersections = raycaster.intersectObject(world.group, true);
-      const hit = intersections[0]; if (!hit) return;
+      const hit = intersections.find(intersection=>!intersection.object.userData.ambientActor); if (!hit) return;
       let object: THREE.Object3D | null = hit.object;
       while (object && !object.userData.placeId) object = object.parent;
       const id = object?.userData.placeId; if (id && enabled.has(id)) { live.current.onSelect(id); focus(id); } else if(!id&&hit.object.userData.walkSurface&&live.current.presence?.roster?.avatars.some(a=>a.isSelf)){live.current.onMove?.(nearestWalkNode(hit.point.x,hit.point.z));}
@@ -234,6 +235,6 @@ export default function CastleScene({ places, selectedId, onSelect, paused, nigh
       <button type="button" onClick={() => api.current?.zoom(1.25)} aria-label="拉遠城堡"><ZoomOut size={18} aria-hidden="true" /></button>
     </div>}
     {!unavailable && <p className="castle-3d-gesture">拖曳轉一圈<span>・</span>滾輪或雙指拉近<span>・</span>點建築探索</p>}
-    <p className="castle-3d-caption">{unavailable ? '城堡插畫備用畫面' : '真人玩偶由本人加入・暫停僅減少動態，位置仍會更新'}{reduced && !unavailable && <span>・已減少動態</span>}</p>
+    <p className="castle-3d-caption">{unavailable ? '城堡插畫備用畫面' : '散步居民與小動物為場景角色；暱稱玩偶是真人'}{reduced && !unavailable && <span>・已減少動態</span>}</p>
   </div>;
 }

@@ -1,3 +1,4 @@
+import {createAmbientLife} from './ambientLife';
 import * as THREE from 'three';
 import { WALK_NODES,WALK_EDGES,sampleCastleMotion } from '@shared/castleNavigation';
 import { CASTLE_MAX_RESIDENTS,type CastleAvatar } from '@shared/castlePresence';
@@ -294,10 +295,11 @@ export function buildCastleWorld() {
   const sea = new THREE.Mesh(seaGeometry, seaMaterial); sea.rotation.x = -Math.PI / 2; sea.position.y = -3.5; sea.receiveShadow = true; world.add(sea);
   // Foam is a 3D ring around the cliff, rather than an image or a painted backdrop.
   const foamMaterial = mat(0xc4e8d7); const foam = mesh(world, geo(new THREE.TorusGeometry(1, .035, 3, 100)), foamMaterial, 0, -3.38, 0, 23.2, 18.7, 1, false); foam.rotation.x = -Math.PI / 2;
+  const ambient=createAmbientLife();world.add(ambient.group);
   const originalSeaPositions = Float32Array.from(seaGeometry.attributes.position.array);
   let elapsed = 0;
   function update(delta: number) {
-    const dt = Math.max(0, Math.min(.05, delta)); elapsed += dt;
+    const dt = Math.max(0, Math.min(.05, delta)); elapsed += dt;ambient.update(dt);
     boats.forEach((boat, i) => { boat.position.y = -3.1 + Math.sin(elapsed * 1.5 + i * 2) * .1; boat.rotation.z = Math.sin(elapsed + i) * .045; });
     animatedFlags.forEach((flag, i) => { const position = flag.geometry.attributes.position; for (let j = 0; j < position.count; j++) { const x = position.getX(j); position.setZ(j, Math.sin(x * 5 + elapsed * 3 + i) * .08 * (x + .5)); } position.needsUpdate = true; });
     const positions = seaGeometry.attributes.position;
@@ -305,6 +307,6 @@ export function buildCastleWorld() {
     streams.forEach((stream, i) => { stream.scale.x = stream.scale.z = .03 + Math.sin(elapsed * 5 + i) * .004; });
   }
   function night(value: boolean) { glowMat.emissive.setHex(value ? 0xffc563 : 0x000000); glowMat.emissiveIntensity = value ? .9 : 0; seaMaterial.color.setHex(value ? 0x255d70 : 0x62bfb9); }
-  function dispose() { geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
-  return { group: world, places, walkers, setPresence, updateResidents, update, night, dispose, get residentCount(){return walkers.length;}, obstacleBounds };
+  function dispose() { ambient.dispose();geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
+  return { group: world, places, ambient, walkers, setPresence, updateResidents, update, night, dispose, get residentCount(){return walkers.length;}, obstacleBounds };
 }

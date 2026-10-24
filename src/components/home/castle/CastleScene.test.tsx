@@ -112,4 +112,20 @@ describe('3D scene lifecycle (CPU renderer harness; visual WebGL is checked on B
     fireEvent.click(screen.getByRole('button',{name:'重設為城堡全景'}));expect(Number(host.dataset.worldCamera)).toBeCloseTo(62.34,1);expect(JSON.parse(host.dataset.worldProjection||'{}').fov).toBe(42);
   });
 
+  it('animates only ambient time in the active loop, freezing it on pause, reduced motion and hidden tabs while real avatars update',()=>{
+    let changeMotion:((event:MediaQueryListEvent)=>void)|undefined;
+    vi.stubGlobal('matchMedia',()=>({matches:false,addEventListener:(_type:string,listener:(event:MediaQueryListEvent)=>void)=>{changeMotion=listener;},removeEventListener:()=>{}}));
+    const view=show(),host=screen.getByTestId('castle-3d-world');const ambient=()=>JSON.parse(host.dataset.worldAmbient||'{}');expect(ambient()).toMatchObject({residents:7,animals:6,elapsed:0});expect(host.dataset.worldResidents).toBe('0');
+    tick(1000);tick(1050);expect(ambient().elapsed).toBe(.05);const frozen=host.dataset.worldAmbient;
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail"/>);fireEvent.click(screen.getByRole('button',{name:'拉近城堡'}));fireEvent.click(screen.getByRole('button',{name:'向右旋轉城堡'}));expect(host.dataset.worldAmbient).toBe(frozen);expect(callbacks.size).toBe(0);
+    const avatar={avatarId:'22222222-2222-4222-8222-222222222222',alias:'真人暱稱',preset:'jade' as const,isSelf:true,motion:{sequence:1,path:[[0,10.5] as [number,number]],startedAt:1000,durationMs:0}};
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused night={false} detailId="detail" presence={{roster:{instanceEpoch:'11111111-1111-4111-8111-111111111111',serverNow:1000,ttlMs:25000,avatars:[avatar]},receivedAt:performance.now()}}/>);expect(host.dataset.worldResidentPosition).toBe('0.000,10.500');expect(host.dataset.worldResidents).toBe('1');expect(host.dataset.worldAmbient).toBe(frozen);expect(document.querySelectorAll('.castle-resident-labels span')).toHaveLength(1);
+    view.rerender(<CastleScene places={places} onSelect={vi.fn()} paused={false} night={false} detailId="detail"/>);act(()=>changeMotion?.({matches:true} as MediaQueryListEvent));expect(callbacks.size).toBe(0);fireEvent.click(screen.getByRole('button',{name:'拉遠城堡'}));expect(host.dataset.worldAmbient).toBe(frozen);
+    act(()=>changeMotion?.({matches:false} as MediaQueryListEvent));vi.spyOn(document,'hidden','get').mockReturnValue(true);fireEvent(document,new Event('visibilitychange'));expect(callbacks.size).toBe(0);expect(host.dataset.worldAmbient).toBe(frozen);vi.spyOn(document,'hidden','get').mockReturnValue(false);fireEvent(document,new Event('visibilitychange'));tick(100000);expect(host.dataset.worldAmbient).toBe(frozen);tick(100050);expect(ambient().elapsed).toBe(.1);expect(gpu.instances).toBe(1);
+  });
+  it('ignores only ambient bodies in picking and retains a real environmental occluder',()=>{
+    let blocked=false;vi.spyOn(THREE.Raycaster.prototype,'intersectObject').mockImplementation(object=>{let ambient:THREE.Object3D|undefined,building:THREE.Object3D|undefined;object.traverse(child=>{if(child instanceof THREE.Mesh&&child.userData.ambientActor)ambient=child;if(child.userData.placeId==='chapel')building=child;});const terrain=new THREE.Mesh();return [{object:ambient!,distance:.5,point:new THREE.Vector3()},...(blocked?[{object:terrain,distance:1,point:new THREE.Vector3()}]:[]),{object:building!,distance:2,point:new THREE.Vector3()}];});
+    const select=vi.fn();show({paused:true,onSelect:select});const surface=screen.getByTestId('castle-3d-canvas'),click=()=>{fireEvent.pointerDown(surface,{pointerId:1,button:0,clientX:100,clientY:100});fireEvent.pointerUp(surface,{pointerId:1,button:0,clientX:100,clientY:100});};click();expect(select).toHaveBeenCalledWith('chapel');select.mockClear();blocked=true;click();expect(select).not.toHaveBeenCalled();
+  });
+
 });
