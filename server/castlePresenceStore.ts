@@ -1,3 +1,4 @@
+import {castleAppearance,legacyCastleAppearance,type CastleAppearance,type CastleAvatarProfile,type CastleProfileResponse} from '../shared/castleAvatar';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { CASTLE_MAX_RESIDENTS, CASTLE_TTL_MS, type CastleJoin } from '../shared/castlePresence';
@@ -22,6 +23,7 @@ type Entry = {
     avatarId: string;
     alias: string;
     preset: CastleJoin['preset'];
+    appearance:CastleAppearance;profileRevision:number;
     motion: CastleMotion;
     leases: Map<string, Lease>;
     lastMove: number;
@@ -49,7 +51,7 @@ export class CastlePresenceStore {
     } }
     private owned(actor: CastleActor, token: string | undefined) { this.prune(); const entry = this.entries.get(actor.actorId), lease = token ? entry?.leases.get(token) : undefined; if (!entry || !lease || entry.church !== actor.church || lease.sid !== actor.sid || lease.sessionVersion !== actor.sessionVersion || lease.authSub !== actor.authSub)
         throw new CastlePresenceError(409, '請重新加入城堡'); return { entry, lease }; }
-    join(actor: CastleActor, input: CastleJoin, previous?: string) {
+    join(actor: CastleActor, input: CastleJoin, previous?: string, saved?:CastleProfileResponse) {
         this.prune();
         let entry = this.entries.get(actor.actorId);
         if (entry?.church !== actor.church) {
@@ -59,9 +61,10 @@ export class CastlePresenceStore {
         if (!entry) {
             if (this.entries.size >= 256 || [...this.entries.values()].filter(e => e.church === actor.church).length >= CASTLE_MAX_RESIDENTS)
                 throw new CastlePresenceError(503, '城堡目前已滿，請稍後再試');
-            entry = { actorId: actor.actorId, church: actor.church, avatarId: randomUUID(), alias: input.alias, preset: input.preset, motion: { sequence: 0, path: [WALK_NODES[0]], startedAt: this.now(), durationMs: 0 }, leases: new Map(), lastMove: -Infinity, commands: new Map() };
+            entry = { actorId: actor.actorId, church: actor.church, avatarId: randomUUID(), alias: input.alias, preset: input.preset, appearance:saved?castleAppearance(saved.profile):legacyCastleAppearance(input.preset),profileRevision:saved?.revision||0, motion: { sequence: 0, path: [WALK_NODES[0]], startedAt: this.now(), durationMs: 0 }, leases: new Map(), lastMove: -Infinity, commands: new Map() };
             this.entries.set(actor.actorId, entry);
         }
+        if(saved)this.updateProfile(actor,saved.profile,saved.revision);
         const old = previous ? entry.leases.get(previous) : undefined;
         if (old && old.sid === actor.sid && old.authSub === actor.authSub && old.sessionVersion === actor.sessionVersion) {
             old.expires = this.clock() + CASTLE_TTL_MS;
@@ -69,12 +72,12 @@ export class CastlePresenceStore {
         }
         if (entry.leases.size >= 4)
             throw new CastlePresenceError(429, '此帳號已開啟多個城堡分頁，請先關閉其中一個', 25);
-        entry.alias = input.alias;
-        entry.preset = input.preset;
+        if(!entry.profileRevision&&!saved){entry.alias = input.alias;entry.preset = input.preset;entry.appearance=legacyCastleAppearance(input.preset);}
         const token = randomBytes(32).toString('base64url');
         entry.leases.set(token, { ...actor, token, expires: this.clock() + CASTLE_TTL_MS });
         return { avatarId: entry.avatarId, leaseToken: token };
     }
+    updateProfile(actor:CastleActor,profile:CastleAvatarProfile,revision:number){const entry=this.entries.get(actor.actorId);if(!entry||entry.church!==actor.church||revision<entry.profileRevision)return;entry.alias=profile.alias;entry.preset=profile.outfitColor;entry.appearance=castleAppearance(profile);entry.profileRevision=revision;}
     heartbeat(actor: CastleActor, token?: string) { const { lease } = this.owned(actor, token); lease.expires = this.clock() + CASTLE_TTL_MS; }
     move(actor: CastleActor, token: string | undefined, targetNode: number, command?: string) { const { entry } = this.owned(actor, token); if (command && entry.commands.has(command))
         return; if (this.clock() - entry.lastMove < 1100)
@@ -119,7 +122,7 @@ export class CastlePresenceStore {
             if (!entry.leases.size)
                 this.entries.delete(entry.actorId);
         }
-        const avatars = [...checked].filter(entry => this.entries.get(entry.actorId) === entry && entry.church === actor.church && [...entry.leases.values()].some(lease => lease.expires > now && valid.has(lease.token))).map(entry => ({ avatarId: entry.avatarId, alias: entry.alias, preset: entry.preset, isSelf: entry.actorId === actor.actorId, motion: entry.motion }));
+        const avatars = [...checked].filter(entry => this.entries.get(entry.actorId) === entry && entry.church === actor.church && [...entry.leases.values()].some(lease => lease.expires > now && valid.has(lease.token))).map(entry => ({ avatarId: entry.avatarId, alias: entry.alias, preset: entry.preset, appearance:entry.appearance, isSelf: entry.actorId === actor.actorId, motion: entry.motion }));
         return { instanceEpoch: this.instanceEpoch, serverNow: this.now(), ttlMs: CASTLE_TTL_MS as 25000, avatars };
     }
     clear() { this.entries.clear(); }

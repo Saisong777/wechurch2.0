@@ -1,7 +1,9 @@
+import {createCastleAvatarModel} from './avatarModel';
+import {legacyCastleAppearance} from '@shared/castleAvatar';
 import {createAmbientLife} from './ambientLife';
 import * as THREE from 'three';
 import { WALK_NODES,WALK_EDGES,sampleCastleMotion } from '@shared/castleNavigation';
-import { CASTLE_MAX_RESIDENTS,type CastleAvatar } from '@shared/castlePresence';
+import { CASTLE_MAX_RESIDENTS,type CastleRenderableAvatar } from '@shared/castlePresence';
 export { WALK_NODES,WALK_EDGES } from '@shared/castleNavigation';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -253,34 +255,13 @@ export function buildCastleWorld() {
     const sailMaterial = mat(0xfff5d7); sailMaterial.side = THREE.DoubleSide; mesh(boat, geo(new THREE.ShapeGeometry(shape, 8)), sailMaterial, 0, .35, 0);
   }
 
-  const clothes = [mat(0xd88065), mat(0xe3b854), mat(0x3d8986), mat(0x677cac), mat(0xf0e6cc), mat(0x8b79a5)];
-  const skins = [mat(0xdca582), mat(0xa97455), mat(0xf0c6a1), mat(0xc58c68)]; const hair = [mat(0x49392f), mat(0x8c603b), mat(0xddd5bd)]; const trousers = [mat(0x435865), mat(0x756957), mat(0x465c51)];
-  const walkers: { group: THREE.Group; avatar: CastleAvatar; arms: THREE.Group[]; legs: THREE.Group[]; phase: number }[] = [];
+  const walkers:{group:THREE.Group;avatar:CastleRenderableAvatar;arms:THREE.Group[];legs:THREE.Group[];phase:number;model:ReturnType<typeof createCastleAvatarModel>}[]=[];
   let rosterTime=0,receivedTime=0;
-  function createResident(avatar:CastleAvatar) {
-    const i=['coral','sunshine','jade','blue','ivory','violet'].indexOf(avatar.preset);
-    const person = new THREE.Group(); person.name = `resident-${avatar.avatarId}`; world.add(person);
-    const outfit = clothes[i % clothes.length], skin = skins[i % skins.length], pants = trousers[i % trousers.length];
-    cylinder(person, outfit, 0, .88, 0, .21, .55); ball(person, skin, 0, 1.36, 0, .185, .21); ball(person, hair[i % 3], 0, 1.48, -.025, .19, .12, .18);
-    // Tiny noses show the direction residents are looking while turning.
-    ball(person, skin, 0, 1.35, .17, .06, .06, .055);
-    const arms: THREE.Group[] = [], legs: THREE.Group[] = [];
-    for (const side of [-1, 1]) {
-      const arm = new THREE.Group(); arm.position.set(side * .27, 1.08, 0); person.add(arm); arms.push(arm);
-      cylinder(arm, outfit, 0, -.13, 0, .075, .27); cylinder(arm, skin, 0, -.34, 0, .057, .22); ball(arm, skin, 0, -.47, 0, .065);
-      const leg = new THREE.Group(); leg.position.set(side * .105, .64, 0); person.add(leg); legs.push(leg);
-      cylinder(leg, pants, 0, -.25, 0, .08, .5); box(leg, dark, 0, -.51, .055, .16, .1, .27);
-    }
-    if (i % 4 === 0) { box(person, coral, 0, .87, -.24, .3, .35, .14); }
-    if (i % 5 === 0) { cylinder(person, gold, 0, 1.58, 0, .27, .055); }
-    person.scale.setScalar(.97);
-    const walker={group:person,avatar,arms,legs,phase:i*.8};walkers.push(walker);return walker;
-  }
-  function setPresence(avatars:readonly CastleAvatar[],serverNow:number,receivedAt=performance.now()) {
-    const ids=new Set(avatars.slice(0,CASTLE_MAX_RESIDENTS).map(a=>a.avatarId));
-    for(let i=walkers.length-1;i>=0;i--)if(!ids.has(walkers[i].avatar.avatarId)){walkers[i].group.removeFromParent();walkers.splice(i,1);}
-    for(const avatar of avatars.slice(0,CASTLE_MAX_RESIDENTS)){let walker=walkers.find(w=>w.avatar.avatarId===avatar.avatarId);if(walker&&walker.avatar.preset!==avatar.preset){walker.group.removeFromParent();walkers.splice(walkers.indexOf(walker),1);walker=undefined;}if(walker)walker.avatar=avatar;else createResident(avatar);}
-    rosterTime=serverNow;receivedTime=receivedAt;updateResidents(receivedAt,false);
+  function createResident(avatar:CastleRenderableAvatar){const model=createCastleAvatarModel(avatar.appearance||legacyCastleAppearance(avatar.preset)),person=model.group;person.name=`resident-${avatar.avatarId}`;person.scale.setScalar(.97);world.add(person);const phase=Math.max(0,['coral','sunshine','jade','blue','ivory','violet'].indexOf(avatar.preset))*.8;const walker={group:person,avatar,arms:model.arms,legs:model.legs,phase,model};walkers.push(walker);return walker;}
+  function setPresence(avatars:readonly CastleRenderableAvatar[],serverNow:number,receivedAt=performance.now()){
+   const ids=new Set(avatars.slice(0,CASTLE_MAX_RESIDENTS).map(a=>a.avatarId));for(let i=walkers.length-1;i>=0;i--)if(!ids.has(walkers[i].avatar.avatarId)){walkers[i].model.dispose();walkers.splice(i,1);}
+   for(const avatar of avatars.slice(0,CASTLE_MAX_RESIDENTS)){const walker=walkers.find(w=>w.avatar.avatarId===avatar.avatarId);if(walker){const appearance=avatar.appearance||legacyCastleAppearance(avatar.preset);if(JSON.stringify(walker.model.appearance)!==JSON.stringify(appearance))walker.model.applyAppearance(appearance);walker.avatar=avatar;}else createResident(avatar);}
+   rosterTime=serverNow;receivedTime=receivedAt;updateResidents(receivedAt,false);
   }
   function updateResidents(now=performance.now(),animate=true) {
     const time=rosterTime+Math.max(0,Math.min(6000,now-receivedTime));
@@ -307,6 +288,6 @@ export function buildCastleWorld() {
     streams.forEach((stream, i) => { stream.scale.x = stream.scale.z = .03 + Math.sin(elapsed * 5 + i) * .004; });
   }
   function night(value: boolean) { glowMat.emissive.setHex(value ? 0xffc563 : 0x000000); glowMat.emissiveIntensity = value ? .9 : 0; seaMaterial.color.setHex(value ? 0x255d70 : 0x62bfb9); }
-  function dispose() { ambient.dispose();geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
+  function dispose() { walkers.forEach(walker=>walker.model.dispose());ambient.dispose();geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
   return { group: world, places, ambient, walkers, setPresence, updateResidents, update, night, dispose, get residentCount(){return walkers.length;}, obstacleBounds };
 }

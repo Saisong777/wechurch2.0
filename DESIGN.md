@@ -696,3 +696,15 @@ CPU 驗證涵蓋實際 mesh 點選及遮擋、各物種關節、路線停步與�
 清單交接焦點仍綁新 encounter key 與已 commit 的同 key 本文。尚未看見角色時保留合法相機過場的交接；但其後任何新 pointerdown／keydown（包含 Tab），以及 OrbitControls 的 wheel／drag start 鏡頭操作立即取消待補焦點，前景／HUD／context loss 亦取消，返回不可追焦。遮擋／frustum 不可見時只在狀態改變更新一次簡短 sr-only 提示；若隱藏或失去 context 前焦點確實屬於泡泡且背景仍可互動，先還給朋友入口。前景視窗或 HUD 持有鍵盤時不由背景復焦。
 
 本文按鈕使用固定、簡短的「與某某交談」名稱，以 useId 的 aria-describedby 連到當前可見台詞，讓首次鍵盤交接有目前台詞描述；可見台詞不放 live role，最新回應改在同 section、按鈕外的單一 sr-only polite／atomic 區域。這是朗讀結構穩健化；沒有宣稱原 status 必定被瀏覽器裁掉，也沒有以 DOM 測試冒稱真實輔助閱讀工具已通過。完整三句／重聊與原動作仍保留，實際朗讀及六常見尺寸的泡泡／標籤像素驗收由同版 B 完成。
+
+### 帳號的城堡玩偶（v15）
+
+已登入且教會確認的使用者進入城堡時，自動以帳號造型入場。暱稱預設只用公開 display_name；空白、控制字元或含 @ 的名稱改用「同行者」，不拿 email 作公開名稱。未登入／待核教會沒有假玩偶。主動離開只結束本分頁的 lease；畫面隱藏暫時釋放，回到前景只恢復仍想留在城堡的分頁。401/403 停止自動重試，需重新確認登入；網路／容量錯誤採有上限重試與 Retry-After，最長 25 秒清過期名冊。
+
+「我的造型」是森林綠與米白的小更衣間，視窗本身滾動、關閉與儲存始終在框內。名稱、男／女／中性呈現、四種膚色、四種髮型、四種髮色、便服／外套／裙裝、六種配色可自由組合，性別呈現不改會員性別、不鎖穿搭。預覽與城堡真人使用同一個實際 3D 模型工廠，選項只切換固定的 mesh 與材質；換衣不重建 renderer 或玩偶身分，不重設 motion、位置、phase、其他分頁 lease。預覽不新增動畫 loop，無 WebGL 時明說無法預覽仍能填寫保存。所有選項／操作至少 44px，有名稱、選取語意與鍵盤焦點。衣櫥屬前景：背景漫畫泡泡／尖角暫藏，Escape 只關衣櫥並回「我的造型」；原內容視窗的前景所有權仍保留。
+
+造型保存在獨立 castle_avatar_profiles 表；0031 只追加此表及 journal idx31，不改前 31 份 SQL 或會員表欄位。GET defaults 不寫入；PUT 使用 owner-only strict profile 與 expectedRevision CAS（首次為 0），同帳號另一視窗更新時要求明確重載，連線中斷不假稱成功。交易內鎖定／重核原教會和身分，COMMIT 後再驗；commit 後回應失敗不能宣稱已 rollback，下次合法 GET 協調結果。帳號 join/read/同步與 save/同步共用有界序列（每帳號最多 8 項、全域最多 256 active keys，finally 清理）；heartbeat/move 不進此序列，避免首次 join 與保存交錯倒退造型。記憶體只 patch 當前同教會 entry，不替未入場者建立玩偶。
+
+X-Castle-Protocol: 2 才提供六個外觀欄位；無 header／版本 1 保留原五欄 strict avatar。舊 alias/preset join 不能覆蓋已保存造型；新 join 空物件由伺服器讀帳號資料。舊名冊仍可由新畫面轉為預設造型。原 32 人、4 lease／帳號、25 秒 TTL、路網與權威位置維持；新增模型有固定幾何／材質與 dispose，並非零成本，也不把單人 <450 mesh 檢查宣稱為 32 人容量實測。
+
+本次包含新資料表，原 code-only 發布證明不足：B 必須先依同版備份模型驗追加 migration、app role 的 SELECT/INSERT/CAS UPDATE 權限與舊表保護，再由主責依新 migration 發布流程及真 B 畫面驗收；作者 source/CPU 檢查不替代這些證據。

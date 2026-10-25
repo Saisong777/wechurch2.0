@@ -11,6 +11,7 @@ import { ArrowRight, BookHeart, BookOpen, Castle, Compass, Footprints, Gamepad2,
 import './castle-home.css';
 import './castle-fullscreen.css';
 import { useImmersiveSurface } from '@/hooks/useImmersiveSurface';
+const CastleAvatarWardrobe = lazy(() => import('./CastleAvatarWardrobe'));
 const CastleScene = lazy(() => import('./castle/CastleScene'));
 
 type Place = { id: string; name: string; label: string; description: string; href: string; action: string; icon: LucideIcon; feature?: string };
@@ -48,6 +49,11 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
   const navigate=useNavigate();
   const windowActive=useCastleWindowActive();
   const presence=useCastlePresence(presenceScope);
+  const [wardrobeOpen,setWardrobeOpen]=useState(false),[wardrobeLoaded,setWardrobeLoaded]=useState(false);
+  const wardrobeReturn=useRef<HTMLElement|null>(null);
+  const openWardrobe=(trigger:HTMLElement)=>{wardrobeReturn.current=trigger;setWardrobeLoaded(true);setWardrobeOpen(true);};
+  useEffect(()=>{setWardrobeOpen(false);},[presenceScope]);
+  useEffect(()=>{if(windowActive)setWardrobeOpen(false);},[windowActive]);
   const places = PLACES.filter(place => !place.feature || (!featuresLoading && featureEnabled(place.feature)));
   const [selectedId, setSelectedId] = useState('chapel');
   const selected = places.find(place => place.id === selectedId) || places[0];
@@ -79,10 +85,10 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
     else if (wasOpen.current) { lastTrigger.current?.focus({ preventScroll: true }); wasOpen.current = false; }
   }, [panel]);
   useEffect(() => {
-    if (!panel||windowActive) return;
+    if (!panel||windowActive||wardrobeOpen) return;
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) setPanel(null); };
     document.addEventListener('keydown', escape); return () => document.removeEventListener('keydown', escape);
-  }, [panel,windowActive]);
+  }, [panel,windowActive,wardrobeOpen]);
   useLayoutEffect(() => {
     const measure = () => {
       const top = Math.max(topbar.current?.getBoundingClientRect().bottom || 0, portrait?mailbox.current?.getBoundingClientRect().bottom || 0:noticeArea.current?.getBoundingClientRect().bottom || 0) + 10;
@@ -122,14 +128,14 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
         </div>;
   const messageContent=<>{notices}{hasDraft&&<div className="castle-draft" role="status"><p>此裝置有靈修草稿，尚未同步。</p><button type="button" onClick={onOpenNote}>開啟草稿<ArrowRight size={16} aria-hidden="true"/></button></div>}</>;
   const noticesContent=<div className={portrait?'castle-menu-notices':'castle-hud-notices'} ref={noticeArea}>
-    <CastlePresencePanel presence={presence} signedIn={signedIn}/>
+    <CastlePresencePanel presence={presence} signedIn={signedIn} onWardrobe={openWardrobe}/>
     {portrait?<div ref={messageArea}>{messageContent}</div>:messageContent}
   </div>;
 
   return <div className={`castle-home castle-home--fullscreen ${night ? 'castle-home--night' : ''} ${paused ? 'castle-home--paused' : ''}`} data-testid="castle-home" data-castle-portrait={String(portrait)} data-castle-panel={panel || 'closed'} data-castle-speaking={String(speaking)} style={{ '--castle-panel-bottom': `${insets.bottom}px` } as CSSProperties}>
     <div className="castle-map-shell castle-map-shell--3d">
       <Suspense fallback={<div className="castle-3d-loading-fallback" role="status">正在打開城門…</div>}>
-        <CastleScene places={places} selectedId={selected?.id} onSelect={activatePlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} friendRequest={friendRequest} onFriendSelect={()=>setPanel(null)} onFriendsReady={setFriendsReady} onEncounterChange={setSpeaking} onFriendClose={()=>friendButton.current?.focus({preventScroll:true})} bubbleEnabled={!windowActive&&!panel} hudObstacles={hudObstacles} />
+        <CastleScene places={places} selectedId={selected?.id} onSelect={activatePlace} paused={paused} night={night} detailId={detailId} insets={insets} presence={presence.view} onMove={presence.move} friendRequest={friendRequest} onFriendSelect={()=>setPanel(null)} onFriendsReady={setFriendsReady} onEncounterChange={setSpeaking} onFriendClose={()=>friendButton.current?.focus({preventScroll:true})} bubbleEnabled={!windowActive&&!panel&&!wardrobeOpen} hudObstacles={hudObstacles} />
       </Suspense>
     </div>
     <div className="castle-hud" aria-label="城堡導覽與設定">
@@ -145,7 +151,7 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
       </div>
       <button ref={friendButton} className="castle-friends-launch" type="button" aria-label="開啟城堡朋友" aria-expanded={panel==='friends'} aria-controls={drawerId} onClick={event=>openPanel('friends',event.currentTarget)}><PawPrint size={19} aria-hidden="true"/><span>城堡朋友</span></button>
       {!portrait&&noticesContent}
-      {portrait&&<div ref={mobileEntry} className="castle-mobile-entry">{!signedIn?<Link to="/login"><Users size={16} aria-hidden="true"/>登入加入</Link>:<button type="button" aria-controls={drawerId} aria-expanded={panel==='menu'} onClick={event=>openPanel('menu',event.currentTarget)}><Users size={16} aria-hidden="true"/>{presence.view.status==='disconnected'||presence.view.status==='expired'?'連線中斷・重連':presence.view.status==='connecting'?'城堡連線中…':presence.view.status==='joined'?`城堡內 ${presence.view.roster?.avatars.length||0} 人`:'加入城堡'}</button>}</div>}
+      {portrait&&<div ref={mobileEntry} className="castle-mobile-entry">{!signedIn?<Link to="/login"><Users size={16} aria-hidden="true"/>登入加入</Link>:<button type="button" aria-controls={drawerId} aria-expanded={panel==='menu'} onClick={event=>openPanel('menu',event.currentTarget)}><Users size={16} aria-hidden="true"/>{presence.view.status==='disconnected'||presence.view.status==='expired'?'連線中斷・重連':presence.view.status==='connecting'?'城堡連線中…':presence.view.status==='joined'?`城堡內 ${presence.view.roster?.avatars.length||0} 人`:presence.view.status==='joining'?'玩偶入場中…':'城堡連線'}</button>}{signedIn&&presenceScope&&<button type="button" className="castle-my-look" onClick={event=>openWardrobe(event.currentTarget)}>我的造型</button>}</div>}
       <aside ref={drawer} id={drawerId} className="castle-drawer" hidden={!panel} aria-labelledby={`${drawerId}-title`}>
         <div className="castle-drawer-heading"><h2 id={`${drawerId}-title`}>{panel === 'friends'?'城堡朋友':panel === 'menu' ? '教會與我的日常' : '城堡地點'}</h2><button data-castle-close type="button" aria-label="收合城堡面板" onClick={() => setPanel(null)}><X size={19} aria-hidden="true" /></button></div>
         <div className="castle-drawer-scroll">
@@ -182,5 +188,6 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
         <button className="castle-compact-expand" type="button" aria-label="展開城堡地點" onClick={event => openPanel('places', event.currentTarget)}><ChevronUp size={16} aria-hidden="true" /></button>
       </div>
     </div>
+    {wardrobeLoaded&&<Suspense fallback={<span className="sr-only" role="status">正在打開更衣間…</span>}><CastleAvatarWardrobe scope={presenceScope} open={wardrobeOpen} onOpenChange={setWardrobeOpen} onSaved={presence.refresh} returnFocus={wardrobeReturn} foreground={windowActive}/></Suspense>}
   </div>;
 }

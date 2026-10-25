@@ -1,5 +1,8 @@
 import express from 'express';
-import { castleJoinResponseSchema } from '../shared/castlePresence';
+import type {AddressInfo} from 'node:net';
+import type {CastleAvatarRepository} from './castleAvatarRepository';
+import type {CastleProfileSave,CastleProfileResponse} from '../shared/castleAvatar';
+import { castleJoinResponseSchema, castleJoinV2ResponseSchema, castleRosterV2Schema } from '../shared/castlePresence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Server } from 'node:http';
 vi.mock('./churchContext', () => ({ churchContext: () => undefined }));
@@ -17,7 +20,7 @@ describe('presence API boundary', () => {
         const store = new CastlePresenceStore(async (c) => new Set(c.map(c => c.token)));
         app.use('/api/castle-presence', castlePresenceRoutes(store, (req, res, next) => req.get('X-Test-Guest') ? void res.status(401).end() : next(), () => ({ actorId: actor.actorId, actorChurch: actor.church, selectedChurch: actor.church, isSystemAdmin: false }), true));
         server = await new Promise<Server>(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
-        const port = (server.address() as any).port, url = `http://127.0.0.1:${port}/api/castle-presence`;
+        const port = (server.address() as AddressInfo).port, url = `http://127.0.0.1:${port}/api/castle-presence`;
         const send = (path: string, body?: unknown, headers: Record<string, string> = {}) => fetch(url + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
         expect((await send('', undefined, { 'X-Test-Guest': '1' })).status).toBe(401);
         for (const body of [{ alias: 'A', preset: 'jade', actorId: actor.actorId }, { alias: '\u0000', preset: 'jade' }, { alias: 'A', preset: 'photo' }])
@@ -53,4 +56,11 @@ describe('presence API boundary', () => {
         version = 2;
         expect((await verify([candidate])).size).toBe(0);
     });
+});
+
+it('negotiates appearance without changing v1 strict responses, and legacy join cannot overwrite stored look',async()=>{
+ const profile={version:1 as const,alias:'Saved',genderPresentation:'female' as const,skinTone:'deep' as const,hairStyle:'long' as const,hairColor:'silver' as const,outfit:'jacket' as const,outfitColor:'violet' as const};let saved:CastleProfileResponse={profile,revision:1};const profiles={run:async(_actor:unknown,work:()=>Promise<unknown>)=>work(),read:vi.fn(async()=>saved),save:vi.fn(async(_actor:unknown,input:CastleProfileSave)=>{if(input.expectedRevision!==saved.revision)throw Object.assign(Error('conflict'),{status:409});saved={profile:input.profile,revision:saved.revision+1};return saved;})};
+ const app=express();app.use(express.json());app.use((req,_res,next)=>{Object.assign(req,{user:{sessionUserId:actor.actorId,sessionVersion:1,claims:{sub:actor.authSub}},sessionID:actor.sid});next();});const store=new CastlePresenceStore(async c=>new Set(c.map(c=>c.token)));app.use('/api/castle-presence',castlePresenceRoutes(store,(_req,_res,next)=>next(),()=>({actorId:actor.actorId,actorChurch:actor.church,selectedChurch:actor.church,isSystemAdmin:false}),true,profiles as unknown as CastleAvatarRepository));server=await new Promise<Server>(r=>{const s=app.listen(0,'127.0.0.1',()=>r(s));});const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/castle-presence`,send=(path:string,method='GET',body?:unknown,headers={})=>fetch(url+path,{method,headers:{'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
+ const v2=castleJoinV2ResponseSchema.parse(await(await send('/join','POST',{}, {'X-Castle-Protocol':'2'})).json());expect(v2.avatars[0].appearance).toMatchObject({outfit:'jacket',skinTone:'deep'});expect(Object.keys(v2.avatars[0])).toHaveLength(6);const legacy=castleJoinResponseSchema.parse(await(await send('/join','POST',{alias:'Old',preset:'coral'},{'X-Castle-Lease':v2.leaseToken})).json());expect(legacy.avatars[0].alias).toBe('Saved');expect(legacy.avatarId).toBe(v2.avatarId);expect(Object.keys(legacy.avatars[0])).toHaveLength(5);expect(profiles.save).not.toHaveBeenCalled();expect((await send('/profile','PUT',{expectedRevision:1,profile,userId:'forged'})).status).toBe(400);expect((await send('','GET',undefined,{'X-Castle-Protocol':'3'})).status).toBe(400);
+ const motion=v2.avatars[0].motion;expect((await send('/profile','PUT',{expectedRevision:1,profile:{...profile,alias:'New'}})).status).toBe(200);const after=castleRosterV2Schema.parse(await(await send('','GET',undefined,{'X-Castle-Protocol':'2'})).json());expect(after.avatars[0].alias).toBe('New');expect(after.avatars[0].motion).toEqual(motion);expect(after.avatars[0].avatarId).toBe(v2.avatarId);
 });

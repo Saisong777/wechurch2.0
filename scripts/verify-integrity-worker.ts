@@ -88,6 +88,7 @@ try {
   } else {
   const a=makeClient(),b=makeClient(),guest=makeClient(); const ids:string[]=[];
   const {verifyCastlePresenceHttp}=await import('./verify-castle-presence-http');await verifyCastlePresenceHttp(pool,makeClient);
+  const {verifyCastleAvatarHttp}=await import('./verify-castle-avatar-http');await verifyCastleAvatarHttp(pool,makeClient);
   const { verifyCareHttp } = await import('./verify-care-http');
   await verifyCareHttp(pool, makeClient);
   const { verifyDevotionShareHttp } = await import('./verify-devotion-share-http');

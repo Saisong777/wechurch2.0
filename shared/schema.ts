@@ -1,3 +1,4 @@
+import type {CastleAvatarProfile} from './castleAvatar';
 import { pgTable, text, serial, integer, boolean, timestamp, uuid, pgEnum, date, jsonb, uniqueIndex, unique, index, primaryKey, check, foreignKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import type { z } from "zod/v4";
@@ -1628,3 +1629,12 @@ export const churchLoginDigestReads=pgTable('church_login_digest_reads',{
  userId:uuid('user_id').notNull().references(()=>users.id),church:text('church').notNull(),day:date('day').notNull(),
  readAt:timestamp('read_at',{withTimezone:true}).notNull().defaultNow(),
 },t=>({pk:primaryKey({columns:[t.userId,t.church,t.day]})}));
+
+// Castle-only account appearance. Never a member gender/profile or presence lease record.
+export const castleAvatarProfiles=pgTable('castle_avatar_profiles',{
+ userId:uuid('user_id').primaryKey().references(()=>users.id,{onDelete:'cascade'}),
+ profile:jsonb('profile').$type<CastleAvatarProfile>().notNull(),
+ revision:integer('revision').notNull().default(1),
+ createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+ updatedAt:timestamp('updated_at',{withTimezone:true}).notNull().defaultNow(),
+},table=>[check('castle_avatar_profile_object',sql`jsonb_typeof(${table.profile})='object'`),check('castle_avatar_profile_revision',sql`${table.revision}>0`)]);

@@ -269,3 +269,38 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
 .castle-rpg-layer[data-anchor-visible="false"] .castle-rpg-tail { display:none; }
 
 .castle-friends-list button:disabled { opacity: .6; cursor: not-allowed; }
+
+/* The wardrobe is a foreground room; it owns its scrolling and dialog focus. */
+.castle-wardrobe{--background:48 85% 98%;--foreground:171 47% 19%;--muted:155 28% 91%;--muted-foreground:168 20% 34%;--border:45 42% 69%;--input:45 42% 69%;--ring:171 47% 19%;width:min(880px,calc(100vw - 32px));max-width:880px;max-height:calc(100dvh - 32px);display:flex;flex-direction:column;gap:0;padding:24px;background:#fffdf4;color:#174f49;border:1px solid #d8c58d;border-radius:22px;box-shadow:0 24px 90px #173f4955;isolation:isolate}
+.castle-wardrobe h2{display:flex;align-items:center;gap:9px;font-family:"Noto Serif TC",serif;font-size:24px}
+.castle-wardrobe [data-radix-dialog-description]{color:#4d6b60}
+.castle-wardrobe>button:last-child{min-width:44px;min-height:44px;top:8px;right:8px;display:grid;place-items:center}
+.castle-wardrobe-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:18px 2px 12px;margin-top:8px}
+.castle-wardrobe-grid{display:grid;grid-template-columns:minmax(200px,.9fr) minmax(0,1.3fr);gap:26px}
+.castle-wardrobe-display{min-width:0;text-align:center}
+.castle-avatar-preview{height:260px;position:relative;overflow:hidden;border-radius:45% 45% 16px 16px;border:1px solid #d8c58d;background:#f5f1df}
+.castle-avatar-preview canvas{width:100%;height:100%;display:block;touch-action:none}
+.castle-avatar-preview canvas[hidden]{display:none}
+.castle-avatar-preview p{position:relative;padding:30px 20px;font-size:14px}
+.castle-avatar-plinth{position:absolute;bottom:8px;left:0;right:0;font-size:11px;letter-spacing:.15em;pointer-events:none;color:#647d65}
+.castle-wardrobe-name{font-family:"Noto Serif TC",serif;font-size:23px;margin:12px 0 5px}
+.castle-wardrobe-display small,.castle-wardrobe-help{font-size:12px;line-height:1.7;color:#4d6b60}
+.castle-wardrobe-alias{display:flex;flex-direction:column;gap:7px;font-size:14px;font-weight:600}
+.castle-wardrobe .castle-wardrobe-alias input{background:#fffdf4;border:1px solid #a6bbab;border-radius:9px;min-height:44px;padding:9px 12px;color:#174f49;width:100%;font-weight:400}
+.castle-wardrobe-option{margin-top:15px;min-width:0}.castle-wardrobe-option legend{font-size:13px;font-weight:600;margin-bottom:7px}
+.castle-wardrobe-option>div{display:flex;flex-wrap:wrap;gap:6px}
+.castle-wardrobe button{min-height:44px;touch-action:manipulation}
+.castle-wardrobe-option button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:48px;padding:8px 12px;border:1px solid #b4c6b7;border-radius:10px;background:#fffdf4;font-size:13px}
+.castle-wardrobe-option button[aria-pressed=true]{border-color:#174f49;background:#c7e7de;box-shadow:inset 0 0 0 1px #174f49}
+.castle-wardrobe button:focus-visible{outline:3px solid #b38d35;outline-offset:3px}
+.castle-wardrobe button:disabled{opacity:.5;cursor:wait}
+.castle-wardrobe [role=alert]{background:#ffebde;color:#713d2c;border:1px solid #bd6b4b;border-radius:10px;padding:12px;margin-bottom:14px;font-size:14px}
+.castle-wardrobe [role=alert] button{font-weight:600;text-decoration:underline}
+.castle-wardrobe-help{margin-top:18px}.castle-wardrobe footer{display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;padding-top:12px;border-top:1px solid #d8c58d}
+.castle-wardrobe footer button{padding:10px 18px;border:1px solid #b4c6b7;border-radius:10px}.castle-wardrobe footer .castle-primary-link{background:#174f49;color:#fffdf4}
+.castle-look-swatch{display:inline-block;width:16px;height:16px;border:1px solid #174f4933;border-radius:50%;background:#3d8986}.castle-look-swatch--coral{background:#d88065}.castle-look-swatch--sunshine{background:#e3b854}.castle-look-swatch--blue{background:#677cac}.castle-look-swatch--ivory{background:#f0e6cc}.castle-look-swatch--violet{background:#8b79a5}
+.castle-mobile-entry{display:flex;align-items:center;gap:6px;max-width:calc(100vw - 24px)}.castle-mobile-entry .castle-my-look{min-width:44px;padding:8px 12px;background:#174f49;color:#fffdf4}
+@media(max-width:640px){.castle-wardrobe{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:18px 14px;border-radius:17px}.castle-wardrobe-grid{grid-template-columns:1fr;gap:15px}.castle-avatar-preview{height:200px;max-width:270px;margin:auto}.castle-wardrobe h2{font-size:21px;padding-right:28px}.castle-wardrobe-scroll{padding-top:12px}.castle-wardrobe-display small{display:block;max-width:260px;margin:auto}.castle-wardrobe footer{padding-top:10px}}
+@media(max-height:450px){.castle-wardrobe{max-height:calc(100dvh - 12px);padding:14px 18px}.castle-wardrobe-grid{grid-template-columns:minmax(150px,.7fr) minmax(0,1.3fr);gap:18px}.castle-avatar-preview{height:180px}.castle-wardrobe>div:first-child p{font-size:12px}.castle-wardrobe footer{padding-top:7px}.castle-wardrobe-scroll{margin-top:0;padding-top:10px}}
+
+.castle-presence-summary{flex-wrap:wrap}.castle-presence button,.castle-presence-summary>a{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:4px}

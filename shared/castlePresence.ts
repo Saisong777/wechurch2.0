@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import {castleAliasSchema,castlePresetSchema,castleAppearanceSchema,legacyCastleAppearance} from './castleAvatar';
+export {castlePresetSchema} from './castleAvatar';
 export const CASTLE_TTL_MS = 25000;
 export const CASTLE_MAX_RESIDENTS = 32;
-export const castlePresetSchema = z.enum(['coral', 'sunshine', 'jade', 'blue', 'ivory', 'violet']);
 export type CastlePreset = z.infer<typeof castlePresetSchema>;
-export const castleJoinSchema = z.object({ alias: z.string().trim().min(1).max(24).refine(value => Array.from(value).every(character => { const code=character.charCodeAt(0); return code>31&&(code<127||code>159); })), preset: castlePresetSchema }).strict();
+export const castleJoinSchema = z.object({ alias: castleAliasSchema, preset: castlePresetSchema }).strict();
 export const castleMoveSchema = z.object({ targetNode: z.number().int().min(0).max(15) }).strict();
 export const castleEmptySchema = z.object({}).strict();
 const point = z.tuple([z.number().finite(), z.number().finite()]);
@@ -14,3 +15,12 @@ export const castleJoinResponseSchema = castleRosterSchema.extend({ avatarId: z.
 export type CastleAvatar = z.infer<typeof castleAvatarSchema>;
 export type CastleRoster = z.infer<typeof castleRosterSchema>;
 export type CastleJoin = z.infer<typeof castleJoinSchema>;
+
+export const castleAvatarV2Schema=castleAvatarSchema.extend({appearance:castleAppearanceSchema}).strict();
+export const castleRosterV2Schema=castleRosterSchema.extend({avatars:z.array(castleAvatarV2Schema).max(CASTLE_MAX_RESIDENTS)}).strict();
+export const castleJoinV2ResponseSchema=castleRosterV2Schema.extend({avatarId:z.string().uuid(),leaseToken:z.string().min(32).max(128)}).strict();
+export const castleCompatibleRosterSchema=z.union([castleRosterV2Schema,castleRosterSchema.transform(roster=>({...roster,avatars:roster.avatars.map(avatar=>({...avatar,appearance:legacyCastleAppearance(avatar.preset)}))}))]);
+export const castleCompatibleJoinSchema=z.union([castleJoinV2ResponseSchema,castleJoinResponseSchema.transform(roster=>({...roster,avatars:roster.avatars.map(avatar=>({...avatar,appearance:legacyCastleAppearance(avatar.preset)}))}))]);
+export type CastleAvatarV2=z.infer<typeof castleAvatarV2Schema>;
+export type CastleRosterV2=z.infer<typeof castleRosterV2Schema>;
+export type CastleRenderableAvatar=CastleAvatar&{appearance?:z.infer<typeof castleAppearanceSchema>};

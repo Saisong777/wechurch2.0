@@ -1,4 +1,6 @@
-import { Router, type Request, type RequestHandler, type ErrorRequestHandler } from 'express';
+import type {CastleAvatarRepository} from './castleAvatarRepository';
+import {defaultCastleProfile,castleProfileSaveSchema} from '../shared/castleAvatar';
+import { Router, type Request, type Response, type RequestHandler, type ErrorRequestHandler } from 'express';
 import { z } from 'zod';
 import { castleEmptySchema, castleJoinSchema, castleMoveSchema } from '../shared/castlePresence';
 import { normalizeChurch } from '../shared/churches';
@@ -39,11 +41,12 @@ export function castleLeaseVerifier(query: {
         return valid;
     };
 }
-export function castlePresenceRoutes(store: CastlePresenceStore, authenticate: RequestHandler, context = churchContext, available = castleSingleWorkerAvailable()) {
+export function castlePresenceRoutes(store: CastlePresenceStore, authenticate: RequestHandler, context = churchContext, available = castleSingleWorkerAvailable(),profiles?:CastleAvatarRepository) {
     const router = Router();
     router.use((_req, res, next) => { res.setHeader('Cache-Control', 'private, no-store'); if (!available)
         return void res.status(503).json({ error: '城堡連線尚未開放，仍可探索建築。' }); next(); });
     router.use(authenticate);
+    router.use((req,res,next)=>{const protocol=req.get('X-Castle-Protocol');if(protocol&&protocol!=='1'&&protocol!=='2')return void res.status(400).json({error:'城堡通訊版本不正確。'});res.locals.castleV2=protocol==='2';next();});
     router.use((req, res, next) => {
         const user = req.user as any, c = context();
         if (!user?.sessionUserId || !req.sessionID || !Number.isSafeInteger(user.sessionVersion) || !user.claims?.sub)
@@ -71,17 +74,18 @@ export function castlePresenceRoutes(store: CastlePresenceStore, authenticate: R
     const moves = boundedWindowLimiter({ max: 40, key: req => (req.user as any).sessionUserId });
     const writes = boundedWindowLimiter({ max: 60, key: req => (req.user as any).sessionUserId });
     const lease = (req: Request) => { const value = req.get('X-Castle-Lease'); return value ? z.string().regex(/^[A-Za-z0-9_-]{43}$/).parse(value) : undefined; };
-    router.get('/', async (_req, res) => { res.json(await store.roster(res.locals.castleActor)); });
-    router.post('/join', writes, async (req, res) => { const input = castleJoinSchema.parse(req.body); const joined = store.join(res.locals.castleActor, input, lease(req)); try {
-        res.json({ ...await store.roster(res.locals.castleActor), ...joined });
-    }
-    catch (error) {
-        store.leave(res.locals.castleActor, joined.leaseToken);
-        throw error;
-    } });
-    router.post('/heartbeat', writes, async (req, res) => { castleEmptySchema.parse(req.body); store.heartbeat(res.locals.castleActor, lease(req)); res.json(await store.roster(res.locals.castleActor)); });
+    const roster=async(res:Response)=>{const value=await store.roster(res.locals.castleActor);return res.locals.castleV2?value:{...value,avatars:value.avatars.map(({avatarId,alias,preset,isSelf,motion})=>({avatarId,alias,preset,isSelf,motion}))};};
+    router.get('/profile',async(_req,res)=>{if(!profiles)throw new CastlePresenceError(503,'造型服務尚未開放。');res.json(await profiles.read(res.locals.castleActor));});
+    router.put('/profile',writes,async(req,res)=>{if(!profiles)throw new CastlePresenceError(503,'造型服務尚未開放。');const actor=res.locals.castleActor,input=castleProfileSaveSchema.parse(req.body);const saved=await profiles.run(actor,async()=>{const saved=await profiles.save(actor,input);store.updateProfile(actor,saved.profile,saved.revision);return saved;});res.json(saved);});
+    router.get('/', async (_req, res) => { res.json(await roster(res)); });
+    router.post('/join', writes, async (req, res) => {
+     const body=z.union([castleEmptySchema,castleJoinSchema]).parse(req.body),actor=res.locals.castleActor;
+     const join=async()=>{const saved=profiles?await profiles.read(actor):{profile:defaultCastleProfile(),revision:0};const resolved=saved.revision||!('alias' in body)?saved:{profile:{...saved.profile,alias:body.alias,outfitColor:body.preset},revision:0};return store.join(actor,{alias:resolved.profile.alias,preset:resolved.profile.outfitColor},lease(req),resolved);};
+     const joined=profiles?await profiles.run(actor,join):await join();try{res.json({...await roster(res),...joined});}catch(error){store.leave(actor,joined.leaseToken);throw error;}
+    });
+    router.post('/heartbeat', writes, async (req, res) => { castleEmptySchema.parse(req.body); store.heartbeat(res.locals.castleActor, lease(req)); res.json(await roster(res)); });
     router.post('/move', writes, moves, async (req, res) => { const input = castleMoveSchema.parse(req.body), command = req.get('X-Castle-Command-ID'); if (command)
-        z.string().uuid().parse(command); store.move(res.locals.castleActor, lease(req), input.targetNode, command); res.json(await store.roster(res.locals.castleActor)); });
+        z.string().uuid().parse(command); store.move(res.locals.castleActor, lease(req), input.targetNode, command); res.json(await roster(res)); });
     router.delete('/leave', writes, (req, res) => { if (req.body !== undefined)
         throw new CastlePresenceError(400, '離開城堡不需其他資料'); store.leave(res.locals.castleActor, lease(req)); res.json({ ok: true }); });
     const errors: ErrorRequestHandler = (error, _req, res, _next) => { if (error instanceof z.ZodError)

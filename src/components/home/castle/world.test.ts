@@ -63,3 +63,8 @@ describe('miniature castle world', () => {
     world.dispose(); expect(geometry).toHaveBeenCalled(); expect(material).toHaveBeenCalled(); vi.restoreAllMocks();
   });
 });
+
+it('applies an account look in place while preserving the same articulated walker, motion position and ambient clock',()=>{
+ const world=buildCastleWorld(),appearance={genderPresentation:'neutral' as const,skinTone:'warm' as const,hairStyle:'short' as const,hairColor:'brown' as const,outfit:'casual' as const,outfitColor:'jade' as const},avatar={avatarId:'look',alias:'A',preset:'jade' as const,isSelf:true,appearance,motion:{sequence:1,path:[[0,15] as [number,number],[0,10.5] as [number,number]],startedAt:1000,durationMs:3000}};
+ world.setPresence([avatar],1000,0);world.updateResidents(1000,false);const walker=world.walkers[0],group=walker.group,phase=walker.phase,ambient=world.ambient.snapshot();world.setPresence([{...avatar,alias:'新名字',appearance:{...appearance,outfit:'skirt',hairStyle:'long'}}],1500,500);world.updateResidents(500,false);expect(world.walkers[0]).toBe(walker);expect(walker.group).toBe(group);expect(walker.phase).toBe(phase);expect(walker.group.position.z).toBeCloseTo(14.25);expect(world.ambient.snapshot()).toEqual(ambient);world.dispose();
+});
