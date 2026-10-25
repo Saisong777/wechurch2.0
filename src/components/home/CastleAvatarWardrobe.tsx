@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Shirt, X } from 'lucide-react';
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -28,6 +28,7 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
     foreground?: boolean;
 }) {
     const groupId = useId();
+    const scroll = useRef<HTMLDivElement>(null), alert = useRef<HTMLDivElement>(null);
     const { state, load, save } = useCastleAvatarProfile(scope, open);
     const [ownedDraft, setOwnedDraft] = useState<{ scope: string | null; profile: CastleAvatarProfile } | null>(null);
     // A changed account cannot display even one frame of another account's draft.
@@ -38,6 +39,14 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
         if (state.data) setOwnedDraft(old => old?.scope === scope ? old : { scope, profile: state.data!.profile });
     }, [state.data, scope]);
 
+    useEffect(() => {
+        const viewport = scroll.current, message = alert.current;
+        if (!state.error || !viewport || !message) return;
+        const area = viewport.getBoundingClientRect(), bounds = message.getBoundingClientRect();
+        if (bounds.top < area.top) viewport.scrollTop += bounds.top - area.top - 8;
+        else if (bounds.bottom > area.bottom) viewport.scrollTop += bounds.bottom - area.bottom + 8;
+    }, [state.error]);
+    const scopeChanged = state.errorCode === 'CHURCH_CONTEXT_CHANGED';
     const reload = () => void load().then(value => { if (value) setDraft(value.profile); });
     const saveDraft = () => {
         if (!draft) return;
@@ -65,13 +74,16 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
                     <DialogTitle><Shirt size={21} aria-hidden="true" />我的造型</DialogTitle>
                     <DialogDescription>這是你的城堡玩偶。外觀不會更改會員個人資料，髮型與穿著都可自由搭配。</DialogDescription>
                 </DialogHeader>
-                <div className="castle-wardrobe-scroll">
+                <div ref={scroll} className="castle-wardrobe-scroll">
                     {state.loading && !draft && <p role="status">正在取回帳號造型…</p>}
-                    {state.error && <div role="alert">
+                    {state.error && <div ref={alert} role="alert">
                         <p>{state.error}</p>
-                        <button type="button" disabled={state.loading || state.saving} onClick={reload}>
-                            {state.conflict ? '載入另一視窗的新造型' : '重新載入帳號造型'}
-                        </button>
+                        {scopeChanged ? <>
+                            <p>教會或權限已改變，請重新整理確認後再修改造型。</p>
+                            <a className="castle-wardrobe-reload" href="/">重新整理並確認教會</a>
+                        </> : <button type="button" disabled={state.loading || state.saving} onClick={reload}>
+                            載入帳號已存造型（取代目前選項）
+                        </button>}
                     </div>}
                     {draft && <div className="castle-wardrobe-grid">
                         <div className="castle-wardrobe-display">
@@ -79,7 +91,7 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
                             <p className="castle-wardrobe-name">{draft.alias || '我的玩偶'}</p>
                             <small>左右拖曳玩偶轉身，上下滑動可看造型選項。儲存後，同教會的人會看見你的新造型。</small>
                         </div>
-                        <fieldset disabled={state.saving || state.loading}>
+                        <fieldset disabled={state.saving || state.loading || scopeChanged}>
                             <label className="castle-wardrobe-alias">城堡暱稱
                                 <input value={draft.alias} maxLength={24} autoComplete="off" onChange={event => setDraft({ ...draft, alias: event.target.value })} />
                             </label>
@@ -99,7 +111,7 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
                 {state.saving && <p className="castle-wardrobe-saving" role="status">正在儲存帳號造型，請稍候。若連線逾時，會保留選項並讓你重新載入確認。</p>}
                 <footer>
                     <button type="button" disabled={state.saving} onClick={() => onOpenChange(false)}>取消</button>
-                    <button type="button" className="castle-primary-link" disabled={!draft || !draft.alias.trim() || state.saving || state.loading} onClick={saveDraft}>
+                    <button type="button" className="castle-primary-link" disabled={!draft || !draft.alias.trim() || state.saving || state.loading || scopeChanged} onClick={saveDraft}>
                         {state.saving ? '正在儲存…' : '儲存造型'}
                     </button>
                 </footer>

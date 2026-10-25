@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { castleEmptySchema, castleJoinSchema, castleMoveSchema } from '../shared/castlePresence';
 import { normalizeChurch } from '../shared/churches';
 import { CastlePresenceError, CastlePresenceStore, castleSingleWorkerAvailable, type CastleActor, type CastleLeaseVerifier } from './castlePresenceStore';
-import { churchContext } from './churchContext';
+import { churchContext, ChurchScopeError } from './churchContext';
 import { boundedWindowLimiter } from './requestLimits';
 // Only three bounded, read-only queries per roster; never stores presence in auth/session tables.
 export function castleLeaseVerifier(query: {
@@ -88,12 +88,19 @@ export function castlePresenceRoutes(store: CastlePresenceStore, authenticate: R
         z.string().uuid().parse(command); store.move(res.locals.castleActor, lease(req), input.targetNode, command); res.json(await roster(res)); });
     router.delete('/leave', writes, (req, res) => { if (req.body !== undefined)
         throw new CastlePresenceError(400, '離開城堡不需其他資料'); store.leave(res.locals.castleActor, lease(req)); res.json({ ok: true }); });
-    const errors: ErrorRequestHandler = (error, _req, res, _next) => { if (error instanceof z.ZodError)
-        return void res.status(400).json({ error: '城堡請求格式不正確。' }); if (error instanceof CastlePresenceError) {
-        if (error.retryAfter)
-            res.setHeader('Retry-After', error.retryAfter);
-        return void res.status(error.status).json({ error: error.message });
-    } res.status(503).json({ error: '城堡暫時無法連線，請重試。' }); };
+    const errors: ErrorRequestHandler = (error, _req, res, _next) => {
+        if (error instanceof ChurchScopeError) {
+            return void res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        if (error instanceof z.ZodError) {
+            return void res.status(400).json({ error: '城堡請求格式不正確。' });
+        }
+        if (error instanceof CastlePresenceError) {
+            if (error.retryAfter) res.setHeader('Retry-After', error.retryAfter);
+            return void res.status(error.status).json({ error: error.message });
+        }
+        res.status(503).json({ error: '城堡暫時無法連線，請重試。' });
+    };
     router.use(errors);
     return router;
 }

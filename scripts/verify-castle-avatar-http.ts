@@ -4,7 +4,7 @@ import type { Pool } from 'pg';
 import { defaultCastleProfile, castleProfileResponseSchema } from '../shared/castleAvatar';
 import { castleJoinResponseSchema, castleJoinV2ResponseSchema, castleRosterV2Schema } from '../shared/castlePresence';
 type Client = (path: string, method?: string, body?: unknown, headers?: Record<string, string>) => Promise<Response>;
-/** Synthetic local verification only, run by both owned integrity stages; never a test-login endpoint. */
+/** Synthetic local verification only, run by the default original integrity stage (the second stage covers church onboarding); never a test-login endpoint. */
 export async function verifyCastleAvatarHttp(pool: Pool, makeClient: () => Client) {
     const owner = makeClient(), other = makeClient(), guest = makeClient(), header = { 'X-Castle-Protocol': '2' }, ids: string[] = [];
     for (const client of [owner, other]) {

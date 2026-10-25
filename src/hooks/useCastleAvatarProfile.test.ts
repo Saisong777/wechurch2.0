@@ -89,3 +89,19 @@ it('bounds a hung PUT, releases saving and ignores its late receipt while allowi
         expect(view.result.current.state.data?.revision).toBe(2);
     } finally { vi.useRealTimers(); }
 });
+
+it('keeps a church-scope conflict distinct from revision CAS and blocks stale resubmission', async () => {
+    const view = renderHook(() => useCastleAvatarProfile('account', true));
+    await flush();
+    network.fetch.mockResolvedValue(response({ error: '教會已變更', code: 'CHURCH_CONTEXT_CHANGED' }, 409));
+    await act(async () => {
+        await view.result.current.save(receipt.profile);
+    });
+    expect(view.result.current.state.errorCode).toBe('CHURCH_CONTEXT_CHANGED');
+    expect(view.result.current.state.conflict).toBe(false);
+    const calls = network.fetch.mock.calls.length;
+    await act(async () => {
+        expect(await view.result.current.save(receipt.profile)).toBeNull();
+    });
+    expect(network.fetch).toHaveBeenCalledTimes(calls);
+});

@@ -286,7 +286,7 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
 .castle-wardrobe-name{font-family:"Noto Serif TC",serif;font-size:23px;margin:12px 0 5px}
 .castle-wardrobe-display small,.castle-wardrobe-help{font-size:12px;line-height:1.7;color:#4d6b60}
 .castle-wardrobe-alias{display:flex;flex-direction:column;gap:7px;font-size:14px;font-weight:600}
-.castle-wardrobe .castle-wardrobe-alias input{background:#fffdf4;border:1px solid #a6bbab;border-radius:9px;min-height:44px;padding:9px 12px;color:#174f49;width:100%;font-weight:400}
+.castle-wardrobe .castle-wardrobe-alias input{background:#fffdf4;border:1px solid #a6bbab;border-radius:9px;min-height:44px;padding:9px 12px;color:#174f49;width:100%;font-weight:400;font-size:16px}
 .castle-wardrobe-option{margin-top:15px;min-width:0}.castle-wardrobe-option legend{font-size:13px;font-weight:600;margin-bottom:7px}
 .castle-wardrobe-option>div{display:flex;flex-wrap:wrap;gap:6px}
 .castle-wardrobe button{min-height:44px;touch-action:manipulation}
@@ -313,3 +313,5 @@ html.castle-immersive-active, .castle-immersive-active body { overflow: hidden !
 .castle-wardrobe-radio input:disabled+span{opacity:.5;cursor:wait}
 .castle-wardrobe-saving{font-size:12px;line-height:1.5;color:#4d6b60;margin:6px 0;flex-shrink:0}
 .castle-mobile-entry{flex-wrap:wrap}.castle-mobile-entry>button{white-space:nowrap;flex-shrink:0}
+
+.castle-wardrobe-reload{display:inline-flex;align-items:center;min-height:44px;text-decoration:underline;font-weight:600}

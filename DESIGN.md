@@ -705,7 +705,7 @@ CPU 驗證涵蓋實際 mesh 點選及遮擋、各物種關節、路線停步與�
 
 造型保存在獨立 castle_avatar_profiles 表；0031 只追加此表及 journal idx31，不改前 31 份 SQL 或會員表欄位。GET defaults 不寫入；PUT 使用 owner-only strict profile 與 expectedRevision CAS（首次為 0），同帳號另一視窗更新時要求明確重載，連線中斷不假稱成功。交易內鎖定／重核原教會和身分，COMMIT 後再驗；commit 後回應失敗不能宣稱已 rollback，下次合法 GET 協調結果。帳號 join/read/同步與 save/同步共用有界序列（每帳號最多 8 項、全域最多 256 active keys，finally 清理）；heartbeat/move 不進此序列，避免首次 join 與保存交錯倒退造型。記憶體只 patch 當前同教會 entry，不替未入場者建立玩偶。
 
-X-Castle-Protocol: 2 才提供六個外觀欄位；無 header／版本 1 保留原五欄 strict avatar。舊 alias/preset join 不能覆蓋已保存造型；新 join 空物件由伺服器讀帳號資料。舊名冊仍可由新畫面轉為預設造型。原 32 人、4 lease／帳號、25 秒 TTL、路網與權威位置維持；新增模型有固定幾何／材質與 dispose，並非零成本，也不把單人 <450 mesh 檢查宣稱為 32 人容量實測。
+名冊／join／heartbeat／move 的 avatar 回應只在 X-Castle-Protocol: 2 時提供六個外觀欄位；無 header／版本 1 保留原五欄 strict avatar。新增的 /profile 是 owner-only 帳號資料端點，沒有舊客戶端格式契約，不要求此 header。舊 alias/preset join 不能覆蓋已保存造型；新 join 空物件由伺服器讀帳號資料。舊名冊仍可由新畫面轉為預設造型。原 32 人、4 lease／帳號、25 秒 TTL、路網與權威位置維持；新增模型有固定幾何／材質與 dispose，並非零成本，也不把單人 <450 mesh 檢查宣稱為 32 人容量實測。
 
 本次包含新資料表，原 code-only 發布證明不足：B 必須先依同版備份模型驗追加 migration、app role 的 SELECT/INSERT/CAS UPDATE 權限與舊表保護，再由主責依新 migration 發布流程及真 B 畫面驗收；作者 source/CPU 檢查不替代這些證據。
 
@@ -716,3 +716,11 @@ X-Castle-Protocol: 2 才提供六個外觀欄位；無 header／版本 1 保留�
 手機預覽的 OrbitControls 原生 touch 處理在觸控期間停用，canvas 明確允許 pan-y / pinch-zoom；僅單指橫拖以同一相機轉身，上下滑動交給瀏覽器捲動，雙指不搶手勢。所有 listener 隨預覽卸載清理。互斥造型改原生 radio + 44px label、fieldset/legend 與 checked 語意，使用原生方向鍵切換。
 
 PUT 進行時取消、X、Escape 與外點都先等待，顯示保存中說明；帳號／權限 scope 變化仍能由上層關閉並 abort。profile 請求有 20 秒期限，逾時終止本地等待，保留選項、明說結果未確認，允許重新載入協調已 commit 但未收到的結果；不自動重送。portrait 的底部標籤保護改按實際 entry 高度／距視窗底部與安全間距量測，ResizeObserver 包含 entry；短窄畫面允許控制列換行，原短橫向 drawer 規則不變。
+
+#### v15 第二次審查後的邊界與數量
+
+教會／權限在保存前變動時，原 lockChurchContext 的 ChurchScopeError 只按明確 status / code / 公開訊息回覆，CHURCH_CONTEXT_CHANGED 與造型 revision 的 409 衝突分開。衣櫥停止舊資料保存，提示「重新整理並確認教會」；不讓使用者把同一份過時 scope 當換裝衝突重試。其他未知內部錯誤仍回通用 503，不公開細節。COMMIT 後身分驗證失敗仍不能 patch presence，已 commit 的新造型只能由之後合法 GET／join 協調，測試串接真 repository、store 與 router 覆蓋此順序。
+
+儲存錯誤只調整衣櫥自身捲動使 alert 可見，不搶焦、不捲整頁；載入按鈕明說「載入帳號已存造型（取代目前選項）」。暱稱 input 明訂 16px。新的 avatar synthetic HTTP 只由 default original stage 呼叫一次；另一個 church-onboarding stage 保持原驗證，不宣稱兩階段都跑此腳本。
+
+32 人都用外套＋長髮（最多可見部件組合）的實際世界 CPU 計數：總 mesh 1269、沿可見祖先計算的 mesh 949；其中真人總 mesh 1024、可見 mesh 704（每人總 32、可見 22）。新回歸上限分別是 1269／949／1024／704，保留原單人 <450 檢查，限制後續部件增長。這是 Object3D/Mesh 數量，hidden mesh 不是 draw call，可見 mesh 也不等於實際 draw call；共享四個幾何與 17 個材質的資源上限維持，沒有新增 GPU 架構，未推定真手機 FPS。

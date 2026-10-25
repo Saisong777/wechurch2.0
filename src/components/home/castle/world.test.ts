@@ -112,3 +112,37 @@ it('shares four avatar geometries and a finite immutable palette across 32 peopl
     expect(fixed.every(s => s.mock.calls.length === 1)).toBe(true);
     expect(disposeMaterials.every(s => s.mock.calls.length === 1)).toBe(true);
 });
+
+it('bounds actual total and ancestor-visible world meshes for 32 jacket-and-long-hair avatars without treating them as draw calls', () => {
+    const world = buildCastleWorld();
+    const appearance = { genderPresentation: 'neutral' as const, skinTone: 'warm' as const, hairStyle: 'long' as const, hairColor: 'brown' as const, outfit: 'jacket' as const, outfitColor: 'jade' as const };
+    world.setPresence(Array.from({ length: 32 }, (_, i) => ({ avatarId: `full-${i}`, alias: '同行者', preset: 'jade' as const, isSelf: i === 0, appearance, motion: { sequence: 0, path: [[0, 15] as [
+                    number,
+                    number
+                ]], startedAt: 1000, durationMs: 0 } })), 1000, 0);
+    let total = 0, visible = 0, avatarTotal = 0, avatarVisible = 0;
+    world.group.traverse(node => {
+        if (node instanceof THREE.Mesh)
+            total++;
+    });
+    world.group.traverseVisible(node => {
+        if (node instanceof THREE.Mesh)
+            visible++;
+    });
+    for (const walker of world.walkers) {
+        walker.group.traverse(node => {
+            if (node instanceof THREE.Mesh)
+                avatarTotal++;
+        });
+        walker.group.traverseVisible(node => {
+            if (node instanceof THREE.Mesh)
+                avatarVisible++;
+        });
+    }
+    expect(total).toBeLessThanOrEqual(1269);
+    expect(visible).toBeLessThanOrEqual(949);
+    expect(avatarTotal).toBeLessThanOrEqual(1024);
+    expect(avatarVisible).toBeLessThanOrEqual(704);
+    expect(world.residentCount).toBe(32);
+    world.dispose();
+});
