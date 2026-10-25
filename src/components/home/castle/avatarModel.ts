@@ -2,25 +2,52 @@ import * as THREE from 'three';
 import { castleAppearanceSchema, type CastleAppearance } from '@shared/castleAvatar';
 export const AVATAR_COLORS = { coral: 0xd88065, sunshine: 0xe3b854, jade: 0x3d8986, blue: 0x677cac, ivory: 0xf0e6cc, violet: 0x8b79a5 };
 const SKIN = { light: 0xf3d5b6, warm: 0xdca582, tan: 0xb77a55, deep: 0x79533f }, HAIR = { black: 0x342f2b, brown: 0x775133, chestnut: 0xa36140, silver: 0xc6c8c3 };
-/** Shared by the world and wardrobe. Every option reuses a fixed owned mesh/material pool. */
-export function createCastleAvatarModel(initial: CastleAppearance) {
-    const group = new THREE.Group(), geometry = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+/** A world owns one finite immutable palette; a wardrobe preview owns its own pool. */
+export function createCastleAvatarResources() {
+    const cube = new THREE.BoxGeometry(1, 1, 1);
+    const cylinder = new THREE.CylinderGeometry(1, 1, 1, 10);
+    const sphere = new THREE.IcosahedronGeometry(1, 1);
+    const flare = new THREE.CylinderGeometry(.65, 1, 1, 10);
+    const geometries = [cube, cylinder, sphere, flare];
+    const materials = new Map<number, THREE.MeshStandardMaterial>();
+    const colors = [...Object.values(SKIN), ...Object.values(HAIR), ...Object.values(AVATAR_COLORS), 0x435865, 0x35443e, 0xf4e8cd];
+    for (const color of colors) materials.set(color, new THREE.MeshStandardMaterial({ color, roughness: .86, flatShading: true }));
+    let disposed = false;
+    return {
+        cube, cylinder, sphere, flare,
+        material(color: number) {
+            const value = materials.get(color);
+            if (!value || disposed) throw new Error('Avatar resource pool is unavailable');
+            return value;
+        },
+        get geometryCount() { return geometries.length; },
+        get materialCount() { return materials.size; },
+        dispose() {
+            if (disposed) return;
+            disposed = true;
+            geometries.forEach(value => value.dispose());
+            materials.forEach(value => value.dispose());
+        },
+    };
+}
+export type CastleAvatarResources = ReturnType<typeof createCastleAvatarResources>;
+
+/** Shared by the world and wardrobe. Look changes swap references, never shared colors. */
+export function createCastleAvatarModel(initial: CastleAppearance, resources?: CastleAvatarResources) {
+    const pool = resources || createCastleAvatarResources();
+    const owned = !resources, group = new THREE.Group();
     let disposed = false, appearance = castleAppearanceSchema.parse(initial);
-    const own = <T extends THREE.BufferGeometry>(g: T) => {
-        geometry.add(g);
-        return g;
-    };
-    const cube = own(new THREE.BoxGeometry(1, 1, 1)), cylinder = own(new THREE.CylinderGeometry(1, 1, 1, 10)), sphere = own(new THREE.IcosahedronGeometry(1, 1)), flare = own(new THREE.CylinderGeometry(.65, 1, 1, 10));
-    const mat = (color: number) => {
-        const m = new THREE.MeshStandardMaterial({ color, roughness: .86, flatShading: true });
-        materials.add(m);
-        return m;
-    };
-    const skin = mat(SKIN.warm), hair = mat(HAIR.brown), fabric = mat(AVATAR_COLORS.jade), pants = mat(0x435865), dark = mat(0x35443e), trim = mat(0xf4e8cd);
+    const { cube, cylinder, sphere, flare } = pool;
+    const skin = pool.material(SKIN.warm), hair = pool.material(HAIR.brown), fabric = pool.material(AVATAR_COLORS.jade);
+    const pants = pool.material(0x435865), dark = pool.material(0x35443e), trim = pool.material(0xf4e8cd);
+    const slots: Record<'skin' | 'hair' | 'fabric', THREE.Mesh[]> = { skin: [], hair: [], fabric: [] };
     const mesh = (parent: THREE.Group, g: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, sx: number, sy = sx, sz = sx) => {
         const value = new THREE.Mesh(g, m);
         value.position.set(x, y, z);
         value.scale.set(sx, sy, sz);
+        if (m === skin) slots.skin.push(value);
+        else if (m === hair) slots.hair.push(value);
+        else if (m === fabric) slots.fabric.push(value);
         value.castShadow = true;
         value.receiveShadow = true;
         value.userData.realAvatar = true;
@@ -80,9 +107,9 @@ export function createCastleAvatarModel(initial: CastleAppearance) {
         if (disposed)
             return;
         appearance = castleAppearanceSchema.parse(next);
-        skin.color.setHex(SKIN[appearance.skinTone]);
-        hair.color.setHex(HAIR[appearance.hairColor]);
-        fabric.color.setHex(AVATAR_COLORS[appearance.outfitColor]);
+        slots.skin.forEach(value => value.material = pool.material(SKIN[appearance.skinTone]));
+        slots.hair.forEach(value => value.material = pool.material(HAIR[appearance.hairColor]));
+        slots.fabric.forEach(value => value.material = pool.material(AVATAR_COLORS[appearance.outfitColor]));
         for (const [key, value] of Object.entries(outfits))
             value.visible = key === appearance.outfit;
         for (const [key, value] of Object.entries(styles))
@@ -98,8 +125,7 @@ export function createCastleAvatarModel(initial: CastleAppearance) {
             return;
         disposed = true;
         group.removeFromParent();
-        geometry.forEach(value => value.dispose());
-        materials.forEach(value => value.dispose());
+        if (owned) pool.dispose();
         group.clear();
     }
     return { group, arms, legs, applyAppearance, dispose, get appearance() {

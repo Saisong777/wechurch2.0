@@ -67,3 +67,25 @@ it('does not claim a save succeeded when the connection or receipt is uncertain'
     expect(view.result.current.state.error).toContain('尚未確認');
     expect(view.result.current.state.data?.revision).toBe(1);
 });
+
+it('bounds a hung PUT, releases saving and ignores its late receipt while allowing explicit reconciliation', async () => {
+    vi.useFakeTimers();
+    try {
+        const view = renderHook(() => useCastleAvatarProfile('account', true));
+        await flush();
+        let finish!: (response: Response) => void;
+        network.fetch.mockImplementation(() => new Promise<Response>(resolve => { finish = resolve; }));
+        let result: unknown;
+        act(() => { void view.result.current.save(receipt.profile).then(value => { result = value; }); });
+        expect(view.result.current.state.saving).toBe(true);
+        await act(async () => vi.advanceTimersByTimeAsync(20001));
+        expect(view.result.current.state.saving).toBe(false);
+        expect(view.result.current.state.error).toContain('尚未確認');
+        expect(result).toBeNull();
+        await act(async () => finish(response({ ...receipt, revision: 2 })));
+        expect(view.result.current.state.data?.revision).toBe(1);
+        network.fetch.mockResolvedValue(response({ ...receipt, revision: 2 }));
+        await act(async () => { await view.result.current.load(); });
+        expect(view.result.current.state.data?.revision).toBe(2);
+    } finally { vi.useRealTimers(); }
+});

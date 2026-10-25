@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useId, useState, type RefObject } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Shirt, X } from 'lucide-react';
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -27,6 +27,7 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
     returnFocus: RefObject<HTMLElement | null>;
     foreground?: boolean;
 }) {
+    const groupId = useId();
     const { state, load, save } = useCastleAvatarProfile(scope, open);
     const [ownedDraft, setOwnedDraft] = useState<{ scope: string | null; profile: CastleAvatarProfile } | null>(null);
     // A changed account cannot display even one frame of another account's draft.
@@ -48,11 +49,13 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
         });
     };
 
-    return <Dialog open={open} onOpenChange={onOpenChange}>
+    return <Dialog open={open} onOpenChange={value => { if (!state.saving) onOpenChange(value); }}>
         <DialogPortal>
             <DialogOverlay />
             <DialogPrimitive.Content
                 className="castle-wardrobe fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2"
+                onEscapeKeyDown={event => { if (state.saving) event.preventDefault(); }}
+                onInteractOutside={event => { if (state.saving) event.preventDefault(); }}
                 onCloseAutoFocus={event => {
                     event.preventDefault();
                     if (!foreground && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
@@ -74,7 +77,7 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
                         <div className="castle-wardrobe-display">
                             <CastleAvatarPreview appearance={castleAppearance(draft)} />
                             <p className="castle-wardrobe-name">{draft.alias || '我的玩偶'}</p>
-                            <small>拖曳玩偶轉身看看。儲存後，同教會的人會看見你的新造型。</small>
+                            <small>左右拖曳玩偶轉身，上下滑動可看造型選項。儲存後，同教會的人會看見你的新造型。</small>
                         </div>
                         <fieldset disabled={state.saving || state.loading}>
                             <label className="castle-wardrobe-alias">城堡暱稱
@@ -82,25 +85,25 @@ export default function CastleAvatarWardrobe({ scope, open, onOpenChange, onSave
                             </label>
                             {Object.entries(options).map(([key, values]) => <fieldset className="castle-wardrobe-option" key={key}>
                                 <legend>{labels[key as keyof typeof labels]}</legend>
-                                <div>{values.map(([value, label]) => <button
-                                    key={value} type="button"
-                                    aria-pressed={draft[key as keyof typeof options] === value}
-                                    onClick={() => setDraft({ ...draft, [key]: value })}
-                                >
-                                    {key === 'outfitColor' && <i className={`castle-look-swatch castle-look-swatch--${value}`} aria-hidden="true" />}{label}
-                                </button>)}</div>
+                                <div>{values.map(([value, label]) => <label className="castle-wardrobe-radio" key={value}>
+                                    <input type="radio" name={`${groupId}-${key}`} value={value}
+                                        checked={draft[key as keyof typeof options] === value}
+                                        onChange={() => setDraft({ ...draft, [key]: value })} />
+                                    <span>{key === 'outfitColor' && <i className={`castle-look-swatch castle-look-swatch--${value}`} aria-hidden="true" />}{label}</span>
+                                </label>)}</div>
                             </fieldset>)}
                         </fieldset>
                     </div>}
                     <p className="castle-wardrobe-help">造型儲存在這個帳號，不是只保留在這台裝置。若送出後連線中斷，請重新載入確認儲存結果。</p>
                 </div>
+                {state.saving && <p className="castle-wardrobe-saving" role="status">正在儲存帳號造型，請稍候。若連線逾時，會保留選項並讓你重新載入確認。</p>}
                 <footer>
-                    <button type="button" onClick={() => onOpenChange(false)}>取消</button>
+                    <button type="button" disabled={state.saving} onClick={() => onOpenChange(false)}>取消</button>
                     <button type="button" className="castle-primary-link" disabled={!draft || !draft.alias.trim() || state.saving || state.loading} onClick={saveDraft}>
                         {state.saving ? '正在儲存…' : '儲存造型'}
                     </button>
                 </footer>
-                <DialogPrimitive.Close className="absolute" aria-label="關閉我的造型"><X size={19} aria-hidden="true" /></DialogPrimitive.Close>
+                <DialogPrimitive.Close disabled={state.saving} className="absolute" aria-label="關閉我的造型"><X size={19} aria-hidden="true" /></DialogPrimitive.Close>
             </DialogPrimitive.Content>
         </DialogPortal>
     </Dialog>;

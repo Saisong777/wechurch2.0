@@ -19,16 +19,26 @@ export function useCastleAvatarProfile(scope: string | null, enabled: boolean) {
             return null;
         const own = generation.current, controller = new AbortController();
         controllers.current.add(controller);
+        let timedOut = false;
+        let rejectAbort!: () => void;
+        const cancelled = new Promise<never>((_resolve, reject) => {
+            rejectAbort = () => reject(timedOut ? new Error('造型請求已逾時，結果尚未確認，請重新載入帳號造型。') : new DOMException('已取消', 'AbortError'));
+            controller.signal.addEventListener('abort', rejectAbort, { once: true });
+        });
+        const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 20000);
         try {
-            const response = await churchFetch('/api/castle-presence/profile', { method, signal: controller.signal, headers: { 'X-Castle-Protocol': '2', ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
-            const data = await response.json();
-            if (own !== generation.current || controller.signal.aborted || current.current.scope !== scope || !current.current.enabled)
-                return null;
-            if (!response.ok)
-                throw Object.assign(new Error(data?.error || '目前無法讀取造型。'), { status: response.status });
-            return castleProfileResponseSchema.parse(data);
+            const operation = async () => {
+                const response = await churchFetch('/api/castle-presence/profile', { method, signal: controller.signal, headers: { 'X-Castle-Protocol': '2', ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+                const data = await response.json();
+                if (own !== generation.current || controller.signal.aborted || current.current.scope !== scope || !current.current.enabled) return null;
+                if (!response.ok) throw Object.assign(new Error(data?.error || '目前無法讀取造型。'), { status: response.status });
+                return castleProfileResponseSchema.parse(data);
+            };
+            return await Promise.race([operation(), cancelled]);
         }
         finally {
+            clearTimeout(timeout);
+            controller.signal.removeEventListener('abort', rejectAbort);
             controllers.current.delete(controller);
         }
     }, [scope]);

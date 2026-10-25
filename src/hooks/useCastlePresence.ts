@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { churchFetch } from '@/lib/churchFetch';
 import { castleCompatibleJoinSchema, castleCompatibleRosterSchema, type CastleRosterV2 } from '@shared/castlePresence';
-import { castleProfileResponseSchema } from '@shared/castleAvatar';
 export type PresenceStatus = 'idle' | 'connecting' | 'ready' | 'joining' | 'joined' | 'disconnected' | 'expired';
 export type PresenceView = {
     scope: string | null;
@@ -197,9 +196,6 @@ export function useCastlePresence(scope: string | null) {
             const own = generation;
             setView(old => ({ ...old, status: 'joining', message: '' }));
             try {
-                castleProfileResponseSchema.parse(await request('/profile'));
-                if (!desired || own !== generation)
-                    return;
                 if (accept(await request('/join', 'POST', {}), true) && own === generation && lease) {
                     later(() => void heartbeat(), 8000);
                     schedulePoll(2000);

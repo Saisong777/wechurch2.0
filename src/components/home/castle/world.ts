@@ -1,4 +1,4 @@
-import {createCastleAvatarModel} from './avatarModel';
+import {createCastleAvatarModel,createCastleAvatarResources} from './avatarModel';
 import {legacyCastleAppearance} from '@shared/castleAvatar';
 import {createAmbientLife} from './ambientLife';
 import * as THREE from 'three';
@@ -255,9 +255,10 @@ export function buildCastleWorld() {
     const sailMaterial = mat(0xfff5d7); sailMaterial.side = THREE.DoubleSide; mesh(boat, geo(new THREE.ShapeGeometry(shape, 8)), sailMaterial, 0, .35, 0);
   }
 
+  const avatarResources=createCastleAvatarResources();
   const walkers:{group:THREE.Group;avatar:CastleRenderableAvatar;arms:THREE.Group[];legs:THREE.Group[];phase:number;model:ReturnType<typeof createCastleAvatarModel>}[]=[];
   let rosterTime=0,receivedTime=0;
-  function createResident(avatar:CastleRenderableAvatar){const model=createCastleAvatarModel(avatar.appearance||legacyCastleAppearance(avatar.preset)),person=model.group;person.name=`resident-${avatar.avatarId}`;person.scale.setScalar(.97);world.add(person);const phase=Math.max(0,['coral','sunshine','jade','blue','ivory','violet'].indexOf(avatar.preset))*.8;const walker={group:person,avatar,arms:model.arms,legs:model.legs,phase,model};walkers.push(walker);return walker;}
+  function createResident(avatar:CastleRenderableAvatar){const model=createCastleAvatarModel(avatar.appearance||legacyCastleAppearance(avatar.preset),avatarResources),person=model.group;person.name=`resident-${avatar.avatarId}`;person.scale.setScalar(.97);world.add(person);const phase=Math.max(0,['coral','sunshine','jade','blue','ivory','violet'].indexOf(avatar.preset))*.8;const walker={group:person,avatar,arms:model.arms,legs:model.legs,phase,model};walkers.push(walker);return walker;}
   function setPresence(avatars:readonly CastleRenderableAvatar[],serverNow:number,receivedAt=performance.now()){
    const ids=new Set(avatars.slice(0,CASTLE_MAX_RESIDENTS).map(a=>a.avatarId));for(let i=walkers.length-1;i>=0;i--)if(!ids.has(walkers[i].avatar.avatarId)){walkers[i].model.dispose();walkers.splice(i,1);}
    for(const avatar of avatars.slice(0,CASTLE_MAX_RESIDENTS)){const walker=walkers.find(w=>w.avatar.avatarId===avatar.avatarId);if(walker){const appearance=avatar.appearance||legacyCastleAppearance(avatar.preset);if(JSON.stringify(walker.model.appearance)!==JSON.stringify(appearance))walker.model.applyAppearance(appearance);walker.avatar=avatar;}else createResident(avatar);}
@@ -288,6 +289,6 @@ export function buildCastleWorld() {
     streams.forEach((stream, i) => { stream.scale.x = stream.scale.z = .03 + Math.sin(elapsed * 5 + i) * .004; });
   }
   function night(value: boolean) { glowMat.emissive.setHex(value ? 0xffc563 : 0x000000); glowMat.emissiveIntensity = value ? .9 : 0; seaMaterial.color.setHex(value ? 0x255d70 : 0x62bfb9); }
-  function dispose() { walkers.forEach(walker=>walker.model.dispose());ambient.dispose();geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
+  function dispose() { walkers.forEach(walker=>walker.model.dispose());avatarResources.dispose();ambient.dispose();geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); }
   return { group: world, places, ambient, walkers, setPresence, updateResidents, update, night, dispose, get residentCount(){return walkers.length;}, obstacleBounds };
 }

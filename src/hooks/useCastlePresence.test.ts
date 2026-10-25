@@ -38,9 +38,10 @@ describe('account-driven scoped castle presence', () => {
         await flush();
         expect(view.result.current.view.status).toBe('joined');
         const calls = network.fetch.mock.calls;
-        expect(calls[0][0]).toContain('/profile');
-        expect(JSON.parse(calls[1][1].body)).toEqual({});
-        expect(calls[1][1].headers['X-Castle-Protocol']).toBe('2');
+        expect(calls[0][0]).toContain('/join');
+        expect(calls.some(([url]) => url.endsWith('/profile'))).toBe(false);
+        expect(JSON.parse(calls[0][1].body)).toEqual({});
+        expect(calls[0][1].headers['X-Castle-Protocol']).toBe('2');
         view.unmount();
         expect(network.fetch.mock.calls.some(([url, init]) => url.endsWith('/leave') && init.headers['X-Castle-Lease'] === 'x'.repeat(43) && init.keepalive)).toBe(true);
     });
@@ -51,7 +52,7 @@ describe('account-driven scoped castle presence', () => {
         await flush();
         view.rerender({ scope: null });
         await flush();
-        await act(async () => decode(profile));
+        await act(async () => decode(joined));
         expect(view.result.current.view.roster).toBeNull();
         expect(view.result.current.view.scope).toBeNull();
         expect(network.fetch).toHaveBeenCalledTimes(1);

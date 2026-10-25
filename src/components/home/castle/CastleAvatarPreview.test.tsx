@@ -63,3 +63,32 @@ it('does not substitute a fake successful 3D preview when WebGL is unsupported',
     expect(screen.getByRole('status').textContent).toContain('目前無法顯示3D預覽');
     expect(screen.getByRole('button', { name: '重新顯示預覽' })).toBeTruthy();
 });
+
+it('allows vertical touch scrolling and browser pinch while only horizontal single-touch drags rotate the preview', () => {
+    vi.stubGlobal('PointerEvent', class extends MouseEvent {
+        pointerType: string;
+        pointerId: number;
+        constructor(type: string, init: PointerEventInit = {}) {
+            super(type, init);
+            this.pointerType = init.pointerType || 'touch';
+            this.pointerId = init.pointerId || 1;
+        }
+    });
+    render(<CastleAvatarPreview appearance={castleAppearance(defaultCastleProfile())}/>);
+    const canvas = screen.getByLabelText('自己的玩偶造型預覽，可拖曳轉身') as HTMLCanvasElement;
+    expect(canvas.style.touchAction).toBe('pan-y pinch-zoom');
+    const down = new PointerEvent('pointerdown', { pointerType: 'touch', pointerId: 1, clientX: 100, clientY: 100, bubbles: true, cancelable: true });
+    fireEvent(canvas, down);
+    expect(down.defaultPrevented).toBe(false);
+    const before = gpu.render.mock.calls.length;
+    fireEvent.pointerMove(canvas, { pointerType: 'touch', pointerId: 1, clientX: 101, clientY: 140 });
+    expect(gpu.render.mock.calls.length).toBe(before);
+    fireEvent.pointerMove(canvas, { pointerType: 'touch', pointerId: 1, clientX: 140, clientY: 141 });
+    expect(gpu.render.mock.calls.length).toBeGreaterThan(before);
+    fireEvent.pointerDown(canvas, { pointerType: 'touch', pointerId: 2, clientX: 180, clientY: 140 });
+    const pair = gpu.render.mock.calls.length;
+    fireEvent.pointerMove(canvas, { pointerType: 'touch', pointerId: 1, clientX: 170, clientY: 141 });
+    expect(gpu.render.mock.calls.length).toBe(pair);
+    fireEvent.pointerCancel(canvas, { pointerType: 'touch', pointerId: 1 });
+    fireEvent.pointerCancel(canvas, { pointerType: 'touch', pointerId: 2 });
+});

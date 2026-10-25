@@ -68,3 +68,47 @@ it('applies an account look in place while preserving the same articulated walke
  const world=buildCastleWorld(),appearance={genderPresentation:'neutral' as const,skinTone:'warm' as const,hairStyle:'short' as const,hairColor:'brown' as const,outfit:'casual' as const,outfitColor:'jade' as const},avatar={avatarId:'look',alias:'A',preset:'jade' as const,isSelf:true,appearance,motion:{sequence:1,path:[[0,15] as [number,number],[0,10.5] as [number,number]],startedAt:1000,durationMs:3000}};
  world.setPresence([avatar],1000,0);world.updateResidents(1000,false);const walker=world.walkers[0],group=walker.group,phase=walker.phase,ambient=world.ambient.snapshot();world.setPresence([{...avatar,alias:'新名字',appearance:{...appearance,outfit:'skirt',hairStyle:'long'}}],1500,500);world.updateResidents(500,false);expect(world.walkers[0]).toBe(walker);expect(walker.group).toBe(group);expect(walker.phase).toBe(phase);expect(walker.group.position.z).toBeCloseTo(14.25);expect(world.ambient.snapshot()).toEqual(ambient);world.dispose();
 });
+
+it('shares four avatar geometries and a finite immutable palette across 32 people and disposes only after world ownership ends', () => {
+    const world = buildCastleWorld(), appearance = { genderPresentation: 'neutral' as const, skinTone: 'warm' as const, hairStyle: 'short' as const, hairColor: 'brown' as const, outfit: 'casual' as const, outfitColor: 'jade' as const };
+    const avatars = Array.from({ length: 32 }, (_, i) => ({ avatarId: `person-${i}`, alias: `同行${i}`, preset: 'jade' as const, isSelf: i === 0, appearance, motion: { sequence: 0, path: [[0, 15] as [
+                    number,
+                    number
+                ]], startedAt: 1000, durationMs: 0 } }));
+    const geometry = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
+    const collect = () => world.walkers.forEach(w => w.group.traverse(node => {
+        if (node instanceof THREE.Mesh) {
+            geometry.add(node.geometry);
+            (Array.isArray(node.material) ? node.material : [node.material]).forEach(m => materials.add(m));
+        }
+    }));
+    world.setPresence(avatars, 1000, 0);
+    collect();
+    expect(world.walkers).toHaveLength(32);
+    expect(geometry.size).toBe(4);
+    const fixed = [...geometry].map(g => vi.spyOn(g, 'dispose')), last = world.walkers[31], first = world.walkers[0].group;
+    const beforeColors = new Map<THREE.Material, string>();
+    last.group.traverse(node => {
+        if (node instanceof THREE.Mesh) {
+            const m = node.material as THREE.MeshStandardMaterial;
+            beforeColors.set(m, m.color.getHexString());
+        }
+    });
+    for (let i = 0; i < 24; i++) {
+        const changed = { ...appearance, skinTone: (['light', 'warm', 'tan', 'deep'] as const)[i % 4], hairColor: (['black', 'brown', 'chestnut', 'silver'] as const)[i % 4], outfitColor: (['jade', 'coral', 'sunshine', 'blue', 'ivory', 'violet'] as const)[i % 6], outfit: (['casual', 'jacket', 'skirt'] as const)[i % 3] };
+        world.setPresence([{ ...avatars[0], appearance: changed }, ...avatars.slice(1)], 1000, 0);
+        collect();
+    }
+    expect(world.walkers[0].group).toBe(first);
+    expect(geometry.size).toBe(4);
+    expect(materials.size).toBeLessThanOrEqual(17);
+    for (const [m, color] of beforeColors)
+        expect((m as THREE.MeshStandardMaterial).color.getHexString()).toBe(color);
+    world.setPresence(avatars.slice(1), 1000, 0);
+    expect(world.walkers[30]).toBe(last);
+    expect(fixed.every(s => !s.mock.calls.length)).toBe(true);
+    const disposeMaterials = [...materials].map(m => vi.spyOn(m, 'dispose'));
+    world.dispose();
+    expect(fixed.every(s => s.mock.calls.length === 1)).toBe(true);
+    expect(disposeMaterials.every(s => s.mock.calls.length === 1)).toBe(true);
+});

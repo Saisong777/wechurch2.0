@@ -158,3 +158,32 @@ it('lets only the wardrobe own Escape and returns focus to My look while the wor
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:'not connected'}),{status:503})));
  show({signedIn:true,presenceScope:'account/church'});fireEvent.click(await screen.findByRole('button',{name:'點場景小貓'}));expect(screen.getByTestId('scene-insets').getAttribute('data-bubble-enabled')).toBe('true');const trigger=screen.getByRole('button',{name:'我的造型'});fireEvent.click(trigger);const dialog=await screen.findByRole('dialog',{name:'我的造型'});expect(screen.getByTestId('scene-insets').getAttribute('data-bubble-enabled')).toBe('false');fireEvent.keyDown(dialog,{key:'Escape'});await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());expect(document.activeElement).toBe(trigger);expect(screen.getByTestId('scene-insets').getAttribute('data-bubble-enabled')).toBe('true');
 });
+
+it('observes the actual portrait entry and reserves its wrapped height plus bottom safe space', async () => {
+    vi.stubGlobal('innerWidth', 320);
+    vi.stubGlobal('innerHeight', 568);
+    let entryHeight = 44, notify = () => {
+    };
+    const observe = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+        constructor(callback: ResizeObserverCallback) {
+            notify = () => callback([], this as unknown as ResizeObserver);
+        }
+        observe = observe;
+        disconnect() {
+        }
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const entry = this.classList.contains('castle-mobile-entry'), height = entry ? entryHeight : 0, top = entry ? 568 - 20 - height : 0;
+        return { x: 0, y: top, top, left: 0, right: 296, width: entry ? 296 : 0, height, bottom: top + height, toJSON: () => ({}) } as DOMRect;
+    });
+    show();
+    await screen.findByTestId('scene-insets');
+    const entry = screen.getByRole('link', { name: '登入加入' }).parentElement;
+    expect(observe).toHaveBeenCalledWith(entry);
+    const insets = () => JSON.parse(screen.getByTestId('scene-insets').dataset.insets || '{}');
+    expect(insets().bottom).toBe(76);
+    entryHeight = 94;
+    act(() => notify());
+    expect(insets().bottom).toBe(126);
+});

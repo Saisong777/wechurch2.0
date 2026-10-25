@@ -708,3 +708,11 @@ CPU 驗證涵蓋實際 mesh 點選及遮擋、各物種關節、路線停步與�
 X-Castle-Protocol: 2 才提供六個外觀欄位；無 header／版本 1 保留原五欄 strict avatar。舊 alias/preset join 不能覆蓋已保存造型；新 join 空物件由伺服器讀帳號資料。舊名冊仍可由新畫面轉為預設造型。原 32 人、4 lease／帳號、25 秒 TTL、路網與權威位置維持；新增模型有固定幾何／材質與 dispose，並非零成本，也不把單人 <450 mesh 檢查宣稱為 32 人容量實測。
 
 本次包含新資料表，原 code-only 發布證明不足：B 必須先依同版備份模型驗追加 migration、app role 的 SELECT/INSERT/CAS UPDATE 權限與舊表保護，再由主責依新 migration 發布流程及真 B 畫面驗收；作者 source/CPU 檢查不替代這些證據。
+
+#### v15 審查後收斂
+
+自動入場直接送出空物件 join，由伺服器依帳號讀取造型；不再先做一次丟棄結果的 profile GET。伺服器的交易內與 COMMIT 後身分重驗維持，驗證成功後才 patch presence，不能為了讓已失效登入看見造型而提前發布。世界的所有真人共用一個 owned pool（4 個 geometry、17 個固定 palette material）；換裝只換不可變材質引用及可見 mesh。移除一人不 dispose 共用資源，世界結束才釋放一次；衣櫥預覽獨立持有自己的 pool。32 人 CPU 資源有上限，仍不等於手機 FPS 實測。
+
+手機預覽的 OrbitControls 原生 touch 處理在觸控期間停用，canvas 明確允許 pan-y / pinch-zoom；僅單指橫拖以同一相機轉身，上下滑動交給瀏覽器捲動，雙指不搶手勢。所有 listener 隨預覽卸載清理。互斥造型改原生 radio + 44px label、fieldset/legend 與 checked 語意，使用原生方向鍵切換。
+
+PUT 進行時取消、X、Escape 與外點都先等待，顯示保存中說明；帳號／權限 scope 變化仍能由上層關閉並 abort。profile 請求有 20 秒期限，逾時終止本地等待，保留選項、明說結果未確認，允許重新載入協調已 commit 但未收到的結果；不自動重送。portrait 的底部標籤保護改按實際 entry 高度／距視窗底部與安全間距量測，ResizeObserver 包含 entry；短窄畫面允許控制列換行，原短橫向 drawer 規則不變。

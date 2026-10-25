@@ -97,13 +97,15 @@ export function CastleHome({ churchName, preview, featureEnabled, featuresLoadin
       const sideFriends=small&&window.innerWidth>window.innerHeight&&panel==='friends';
       const measuredCompact=compact.current?.getBoundingClientRect().height||0;
       if(!speaking&&!panel&&!portrait&&measuredCompact>0)visibleCompactHeight.current=measuredCompact;
-      const next = { top, right: sideFriends&&bounds?Math.max(0,window.innerWidth-bounds.left)+10:portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: sideFriends?0:small ? panel && bounds ? bounds.height + 20 : portrait?76:visibleCompactHeight.current + 20 : 0 };
+      const entryBounds=mobileEntry.current?.getBoundingClientRect();
+      const entryBottom=entryBounds&&entryBounds.height>0?Math.ceil(window.innerHeight-entryBounds.top+12):76;
+      const next = { top, right: sideFriends&&bounds?Math.max(0,window.innerWidth-bounds.left)+10:portrait?64:!small && panel && bounds ? bounds.width + 28 : 0, bottom: sideFriends?0:small ? panel && bounds ? bounds.height + 20 : portrait?entryBottom:visibleCompactHeight.current + 20 : 0 };
       setInsets(old => old.top === next.top && old.right === next.right && old.bottom === next.bottom ? old : next);
       const occupied=[topbar.current,noticeArea.current,compact.current,friendButton.current,mobileEntry.current].flatMap(node=>{if(!node)return [];const rect=node.getBoundingClientRect();return rect.width>0&&rect.height>0?[{left:rect.left,top:rect.top,width:rect.width,height:rect.height}]:[];});
       setHudObstacles(old=>JSON.stringify(old)===JSON.stringify(occupied)?old:occupied);
     };
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    [topbar.current, mailbox.current, drawer.current, compact.current, noticeArea.current].forEach(node => node && observer?.observe(node));
+    [topbar.current, mailbox.current, drawer.current, compact.current, noticeArea.current, mobileEntry.current].forEach(node => node && observer?.observe(node));
     const chromeObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(measure) : null;
     chromeObserver?.observe(document.getElementById('root') || document.body, { childList: true, subtree: true, characterData: true });
     window.addEventListener('resize', measure); measure();
