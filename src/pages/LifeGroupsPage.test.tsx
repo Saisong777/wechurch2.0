@@ -66,3 +66,12 @@ it('shows both equal leaders in the member workspace without labeling a deputy',
   expect(await screen.findByText('小家長：領袖甲、領袖乙')).toBeVisible();
   expect(screen.queryByText(/副小家長|主要小家長/)).toBeNull();
 });
+
+it('opens a real group response composer on an older browser exposing only secure getRandomValues', async () => {
+    const secure = crypto.getRandomValues.bind(crypto), entropy = vi.fn((bytes: Uint8Array) => secure(bytes));
+    vi.stubGlobal('crypto', { getRandomValues: entropy });
+    show('note');
+    fireEvent.click(await screen.findByRole('button', { name: '寫下留言' }));
+    expect(await screen.findByRole('textbox', { name: '寫下留言' })).toBeTruthy();
+    expect(entropy).toHaveBeenCalled();
+});

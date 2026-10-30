@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { ChurchPageBoundary } from '@/contexts/ChurchContext';
 import { useState } from 'react';
@@ -96,7 +97,7 @@ function ContactRow({ contact: c, care, locked, onRecord, edit, archive, visit }
   function record(open: boolean) { setRecording(open); onRecord(open); }
   return <li className="py-4" data-testid={`care-contact-${c.id}`}>
     <button className="flex min-h-11 w-full min-w-0 items-center gap-3 text-left" aria-expanded={expanded} aria-controls={`care-detail-${c.id}`} disabled={recording} onClick={() => setExpanded(!expanded)}><span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">{Array.from(c.name)[0]}</span><span className="min-w-0 flex-1"><span className="block font-semibold">{c.name}<span className="ml-2 text-xs font-normal text-muted-foreground">{c.relationship}</span></span><span className="mt-1 block truncate text-sm text-muted-foreground">{c.need || c.nextAction || '尚未填寫近況'}</span></span>{expanded ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}</button>
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className={`text-xs ${c.nextCareDate && c.nextCareDate < today ? 'text-destructive' : 'text-muted-foreground'}`}>{c.isArchived ? '已封存' : c.nextCareDate ? `${c.nextCareDate < today ? '提醒已到期' : c.nextCareDate === today ? '今天提醒' : '提醒我關心'} · ${c.nextCareDate}` : c.lastCaredAt ? `上次關心 ${time(c.lastCaredAt)}` : '尚未聯絡'}</p>{!c.isArchived && <div className="flex gap-1"><Button variant="ghost" className="min-h-11 gap-1 px-2 text-sm" disabled={locked || recording || care.isRecording} onClick={() => care.recordAction({ id: crypto.randomUUID(), contactId: c.id, actionType: 'prayer' }, { onSuccess: () => toast.success('已記下代禱'), onError: () => toast.error('尚未儲存成功，請重試') })}><Heart className="h-4 w-4" />代禱{c.prayerCount > 0 ? ` ${c.prayerCount}` : ''}</Button><Button variant="outline" className="min-h-11 gap-1 px-3 text-sm" disabled={locked || recording} onClick={() => { setExpanded(true); record(true); }}><Pencil className="h-4 w-4" />記錄關心</Button></div>}</div>
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className={`text-xs ${c.nextCareDate && c.nextCareDate < today ? 'text-destructive' : 'text-muted-foreground'}`}>{c.isArchived ? '已封存' : c.nextCareDate ? `${c.nextCareDate < today ? '提醒已到期' : c.nextCareDate === today ? '今天提醒' : '提醒我關心'} · ${c.nextCareDate}` : c.lastCaredAt ? `上次關心 ${time(c.lastCaredAt)}` : '尚未聯絡'}</p>{!c.isArchived && <div className="flex gap-1"><Button variant="ghost" className="min-h-11 gap-1 px-2 text-sm" disabled={locked || recording || care.isRecording} onClick={() => care.recordAction({ id: secureRandomUUID(), contactId: c.id, actionType: 'prayer' }, { onSuccess: () => toast.success('已記下代禱'), onError: () => toast.error('尚未儲存成功，請重試') })}><Heart className="h-4 w-4" />代禱{c.prayerCount > 0 ? ` ${c.prayerCount}` : ''}</Button><Button variant="outline" className="min-h-11 gap-1 px-3 text-sm" disabled={locked || recording} onClick={() => { setExpanded(true); record(true); }}><Pencil className="h-4 w-4" />記錄關心</Button></div>}</div>
     <div id={`care-detail-${c.id}`} hidden={!expanded} className="mt-4 space-y-4 border-t pt-4">
       {recording && <>
         {latestNote && <div className="border-l-2 border-primary/30 pl-3"><p className="text-xs text-muted-foreground">上次記下 · {time(latestNote.createdAt)}</p><p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-7">{latestNote.note}</p></div>}
@@ -115,7 +116,7 @@ export function CareRecord({ contact, care, close }: { contact: CareContact; car
   const [note, setNote] = useState(''), [error, setError] = useState(''), [confirm, setConfirm] = useState(false);
   const [initialDate] = useState(contact.nextCareDate || '');
   const [date, setDate] = useState(initialDate);
-  const [id] = useState(() => crypto.randomUUID());
+  const [id] = useState(() => secureRandomUUID());
   const dirty = !!note || date !== initialDate || actionType !== 'care';
   return <form className="space-y-4 border-y py-5" aria-label={`記錄${contact.name}的關心`} onSubmit={e => {
     e.preventDefault();

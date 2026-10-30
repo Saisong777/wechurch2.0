@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import React, { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -222,7 +223,7 @@ export const DownloadRecordsDialog: React.FC<DownloadRecordsDialogProps> = ({
 
       const payload = { recipients: emailRecipients, subject: emailSubject, body: emailBody, isHtml: true, attachments: attachmentData.length > 0 ? attachmentData : undefined };
       const serialized = JSON.stringify(payload);
-      if (sendRequest.current?.payload !== serialized) sendRequest.current = { payload: serialized, id: crypto.randomUUID() };
+      if (sendRequest.current?.payload !== serialized) sendRequest.current = { payload: serialized, id: secureRandomUUID() };
       const input = bulkEmailInput.safeParse({ ...payload, requestId: sendRequest.current!.id });
       if (!input.success) throw new Error('請檢查主旨、收件人與附件格式');
       const response = await fetch('/api/send-bulk-email', {

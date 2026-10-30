@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useRef,useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -54,7 +55,7 @@ function MentoringClosures(){
 }
 
 function MentoringComposer({journeyId,cancel,done}:{journeyId:string;cancel:()=>void;done:(id:string)=>void}){
-  const q=useMentoring<MentoringTarget[]>('/targets');const cache=useQueryClient();const operation=useRef(crypto.randomUUID());
+  const q=useMentoring<MentoringTarget[]>('/targets');const cache=useQueryClient();const operation=useRef(secureRandomUUID());
   const [target,setTarget]=useState(''),[cadence,setCadence]=useState('14'),[agreement,setAgreement]=useState('');
   const [consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const dirty=!!(target||agreement||consent);
@@ -75,7 +76,7 @@ function MentoringComposer({journeyId,cancel,done}:{journeyId:string;cancel:()=>
 function MentoringDetailPanel({id,back}:{id:string;back:()=>void}){
   const q=useMentoring<MentoringDetail>(`/contracts/${id}`);const cache=useQueryClient();
   const [body,setBody]=useState(''),[kind,setKind]=useState('reflection'),[consent,setConsent]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  const operation=useRef(crypto.randomUUID());
+  const operation=useRef(secureRandomUUID());
   async function act(path:string,method:string,data:unknown,after?:()=>void){setBusy(true);setError('');try{await request(path,method,data);after?.();await cache.invalidateQueries({queryKey:[base]});await cache.invalidateQueries({queryKey:['/api/me/love-journey']});}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   const backButton=<Button disabled={busy} variant="ghost" onClick={()=>{if(!body||window.confirm('放棄尚未送出的回應？')){flushSync(()=>setBody(''));back();}}}><ArrowLeft className="mr-2 h-4 w-4"/>陪伴列表</Button>;
   if(q.isError)return <div className="space-y-4">{backButton}<p role="alert">{q.error.message}</p><Button onClick={()=>void q.refetch()} variant="outline">重新載入</Button></div>;
@@ -86,7 +87,7 @@ function MentoringDetailPanel({id,back}:{id:string;back:()=>void}){
     {c.status==='pending'&&!c.isLearner&&<div className="space-y-3"><label className="flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" disabled={busy} className="mt-1 h-5 w-5 shrink-0" checked={consent} onChange={e=>setConsent(e.target.checked)}/>我接受以上陪伴約定。只查看本課程進度與學員明確分享給我的回答，不取得其他私人資料。</label><div className="flex flex-wrap gap-3"><Button disabled={busy||!consent} onClick={()=>void act(`/contracts/${id}`,'PATCH',{version:c.version,action:'accept',consent:true})}>接受陪伴</Button><Button variant="outline" disabled={busy} onClick={()=>{if(window.confirm('確定不接受這次邀請？'))void act(`/contracts/${id}`,'PATCH',{version:c.version,action:'decline',consent:true},back);}}>婉拒邀請</Button></div></div>}
     {c.status==='active'&&<><h3 className="font-semibold">學習進度與分享</h3><ul className="divide-y">{q.data.progress.map(d=><li key={d.id} className="space-y-2 py-3"><p>第 {d.dayNumber} 天 · {d.title} <span className="text-sm text-muted-foreground">{d.status==='completed'?'已完成':d.status==='skipped'?'略過':d.status==='not_started'?'尚未開始':'進行中'}</span></p>{d.responseText!==null?<p className="whitespace-pre-wrap leading-7">{d.responseText}</p>:<p className="text-sm text-muted-foreground">未分享回答</p>}</li>)}</ul></>}
     {!!q.data.feedback.length&&<><h3 className="font-semibold">實作與回饋</h3><ol className="divide-y">{q.data.feedback.map(f=><li key={f.id} className="space-y-2 py-3"><p className="text-sm text-muted-foreground">{f.authorName} · {({reflection:'學習回應',practice:'實作紀錄',feedback:'陪伴回饋'})[f.kind]} · {new Date(f.createdAt).toLocaleString('zh-TW')}</p><p className="whitespace-pre-wrap leading-7">{f.body}</p></li>)}</ol>{q.data.hasOlderFeedback&&<p>目前顯示最近 200 則回饋。</p>}</>}
-    {c.status==='active'&&<form className="space-y-3 border-t pt-4" onSubmit={e=>{e.preventDefault();if(busy)return;const submitted=body;void act(`/contracts/${id}/feedback/${operation.current}`,'PUT',{version:c.version,kind:c.isLearner?kind:'feedback',body},()=>{setBody(current=>current===submitted?'':current);operation.current=crypto.randomUUID();});}}>{c.isLearner&&<label className="block space-y-2 text-sm"><span>回應類型</span><select disabled={busy} className={selectClass} value={kind} onChange={e=>setKind(e.target.value)}><option value="reflection">學習回應</option><option value="practice">實作紀錄</option></select></label>}<label className="block space-y-2 text-sm"><span>給對方的回應</span><Textarea disabled={busy} required maxLength={5000} rows={5} value={body} onChange={e=>setBody(e.target.value)}/></label><Button type="submit" disabled={busy||!body.trim()}><Send className="mr-2 h-4 w-4"/>送出回應</Button></form>}
+    {c.status==='active'&&<form className="space-y-3 border-t pt-4" onSubmit={e=>{e.preventDefault();if(busy)return;const submitted=body;void act(`/contracts/${id}/feedback/${operation.current}`,'PUT',{version:c.version,kind:c.isLearner?kind:'feedback',body},()=>{setBody(current=>current===submitted?'':current);operation.current=secureRandomUUID();});}}>{c.isLearner&&<label className="block space-y-2 text-sm"><span>回應類型</span><select disabled={busy} className={selectClass} value={kind} onChange={e=>setKind(e.target.value)}><option value="reflection">學習回應</option><option value="practice">實作紀錄</option></select></label>}<label className="block space-y-2 text-sm"><span>給對方的回應</span><Textarea disabled={busy} required maxLength={5000} rows={5} value={body} onChange={e=>setBody(e.target.value)}/></label><Button type="submit" disabled={busy||!body.trim()}><Send className="mr-2 h-4 w-4"/>送出回應</Button></form>}
     {(c.status==='active'||(c.isLearner&&c.status==='pending'))&&<Button variant="outline" disabled={busy} onClick={()=>{if(body&& !window.confirm('尚有未送出的回應，確定放棄並繼續結束陪伴？'))return;if(window.confirm('結束後對方將無法存取本陪伴關係，已分享的回答會收回私人；日後邀請新陪伴者需重新分享。確定結束？'))void act(`/contracts/${id}`,'PATCH',{version:c.version,action:'end',consent:true},()=>{flushSync(()=>setBody(''));if(!c.isLearner)back();});}}>{c.status==='pending'?'取消邀請':'結束陪伴或準備交接'}</Button>}
     {error&&<p role="alert" className="text-destructive">{error}</p>}
   </section>;

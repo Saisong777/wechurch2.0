@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { useChurchContext,useChurchScopeKey } from '@/contexts/ChurchContext';
 import { churchDisplayName } from '@shared/churches';
 import { churchFetch as fetch } from '@/lib/churchFetch';
@@ -65,7 +66,7 @@ export function DevotionWallShareDialog({draft,close,allowGroup=false}:{draft:De
         const input={sourceId:draft.sourceId,title,body,reference,consent,
           ...(groupSelected?{group:{groupId}}:{}),...(isWall?{wall:{day:window.data!.day,anonymous}}:{})};
         // Retry the exact reviewed operation; changing content/destinations gets a new ID.
-        const key=JSON.stringify([initialScope.current,input]);const mutationId=mutationIds.current[key] ??= crypto.randomUUID();
+        const key=JSON.stringify([initialScope.current,input]);const mutationId=mutationIds.current[key] ??= secureRandomUUID();
         await devotionWallApi(`/shares/${mutationId}`,'PUT',input);
         if(currentActor.current!==initialActor.current || !scopeMatches)return;
         // A failed cache refresh is not a failed publication.

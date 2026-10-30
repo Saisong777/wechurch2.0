@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -82,7 +83,7 @@ function Editor({ actor, scope, groupId, groupName, date, entry, close, initial,
     if (sending.current || needsRebase || !currentScope() || (!draft.attempt && (!preview || !consent || !canPreview))) return;
     const parsed = readingReflectionInput.safeParse({ devotionVersion: entry.version, noteId: draft.noteId, noteVersion: draft.noteVersion, observation: draft.observation, receiving: draft.receiving, response: draft.response, shareFields: draft.shareFields, markRead: draft.markRead, consent: true });
     if (!draft.attempt && !parsed.success) { setError(parsed.error.issues[0]?.message || '請核對筆記內容。'); return; }
-    const attempt = draft.attempt || { id: crypto.randomUUID(), input: parsed.data! };
+    const attempt = draft.attempt || { id: secureRandomUUID(), input: parsed.data! };
     if (attempt.conflict) return;
     sending.current = true; setBusy(true); setError('');
     setDraft(previous => ({ ...previous, attempt }));

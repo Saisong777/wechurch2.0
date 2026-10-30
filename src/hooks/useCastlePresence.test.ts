@@ -133,3 +133,21 @@ describe('account-driven scoped castle presence', () => {
         expect(network.fetch.mock.calls.some(([url]) => url.endsWith('/leave'))).toBe(false);
     });
 });
+
+it('sends a secure v4 movement command on a browser without randomUUID', async () => {
+    const getRandomValues = crypto.getRandomValues.bind(crypto);
+    vi.stubGlobal('crypto', { getRandomValues });
+    try {
+        const view = renderHook(() => useCastlePresence('member/church'));
+        await flush();
+        act(() => view.result.current.move(2));
+        await act(async () => vi.advanceTimersByTimeAsync(1501));
+        const move = network.fetch.mock.calls.find(([url]) => url.endsWith('/move'));
+        expect(move).toBeTruthy();
+        expect(move![1].headers['X-Castle-Command-ID']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        expect(JSON.parse(move![1].body)).toEqual({ targetNode: 2 });
+    }
+    finally {
+        vi.unstubAllGlobals();
+    }
+});

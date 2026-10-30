@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +13,7 @@ export function FamilyComments({ groupId, shareId, actor, manager, count, target
 }) {
   const [composing, setComposing] = useState(false);
   const [body, setBody] = useState('');
-  const [mutationId, setMutationId] = useState(() => crypto.randomUUID());
+  const [mutationId, setMutationId] = useState(() => secureRandomUUID());
   const [visibleCount, setVisibleCount] = useState(3);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -85,13 +86,13 @@ export function FamilyComments({ groupId, shareId, actor, manager, count, target
       locked.current = true; setBusy(true); setError('');
       try {
         await familyRequest(`${path}/${mutationId}`, 'PUT', { body });
-        input.current?.blur(); setBody(''); setSubmittedId(mutationId); setMutationId(crypto.randomUUID());
+        input.current?.blur(); setBody(''); setSubmittedId(mutationId); setMutationId(secureRandomUUID());
         await client.invalidateQueries({ queryKey: [familyBase] });
       } catch (e) { setError((e as Error).message); }
       finally { locked.current = false; setBusy(false); }
     }}>
       <label className="block space-y-2 text-sm"><span>寫下留言</span><Textarea ref={input} required rows={2} maxLength={4000} disabled={busy} value={body} onChange={e => setBody(e.target.value)} /></label>
-      <div className="flex flex-wrap items-center gap-2"><Button disabled={busy || !body.trim()}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}送出留言</Button><Button type="button" variant="ghost" disabled={busy} onClick={() => { if (!body.trim() || window.confirm('放棄尚未送出的留言？')) { setBody(''); setMutationId(crypto.randomUUID()); setError(''); setComposing(false); } }}>取消</Button></div>
+      <div className="flex flex-wrap items-center gap-2"><Button disabled={busy || !body.trim()}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}送出留言</Button><Button type="button" variant="ghost" disabled={busy} onClick={() => { if (!body.trim() || window.confirm('放棄尚未送出的留言？')) { setBody(''); setMutationId(secureRandomUUID()); setError(''); setComposing(false); } }}>取消</Button></div>
     </form>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
   </section>;

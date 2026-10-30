@@ -1,3 +1,4 @@
+import { withRequestTimeout, throwIfRequestAborted } from '@/lib/requestTimeout';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChurchContext, useChurchScopeKey } from '@/contexts/ChurchContext';
@@ -11,17 +12,21 @@ export const loginSummaryKey = '/api/me/church-login-summary';
 export const loginInboxKey = '/api/admin/church-login-inbox';
 
 export async function churchOnboardingRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const timeout = AbortSignal.timeout(15000);
-  const response = await churchFetch(path, {
-    credentials: 'include', cache: 'no-store', ...init,
-    signal: init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
+  return withRequestTimeout(init?.signal, async signal => {
+    const response = await churchFetch(path, {
+      credentials: 'include', cache: 'no-store', ...init, signal,
+    });
+    throwIfRequestAborted(signal);
+    if (!response.ok) {
+      let message = '';
+      try { const body = await response.json(); message = typeof body.error === 'string' ? body.error : ''; } catch { /* Keep the bounded fallback. */ }
+      throwIfRequestAborted(signal);
+      throw new Error(message || (response.status === 409 ? '資料已更新，請重新載入後確認。' : '暫時無法確認資料，請重試。'));
+    }
+    const body = await response.json();
+    throwIfRequestAborted(signal);
+    return body as T;
   });
-  if (!response.ok) {
-    let message = '';
-    try { const body = await response.json(); message = typeof body.error === 'string' ? body.error : ''; } catch { /* Keep the bounded fallback. */ }
-    throw new Error(message || (response.status === 409 ? '資料已更新，請重新載入後確認。' : '暫時無法確認資料，請重試。'));
-  }
-  return response.json();
 }
 
 export function useChurchOnboarding() {

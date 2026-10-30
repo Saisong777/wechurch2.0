@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { apiRequest, ApiError } from './queryClient';
 import { LocalDevotionalNote, removeLocalDevotionalNote, upsertLocalDevotionalNote } from './localDevotionalNotes';
 
@@ -7,7 +8,7 @@ export async function saveDevotionalNote(userId: string, input: LocalDevotionalN
   if (!userId || (input.userId && input.userId !== userId)) throw new Error('請重新登入後再儲存');
   const draft: LocalDevotionalNote = {
     ...input, userId, syncStatus: 'pending',
-    clientMutationId: input.clientMutationId || crypto.randomUUID(),
+    clientMutationId: input.clientMutationId || secureRandomUUID(),
   };
   // Save a recoverable, account-scoped draft before attempting a network write.
   upsertLocalDevotionalNote(draft, userId);

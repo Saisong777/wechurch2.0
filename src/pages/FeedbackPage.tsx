@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import {useCastleContentPresentation} from '@/contexts/CastleContentPresentationContext';
 import {Mail,Lightbulb,Wrench,MessageCircle,Leaf,Clock3,ShieldCheck,ArrowRight,CheckCircle2} from 'lucide-react';
 import './feedback-corner.css';
@@ -96,7 +97,7 @@ export default function FeedbackPage() {
   const update = (patch: Partial<Draft>) => { if (!draft.locked) { setReceipt(null); setDraft(d => ({ ...d, ...patch })); } };
   const submit = async () => {
     if (!user || busy || cooldown > 0 || scopeBlocked || !draft.consent || !validLength) return;
-    const requestId = draft.requestId || crypto.randomUUID();
+    const requestId = draft.requestId || secureRandomUUID();
     const payload = { ...draft, title: draft.title.trim(), body: draft.body.trim(), requestId, consent: true as const };
     // Persist the exact attempt before sending. A lost response is retried with this ID.
     const locked = { ...payload, locked: true }; setDraft(locked); setBusy(true); setError(''); setLoginRequired(false);

@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChurchContext } from '@/contexts/ChurchContext';
@@ -42,9 +43,9 @@ export function FirstChurchChoice() {
     if (!name || choose.isPending) return;
     const submittingActor = user.id;
     const churchId = none ? null : selected;
-    if (!attempt.current || attempt.current.churchId !== churchId) attempt.current = {churchId, requestId: crypto.randomUUID()};
     setMessage('');
     try {
+      if (!attempt.current || attempt.current.churchId !== churchId) attempt.current = {churchId, requestId: secureRandomUUID()};
       await choose.mutateAsync(attempt.current);
       if (actor.current !== submittingActor) return;
       const refreshedActor = await refreshAuth();

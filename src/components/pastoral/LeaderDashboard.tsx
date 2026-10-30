@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { UnsavedChangesGuard } from '@/components/layout/UnsavedChangesGuard';
 import { useEffect, useState } from 'react';
@@ -112,7 +113,7 @@ function GatheringsList({groups,scope,page,setPage,edit}:{groups:DashboardGroup[
 }
 function AttendanceEditor({group,id,close,saved}:{group:DashboardGroup;id?:string;close:()=>void;saved:()=>Promise<void>}) {
   const [meetingId,setMeetingId]=useState(id);
-  const [createId]=useState(()=>crypto.randomUUID());
+  const [createId]=useState(()=>secureRandomUUID());
   const detail=useDashboard<GatheringDetail>(`/${group.id}/gatherings/${meetingId}`,!!meetingId);
   const [date,setDate]=useState(taipeiToday());
   const roster=useDashboard<{key:string;name:string}[]>(`/${group.id}/roster?date=${date}`,!meetingId&&!!date);

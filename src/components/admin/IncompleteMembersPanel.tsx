@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -105,7 +106,7 @@ export const IncompleteMembersPanel = ({ church = 'all' }: { church?: string }) 
       };
 
       const requestKey = JSON.stringify([member.email, member.name, member.type]);
-      if (!notificationRequests.current.has(requestKey)) notificationRequests.current.set(requestKey, crypto.randomUUID());
+      if (!notificationRequests.current.has(requestKey)) notificationRequests.current.set(requestKey, secureRandomUUID());
       const response = await fetch('/api/send-profile-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

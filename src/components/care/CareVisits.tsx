@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -35,7 +36,7 @@ export function VisitReminder({ always = false }: { always?: boolean }) {
 export function VisitComposer({ contact, close }: { contact?: CareContact; close: () => void }) {
   const [name, setName] = useState(contact?.name || ''), [reason, setReason] = useState(''), [method, setMethod] = useState(''), [urgency, setUrgency] = useState('normal');
   const [consent, setConsent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirm, setConfirm] = useState(false);
-  const id = useRef(crypto.randomUUID()), client = useQueryClient();
+  const id = useRef(secureRandomUUID()), client = useQueryClient();
   const q = useVisitQuery<{ available: boolean }>('/summary');
   const dirty = name !== (contact?.name || '') || !!reason || !!method || consent || urgency !== 'normal';
   function change(setter: (s: string) => void, value: string) { setter(value); setConsent(false); }

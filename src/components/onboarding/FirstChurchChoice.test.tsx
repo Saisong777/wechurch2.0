@@ -124,3 +124,39 @@ it('does not apply the recovered manual retry to a different account',async()=>{
   show();fireEvent.change(await screen.findByRole('combobox'),{target:{value:'火樂'}});fireEvent.click(screen.getByRole('button',{name:'繼續確認'}));fireEvent.click(screen.getByRole('button',{name:'確認教會'}));await screen.findByText('教會選擇狀態暫時無法確認。');
   allowRecovery=true;auth.refreshAuth.mockResolvedValue({id:'other-member'});fireEvent.click(screen.getByRole('button',{name:'重新確認選擇資格'}));await waitFor(()=>expect(auth.refreshAuth).toHaveBeenCalledTimes(1));expect(context.refreshChurch).not.toHaveBeenCalled();
 });
+
+it('confirms and safely replays the same choice without randomUUID, AbortSignal.any or timeout', async () => {
+    const secure = crypto.getRandomValues.bind(crypto), entropy = vi.fn((bytes: Uint8Array) => secure(bytes));
+    vi.stubGlobal('crypto', { getRandomValues: entropy });
+    class LegacySignal extends AbortSignal {
+    }
+    Object.defineProperties(LegacySignal, { any: { value: undefined }, timeout: { value: undefined } });
+    vi.stubGlobal('AbortSignal', LegacySignal);
+    failPost = true;
+    show();
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: '火樂' } });
+    fireEvent.click(screen.getByRole('button', { name: '繼續確認' }));
+    fireEvent.click(screen.getByRole('button', { name: '確認教會' }));
+    await screen.findByText('網路暫時無法確認');
+    await waitFor(() => expect(screen.getByRole('button', { name: '確認教會' })).toBeEnabled());
+    failPost = false;
+    fireEvent.click(screen.getByRole('button', { name: '確認教會' }));
+    await waitFor(() => expect(context.refreshChurch).toHaveBeenCalledTimes(1));
+    const writes = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'POST').map(([, init]) => JSON.parse(init!.body as string));
+    expect(writes).toHaveLength(2);
+    expect(writes[0]).toEqual(writes[1]);
+    expect(writes[0].requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(entropy).toHaveBeenCalledTimes(1);
+    expect(auth.refreshAuth).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('combobox')).toBeNull();
+});
+it('shows an honest error and never writes if secure randomness itself is unavailable', async () => {
+    vi.stubGlobal('crypto', {});
+    show();
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: '火樂' } });
+    fireEvent.click(screen.getByRole('button', { name: '繼續確認' }));
+    fireEvent.click(screen.getByRole('button', { name: '確認教會' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('無法安全建立');
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+    expect(auth.refreshAuth).not.toHaveBeenCalled();
+});

@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { useState, useMemo, useRef } from 'react';
 import { getKnownChurchOptions, normalizeChurch } from '@shared/churches';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -123,7 +124,7 @@ export const AdminMailComposer: React.FC<AdminMailComposerProps> = ({ onBack }) 
         ...(attachmentData.length > 0 ? { attachments: attachmentData } : {}),
       };
       const serialized = JSON.stringify(payload);
-      if (sendRequest.current?.payload !== serialized) sendRequest.current = { payload: serialized, id: crypto.randomUUID() };
+      if (sendRequest.current?.payload !== serialized) sendRequest.current = { payload: serialized, id: secureRandomUUID() };
       const res = await apiRequest('POST', '/api/send-bulk-email', { ...payload, requestId: sendRequest.current!.id });
       return res.json();
     },

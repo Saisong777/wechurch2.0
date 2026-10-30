@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
@@ -62,7 +63,7 @@ export function SupportPanel({ mode }: { mode: 'personal' | 'work' }) {
 function SupportComposer({ cancel, done }: { cancel: () => void; done: (id: string) => void }) {
   const targets = useSupport<SupportTarget[]>('/targets');
   const client = useQueryClient();
-  const operation = useRef(crypto.randomUUID());
+  const operation = useRef(secureRandomUUID());
   const [title, setTitle] = useState(''), [body, setBody] = useState(''), [target, setTarget] = useState('');
   const [consent, setConsent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const dirty = !!(title || body);
@@ -94,7 +95,7 @@ function SupportDetail({ id, back }: { id: string; back: () => void }) {
   const [reply, setReply] = useState(''), [privateNote, setPrivateNote] = useState(false), [nextAction, setNextAction] = useState<string>(), [date, setDate] = useState<string>();
   const [status, setStatus] = useState<SupportStatus>('accepted'), [target, setTarget] = useState(''), [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const replyId = useRef(crypto.randomUUID());
+  const replyId = useRef(secureRandomUUID());
   const dirty = !!reply || nextAction !== undefined || date !== undefined || !!target;
   async function act(path: string, method: string, body: unknown, after?: () => void) {
     setBusy(true); setError('');
@@ -113,7 +114,7 @@ function SupportDetail({ id, back }: { id: string; back: () => void }) {
     <h3 className="font-semibold">跟進紀錄</h3>{q.data.hasOlderEvents && <p className="text-sm text-muted-foreground">顯示最近 500 則紀錄。</p>}
     {!q.data.events.length && <p className="text-muted-foreground">尚未有回覆。</p>}
     <ol className="divide-y">{q.data.events.map(e => <li key={e.id} className="space-y-2 py-4"><p className="text-sm text-muted-foreground">{e.authorName} · {new Date(e.createdAt).toLocaleString('zh-TW')}{e.private && ' · 僅自己可見'}</p><p className="whitespace-pre-wrap leading-7">{e.body}</p></li>)}</ol>
-    {r.status !== 'cancelled' && <form className="space-y-3 border-t pt-5" onSubmit={e => { e.preventDefault(); void act(`/requests/${id}/replies/${replyId.current}`, 'PUT', { version: r.version, body: reply, private: privateNote }, () => { setReply(''); replyId.current = crypto.randomUUID(); }); }}><Field label="回覆"><Textarea required maxLength={10000} rows={4} value={reply} onChange={e => setReply(e.target.value)} /></Field><label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5" checked={privateNote} onChange={e => setPrivateNote(e.target.checked)} />僅自己備註，不傳給對方</label><Button disabled={busy || !reply.trim()} type="submit"><Send className="mr-2 h-4 w-4" />{privateNote ? '儲存私人備註' : '傳送回覆'}</Button></form>}
+    {r.status !== 'cancelled' && <form className="space-y-3 border-t pt-5" onSubmit={e => { e.preventDefault(); void act(`/requests/${id}/replies/${replyId.current}`, 'PUT', { version: r.version, body: reply, private: privateNote }, () => { setReply(''); replyId.current = secureRandomUUID(); }); }}><Field label="回覆"><Textarea required maxLength={10000} rows={4} value={reply} onChange={e => setReply(e.target.value)} /></Field><label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5" checked={privateNote} onChange={e => setPrivateNote(e.target.checked)} />僅自己備註，不傳給對方</label><Button disabled={busy || !reply.trim()} type="submit"><Send className="mr-2 h-4 w-4" />{privateNote ? '儲存私人備註' : '傳送回覆'}</Button></form>}
     {!!options.length && <form className="space-y-3 border-t pt-5" onSubmit={e => { e.preventDefault(); if (selectedStatus) void act(`/requests/${id}`, 'PATCH', { version: r.version, status: selectedStatus, nextAction: nextAction ?? r.nextAction, dueDate: (date ?? r.dueDate) || null }, () => { setNextAction(undefined); setDate(undefined); }); }}><Field label="更新狀態"><select className={selectClass} value={selectedStatus} onChange={e => setStatus(e.target.value as SupportStatus)}>{options.map(s => <option key={s} value={s}>{supportStatusLabels[s]}</option>)}</select></Field>{!r.isSender && <><Field label="下一步或退回原因"><Textarea maxLength={1000} value={nextAction ?? r.nextAction ?? ''} onChange={e => setNextAction(e.target.value)} /></Field><Field label="預定跟進日期"><Input type="date" value={date ?? r.dueDate ?? ''} onChange={e => setDate(e.target.value)} /></Field></>}<Button type="submit" disabled={busy}>確認更新</Button></form>}
     {r.isSender && <details className="border-t pt-5"><summary className="min-h-11 cursor-pointer font-medium">更換陪伴者</summary><div className="space-y-3 pt-3"><TargetPicker targets={targets.data || []} value={target} change={setTarget} /><label className="flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={consent} onChange={e => setConsent(e.target.checked)} />我同意將事項與雙方公開回覆交給新陪伴者。原陪伴者將無法繼續存取；私人備註不轉交。</label><Button disabled={busy || !selectedTarget || !consent} onClick={() => { if (selectedTarget) { const { kind, id: targetId, receiverId } = selectedTarget; void act(`/requests/${id}/transfer`, 'POST', { version: r.version, target: { kind, id: targetId, receiverId }, consent }, () => { setTarget(''); setConsent(false); }); } }}>確認轉交</Button></div></details>}
     {error && <div role="alert" className="space-y-2 text-destructive"><p>{error}</p><Button variant="outline" onClick={() => void q.refetch()}>載入最新狀態，保留輸入</Button></div>}

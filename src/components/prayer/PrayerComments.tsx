@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Send, Trash2, HandHeart, HeartHandshake, Sun, Loader2, Check } from 'lucide-react';
@@ -43,7 +44,7 @@ export function PrayerComments({prayerId,count=0,anonymousOwner=false,readOnly=f
     const input = {content:kind === 'sticker' ? '' : content.trim(),kind,...(kind === 'sticker' ? {sticker} : {})};
     const signature = JSON.stringify(input);
     // Reuse the receipt key after a network failure, but not after editing the draft.
-    if (request.current?.signature !== signature) request.current = {signature,id:crypto.randomUUID()};
+    if (request.current?.signature !== signature) request.current = {signature,id:secureRandomUUID()};
     try { await create.mutateAsync({prayerId,...input,requestId:request.current.id}); if (kind !== 'sticker') setContent(''); request.current = undefined; }
     catch { /* Keep the draft and receipt key for an explicit retry. */ }
   }

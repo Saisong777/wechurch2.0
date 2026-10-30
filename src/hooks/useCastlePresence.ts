@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { churchFetch } from '@/lib/churchFetch';
 import { castleCompatibleJoinSchema, castleCompatibleRosterSchema, type CastleRosterV2 } from '@shared/castlePresence';
@@ -239,7 +240,7 @@ export function useCastlePresence(scope: string | null) {
             lastMove = performance.now();
             const own = generation;
             try {
-                accept(await request('/move', 'POST', { targetNode: target }, lease, crypto.randomUUID()));
+                accept(await request('/move', 'POST', { targetNode: target }, lease, secureRandomUUID()));
             }
             catch (error) {
                 if (own === generation) {

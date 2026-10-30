@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -54,7 +55,7 @@ function GrantEditor({data,member,initial,close,done}:{data:Snapshot;member:Memb
  const [permissions,setPermissions]=useState<Permission[]>(initial?.permissions || []);
  const [expiry,setExpiry]=useState(initial?.expiresAt?new Date(initial.expiresAt).toLocaleDateString('sv-SE'): '');
  const [reason,setReason]=useState(initial?.reason || '');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
- const [requestId]=useState(()=>crypto.randomUUID());
+ const [requestId]=useState(()=>secureRandomUUID());
  const allowed=permissionKeys.filter(p=>scope!=='site' && (!globalPermissions.includes(p) || scope==='church') && (p!=='visits.manage' || scope==='church') && (p!=='groups.manage'||scope!=='member'));
  return <form className="space-y-4 border-y py-5" aria-label="編輯成員授權" onSubmit={async e=>{e.preventDefault();if(busy)return;
    if(!window.confirm(`確認${initial?'更新':'授予'}「${member.name}」的${data.roles.find(r=>r.id===roleId)?.name}職分與 ${permissions.length} 項權限？`))return;

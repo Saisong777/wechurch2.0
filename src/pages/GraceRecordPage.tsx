@@ -1,3 +1,4 @@
+import { secureRandomUUID } from '@/lib/secureRandomUUID';
 import { churchFetch as fetch } from '@/lib/churchFetch';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -49,7 +50,7 @@ function PersonalPrayerPage() {
   const handleAdd = async () => {
     if (save.isPending || (!title.trim() && !prayer.trim())) return;
     if (graceView && (!title.trim() || !prayer.trim() || !occurredOn)) return;
-    createId.current ||= crypto.randomUUID();
+    createId.current ||= secureRandomUUID();
     try {
       await save.mutateAsync({ id: createId.current, create: true, input: {
         title: title.trim() || '今天的禱告', prayer: prayer.trim(), status: graceView ? 'answered' : 'waiting', response: '', responseType: graceView ? 'grace' : null,

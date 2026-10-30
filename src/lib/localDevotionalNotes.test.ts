@@ -113,3 +113,15 @@ describe('dated devotional notes', () => {
     expect(payload).not.toHaveProperty('devotionalDate');
   });
 });
+
+it('keeps secure fallback save receipts stable across offline retries without randomUUID', async () => {
+    const secure = crypto.getRandomValues.bind(crypto), entropy = vi.fn((bytes: Uint8Array) => secure(bytes));
+    vi.stubGlobal('crypto', { getRandomValues: entropy });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+    const first = await saveDevotionalNote('alice', makeNote()), second = await saveDevotionalNote('alice', first.note);
+    expect(first.note.clientMutationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(second.note.clientMutationId).toBe(first.note.clientMutationId);
+    expect(entropy).toHaveBeenCalledOnce();
+    expect(second.status).toBe('pending');
+    expect(loadLocalDevotionalNotes('bob')).toEqual([]);
+});
